@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nvidia-version-check
+spec:
+  restartPolicy: OnFailure
+  containers:
+  - name: nvidia-version-check
+    image: nvidia/cuda:11.7.1-base-ubuntu20.04
+    command: ["nvidia-smi"]
+    resources:
+      limits:
+         nvidia.com/gpu: "1"
