@@ -17,6 +17,10 @@ The Goal of Network Operator is to manage all networking related components to e
 ### Supported Operating Systems
 Currently, Oracle Linux 7 with the Red Hat Compatible Kernel (RHCK) is supported. We are working on adding support for Oracle Linux 8, Ubuntu 20 and Ubuntu 22.
 
+### Required policies
+The Terraform deployment template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE. Follow the imstructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm) to create a Dynamic Group and a Policy for Self-Managed Nodes.
+
+
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 
 You will need at least 2 worker pools. You will also need to use the correct OS images.
