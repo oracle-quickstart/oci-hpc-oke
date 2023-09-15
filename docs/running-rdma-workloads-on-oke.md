@@ -2,6 +2,8 @@
 
 This guide has the instructions for deploying an OKE cluster using A100 bare metal nodes with RDMA connectivity using the [GPU Operator](https://github.com/NVIDIA/gpu-operator) and [Network Operator](https://github.com/Mellanox/network-operator).
 
+Currently, creating SR-IOV Virtual Functions is supported in our Phoenix (PHX) and Osaka (KIX) regions.
+
 ### What is NVIDIA GPU Operator?
 Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin framework. However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which are difficult and prone to errors. The NVIDIA GPU Operator uses the operator framework within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling, DCGM based monitoring and others.
 
@@ -42,6 +44,8 @@ You can find the template in the [terraform directory](../terraform/rdma/).
 
 Make sure to update the image IDs in the `worker pools` blocks.
 
+You can find more information on setting up Terraform for OCI [here](https://docs.oracle.com/en-us/iaas/developer-tutorials/tutorials/tf-provider/01-summary.htm).
+
 ### Wait until you see all nodes in the cluster
 
 ```sh
@@ -59,7 +63,7 @@ NAME           STATUS     ROLES    AGE     VERSION
 Deploying this daemonset is important. When a new node joins to the OKE cluster, it will report itself as ready. However, the RDMA network configuration of the nodes usually takes longer than the node joining the cluster. The health check daemonset checks the status of the RDMA interfaces, and removes the `oci.oraclecloud.com/oci-rdma-health-check` that is being added via cloud init.
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/OguzPastirmaci/oke-rdma/main/oci-rdma-health-check-ds.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oci-rdma-health-check-ds.yaml
 ```
 
 ### Build the GPU Operator driver container image for Oracle Linux
@@ -116,15 +120,31 @@ helm install --wait \
 
 Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
 
+### Deploy SR-IOV CNI
+```
+kubectl apply -f https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml
+```
+
+### Deploy RDMA CNI
+```
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni/master/deployment/rdma-cni-daemonset.yaml
+```
+
 ### Check that the Virtual Functions (VFs) are correctly exposed
 Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
 
 By default, we create one Virtual Function per Physical Function. So for the A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
 
+You can run the following command to see all allocatable resources of a node:
+
+```
+kubectl get node <node name> -o json | jq '.status.allocatable'
+```
+
 ### Create Network Attachment Definition
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/OguzPastirmaci/oke-rdma/main/network-attachment-definition.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
 ```
 
 ### Deploy MPI Operator
