@@ -44,9 +44,7 @@ helm install --wait \
   --set operator.defaultRuntime=crio \
   --set driver.repository=<The repository that you pushed your image> \
   --set driver.version=<The driver version in your pushed image. Only the version, don't add ol7.9 at the end> \
-  --set toolkit.version=v1.13.5-centos7 \
-  --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
+  --set toolkit.version=v1.13.5-centos7
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
