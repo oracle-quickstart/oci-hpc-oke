@@ -13,6 +13,7 @@ You can find the template in the [terraform directory](../terraform/non-rdma/).
 
 Make sure to update the image IDs in the `worker pools` blocks.
 
+The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
 
 ### Build the GPU driver container image
 For deploying the GPU Operator to your cluster, you will need to build a GPU driver container image for Oracle Linux. Follow the instructions [here](building-ol7-gpu-operator-driver-image.md). After you built the GPU driver container image, continue with the instructions below.
