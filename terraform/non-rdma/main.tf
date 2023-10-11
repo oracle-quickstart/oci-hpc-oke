@@ -40,7 +40,7 @@ module "oke" {
 
   worker_pools = {
    system = {
-     description = "CPU pool", enabled = true, disable_default_cloud_init=true, image_type = "custom", image_id = "",
+     description = "CPU pool", enabled = true, image_type = "custom", image_id = "",
      mode        = "instance-pool", boot_volume_size = 150, shape = "VM.Standard.E3.Flex", ocpus = 8, memory = 128, size = 1,
     }
 
