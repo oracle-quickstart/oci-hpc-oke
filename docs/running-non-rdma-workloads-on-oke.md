@@ -13,6 +13,7 @@ You can find the template in the [terraform directory](../terraform/non-rdma/).
 
 Make sure to update the image IDs in the `worker pools` blocks.
 
+The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
 
 ### Build the GPU driver container image
 For deploying the GPU Operator to your cluster, you will need to build a GPU driver container image for Oracle Linux. Follow the instructions [here](building-ol7-gpu-operator-driver-image.md). After you built the GPU driver container image, continue with the instructions below.
@@ -43,9 +44,7 @@ helm install --wait \
   --set operator.defaultRuntime=crio \
   --set driver.repository=<The repository that you pushed your image> \
   --set driver.version=<The driver version in your pushed image. Only the version, don't add ol7.9 at the end> \
-  --set toolkit.version=v1.13.5-centos7 \
-  --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
+  --set toolkit.version=v1.13.5-centos7
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.

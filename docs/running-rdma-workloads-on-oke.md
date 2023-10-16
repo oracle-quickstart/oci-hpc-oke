@@ -46,6 +46,8 @@ Make sure to update the image IDs in the `worker pools` blocks.
 
 You can find more information on setting up Terraform for OCI [here](https://docs.oracle.com/en-us/iaas/developer-tutorials/tutorials/tf-provider/01-summary.htm).
 
+The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
+
 ### Wait until you see all nodes in the cluster
 
 ```sh
