@@ -93,6 +93,7 @@ spec:
               numVF=$(lspci | grep 'Virtual Function' | wc -l)
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_true="${authTrue}" --overwrite
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_false="${authFalse}" --overwrite
+              kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_sriov_vf="${numVF}" --overwrite
               authAll="false"
               if ((authTrue > 0)) && ((authFalse == 0)) && ((numVF == 16)); then authAll="true" && kubectl taint nodes ${NODE_NAME} oci.oraclecloud.com/oci-rdma-health-check:NoSchedule-; fi
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_all="${authAll}" --overwrite
