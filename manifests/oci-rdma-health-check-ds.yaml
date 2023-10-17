@@ -90,10 +90,11 @@ spec:
             while true; do
               authTrue=$(oci-cn-auth -i | grep "authenticated: True" | wc -l)
               authFalse=$(oci-cn-auth -i | grep "authenticated: False" | wc -l)
+              numVF=$(lspci | grep 'Virtual Function' | wc -l)
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_true="${authTrue}" --overwrite
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_false="${authFalse}" --overwrite
               authAll="false"
-              if ((authTrue > 0)) && ((authFalse == 0)); then authAll="true" && kubectl taint nodes ${NODE_NAME} oci.oraclecloud.com/oci-rdma-health-check:NoSchedule-; fi
+              if ((authTrue > 0)) && ((authFalse == 0)) && ((numVF == 16)); then authAll="true" && kubectl taint nodes ${NODE_NAME} oci.oraclecloud.com/oci-rdma-health-check:NoSchedule-; fi
               kubectl label nodes ${NODE_NAME} oci.oraclecloud.com/oci_cn_auth_all="${authAll}" --overwrite
               sleep 180;
             done
