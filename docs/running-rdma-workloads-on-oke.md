@@ -22,7 +22,6 @@ Currently, Oracle Linux 7 with the Red Hat Compatible Kernel (RHCK) is supported
 ### Required policies
 The Terraform deployment template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE. Follow the imstructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm) to create a Dynamic Group and a Policy for Self-Managed Nodes.
 
-
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 
 You will need at least 2 worker pools. You will also need to use the correct OS images.
@@ -62,7 +61,9 @@ NAME           STATUS     ROLES    AGE     VERSION
 ```
 
 ### Deploy the OCI RDMA Health Check daemonset
-Deploying this daemonset is important. When a new node joins to the OKE cluster, it will report itself as ready. However, the RDMA network configuration of the nodes usually takes longer than the node joining the cluster. The health check daemonset checks the status of the RDMA interfaces, and removes the `oci.oraclecloud.com/oci-rdma-health-check` that is being added via cloud init.
+> [!IMPORTANT]  
+> Deploying this daemonset is important.
+> When a new node joins to the OKE cluster, it will report itself as ready. However, the RDMA network configuration of the nodes usually takes longer than the node joining the cluster. The health check daemonset checks the status of the RDMA interfaces, and removes the `oci.oraclecloud.com/oci-rdma-health-check` that is being added via cloud init.
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oci-rdma-health-check-ds.yaml
