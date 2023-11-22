@@ -8,7 +8,7 @@ variable "ssh_private_key_path" { type = string }
 
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.0.0-beta.6"
+  version = "5.0.2"
 
   # Provider
   providers           = { oci.home = oci.home }
