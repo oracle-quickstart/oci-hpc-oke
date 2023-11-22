@@ -40,11 +40,11 @@ Change the `driver.repository` and `driver.version` in the Helm command below.
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v23.3.2 \
+  --version v23.9.0 \
   --set operator.defaultRuntime=crio \
   --set driver.repository=<The repository that you pushed your image> \
   --set driver.version=<The driver version in your pushed image. Only the version, don't add ol7.9 at the end> \
-  --set toolkit.version=v1.13.5-centos7
+  --set toolkit.version=v1.14.3-centos7
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
