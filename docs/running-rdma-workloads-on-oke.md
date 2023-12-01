@@ -2,7 +2,8 @@
 
 This guide has the instructions for deploying an OKE cluster using A100 bare metal nodes with RDMA connectivity using the [GPU Operator](https://github.com/NVIDIA/gpu-operator) and [Network Operator](https://github.com/Mellanox/network-operator).
 
-Currently, creating SR-IOV Virtual Functions is supported in our Phoenix (PHX) and Osaka (KIX) regions.
+> [!IMPORTANT]  
+> Currently, creating SR-IOV Virtual Functions is supported in limited regions. For A100s, Phoenix (PHX) and Osaka (KIX) regions are supported. For H100, all regions with H100s are supported.
 
 ### What is NVIDIA GPU Operator?
 Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin framework. However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which are difficult and prone to errors. The NVIDIA GPU Operator uses the operator framework within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling, DCGM based monitoring and others.
