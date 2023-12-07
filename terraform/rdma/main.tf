@@ -1,11 +1,3 @@
-variable "config_file_profile" { type = string }
-variable "home_region" { type = string }
-variable "region" { type = string }
-variable "tenancy_id" { type = string }
-variable "compartment_id" { type = string }
-variable "ssh_public_key_path" { type = string }
-variable "ssh_private_key_path" { type = string }
-
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
   version = "5.0.2"
@@ -20,14 +12,21 @@ module "oke" {
   ssh_public_key_path = var.ssh_public_key_path
   ssh_private_key_path = var.ssh_private_key_path
   
-  kubernetes_version = "v1.27.2"
-  cluster_type = "enhanced"
-  cluster_name         = "test-cluster"
+  kubernetes_version = var.kubernetes_version
+  cluster_type = var.cluster_type
+  cluster_name         = var.cluster_name
   bastion_allowed_cidrs = ["0.0.0.0/0"]
   allow_worker_ssh_access     = true
   control_plane_allowed_cidrs = ["0.0.0.0/0"]
+
   control_plane_is_public = true
 
+  sriov_cni_plugin_install       = true
+  sriov_cni_plugin_namespace     = "kube-system"
+  
+  rdma_cni_plugin_install       = true
+  rdma_cni_plugin_namespace     = "kube-system"
+  
   # Resource creation
   assign_dns           = false
   create_vcn           = true
@@ -37,43 +36,48 @@ module "oke" {
   create_iam_resources = false
   use_defined_tags     = false
 
-
   worker_pools = {
-   system = {
-     description = "CPU pool", enabled = true, disable_default_cloud_init=true, image_type = "custom", image_id = "",
-     mode        = "instance-pool", boot_volume_size = 150, shape = "VM.Standard.E3.Flex", ocpus = 8, memory = 128, size = 1,
-     cloud_init = [{ content = "./cloud-init/ol7.sh" }],
+    ubuntu_a100 = {
+      description = "GPU pool", enabled = true,
+      disable_default_cloud_init=true,
+      mode        = "cluster-network",
+      size = 2,
+      shape = var.a100_shape,
+      boot_volume_size = 250,
+      placement_ads = [1],
+      image_type = "custom",
+      image_id = var.ubuntu_a100_image,
+      node_labels = { "oci.oraclecloud.com/disable-gpu-device-plugin" : "true" },
+      cloud_init = [{ content = "./cloud-init/ubuntu_gpu.sh" }],
+      agent_config = {
+       are_all_plugins_disabled = false,
+       is_management_disabled   = false,
+       is_monitoring_disabled   = false,
+       plugins_config = {
+         "Compute HPC RDMA Authentication"     = "ENABLED",
+         "Compute HPC RDMA Auto-Configuration" = "ENABLED",
+         "Compute Instance Monitoring"         = "ENABLED",
+         "Compute Instance Run Command"        = "ENABLED",
+         "Compute RDMA GPU Monitoring"         = "DISABLED",
+         "Custom Logs Monitoring"              = "ENABLED",
+         "Management Agent"                    = "ENABLED",
+         "Oracle Autonomous Linux"             = "DISABLED",
+         "OS Management Service Agent"         = "DISABLED",
+       }
+     },
     }
-
-   a100-rdma = {
-     description = "A100 pool", enabled = true, disable_default_cloud_init=true,
-     mode        = "cluster-network", image_type = "custom", image_id = "", size = 2, shape = "BM.GPU4.8", boot_volume_size = 256, placement_ads = [1],
-     node_labels = { "oci.oraclecloud.com/disable-gpu-device-plugin" : "true" },
-     cloud_init = [{ content = "./cloud-init/ol7_a100.sh" }],
-   }
-  }
-}
-terraform {
-  required_providers {
-    oci = {
-      configuration_aliases = [oci.home]
-      source                = "oracle/oci"
-      version               = ">= 5.4.0"
+    ubuntu-system = {
+      description = "CPU pool", enabled = true,
+      disable_default_cloud_init=true,
+      mode        = "node-pool",
+      boot_volume_size = 150,
+      shape = "VM.Standard.E4.Flex",
+      ocpus = 8,
+      memory = 64,
+      size = 2,
+      image_type = "custom",
+      image_id = var.ubuntu_system_pool_image,
+      cloud_init = [{ content = "./cloud-init/ubuntu_system.sh" }],
     }
   }
-
-  required_version = ">= 1.2.0"
-}
-
-provider "oci" {
-  config_file_profile = var.config_file_profile
-  region              = var.region
-  tenancy_ocid        = var.tenancy_id
-}
-
-provider "oci" {
-  alias               = "home"
-  config_file_profile = var.config_file_profile
-  region              = var.home_region
-  tenancy_ocid        = var.tenancy_id
 }

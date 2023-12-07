@@ -1,5 +1,5 @@
 
-# Running non-RDMA GPU workloads on OKE with the GPU Operator
+# Running RDMA GPU workloads on OKE with the GPU Operator
 
 The deployment uses the [GPU Operator](https://github.com/NVIDIA/gpu-operator) for deploying the GPU driver and other components.
 
