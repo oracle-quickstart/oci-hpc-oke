@@ -82,5 +82,5 @@ NODE            GPUs   RDMA-VFs
 ### Create Network Attachment Definition
 
 ```sh
-kubectl apply -f 
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
 ```
