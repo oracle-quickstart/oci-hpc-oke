@@ -5,8 +5,4 @@ add-apt-repository -y 'deb [trusted=yes] https://objectstorage.us-phoenix-1.orac
 
 apt install -y jq oci-oke-node-all=1.27.2*
 
-# Initialize OKE
-OKE_APISERVER_ENDPOINT=$(curl -sH "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/ | jq -r '.metadata."apiserver_host"')
-OKE_KUBELET_CA_CERT=$(curl -sH "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/ | jq -r '.metadata."cluster_ca_cert"')
-
-oke bootstrap --apiserver-host $OKE_APISERVER_ENDPOINT --ca $OKE_KUBELET_CA_CERT
+oke bootstrap
