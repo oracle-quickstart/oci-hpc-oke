@@ -5,4 +5,4 @@ add-apt-repository -y 'deb [trusted=yes] https://idv4srl8nzr8.objectstorage.us-p
 
 apt install -y oci-oke-node-all=1.27.2*
 
-oke bootstrap --num-vfs 1
+oke bootstrap
