@@ -30,7 +30,7 @@ spec:
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: true
-          privileged: false
+          privileged: true
           readOnlyRootFilesystem: true
           capabilities:
             drop:
