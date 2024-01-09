@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vf-config
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: vf-config
+  template:
+    metadata:
+      labels:
+        app: vf-config
+    spec:
+      priorityClassName: system-node-critical
+      hostNetwork: true
+      tolerations: [{ operator: "Exists" }]
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        node.kubernetes.io/instance-type: BM.GPU.H100.8
+      volumes: [{ name: root, hostPath: { path: "/" } }]
+      containers:
+        - name: vf-config
+          image: oraclelinux:9
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [CAP_SYS_ADMIN]
+          volumeMounts: [{ name: root, mountPath: /host }]
+          resources: {}
+          command:
+            - /usr/bin/bash
+            - -c
+            - |
+              set -e -o pipefail; trap 'exit=1' SIGINT
+              chroot /host /usr/bin/bash -ex <<EOF
+                while true ; do
+                  grep "Fully Configured" /var/log/oracle-cloud-agent/plugins/oci-hpc/oci-hpc-configure/oci-hpc-mlx-configure.log && break
+                  sleep 15 ; continue ;
+                done
+
+                snap stop oracle-cloud-agent || true
+                echo 0 | tee /sys/class/net/rdma*/device/sriov_numvfs || true
+                sleep 30
+                rdma system show
+                oci-vf-config; sleep 2
+                echo 4220 | tee /sys/class/net/rdma*/mtu || true
+                snap start  oracle-cloud-agent || echo "Error restarting" >&2
+                crictl rmp -f "\$(crictl pods | grep sriov-device | awk '{print \$1}' | tail -1)" || true
+              EOF
+              while :; do { [[ $exit ]] && break; }; sleep 1; done # Sleep forever, exit gracefully
