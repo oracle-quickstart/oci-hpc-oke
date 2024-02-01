@@ -14,8 +14,8 @@
       <pci busid="0000:0a:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:0c:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_18" dev="0" speed="200000" port="1" latency="0.000000" guid="0x9a70500003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_19" dev="1" speed="200000" port="2" latency="0.000000" guid="0x9a70500003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_18" dev="0" speed="180000" port="1" latency="0.000000" guid="0x9a70500003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_19" dev="1" speed="180000" port="2" latency="0.000000" guid="0x9a70500003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -34,8 +34,8 @@
       <pci busid="0000:28:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:2a:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_26" dev="2" speed="200000" port="1" latency="0.000000" guid="0x48191e0003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_27" dev="3" speed="200000" port="2" latency="0.000000" guid="0x48191e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_26" dev="2" speed="180000" port="1" latency="0.000000" guid="0x48191e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_27" dev="3" speed="180000" port="2" latency="0.000000" guid="0x48191e0003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -54,8 +54,8 @@
       <pci busid="0000:3f:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:41:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_28" dev="4" speed="200000" port="1" latency="0.000000" guid="0xdcde3b0003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_29" dev="5" speed="200000" port="2" latency="0.000000" guid="0xdcde3b0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_28" dev="4" speed="180000" port="1" latency="0.000000" guid="0xdcde3b0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_29" dev="5" speed="180000" port="2" latency="0.000000" guid="0xdcde3b0003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -74,8 +74,8 @@
       <pci busid="0000:56:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:58:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_30" dev="6" speed="200000" port="1" latency="0.000000" guid="0x2803600003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_31" dev="7" speed="200000" port="2" latency="0.000000" guid="0x2803600003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_30" dev="6" speed="180000" port="1" latency="0.000000" guid="0x2803600003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_31" dev="7" speed="180000" port="2" latency="0.000000" guid="0x2803600003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -96,8 +96,8 @@
       <pci busid="0000:84:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:86:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_32" dev="8" speed="200000" port="1" latency="0.000000" guid="0xc8111e0003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_33" dev="9" speed="200000" port="2" latency="0.000000" guid="0xc8111e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_32" dev="8" speed="180000" port="1" latency="0.000000" guid="0xc8111e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_33" dev="9" speed="180000" port="2" latency="0.000000" guid="0xc8111e0003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -116,8 +116,8 @@
       <pci busid="0000:a3:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:a5:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_20" dev="10" speed="200000" port="1" latency="0.000000" guid="0x8011e0003ae6d94" maxconn="131072" gdr="1"/>
-            <net name="mlx5_21" dev="11" speed="200000" port="2" latency="0.000000" guid="0x8011e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_20" dev="10" speed="180000" port="1" latency="0.000000" guid="0x8011e0003ae6d94" maxconn="131072" gdr="1"/>
+            <net name="mlx5_21" dev="11" speed="180000" port="2" latency="0.000000" guid="0x8011e0003ae6d94" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -136,8 +136,8 @@
       <pci busid="0000:bb:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:bd:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_22" dev="12" speed="200000" port="1" latency="0.000000" guid="0x8011e0003ae6d95" maxconn="131072" gdr="1"/>
-            <net name="mlx5_23" dev="13" speed="200000" port="2" latency="0.000000" guid="0x8011e0003ae6d95" maxconn="131072" gdr="1"/>
+            <net name="mlx5_22" dev="12" speed="180000" port="1" latency="0.000000" guid="0x8011e0003ae6d95" maxconn="131072" gdr="1"/>
+            <net name="mlx5_23" dev="13" speed="180000" port="2" latency="0.000000" guid="0x8011e0003ae6d95" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
@@ -156,8 +156,8 @@
       <pci busid="0000:d3:00.0" class="0x060400" vendor="0x1000" device="0xc030" subsystem_vendor="0x1000" subsystem_device="0x1003" link_speed="32.0 GT/s PCIe" link_width="16">
         <pci busid="0000:d5:00.0" class="0x020000" vendor="0x15b3" device="0x1021" subsystem_vendor="0x15b3" subsystem_device="0x0038" link_speed="32.0 GT/s PCIe" link_width="16">
           <nic>
-            <net name="mlx5_24" dev="14" speed="200000" port="1" latency="0.000000" guid="0x8011e0003ae6d96" maxconn="131072" gdr="1"/>
-            <net name="mlx5_25" dev="15" speed="200000" port="2" latency="0.000000" guid="0x8011e0003ae6d96" maxconn="131072" gdr="1"/>
+            <net name="mlx5_24" dev="14" speed="180000" port="1" latency="0.000000" guid="0x8011e0003ae6d96" maxconn="131072" gdr="1"/>
+            <net name="mlx5_25" dev="15" speed="180000" port="2" latency="0.000000" guid="0x8011e0003ae6d96" maxconn="131072" gdr="1"/>
           </nic>
         </pci>
       </pci>
