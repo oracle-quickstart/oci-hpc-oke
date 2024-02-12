@@ -45,9 +45,9 @@ You can change the `driver.version` in the Helm command below if you need to use
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v23.9.0 \
+  --version v23.9.1 \
   --set operator.defaultRuntime=crio \
-  --set driver.version=535.104.12
+  --set driver.version=535.154.05
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
@@ -58,16 +58,33 @@ Wait until all network operator pods are running with `kubectl get pods -n gpu-o
 helm install --wait \
   -n network-operator --create-namespace \
   network-operator nvidia/network-operator \
-  --version v23.7.0 \
+  --version v23.10.0 \
   --set deployCR=true \
   --set nfd.enabled=false \
   --set rdmaSharedDevicePlugin.deploy=false \
   --set nvPeerDriver.deploy=true \
   --set sriovDevicePlugin.deploy=true \
+  --set secondaryNetwork.ipamPlugin.deploy=false \
+  --set nvIpam.deploy=true \
   --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101a"], "isRdma": [true]}]'
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
+
+### Deploy SR-IOV CNI
+```
+[kubectl apply -f https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml)
+```
+
+### Deploy RDMA CNI
+```
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni/master/deployment/rdma-cni-daemonset.yaml
+```
+
+### Deploy VF Configuration daemonset
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/vf-config.yaml
+```
 
 ### Confirm that the GPUs are VFs are correctly exposed
 ```
@@ -83,4 +100,177 @@ NODE            GPUs   RDMA-VFs
 
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
+```
+
+### Create the IP Pool for Nvidia IPAM
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/ubuntu/manifests/ip-pool.yaml
+```
+
+### Deploy Volcano
+```
+helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
+helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
+```
+### Create the service accounts for Volcano
+```
+kubectl create serviceaccount -n default mpi-worker-view
+kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
+```
+
+### Run the NCCL test
+```
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: nccl-allreduce-job0
+spec:
+  minAvailable: 1
+  schedulerName: volcano
+  plugins:
+    ssh: []
+    svc: []
+  queue: default
+  tasks:
+    - replicas: 1
+      name: mpimaster
+      policies:
+        - event: TaskCompleted
+          action: CompleteJob
+      template:
+        spec:
+          volumes:
+            - name: topo
+              configMap:
+                name: topology-h100
+                items:
+                - key: topo.xml
+                  path: topo.xml
+            - name: root
+              hostPath:
+                path: /
+                type: Directory
+          initContainers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  until [[ "$(kubectl get pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker -o json | jq '.items | length')" != 0 ]]; do
+                    echo "Waiting for MPI worker pods..."
+                    sleep 3
+                  done
+                  echo "Waiting for MPI worker pods to be ready..."
+                  kubectl wait pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker --for=condition=Ready --timeout=600s && sleep 2
+              image: aga.ocir.io/hpc_limited_availability/oke/kubectl:latest
+              name: wait-for-workers
+          serviceAccount: mpi-worker-view
+          terminationGracePeriodSeconds: 2
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+          containers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  MPI_HOST=$(cat /etc/volcano/mpiworker.host | tr "\n" ",")
+                  mkdir -p /var/run/sshd; /usr/sbin/sshd
+                  mpirun --allow-run-as-root \
+                    -mca coll ^hcoll \
+                    -np 24 -npernode 8 --bind-to numa --map-by ppr:8:node \
+                    -hostfile /etc/volcano/mpiworker.host \
+                    -x NCCL_CROSS_NIC=0 \
+                    -x NCCL_SOCKET_NTHREADS=16 \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_QPS_PER_CONNECTION=16 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x NCCL_NET_PLUGIN=none \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x coll_hcoll_enable=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_ALGO=auto \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    -x NCCL_TOPO_FILE=/h100/topo.xml \
+                    -mca coll_hcoll_enable 0 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 8G -c 1; sleep 3600
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              volumeMounts:
+              - { mountPath: /h100, name: topo }
+              - { mountPath: /host, name: root }
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+              name: mpimaster
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /workspace
+              resources:
+                requests:
+                  cpu: 1
+          restartPolicy: OnFailure
+    - replicas: 3
+      minAvailable: 3
+      name: mpiworker
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov
+        spec:
+          containers:
+            - name: mpiworker
+              command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /workspace
+              resources:
+                requests:
+                  nvidia.com/gpu: 8
+                  nvidia.com/sriov_rdma_vf: 16
+                  ephemeral-storage: 1Gi
+                limits:
+                  nvidia.com/gpu: 8
+                  nvidia.com/sriov_rdma_vf: 16
+                  ephemeral-storage: 1Gi
+              volumeMounts:
+              - { mountPath: /h100, name: topo }
+              - mountPath: /dev/shm
+                name: shm
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 15
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+          volumes:
+          - name: topo
+            configMap:
+              name: topology-h100
+              items:
+              - key: topo.xml
+                path: topo.xml
+          - name: root
+            hostPath:
+              path: /
+              type: Directory
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 8Gi
 ```
