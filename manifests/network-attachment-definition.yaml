@@ -17,14 +17,8 @@ spec:
           "name": "sriov-network",
           "spoofchk": "off",
           "ipam": {
-            "type": "whereabouts",
-            "enable_overlapping_ranges": false,
-            "datastore": "kubernetes",
-            "kubernetes": { "kubeconfig": "/etc/cni/net.d/whereabouts.d/whereabouts.kubeconfig" },
-            "range": "192.168.0.0/16",
-            "exclude": [],
-            "log_file": "/var/log/whereabouts.log",
-            "log_level": "info"
+            "type": "nv-ipam",
+            "poolName": "default"
           }
         },
         { "type": "tuning",
