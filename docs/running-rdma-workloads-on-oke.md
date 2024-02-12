@@ -1,3 +1,5 @@
+> [!IMPORTANT]  
+> Ubuntu is not currently officially supported. We are working on adding support.
 
 # Running RDMA GPU workloads on OKE with the GPU Operator
 
