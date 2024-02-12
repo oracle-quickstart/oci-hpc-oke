@@ -6,6 +6,6 @@ Please visit OKE documentation page for more information: https://docs.oracle.co
 
 This repository will focus on two workload types using GPUs: RDMA workloads using OCI's high performance network with support for RDMA (e.g. training jobs) and non-RDMA workloads that don't need to use the RDMA network (e.g. inference jobs).
 
-### [Running RDMA workloads on OKE](./docs/running-rdma-workloads-on-oke.md)
-
-### [Running non-RDMA workloads on OKE](./docs/running-non-rdma-workloads-on-oke.md)
+### Running RDMA workloads on OKE
+[Using Nvidia A100 shapes](./docs/running-rdma-workloads-on-oke-a100.md)
+[Using Nvidia H100 shapes](./docs/running-rdma-workloads-on-oke-h100.md)

@@ -61,18 +61,6 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.81     Ready      node     2d23h   v1.25.6
 ```
 
-### Deploy the OCI RDMA Health Check daemonset
-> [!IMPORTANT]  
-> Deploying this daemonset is important.
-> When a new node joins to the OKE cluster, it will report itself as ready. However, the RDMA network configuration of the nodes usually takes longer than the node joining the cluster. The health check daemonset checks the status of the RDMA interfaces, and removes the `oci.oraclecloud.com/oci-rdma-health-check` that is being added via cloud init.
-
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oci-rdma-health-check-ds.yaml
-```
-
-### Build the GPU Operator driver container image for Oracle Linux
-You can follow the instructions [here](./building-ol7-gpu-operator-driver-image.md) for building the GPU Operator driver container image.
-
 ### Get the latest Helm 3 version
 ```sh
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
@@ -95,11 +83,10 @@ Change the `driver.repository` and `driver.version` in the Helm command below.
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v23.3.2 \
+  --version v23.9.1 \
+  --set driver.enabled=false \
   --set operator.defaultRuntime=crio \
-  --set driver.repository=<The repository that you pushed your image> \
-  --set driver.version=<The driver version in your pushed image. Only the version, don't add ol7.9 at the end> \
-  --set toolkit.version=v1.13.5-centos7 \
+  --set toolkit.version=v1.14.5-ubi8 \
   --set driver.rdma.enabled=true \
   --set driver.rdma.useHostMofed=true
 ```
@@ -113,12 +100,14 @@ Wait until all network operator pods are running with `kubectl get pods -n gpu-o
 helm install --wait \
   -n network-operator --create-namespace \
   network-operator nvidia/network-operator \
-  --version v23.5.0 \
+  --version v23.10.0 \
   --set deployCR=true \
   --set nfd.enabled=false \
   --set rdmaSharedDevicePlugin.deploy=false \
   --set nvPeerDriver.deploy=true \
   --set sriovDevicePlugin.deploy=true \
+  --set secondaryNetwork.ipamPlugin.deploy=false \
+  --set nvIpam.deploy=true \
   --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101a"], "isRdma": [true]}]'
 ```
 
@@ -142,7 +131,12 @@ By default, we create one Virtual Function per Physical Function. So for the A10
 You can run the following command to see all allocatable resources of a node:
 
 ```
-kubectl get node <node name> -o json | jq '.status.allocatable'
+kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov_rdma_vf'
+
+NODE            GPUs   RDMA-VFs
+10.79.148.115   8      16
+10.79.151.167   8      16
+10.79.156.205   8      16
 ```
 
 ### Create Network Attachment Definition
@@ -156,7 +150,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.4.0/deploy/v2beta1/mpi-operator.yaml
 ```
 
-### Run NCCL test
+### Optional - Run NCCL test
 
 Run the test with `kubectl apply -f nccl-test.yaml`.
 
