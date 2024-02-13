@@ -39,7 +39,7 @@ module "oke" {
       ocpus = 16,
       memory = 64,
       size = 3,
-      cloud_init = [{ content = "./cloud-init/ubuntu.sh" }],
+      cloud_init = [{ content = "./cloud-init/ol8.sh" }],
   }
 
    gpu = {
