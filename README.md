@@ -135,21 +135,6 @@ Wait until all network operator pods are running with `kubectl get pods -n netwo
 ```
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/vf-config.yaml
 ```
-
-### Confirm that the GPUs are VFs are correctly exposed
-Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
-
-By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
-
-```
-kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov_rdma_vf'
-
-NODE            GPUs   RDMA-VFs
-10.79.148.115   8      16
-10.79.151.167   8      16
-10.79.156.205   8      16
-```
-
 ### Create Network Attachment Definition
 
 ```sh
@@ -172,6 +157,20 @@ SHAPE=<your GPU shape>
 curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/topology/$SHAPE.xml
 
 kubectl create configmap nccl-topology --from-file ./topo.xml
+```
+
+### Confirm that the GPUs are VFs are correctly exposed
+Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
+
+By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
+
+```
+kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov_rdma_vf'
+
+NODE            GPUs   RDMA-VFs
+10.79.148.115   8      16
+10.79.151.167   8      16
+10.79.156.205   8      16
 ```
 
 ### Requesting the Virtual Functions in manifests
