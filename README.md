@@ -2,7 +2,7 @@
 
 Oracle Cloud Infrastructure Container Engine for Kubernetes (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
 
-Please visit OKE documentation page for more information: https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm
+Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
 
 This guide has the instructions for deploying an OKE cluster using H100 & A100 bare metal nodes with RDMA connectivity using the [GPU Operator](https://github.com/NVIDIA/gpu-operator) and [Network Operator](https://github.com/Mellanox/network-operator).
 
@@ -25,8 +25,8 @@ The Terraform deployment template uses the [Self Managed Nodes](https://docs.ora
 
 You must create the necessary OKE policies:
 
-[Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
-[Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
+- [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
+- [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
 
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 
@@ -39,11 +39,11 @@ For the non-GPU worker pools, you can use the default OKE images (no need to spe
 > [!NOTE]  
 > The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2). Deploying the GPU driver as a container with the GPU Operator is currently not supported.
 
-#### GPU nodes
+#### Image to import and use for the H100 and A100 nodes
 [OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/f6mKO0d_OG7gL4EyE5rvOWObL6LBgQ1XXtpM2H67SYmFHQ-tBwxyg7Wmii94VYc8/n/hpc_limited_availability/b/images/o/OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0)
 
 ### Deploy the cluster using the Terraform template
-You can find the template in the [terraform directory](../terraform).
+You can find the template in the [terraform directory](./terraform/).
 
 Make sure to update the variables in the `worker pools` blocks.
 
