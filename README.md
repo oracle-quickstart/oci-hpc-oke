@@ -143,7 +143,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 
 ### Create the IP Pool for Nvidia IPAM
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/ubuntu/manifests/ip-pool.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/ip-pool.yaml
 ```
 
 ### Create the topology config map
