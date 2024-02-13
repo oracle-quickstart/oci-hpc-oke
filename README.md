@@ -174,7 +174,20 @@ curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hp
 kubectl create configmap nccl-topology --from-file ./topo.xml
 ```
 
-### Optional - Deploy Volcano
+### Requesting the Virtual Functions in manifests
+Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resources. In order to use them, you need to add the following annotation to your manifests. The next step in this guide has an example for running the NCCL test, you can use that manifest as an example.
+
+```yaml
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov
+```
+
+### Optional - Deploy Volcano and run the NCCL test
+Volcano is needed for running the optional NCCL test. It's not required for the regular operation of the cluster, you can remove it after you finish running the NCCL test.
+
+#### Deploy Volcano
 ```sh
 helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
 helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
@@ -183,7 +196,7 @@ kubectl create serviceaccount -n default mpi-worker-view
 kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
 ```
 
-### Optional - Run the NCCL test
+#### Run the NCCL test
 > [!IMPORTANT]  
 > The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest.
 
@@ -198,8 +211,6 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 ```
 
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
-
-
 
 ```sh
 Defaulted container "mpimaster" out of: mpimaster, wait-for-workers (init)
