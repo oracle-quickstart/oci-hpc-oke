@@ -9,8 +9,6 @@ sudo dd iflag=direct if=/dev/oracleoci/oraclevda of=/dev/null count=1
 echo "1" | sudo tee /sys/class/block/`readlink /dev/oracleoci/oraclevda | cut -d'/' -f 2`/device/rescan
 sudo /usr/libexec/oci-growfs -y
 
-timedatectl set-timezone $${worker_timezone}
-
 bash /etc/oke/oke-install.sh \
   --apiserver-endpoint $OKE_APISERVER_ENDPOINT \
   --kubelet-ca-cert $OKE_KUBELET_CA_CERT
