@@ -43,6 +43,9 @@ spec:
               name: wait-for-workers
           serviceAccount: mpi-worker-view
           terminationGracePeriodSeconds: 2
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists          
           containers:
             - command:
                 - /bin/bash
