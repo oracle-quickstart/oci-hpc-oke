@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> Ubuntu is not currently officially supported. We are working on adding support.
+
 # Running RDMA (remote direct memory access) GPU workloads on OKE using GPU Operator and Network Operator
 
 Oracle Cloud Infrastructure Container Engine for Kubernetes (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
@@ -30,17 +33,10 @@ You must create the necessary OKE policies:
 
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 
-You will need a CPU and a GPU pool. The Terraform template deploys an operational/system worker pool (CPU) and a GPU worker pool.
-
-The GPU pool requires you to use an image provided by the Oracle HPC team, you can find the import link below. This image included the OFED drivers and necessary packages configured for RDMA.
-
-For the non-GPU worker pools, you can use the default OKE images (no need to specify them in the Terraform template).
-
-> [!NOTE]  
-> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2). Deploying the GPU driver as a container with the GPU Operator is currently not supported.
+Ubuntu image is work in progress.
 
 #### Image to import and use for the H100 and A100 nodes
-[OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/f6mKO0d_OG7gL4EyE5rvOWObL6LBgQ1XXtpM2H67SYmFHQ-tBwxyg7Wmii94VYc8/n/hpc_limited_availability/b/images/o/OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0)
+Ubuntu image is work in progress.
 
 ### Deploy the cluster using the Terraform template
 You can find the template in the [terraform directory](./terraform/).
@@ -83,9 +79,8 @@ helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
   --version v23.9.1 \
-  --set driver.enabled=false \
   --set operator.defaultRuntime=crio \
-  --set toolkit.version=v1.14.5-ubi8 \
+  --set driver.version=535.154.05  \
   --set driver.rdma.enabled=true \
   --set driver.rdma.useHostMofed=true
 ```

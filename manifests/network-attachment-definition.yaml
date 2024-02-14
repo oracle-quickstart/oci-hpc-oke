@@ -23,6 +23,7 @@ spec:
         },
         { "type": "tuning",
           "sysctl": {
+            "net.core.somaxconn": "65535",
             "net.ipv4.conf.all.arp_announce": "2",
             "net.ipv4.conf.all.arp_filter": "1",
             "net.ipv4.conf.all.arp_ignore": "1",
