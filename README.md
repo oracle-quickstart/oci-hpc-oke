@@ -143,7 +143,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 
 ### Create the IP Pool for Nvidia IPAM
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/ubuntu/manifests/ip-pool.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/ip-pool.yaml
 ```
 
 ### Create the topology ConfigMap
@@ -159,7 +159,7 @@ curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hp
 kubectl create configmap nccl-topology --from-file ./topo.xml
 ```
 
-### Confirm that the GPUs are VFs are correctly exposed
+### Confirm that the GPUs are Virtual Functions (VFs) are correctly exposed
 Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
 
 By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
@@ -173,8 +173,8 @@ NODE            GPUs   RDMA-VFs
 10.79.156.205   8      16
 ```
 
-### Requesting the Virtual Functions in manifests
-Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resources. In order to use them, you need to add the following annotation to your manifests. The next step in this guide has an example for running the NCCL test, you can use that manifest as an example.
+### Requesting VFs in manifests
+Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resources. To use them, you need to add the following annotation to your manifests. The next step in this guide has an example for running the NCCL test, you can use that manifest as an example.
 
 ```yaml
       template:
