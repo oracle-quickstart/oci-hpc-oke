@@ -146,7 +146,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/ip-pool.yaml
 ```
 
-### Create the topology config map
+### Create the topology ConfigMap
 This step creates a ConfigMap that can be used as the NCCL topology file when running your jobs that use NCCL as the backend.
 
 You can find the topology files in the [topology directory](../manifests/topology/) in this repo. Please make sure you use the correct topology file based on your shape when creating the ConfigMap.
@@ -273,3 +273,19 @@ Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0'
 # Avg bus bandwidth    : 66.4834
 #
 ```
+
+## FAQ
+#### Are there any features that are not supported when using self-managed nodes?
+Yes, some features and capabilities are not available, or not yet available, when using self-managed nodes. Please see [this link](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) for a list of features and capabilities that are not available for self-managed nodes.
+
+#### Can I use Ubuntu as the operating system?
+We are working on adding support for Ubuntu, but it is not available today.
+
+#### I don't see my GPU nodes in the OKE page in the console under worker pools
+This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are created by you and joined to the OKe cluster, rather than OKE has created for you.
+
+#### Can I use Multi-Instance GPU (MIG)?
+Yes, you can configure GPU Operator with MIG. Please see the instructions [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html).
+
+#### If I don't need RDMA connectivity between my H100 or A100 nodes, do I still need to follow the instructions in this repo?
+No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console.
