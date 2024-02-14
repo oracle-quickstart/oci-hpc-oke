@@ -289,3 +289,6 @@ Yes, you can configure GPU Operator with MIG. Please see the instructions [here]
 
 #### If I don't need RDMA connectivity between my H100 or A100 nodes, do I still need to follow the instructions in this repo?
 No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console.
+
+#### I'm getting the "Error: 400-InvalidParameter, Shape <GPU BM shape> is incompatible with image"
+Please follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm#configuringimagecapabilities_topic-using_the_console) to add the capability of the shape that you are getting the error to your imported image.
