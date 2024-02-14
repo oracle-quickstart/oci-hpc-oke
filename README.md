@@ -149,7 +149,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 ### Create the topology ConfigMap
 This step creates a ConfigMap that can be used as the NCCL topology file when running your jobs that use NCCL as the backend.
 
-You can find the topology files in the [topology directory](./manifests/topology) in this repo. Please make sure you use the correct topology file based on your shape when creating the ConfigMap.
+You can find the topology files in the [topology directory](https://github.com/oracle-quickstart/oci-hpc-oke/tree/main/manifests/topology) in this repo. Please make sure you use the correct topology file based on your shape when creating the ConfigMap.
 
 ```
 SHAPE=<your GPU shape>
