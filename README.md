@@ -288,7 +288,7 @@ This is expected. Currently, only the worker pools with the `node-pool` mode are
 Yes, you can configure GPU Operator with MIG. Please see the instructions [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html).
 
 #### If I don't need RDMA connectivity between my H100 or A100 nodes, do I still need to follow the instructions in this repo?
-No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console.
+No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console. H100 need to have flannel as a POD networking type and make use of a custom images. We are working on a better experience on H100 without RDMA. 
 
 #### I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error
 Please follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm#configuringimagecapabilities_topic-using_the_console) to add the capability of the shape that you are getting the error to your imported image.
