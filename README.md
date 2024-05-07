@@ -129,6 +129,16 @@ helm install --wait \
   --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101e"], "isRdma": [true]}]'
 ```
 
+### Deploy SR-IOV CNI
+```
+[kubectl apply -f [https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml))
+```
+
+### Deploy RDMA CNI
+```
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni/master/deployment/rdma-cni-daemonset.yaml
+```
+
 Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
 
 ### Deploy the Virtual Function Configuration daemonset
