@@ -131,7 +131,7 @@ helm install --wait \
 
 ### Deploy SR-IOV CNI
 ```
-[kubectl apply -f [https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml))
+kubectl apply -f https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml
 ```
 
 ### Deploy RDMA CNI
