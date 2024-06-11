@@ -1,53 +1,43 @@
-# Running RDMA (remote direct memory access) GPU workloads on OKE using GPU Operator and Network Operator
-
+# Running RDMA (remote direct memory access) GPU workloads on OKE
 Oracle Cloud Infrastructure Container Engine for Kubernetes (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
 
 Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
 
-This guide has the instructions for deploying an OKE cluster using H100 & A100 bare metal nodes with RDMA connectivity using the [GPU Operator](https://github.com/NVIDIA/gpu-operator) and [Network Operator](https://github.com/Mellanox/network-operator).
-
-> [!IMPORTANT]  
-> Currently, creating SR-IOV Virtual Functions is supported in limited regions. For H100, all regions with H100s are supported. For A100s, Phoenix (PHX) and Osaka (KIX) regions are supported. For other regions, please contact your sales representative.
-
-### What is NVIDIA GPU Operator?
-Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin framework. However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which are difficult and prone to errors. The NVIDIA GPU Operator uses the operator framework within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling, DCGM based monitoring and others.
-
-### What is NVIDIA Network Operator?
-NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage Networking related Components in order to enable Fast networking, RDMA and GPUDirect for workloads in a Kubernetes cluster.
-
-The Goal of Network Operator is to manage all networking related components to enable execution of RDMA and GPUDirect RDMA workloads in a kubernetes cluster.
-
 ### Supported Operating Systems
-For the A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8), Oracle Linux 8 with the Red Hat Compatible Kernel (RHCK) is supported.
+For the A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8), Ubuntu 22.04 is supported.
 
 ### Required policies
-The Terraform deployment template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
+The OCI Resource Manager stack template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
 
-You must create the necessary OKE policies:
+Below policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please find more information about the policies below.
 
 - [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
 - [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
 
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
+You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
 
-You will need a CPU and a GPU pool. The Terraform template deploys an operational/system worker pool (CPU) and a GPU worker pool.
-
-The GPU pool requires you to use an image provided by the Oracle HPC team, you can find the import link below. This image included the OFED drivers and necessary packages configured for RDMA.
-
-For the non-GPU worker pools, you can use the default OKE images (no need to specify them in the Terraform template).
+You can use the below image for both CPU and GPU pools.
 
 > [!NOTE]  
-> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2). Deploying the GPU driver as a container with the GPU Operator is currently not supported.
+> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2).
 
 #### Image to import and use for the H100 and A100 nodes
-[OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/f6mKO0d_OG7gL4EyE5rvOWObL6LBgQ1XXtpM2H67SYmFHQ-tBwxyg7Wmii94VYc8/n/hpc_limited_availability/b/images/o/OracleLinux-8-OCA-RHCK-OFED-5.8-3.0.7.0-GPU-535-OKE-2024.02.12-0)
+You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
 
-### Deploy the cluster using the Terraform template
-You can find the template in the [terraform directory](./terraform/).
+[Image to import](https://objectstorage.ca-toronto-1.oraclecloud.com/p/oXC6BcCkB0lXhycxV-0UuDqGGnVtFWfLOkwuJWA5WbsBDb4FkHwnsOHa_ElRcfL2/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.03.15-0)
 
-Make sure to update the variables in the `worker pools` blocks.
+### Deploy the cluster using the Oracle Cloud Resource Manager template
+You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-You can find more information on setting up Terraform for OCI [here](https://docs.oracle.com/en-us/iaas/developer-tutorials/tutorials/tf-provider/01-summary.htm).
+[
+![Deploy to Oracle Cloud]
+(https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)
+]
+(https://cloud.oracle.com/resourcemanager/stacks/create
+?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.6.0/oke-rdma-quickstart-v24.6.0.zip)
+
+For the image ID, use the ID of the image that you imported in the previous step.
 
 The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
 
@@ -64,133 +54,64 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.81     Ready      node     2d23h   v1.25.6
 ```
 
-### Get the latest Helm 3 version
-```sh
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-chmod 700 get_helm.sh
-./get_helm.sh
-```
-
-### Add Helm repos for Network Operator and GPU Operator
-```sh
-helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
-helm repo update
-```
-
-### Deploy GPU Operator
-```
-helm install --wait \
-  -n gpu-operator --create-namespace \
-  gpu-operator nvidia/gpu-operator \
-  --version v23.9.1 \
-  --set driver.enabled=false \
-  --set operator.defaultRuntime=crio \
-  --set toolkit.version=v1.14.5-ubi8 \
-  --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
-```
-
-Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
-
-### Deploy Network Operator
-
-> [!IMPORTANT]  
-> The device name you will use when deploying the Network Operator is different between A100 and H100 shapes. Please make sure that you are running the correct command based on your shape.
-
-#### A100 shapes (BM.GPU.A100-v2.8, BM.GPU4.8)
-```
-helm install --wait \
-  -n network-operator --create-namespace \
-  network-operator nvidia/network-operator \
-  --version v23.10.0 \
-  --set deployCR=true \
-  --set nfd.enabled=false \
-  --set rdmaSharedDevicePlugin.deploy=false \
-  --set nvPeerDriver.deploy=true \
-  --set sriovDevicePlugin.deploy=true \
-  --set secondaryNetwork.ipamPlugin.deploy=false \
-  --set nvIpam.deploy=true \
-  --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101a"], "isRdma": [true]}]'
-```
-
-#### H100 shapes (BM.GPU.H100.8)
-```
-helm install --wait \
-  -n network-operator --create-namespace \
-  network-operator nvidia/network-operator \
-  --version v23.10.0 \
-  --set deployCR=true \
-  --set nfd.enabled=false \
-  --set rdmaSharedDevicePlugin.deploy=false \
-  --set nvPeerDriver.deploy=true \
-  --set sriovDevicePlugin.deploy=true \
-  --set secondaryNetwork.ipamPlugin.deploy=false \
-  --set nvIpam.deploy=true \
-  --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101e"], "isRdma": [true]}]'
-```
-
-### Deploy SR-IOV CNI
-```
-kubectl apply -f https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml
-```
-
-### Deploy RDMA CNI
-```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni/master/deployment/rdma-cni-daemonset.yaml
-```
-
-Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
-
-### Deploy the Virtual Function Configuration daemonset
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/vf-config.yaml
-```
-### Create Network Attachment Definition
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
-```
-
-### Create the IP Pool for Nvidia IPAM
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/ip-pool.yaml
-```
-
-### Create the topology ConfigMap
-This step creates a ConfigMap that can be used as the NCCL topology file when running your jobs that use NCCL as the backend.
-
-You can find the topology files in the [topology directory](https://github.com/oracle-quickstart/oci-hpc-oke/tree/main/manifests/topology) in this repo. Please make sure you use the correct topology file based on your shape when creating the ConfigMap.
-
-```
-SHAPE=<your GPU shape>
-
-curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/topology/$SHAPE.xml
-
-kubectl create configmap nccl-topology --from-file ./topo.xml
-```
-
-### Confirm that the GPUs are Virtual Functions (VFs) are correctly exposed
-Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
-
-By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
-
-```
-kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov_rdma_vf'
-
-NODE            GPUs   RDMA-VFs
-10.79.148.115   8      16
-10.79.151.167   8      16
-10.79.156.205   8      16
-```
-
-### Requesting VFs in manifests
-Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resources. To use them, you need to add the following annotation to your manifests. The next step in this guide has an example for running the NCCL test, you can use that manifest as an example.
+### Using the host RDMA network interfaces in manifests
+In order to use the RDMA interfaces on the host in your pods, you should have the below sections in your manifests:
 
 ```yaml
-      template:
-        metadata:
-          annotations:
-            k8s.v1.cni.cncf.io/networks: oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov
+spec:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  volumes:
+  - { name: devinf, hostPath: { path: /dev/infiniband }}
+  - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+```
+
+```yaml
+securityContext:
+      privileged: true
+      capabilities:
+        add: [ "IPC_LOCK" ]
+```
+```yaml
+    volumeMounts:
+    - { mountPath: /dev/infiniband, name: devinf }
+    - { mountPath: /dev/shm, name: shm }
+```
+Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](../manifests/)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-test-pod-1
+spec:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  volumes:
+  - { name: devinf, hostPath: { path: /dev/infiniband }}
+  - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+  restartPolicy: OnFailure
+  containers:
+  - image: oguzpastirmaci/mofed-perftest:5.4-3.6.8.1-ubuntu20.04-amd64
+    name: mofed-test-ctr
+    securityContext:
+      privileged: true
+      capabilities:
+        add: [ "IPC_LOCK" ]
+    volumeMounts:
+    - { mountPath: /dev/infiniband, name: devinf }
+    - { mountPath: /dev/shm, name: shm }
+    resources:
+      requests:
+        cpu: 8
+        ephemeral-storage: 32Gi
+        memory: 2Gi
+    command:
+    - sh
+    - -c
+    - |
+      ls -l /dev/infiniband /sys/class/net
+      sleep 1000000
 ```
 
 ### Optional - Deploy Volcano and run the NCCL test
@@ -207,16 +128,26 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 
 #### Run the NCCL test
 > [!IMPORTANT]  
-> The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest.
+> The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
 
-##### H100
+##### BM.GPU.H100
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/h100-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.H100.8-nccl-test.yaml
 ```
 
-##### A100
+##### BM.GPU.A100-v2.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/a100-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.A100-v2.8-nccl-test.yaml
+```
+
+##### BM.GPU4.8
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU4.8-nccl-test.yaml
+```
+
+##### BM.GPU.B4.8
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.B4.8-nccl-test.yaml
 ```
 
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
