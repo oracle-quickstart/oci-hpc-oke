@@ -15,7 +15,7 @@ Below policies are required. The OCI Resource Manager stack will create them for
 - [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
 
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
-You will need a CPU and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
+You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
 
 You can use the below image for both CPU and GPU pools.
 
