@@ -51,7 +51,7 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.127.206   Ready      node     2d3h    v1.25.6
 10.0.127.32    Ready      node     2d3h    v1.25.6
 10.0.83.93     Ready      <none>   2d23h   v1.25.6
-10.0.96.81     Ready      node     2d23h   v1.25.6
+10.0.96.82     Ready      node     2d23h   v1.25.6
 ```
 
 ### Using the host RDMA network interfaces in manifests
