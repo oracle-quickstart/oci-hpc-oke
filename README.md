@@ -23,7 +23,7 @@ You can use the below image for both CPU and GPU pools.
 > The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2).
 
 #### Image to import and use for the H100 and A100 nodes
-You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
+You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
 
 [Image to import](https://objectstorage.ca-toronto-1.oraclecloud.com/p/oXC6BcCkB0lXhycxV-0UuDqGGnVtFWfLOkwuJWA5WbsBDb4FkHwnsOHa_ElRcfL2/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.03.15-0)
 
