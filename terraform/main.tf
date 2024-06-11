@@ -1,6 +1,6 @@
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.1.1"
+  version = "5.1.7"
 
   # Provider
   providers           = { oci.home = oci.home }
@@ -39,7 +39,7 @@ module "oke" {
       ocpus = 16,
       memory = 64,
       size = 3,
-      cloud_init = [{ content = "./cloud-init/ol8.sh" }],
+      cloud_init = [{ content = "./cloud-init/ubuntu.sh" }],
   }
 
    gpu = {
@@ -53,7 +53,7 @@ module "oke" {
      image_type = "custom",
      image_id = var.gpu_image,
      node_labels = { "oci.oraclecloud.com/disable-gpu-device-plugin" : "true" },
-     cloud_init = [{ content = "./cloud-init/ol8.sh" }],
+     cloud_init = [{ content = "./cloud-init/ubuntu.sh" }],
      agent_config = {
         are_all_plugins_disabled = false,
         is_management_disabled   = false,
