@@ -69,6 +69,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/mi300x/manifests/amd-smi.yaml
 ```
+After the container finished running, run `kubectl logs amd-version-check`.
 
 ```
 kubectl logs amd-version-check
