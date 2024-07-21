@@ -63,3 +63,46 @@ kubectl taint nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8 nvidia.c
 ### Deploy the AMD GPU device plugin
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/mi300x/manifests/ds-amdgpu-deviceplugin.yaml
+```
+
+### Run the test pod to confirm the GPUs are available
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/mi300x/manifests/amd-smi.yaml
+```
+
+```
+kubectl logs amd-version-check
+
+AMDSMI Tool: 24.5.1+c5106a9 | AMDSMI Library version: 24.5.2.0 | ROCm version: 6.1.2
+GPU: 0
+    BDF: 0000:11:00.0
+    UUID: d4ff74a1-0000-1000-80b1-dbb1e6a69543
+
+GPU: 1
+    BDF: 0000:2f:00.0
+    UUID: ccff74a1-0000-1000-8097-03f9b4bc331b
+
+GPU: 2
+    BDF: 0000:46:00.0
+    UUID: 91ff74a1-0000-1000-80ee-7b68b869c2f7
+
+GPU: 3
+    BDF: 0000:5d:00.0
+    UUID: 55ff74a1-0000-1000-801c-58461786bea3
+
+GPU: 4
+    BDF: 0000:8b:00.0
+    UUID: 43ff74a1-0000-1000-80a6-10e214063eb5
+
+GPU: 5
+    BDF: 0000:aa:00.0
+    UUID: a8ff74a1-0000-1000-80e5-4939c30a8ee2
+
+GPU: 6
+    BDF: 0000:c2:00.0
+    UUID: aeff74a1-0000-1000-80fe-27257d976fb0
+
+GPU: 7
+    BDF: 0000:da:00.0
+    UUID: 99ff74a1-0000-1000-8026-2e7bfcd71f9a
+```
