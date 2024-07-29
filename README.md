@@ -30,7 +30,7 @@ You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.7.0/oke-rdma-quickstart-v24.7.0.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.7.1/oke-rdma-quickstart-v24.7.1.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
@@ -47,6 +47,23 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.127.32    Ready      node     2d3h    v1.25.6
 10.0.83.93     Ready      <none>   2d23h   v1.25.6
 10.0.96.82     Ready      node     2d23h   v1.25.6
+```
+
+### Add a Service Account Authentication Token (optional but recommended)
+More info [here.](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm)
+
+```
+kubectl -n kube-system create serviceaccount kubeconfig-sa
+
+kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
+
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oke-kubeconfig-sa-token.yaml
+
+TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
+
+kubectl config set-credentials kubeconfig-sa --token=$TOKEN
+
+kubectl config set-context --current --user=kubeconfig-sa
 ```
 
 ### Using the host RDMA network interfaces in manifests
