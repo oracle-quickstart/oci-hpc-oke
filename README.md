@@ -49,6 +49,23 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.82     Ready      node     2d23h   v1.25.6
 ```
 
+### Add a Service Account Authentication Token (optional but recommended)
+More info [here.](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm)
+
+```
+kubectl -n kube-system create serviceaccount kubeconfig-sa
+
+kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
+
+kubectl apply -f oke-kubeconfig-sa-token.yaml
+
+TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
+
+kubectl config set-credentials kubeconfig-sa --token=$TOKEN
+
+kubectl config set-context --current --user=kubeconfig-sa
+```
+
 ### Using the host RDMA network interfaces in manifests
 In order to use the RDMA interfaces on the host in your pods, you should have the below sections in your manifests:
 
