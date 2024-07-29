@@ -57,7 +57,7 @@ kubectl -n kube-system create serviceaccount kubeconfig-sa
 
 kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
 
-kubectl apply -f oke-kubeconfig-sa-token.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oke-kubeconfig-sa-token.yaml
 
 TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
 
