@@ -1,0 +1,93 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  annotations:
+  name: rccl-tests-job0
+spec:
+  minAvailable: 0
+  plugins:
+    ssh: []
+    svc: []
+  queue: default
+  schedulerName: volcano
+  tasks:
+  - name: mpimaster
+    policies:
+    - action: CompleteJob
+      event: TaskCompleted
+    replicas: 1
+    template:
+      metadata:
+      spec:
+        containers:
+        - command:
+          - /bin/bash
+          - -c
+          - |
+            sysctl --system
+            mkdir -p /var/run/sshd; /usr/sbin/sshd -p 2222
+            tail -f /dev/null
+          ports:
+          - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+          image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:latest
+          imagePullPolicy: Always
+          name: mpimaster
+          resources:
+            limits:
+              ephemeral-storage: 32Gi
+            requests:
+              cpu: 8
+              ephemeral-storage: 32Gi
+              memory: 2Gi
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [IPC_LOCK, SYS_PTRACE]
+          volumeMounts:
+          - { mountPath: /dev/shm, name: shm }
+          workingDir: /workspace
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        restartPolicy: OnFailure
+        terminationGracePeriodSeconds: 2
+        volumes:
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+  - minAvailable: 0
+    name: mpiworker
+    replicas: 2
+    template:
+      spec:
+        containers:
+        - command:
+          - /bin/bash
+          - -c
+          - sysctl --system; mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+          ports:
+          - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+          image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:latest
+          imagePullPolicy: Always
+          name: mpiworker
+          resources:
+            limits:
+              ephemeral-storage: 32Gi
+              amd.com/gpu: 8
+            requests:
+              cpu: 200
+              ephemeral-storage: 32Gi
+              memory: 1024Gi
+              amd.com/gpu: 8
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [IPC_LOCK, SYS_PTRACE]
+          volumeMounts:
+          - { mountPath: /dev/shm, name: shm }
+          workingDir: /workspace
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        restartPolicy: OnFailure
+        terminationGracePeriodSeconds: 2
+        tolerations:
+        - { key: amd.com/gpu, operator: Exists }
+        volumes:
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
