@@ -39,27 +39,6 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.82     Ready      node     2d23h   v1.25.6
 ```
 
-### Disable the Nvidia GPU device plugin
-
-```sh
-kubectl label nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8 oci.oraclecloud.com/disable-gpu-device-plugin=true
-```
-
-### Label and taint the BM.GPU.MI300X.8 nodes with the necessary values
-
-```sh
-kubectl label nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8 amd.com/gpu=true
-```
-
-```sh
-kubectl taint nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8 amd.com/gpu=present:NoSchedule
-```
-### Remove the Nvidia taint
-
-```sh
-kubectl taint nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8 nvidia.com/gpu=present:NoSchedule-
-```
-
 ### Deploy the AMD GPU device plugin
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/mi300x/manifests/ds-amdgpu-deviceplugin.yaml
