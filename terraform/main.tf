@@ -1,6 +1,6 @@
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.1.7"
+  version = "5.1.8"
 
   # Provider
   providers           = { oci.home = oci.home }
@@ -34,6 +34,8 @@ module "oke" {
       description = "Operational pool", enabled = true,
       disable_default_cloud_init=true,
       mode        = "node-pool",
+      image_type = "custom",
+      image_id = var.operational_pool_image,
       boot_volume_size = 150,
       shape = "VM.Standard.E4.Flex",
       ocpus = 16,
