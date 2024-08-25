@@ -13,7 +13,7 @@ locals {
 }
 
 module "oke" {
-  source                       = "github.com/OguzPastirmaci/terraform-oci-oke-stack-source.git?ref=tf12&depth=1"
+  source                       = "github.com/oracle-quickstart/oci-hpc-oke.git?ref=stack-module-source&depth=1"
   providers                    = { oci.home = oci.home }
   region                       = var.region
   tenancy_id                   = var.tenancy_ocid
