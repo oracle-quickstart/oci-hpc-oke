@@ -1,6 +1,6 @@
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.1.7"
+  version = "5.1.8"
 
   # Provider
   providers           = { oci.home = oci.home }
