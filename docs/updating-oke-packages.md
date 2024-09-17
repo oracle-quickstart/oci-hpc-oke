@@ -47,7 +47,7 @@ This will create an Import state job. Once the job is succeeded, the new nodes y
 The above steps will only be valid for new nodes deployed after the change is applied. If you have some nodes that were deployed but did not join the cluster, SSH into the node and run the below commands to join it to your OKE cluster.
 
 > [!IMPORTANT]  
-> Make sure you use the Kubernetes version that matches your existing OKE cluster. The second command below has version 1.29, change it accordingly.
+> Make sure you use the Kubernetes version that matches your existing OKE cluster. The second command below has version 1.29 as an example, change it accordingly.
 
 ```
 sudo rm /etc/apt/sources.list.d/oke-node.list
