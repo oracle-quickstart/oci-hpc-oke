@@ -42,3 +42,16 @@ The first part of `content` should look like below:
 ![Import state](./images/import_state.png)
 
 This will create an Import state job. Once the job is succeeded, the new nodes you deploy in your cluster will use the correct OKE packages.
+
+## Some of my nodes were deployed before I edited the Terraform state. How can I update the packages on them?
+The above steps will only be valid for new nodes deployed after the change is applied. If you have some nodes that were deployed but did not join the cluster, SSH into the node and run the below commands to join it to your OKE cluster.
+
+```
+sudo rm /etc/apt/sources.list.d/oke-node.list
+
+sudo add-apt-repository -y 'deb [trusted=yes] https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-jammy/kubernetes-1.29 stable main'
+
+sudo apt install -y oci-oke-node-all*
+
+sudo oke bootstrap --manage-gpu-services --crio-extra-args "--root /var/lib/oke-crio"
+```
