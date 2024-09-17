@@ -1,4 +1,4 @@
-# Updating the OKE packages
+# Updating the OKE packages in an existing cluster
 To update the OKE packages in your cluster deployed using the OCI Resource Manager stack, you will need to edit the Terraform state of your deployment.
 
 ## 1. Download the stack state file
@@ -6,14 +6,18 @@ To update the OKE packages in your cluster deployed using the OCI Resource Manag
 
 2. Click on the name of your stack. In the **Stack details** page, click **More actions** and **Download Terraform state**.
 
-![Download Terraform state](../images/download_terraform_state.png)
+![Download Terraform state](./images/download_terraform_state.png)
 
 ## 2. Open the downloaded Terraform state file with your favorite code editor
 The state file is a JSON file. You will update the cloud init in the state, which adds the Ubuntu repo for OKE packages.
 
-1. Search for `[trusted=yes]` in the state file. Depending on how many worker pools you have, you will have multiple results.
+Using your favorite code editor:
 
-2. In the line that starts with `"content"` that you found by searching for `[trusted=yes]`, change the old repo that starts with `https` to the new repos. The old link will have `hpc_limited_availability` in it.
+1. Increment the `serial` value in line 4 by one (for example change it to 100 from 99).
+
+2. Search for `[trusted=yes]` in the state file. Depending on how many worker pools you have, you will have multiple results.
+
+3. In the line that starts with `"content"` that you found by searching for `[trusted=yes]`, change the old repo that starts with `https` to the new repos. The old link will have `hpc_limited_availability` in it.
   
    Example of the old repo: `https://objectstorage.us-phoenix-1.oraclecloud.com/../n/hpc_limited_availability/b/oke_node_repo`
 
@@ -32,4 +36,10 @@ The first part of `content` should look like below:
 ```
 
 ## 3. Import the updated state file to your stack
-In the **Stack details** page. click **More actions** and **Import state**. Choose the state file you edited in the previous step, and click **Import**. This will create an Import state job. Once the job is succeeded, the new nodes you deploy in your cluster will use the correct OKE packages.
+1. In the **Stack details** page. click **More actions** and **Import state**.
+2. Choose the state file you edited in the previous step, and click **Import**.
+
+![Import state](./images/import_state.png)
+
+This will create an Import state job. Once the job is succeeded, the new nodes you deploy in your cluster will use the correct OKE packages.
+
