@@ -1,14 +1,14 @@
 # Updating the OKE packages in an existing cluster
 To update the OKE packages in your cluster deployed using the OCI Resource Manager stack, you will need to edit the Terraform state of your deployment.
 
-## 1. Download the stack state file
+### 1. Download the stack state file
 1. Go to your deployment stack by following **Menu > Developer Services > Resource Manager > Stacks** in the web console.
 
 2. Click on the name of your stack. In the **Stack details** page, click **More actions** and **Download Terraform state**.
 
 ![Download Terraform state](./images/download_terraform_state.png)
 
-## 2. Open the downloaded Terraform state file with your favorite code editor
+### 2. Open the downloaded Terraform state file with your favorite code editor
 The state file is a JSON file. You will update the cloud init in the state, which adds the Ubuntu repo for OKE packages.
 
 Using your favorite code editor:
@@ -35,11 +35,10 @@ The first part of `content` should look like below:
 "content": "\"apt\":\n  \"sources\":\n    \"oke-node\":\n      \"source\": \"deb [trusted=yes] https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-jammy/kubernetes-1.29\n        stable main\ ....
 ```
 
-## 3. Import the updated state file to your stack
+### 3. Import the updated state file to your stack
 1. In the **Stack details** page. click **More actions** and **Import state**.
 2. Choose the state file you edited in the previous step, and click **Import**.
 
 ![Import state](./images/import_state.png)
 
 This will create an Import state job. Once the job is succeeded, the new nodes you deploy in your cluster will use the correct OKE packages.
-
