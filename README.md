@@ -91,7 +91,7 @@ securityContext:
     - { mountPath: /dev/infiniband, name: devinf }
     - { mountPath: /dev/shm, name: shm }
 ```
-Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](../manifests/)
+Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](./manifests/)
 
 ```yaml
 apiVersion: v1
