@@ -20,7 +20,7 @@ You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys 
 You can use the below image for both CPU and GPU pools.
 
 > [!NOTE]  
-> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2).
+> The GPU image has the GPU drivers pre-installed.
 
 #### Image to import and use for the H100 and A100 nodes
 You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
