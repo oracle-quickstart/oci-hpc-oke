@@ -20,17 +20,19 @@ You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys 
 You can use the below image for both CPU and GPU pools.
 
 > [!NOTE]  
-> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2).
+> The GPU image has the GPU drivers pre-installed.
 
 #### Image to import and use for the H100 and A100 nodes
 You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
 
-[Image to import](https://objectstorage.ca-toronto-1.oraclecloud.com/p/oXC6BcCkB0lXhycxV-0UuDqGGnVtFWfLOkwuJWA5WbsBDb4FkHwnsOHa_ElRcfL2/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.03.15-0)
+[GPU driver v535 with CUDA 12.2](https://objectstorage.ca-toronto-1.oraclecloud.com/p/KOcEZeDpEAASLSKzumODnVr42mFwM_p9n1_Nra2FsV_F6BcpAkoH66HZxN4cCtIb/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.09.18-0)
+
+[GPU driver v550 with CUDA 12.4](https://objectstorage.ca-toronto-1.oraclecloud.com/p/EDngSWYfn3HjrN0xbfBSVCctRVKVvNf3NOW7DdInKMtgiZwiUqy7PsA_xifmI1oq/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-550-CUDA-12.4-2024.09.18-0)
 
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.9.1/oke-rdma-quickstart-v24.9.1.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.9.2/oke-rdma-quickstart-v24.9.2.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
@@ -89,7 +91,7 @@ securityContext:
     - { mountPath: /dev/infiniband, name: devinf }
     - { mountPath: /dev/shm, name: shm }
 ```
-Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](../manifests/)
+Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](./manifests/)
 
 ```yaml
 apiVersion: v1
