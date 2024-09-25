@@ -115,27 +115,22 @@ NUM_GPUS=8
 NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
 NP=$(($NUM_HOSTS*$NUM_GPUS))
 mpirun --allow-run-as-root \
-  -mca plm_rsh_args "-p 2222" \
-  -mca pml ucx \
-  -np $NP -npernode $NUM_GPUS --bind-to numa \
-  -hostfile /etc/volcano/mpiworker.host \
-  -x NCCL_DEBUG=WARN \
-  -x NCCL_MIN_CHANNEL=32 \
-  -x NCCL_IB_QPS_PER_CONNECTION=1 \
-  -x NCCL_IB_GID_INDEX=3 \
-  -x NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9" \
-  -x NCCL_IB_HCA=^="mlx5_1,mlx5_6" \
-  -x NCCL_IB_SL=0 \
-  -x NCCL_IB_TIMEOUT=22 \
-  -x UCX_TLS=tcp \
-  -x UCX_NET_DEVICES=eth0 \
-  -x NCCL_NET_GDR_LEVEL=3 \
-  -x NCCL_SOCKET_IFNAME=eth0 \
-  -x NCCL_IGNORE_CPU_AFFINITY=1 \
-  -x RX_QUEUE_LEN=8192 \
-  -x IB_RX_QUEUE_LEN=8192 \
-  -x LD_LIBRARY_PATH=$LD_LIBRARY_PATH \
-  all_reduce_perf -b 1G -f 2 -e 16G -g 1
+-mca plm_rsh_args "-p 2222" \
+--bind-to numa \
+--mca oob_tcp_if_exclude docker,lo \
+--mca btl ^openib \
+-x NCCL_DEBUG=VERSION \
+-x NCCL_IB_HCA=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9 \
+-x NCCL_SOCKET_IFNAME=eth0 \
+-x NCCL_IB_TC=41 \
+-x NCCL_IB_SL=0 \
+-x NCCL_IB_GID_INDEX=3 \
+-x NCCL_IB_QPS=2 \
+-x NCCL_IB_SPLIT_DATA_ON_QPS=4 \
+-x NCCL_ALGO=Ring \
+-hostfile /etc/volcano/mpiworker.host \
+-N 8 -np $NP \
+/workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
 ```
 
 
