@@ -20,7 +20,7 @@ Please contact your sales representative for getting the image compatible with A
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.7.1/oke-rdma-quickstart-v24.7.1.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.9.2/oke-rdma-quickstart-v24.9.2.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
@@ -132,6 +132,3 @@ mpirun --allow-run-as-root \
 -N 8 -np $NP \
 /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
 ```
-
-
-
