@@ -132,3 +132,11 @@ mpirun --allow-run-as-root \
 -N 8 -np $NP \
 /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
 ```
+
+#### Available images
+| ROCm version  | OFED version | Image tag |
+| ------------- | ------------- | -----------
+| 6.2.1  | 5.9-0.5.6.0.127  | iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.2.1-ofed-5.9-0.5.6.0.127
+| 6.2.0  | 5.9-0.5.6.0.127  |  iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.2.0-ofed-5.9-0.5.6.0.127
+
+
