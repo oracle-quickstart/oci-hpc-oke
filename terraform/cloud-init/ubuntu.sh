@@ -10,7 +10,12 @@ while fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
 done
 
 apt update
-
 apt install -y oci-oke-node-all*
+
+# TEMPORARY REQUIREMENT: Edit registries.conf to add unqualified registries
+cat <<EOF > /etc/containers/registries.conf
+unqualified-search-registries = ["container-registry.oracle.com", "docker.io"]
+short-name-mode = "permissive"
+EOF
 
 oke bootstrap --manage-gpu-services
