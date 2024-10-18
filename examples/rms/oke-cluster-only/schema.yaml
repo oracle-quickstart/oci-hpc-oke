@@ -1,0 +1,990 @@
+# Copyright (c) 2023 Oracle Corporation and/or its affiliates.
+# Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
+
+title: "OKE: Network & Cluster"
+description: OKE cluster with VCN network resources
+informationalText: "Connect to operator host using the SSH command below for Kubernetes endpoint access."
+schemaVersion: 1.1.0
+version: "20230304"
+locale: "en"
+
+variableGroups:
+  - title: "Hidden"
+    visible: false
+    variables:
+      - api_fingerprint
+      - current_user_ocid
+      - tenancy_ocid
+      - region
+      - output_detail
+      - timezone
+      - subnets
+      - await_node_readiness
+
+  - title: "Identity"
+    variables:
+      - compartment_ocid
+      - create_iam_resources
+      - create_iam_tag_namespace
+      - create_iam_defined_tags
+      - create_iam_autoscaler_policy
+      - create_iam_kms_policy
+      - create_iam_operator_policy
+      - create_iam_worker_policy
+      - use_defined_tags
+      - tag_namespace
+
+  - title: "Network"
+    variables:
+      - assign_dns
+      - vcn_id
+      - ig_route_table_id
+      - nat_gateway_id
+      - nat_route_table_id
+      - nat_gateway_public_ip_id
+      - service_gateway_id
+
+  - title: "SSH"
+    variables:
+      - bastion_public_ip
+      - ssh_public_key
+      - ssh_kms_vault_id
+      - ssh_kms_secret_id
+
+  - title: "Operator"
+    variables:
+      - operator_subnet_id
+      - operator_nsg_id
+      - ${create_operator}
+      - operator_upgrade
+      - operator_availability_domain
+      - operator_private_ip
+      - operator_image_os
+      - operator_image_os_version
+      - operator_image_id
+      - operator_user
+      - operator_shape_name
+      - operator_shape_ocpus
+      - operator_shape_memory
+      - operator_shape_boot
+      - operator_shape
+      - operator_use_encryption
+      - operator_volume_kms_vault_id
+      - operator_volume_kms_key_id
+      - operator_pv_transit_encryption
+      - operator_install_helm
+      - operator_install_k9s
+      - operator_install_kubectx
+      - operator_tags
+
+  - title: "Cluster"
+    variables:
+      - control_plane_is_public
+      - control_plane_subnet_id
+      - control_plane_nsg_id
+      - pods_cidr
+      - services_cidr
+      - int_lb_subnet_id
+      - pub_lb_subnet_id
+      - load_balancers
+      - preferred_load_balancer
+      - cluster_name
+      - cluster_type
+      - kubernetes_version
+      - cluster_dns
+      - cluster_ca_cert
+      - cluster_use_encryption
+      - cluster_kms_vault_id
+      - cluster_kms_key_id
+      - cni_type
+      - use_signed_images
+      - configure_ocir
+      - ocir_username
+      - ocir_email_address
+      - ocir_kms_vault_id
+      - ocir_secret_id
+      - ocir_secret_namespace
+      - ocir_secret_name
+      - cluster_tags
+
+  - title: "Extensions"
+    variables:
+      - cluster_autoscaler_install
+      - metrics_server_install
+      - prometheus_install
+      - dcgm_exporter_install
+      - gatekeeper_install
+      - multus_install
+      - cilium_install
+      - whereabouts_install
+      - sriov_device_plugin_install
+      - sriov_cni_plugin_install
+      - rdma_cni_plugin_install
+      - mpi_operator_install
+
+  - title: "Cluster Autoscaler"
+    visible: cluster_autoscaler_install
+    variables:
+      - ${cluster_autoscaler_namespace}
+      - ${cluster_autoscaler_helm_version}
+      - ${cluster_autoscaler_helm_values}
+      - ${cluster_autoscaler_helm_values_files}
+
+  - title: "Metrics Server"
+    visible:
+      and: metrics_server_install
+    variables:
+      - metrics_server_namespace
+      - metrics_server_helm_version
+      - metrics_server_helm_values
+      - metrics_server_helm_values_files
+
+  - title: "Prometheus"
+    visible: prometheus_install
+    variables:
+      - prometheus_namespace
+      - prometheus_reapply
+      - prometheus_helm_version
+      - prometheus_helm_values
+      - prometheus_helm_values_files
+
+  - title: "DCGM exporter"
+    visible: dcgm_exporter_install
+    variables:
+      - dcgm_exporter_namespace
+      - dcgm_exporter_reapply
+      - dcgm_exporter_helm_version
+      - dcgm_exporter_helm_values
+      - dcgm_exporter_helm_values_files
+
+  - title: "Gatekeeper"
+    visible: gatekeeper_install
+    variables:
+      - gatekeeper_namespace
+      - gatekeeper_helm_version
+      - gatekeeper_helm_values
+      - gatekeeper_helm_values_files
+
+  - title: "Multus"
+    visible: multus_install
+    variables:
+      - multus_namespace
+      - multus_daemonset_url
+      - multus_version
+
+  - title: "Cilium"
+    visible: cilium_install
+    variables:
+      - cilium_namespace
+      - cilium_reapply
+      - cilium_helm_version
+
+  - title: "Whereabouts"
+    visible: whereabouts_install
+    variables:
+      - whereabouts_namespace
+      - whereabouts_daemonset_url
+      - whereabouts_version
+
+  - title: "SR-IOV Device Plugin"
+    visible: sriov_device_plugin_install
+    variables:
+      - sriov_device_plugin_namespace
+      - sriov_device_plugin_daemonset_url
+      - sriov_device_plugin_version
+
+  - title: "SR-IOV CNI Plugin"
+    visible: sriov_cni_plugin_install
+    variables:
+      - sriov_cni_plugin_namespace
+      - sriov_cni_plugin_daemonset_url
+      - sriov_cni_plugin_version
+
+  - title: "MPI Operator"
+    visible: mpi_operator_install
+    variables:
+      - mpi_operator_namespace
+      - mpi_operator_deployment_url
+      - mpi_operator_version
+
+variables:
+  # Identity
+  api_fingerprint:
+    required: false
+    visible: false
+  current_user_ocid:
+    title: User
+    type: ocid
+    required: true
+  tenancy_ocid:
+    title: Tenancy
+    type: oci:identity:compartment:id
+    required: true
+  compartment_ocid:
+    title: Compartment
+    description: The default compartment for created resources.
+    type: oci:identity:compartment:id
+    required: true
+  region:
+    required: true
+    title: Region
+    type: oci:identity:region:name
+  defined_tags:
+    visible: false
+  freeform_tags:
+    visible: false
+  create_iam_resources:
+    default: false
+    description: Whether to create any IAM dynamic groups, policies, and tags.
+    required: true
+    title: Create IAM resources
+    type: boolean
+  create_iam_tag_namespace:
+    default: false
+    required: true
+    title: Create tag namespace
+    type: boolean
+    visible: ${create_iam_resources}
+  create_iam_defined_tags:
+    default: false
+    required: true
+    title: Create defined tags
+    type: boolean
+    visible: ${create_iam_resources}
+  create_iam_autoscaler_policy:
+    title: Create IAM policy for Cluster Autoscaler
+    required: false
+    visible: ${create_iam_resources}
+    type: enum
+    enum: [Never, Auto, Always]
+    default: Auto
+  create_iam_kms_policy:
+    title: Create IAM policy for KMS
+    required: false
+    visible: ${create_iam_resources}
+    type: enum
+    enum: [Never, Auto, Always]
+    default: Auto
+  create_iam_operator_policy:
+    title: Create IAM policy for operater cluster management
+    required: false
+    visible: ${create_iam_resources}
+    type: enum
+    enum: [Never, Auto, Always]
+    default: Auto
+  create_iam_worker_policy:
+    title: Create IAM policy for self-managed worker nodes
+    required: false
+    visible: ${create_iam_resources}
+    type: enum
+    enum: [Never, Auto, Always]
+    default: Auto
+  use_defined_tags:
+    title: Use defined tags
+    default: false
+    type: boolean
+  tag_namespace:
+    title: Tag namespace
+    visible:
+      or:
+        - ${create_iam_tag_namespace}
+        - ${create_iam_defined_tags}
+        - ${use_defined_tags}
+  timezone:
+    title: Timezone
+    type: string
+    # type: oci:identity:region:name
+    # required: true
+  output_detail:
+    title: Output detail
+    type: boolean
+    default: false
+    required: true
+
+  # VCN
+  network_compartment_id:
+    required: false
+    visible: false
+  vcn_id:
+    title: Existing VCN
+    type: oci:core:vcn:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  assign_dns:
+    title: Assign DNS records
+    type: boolean
+    required: true
+  ig_route_table_id:
+    title: Internet Gateway Route Table
+    type: ocid
+    required: false
+  service_gateway_id:
+    title: Service gateway
+    description: Existing service gateway in the VCN.
+    type: oci:core:servicegateway:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+  nat_gateway_id:
+    title: NAT gateway
+    description: Existing NAT gateway in the VCN.
+    type: oci:core:natgateway:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+
+  # NSGs
+  operator_nsg_id:
+    title: Additional Network Security Group
+    type: oci:core:nsg:id
+    # additionalProps:
+    #   allowMultiple: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+  control_plane_nsg_id:
+    title: Additional Network Security Group
+    type: oci:core:nsg:id
+    # additionalProps:
+    #   allowMultiple: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+  control_plane_is_public:
+    title: Public Kubernetes control plane
+    type: boolean
+    default: false
+    required: false
+
+  # Subnets
+  control_plane_subnet_id:
+    title: Control plane subnet
+    type: oci:core:subnet:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+      hidePublicSubnet: false
+      hidePrivateSubnet: false
+      hideRegionalSubnet: false
+      hideAdSubnet: true
+  int_lb_subnet_id:
+    title: Internal load balancer subnet
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+      hidePublicSubnet: false
+      hidePrivateSubnet: false
+      hideRegionalSubnet: false
+      hideAdSubnet: true
+  pub_lb_subnet_id:
+    title: Public load balancer subnet
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+      hidePublicSubnet: false
+      hidePrivateSubnet: false
+      hideRegionalSubnet: false
+      hideAdSubnet: true
+  operator_subnet_id:
+    title: Operator subnet
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_id}
+      hidePublicSubnet: false
+      hidePrivateSubnet: false
+      hideRegionalSubnet: false
+      hideAdSubnet: false
+
+  # SSH
+  ssh_public_key:
+    title: SSH Public Key
+    type: oci:core:ssh:publickey
+    pattern: "((^(ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)(,((ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)*$"
+    required: false
+  ssh_kms_vault_id:
+    title: SSH Vault
+    description: The OCI Vault used to encrypt the SSH key pair.
+    type: oci:kms:vault:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  ssh_kms_secret_id:
+    title: SSH Vault secret
+    description: The OCI Vault secret containing the SSH private key.
+    type: oci:kms:secret:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${ssh_kms_vault_id}
+
+  # Bastion
+  bastion_public_ip:
+    title: Bastion IP
+    description: The address of an existing bastion host for SSH access to operator/cluster resources.
+    type: string
+    required: true
+
+  # Operator variables
+  create_operator:
+    title: Create operator instance
+    description: Provision an OCI Compute instance configured with IAM access to interact with the OKE Kubernetes endpoint, e.g. through a bastion host for private networks. Required for installation of extensions using the module.
+    type: boolean
+    default: true
+    required: false
+  operator_availability_domain:
+    title: Availability domain
+    type: oci:identity:availabilitydomain:name
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_operator}
+  operator_private_ip:
+    title: Operator IP
+    type: string
+    required: false
+    visible:
+      not:
+        - ${create_operator}
+  operator_user:
+    title: User
+    type: string
+    default: opc
+    required: true
+  operator_shape_name:
+    title: Shape
+    type: oci:core:instanceshape:name
+    default: "VM.Standard.E4.Flex"
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_bastion}
+  operator_shape_ocpus:
+    title: OCPUs (Cores)
+    type: number
+    default: 4
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_bastion}
+  operator_shape_memory:
+    title: Memory (GB)
+    type: number
+    default: 16
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_bastion}
+  operator_shape_boot:
+    title: Boot volume size (GB)
+    type: number
+    default: 50
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_bastion}
+  operator_shape:
+    visible: false
+  operator_image_os:
+    title: Image OS
+    type: enum
+    default: "Oracle Linux"
+    enum: ["Oracle Linux"]
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - not:
+            - eq:
+                - ${operator_image_type}
+                - custom
+  operator_image_os_version:
+    title: Image OS version
+    type: enum
+    default: "8"
+    enum: ["7.9", "8"]
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - not:
+            - eq:
+                - ${operator_image_type}
+                - custom
+  operator_image_type:
+    title: Image type
+    type: enum
+    default: platform
+    enum: [platform, custom]
+    required: true
+    visible: false
+  operator_image_id:
+    title: Image ID
+    type: oci:core:image:id
+    required: false
+    visible: ${create_operator}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      operatingSystem: ${operator_image_os}
+      operatingSystemVersion: ${operator_image_os_version}
+      shape: ${operator_shape_name}
+  operator_pv_transit_encryption:
+    title: In-transit volume encryption
+    type: boolean
+    visible: ${create_operator}
+  operator_use_encryption:
+    title: Use encryption
+    type: boolean
+    default: false
+    required: true
+    visible: ${create_operator}
+  operator_volume_kms_vault_id:
+    title: KMS volume encryption vault
+    description: Vault containing operator volume encryption keys.
+    type: oci:kms:vault:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible:
+      and:
+        - ${create_operator}
+        - operator_use_encryption
+  operator_volume_kms_key_id:
+    title: KMS volume encryption key
+    type: oci:kms:key:id
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${operator_volume_kms_vault_id}
+    visible:
+      and:
+        - ${create_operator}
+        - operator_use_encryption
+  operator_upgrade:
+    title: Upgrade OS
+    description: Upgrade the operating system on boot.
+    type: boolean
+    default: false
+    required: true
+    visible: ${create_operator}
+  operator_install_helm:
+    title: Install Helm
+    type: boolean
+    visible: ${create_operator}
+  operator_install_k9s:
+    title: Install K9s
+    type: boolean
+    default: true
+    visible: ${create_operator}
+  operator_install_kubectx:
+    title: Install Kubectx
+    type: boolean
+    visible: ${create_operator}
+  operator_tags:
+    type: oci:identity:tag:value
+    required: false
+    title: Tagging
+    description: Tag values for created resources.
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_operator}
+
+  # Cluster
+  cluster_use_encryption:
+    title: Use encryption
+    type: boolean
+    default: false
+    required: true
+  cluster_kms_vault_id:
+    title: Cluster etcd KMS encryption vault
+    type: oci:kms:vault:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: cluster_use_encryption
+  cluster_kms_key_id:
+    title: Cluster etcd KMS encryption key
+    type: oci:kms:key:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${cluster_kms_vault_id}
+    visible: cluster_use_encryption
+  cluster_name:
+    title: Cluster name
+    description: Display name for the created cluster. Defaults to 'oke' suffixed with the generated Terraform 'state_id' value.
+    type: string
+    required: false
+  cluster_type:
+    title: Cluster Type
+    type: enum
+    default: Basic
+    enum: [Basic, Enhanced]
+    allowMultiple: false
+    required: true
+  cni_type:
+    title: CNI Type
+    type: enum
+    default: Flannel
+    enum: [Flannel, NPN]
+    allowMultiple: false
+    required: true
+  kubernetes_version:
+    type: oci:kubernetes:versions:id
+    title: Kubernetes version
+    description: The Kubernetes version for the created OKE cluster and managed nodes.
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
+  pods_cidr:
+    title: Pod CIDR
+  services_cidr:
+    title: Service CIDR
+  preferred_load_balancer:
+    title: Preferred load balancer
+    type: enum
+    default: Internal
+    enum: [Internal, Public]
+    allowMultiple: false
+    required: true
+  load_balancers:
+    title: Load balancers
+    type: enum
+    enum: [Public, Internal, Both]
+    default: Internal
+    required: true
+  use_signed_images:
+    title: Use signed images
+    type: boolean
+    default: false
+    required: true
+
+  # OCIR
+  configure_ocir:
+    title: Configure container registry (OCIR)
+    type: boolean
+    default: false
+  ocir_username:
+    title: Username
+    visible: configure_ocir
+  ocir_email_address:
+    title: Email address
+    visible: configure_ocir
+  ocir_kms_vault_id:
+    title: Vault ID
+    type: oci:kms:vault:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: configure_ocir
+  ocir_kms_secret_id:
+    title: Vault secret ID
+    type: oci:kms:secret:id
+    required: false
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${ocir_kms_vault_id}
+    visible: configure_ocir
+  ocir_secret_namespace:
+    title: Secret namespace
+    visible: configure_ocir
+  ocir_secret_name:
+    title: Secret name
+    visible: configure_ocir
+
+  cluster_tags:
+    type: oci:identity:tag:value
+    required: false
+    title: Tagging
+    description: Tag values for created resources.
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  # Metrics server
+  metrics_server_install:
+    title: Install Metrics Server
+    description: Deploy the Kubernetes Metrics Server with Oracle Cloud configuration. See <a href=https://github.com/kubernetes-sigs/metrics-server>kubernetes-sigs/metrics-server</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  metrics_server_namespace:
+    title: Kubernetes namespace
+    type: string
+  metrics_server_helm_version:
+    title: Helm chart version
+    type: string
+  metrics_server_helm_values:
+    title: Helm chart values
+    visible: false
+  metrics_server_helm_values_files:
+    title: Helm chart values files
+    visible: false
+
+  # Cluster autoscaler
+  cluster_autoscaler_install:
+    title: Install Cluster Autoscaler
+    description: Deploy the Kubernetes Cluster Autoscaler with Oracle Cloud configuration. See <a href=https://github.com/kubernetes/autoscaler>kubernetes/autoscaler</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  cluster_autoscaler_namespace:
+    title: Kubernetes namespace
+    type: string
+  cluster_autoscaler_helm_version:
+    title: Helm chart version
+    type: string
+  cluster_autoscaler_helm_values:
+    title: Helm chart values
+    visible: false
+  cluster_autoscaler_helm_values_files:
+    title: Helm chart values files
+    visible: false
+
+  # Gatekeeper
+  gatekeeper_install:
+    title: Install Gatekeeper
+    description: Deploy Gatekeeper with Oracle Cloud configuration. See <a href=https://github.com/open-policy-agent/gatekeeper>open-policy-agent/gatekeeper</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  gatekeeper_namespace:
+    title: Kubernetes namespace
+    type: string
+  gatekeeper_helm_version:
+    title: Helm chart version
+    type: string
+  gatekeeper_helm_values:
+    title: Helm chart values
+    visible: false
+  gatekeeper_helm_values_files:
+    title: Helm chart values files
+    visible: false
+
+  # Prometheus
+  prometheus_install:
+    title: Install Prometheus
+    description: Deploy Prometheus with Oracle Cloud configuration. See <a href=https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack>prometheus-community/kube-prometheus-stack</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  prometheus_reapply:
+    title: Re-apply
+    type: boolean
+    default: false
+    required: true
+  prometheus_namespace:
+    title: Kubernetes namespace
+    type: string
+  prometheus_helm_version:
+    title: Helm chart version
+    type: string
+  prometheus_helm_values:
+    title: Helm chart values
+    visible: false
+  prometheus_helm_values_files:
+    title: Helm chart values files
+    visible: false
+
+  # Multus
+  multus_install:
+    title: Install Multus
+    description: Deploy Multus for extended CNI configuration. See <a href=https://github.com/k8snetworkplumbingwg/multus-cni>k8snetworkplumbingwg/multus-cni</a> for more information. Preempts existing CNI configuration, with the configured cluster CNI plugin used by default.
+    type: boolean
+    default: false
+    required: true
+  multus_namespace:
+    title: Kubernetes namespace
+    type: string
+  multus_daemonset_url:
+    title: Daemonset URL
+    description: The URL path to the Multus manifest. Leave unset for tags of <a href=https://github.com/k8snetworkplumbingwg/multus-cni>k8snetworkplumbingwg/multus-cni</a> using the configured Multus version.
+    type: string
+  multus_version:
+    title: Version
+    type: string
+
+  # SR-IOV Device Plugin
+  sriov_device_plugin_install:
+    title: Install SR-IOV device plugin
+    description: Deploy SR-IOV device plugin to advertise Virtual Functions (VFs) to Kubernetes. See <a href=https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin/tree/master/deployments>k8snetworkplumbingwg/sriov-network-device-plugin</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  sriov_device_plugin_namespace:
+    title: Kubernetes namespace
+    type: string
+  sriov_device_plugin_daemonset_url:
+    title: Daemonset URL
+    description: The URL path to the manifest. Leave unset for tags of <a href=https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin/tree/master/deployments>k8snetworkplumbingwg/sriov-network-device-plugin</a> using the configured version.
+    type: string
+  sriov_device_plugin_version:
+    title: Version
+    type: string
+
+  # SR-IOV CNI Plugin
+  sriov_cni_plugin_install:
+    title: Install SR-IOV CNI plugin
+    description: Deploy SR-IOV CNI plugin to configure Virtual Functions (VFs) for Pod networking with Kubernetes. See <a href=https://github.com/openshift/sriov-cni>openshift/sriov-cni</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  sriov_cni_plugin_namespace:
+    title: Kubernetes namespace
+    type: string
+  sriov_cni_plugin_daemonset_url:
+    title: Daemonset URL
+    description: The URL path to the manifest. Leave unset for tags of <a href=https://github.com/openshift/sriov-cni>openshift/sriov-cni</a> using the configured version.
+    type: string
+  sriov_cni_plugin_version:
+    title: Version
+    type: string
+
+  # Whereabouts
+  whereabouts_install:
+    title: Install Whereabouts
+    description: Deploy Whereabouts for cluster-wide IP Address Management (IPAM). See <a href=https://github.com/k8snetworkplumbingwg/whereabouts>k8snetworkplumbingwg/whereabouts</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  whereabouts_namespace:
+    title: Kubernetes namespace
+    type: string
+  whereabouts_daemonset_url:
+    title: Daemonset URL
+    description: The URL path to the manifest. Leave unset for tags of <a href=https://github.com/k8snetworkplumbingwg/whereabouts>k8snetworkplumbingwg/whereabouts</a> using the configured version.
+    type: string
+  whereabouts_version:
+    title: Version
+    type: string
+
+  # MPI Operator
+  mpi_operator_install:
+    title: Install MPI operator
+    description: Deploy MPI operator to run MPI jobs. See <a href=https://github.com/kubeflow/mpi-operator>kubeflow/mpi-operator</a> for more information.
+    type: boolean
+    default: false
+    required: true
+  mpi_operator_namespace:
+    title: Kubernetes namespace
+    type: string
+  mpi_operator_deployment_url:
+    title: Deployment URL
+    description: The URL path to the manifest. Leave unset for tags of <a href=https://github.com/kubeflow/mpi-operator>kubeflow/mpi-operator</a> using the configured version.
+    type: string
+  mpi_operator_version:
+    title: Version
+    type: string
+
+outputGroups:
+  - title: Terraform
+    outputs:
+      - state_id
+  - title: Identity
+    outputs:
+      - dynamic_group_ids
+      - policy_statements
+  - title: Network
+    outputs:
+      - vcn_id
+      - bastion_public_ip
+  - title: Operator
+    outputs:
+      - operator_id
+      - operator_subnet_id
+      - operator_nsg_id
+      - operator_private_ip
+      - operator_ssh_command
+      - operator_ssh_secret_id
+  - title: Cluster
+    outputs:
+      - cluster_id
+      - cluster_endpoints
+      - control_plane_subnet_id
+      - control_plane_nsg_id
+      - int_lb_subnet_id
+      - int_lb_nsg_id
+      - pub_lb_subnet_id
+      - pub_lb_nsg_id
+
+outputs:
+  # Terraform
+  state_id:
+    title: State ID
+    type: copyableString
+
+  # Identity
+  dynamic_group_ids:
+    title: Dynamic groups
+    type: list
+  policy_statements:
+    title: Policy statements
+    type: list
+
+  # Network
+  vcn_id:
+    title: VCN
+    type: ocid
+  bastion_public_ip:
+    title: Bastion IP
+    type: copyableString
+  bastion_ssh_command:
+    title: Bastion SSH command
+    type: copyableString
+  bastion_ssh_secret_id:
+    title: Bastion SSH Vault secret
+    type: ocid
+
+  # Operator
+  operator_id:
+    title: Operator instance
+    type: ocid
+  operator_subnet_id:
+    title: Operator subnet
+    type: ocid
+  operator_nsg_id:
+    title: Operator NSG
+    type: ocid
+  operator_private_ip:
+    title: Operator IP
+    type: copyableString
+  operator_ssh_command:
+    title: Operator SSH command
+    type: copyableString
+  operator_ssh_secret_id:
+    title: Operator SSH Vault secret
+    type: ocid
+
+  # Cluster
+  cluster_id:
+    title: OKE cluster
+    type: ocid
+  cluster_endpoints:
+    title: Cluster endpoints
+    type: map
+  control_plane_subnet_id:
+    title: Control plane subnet
+    type: ocid
+  control_plane_nsg_id:
+    title: Control plane NSG
+    type: ocid
+  int_lb_subnet_id:
+    title: Internal load balancer subnet
+    type: ocid
+  int_lb_nsg_id:
+    title: Internal load balancer NSG
+    type: ocid
+  pub_lb_subnet_id:
+    title: Public load balancer subnet
+    type: ocid
+  pub_lb_nsg_id:
+    title: Public load balancer NSG
+    type: ocid
