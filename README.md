@@ -32,7 +32,7 @@ You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.9.2/oke-rdma-quickstart-v24.9.2.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v24.10.0/oke-rdma-quickstart-v24.10.0.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
@@ -232,9 +232,6 @@ Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0'
 ## FAQ
 #### Are there any features that are not supported when using self-managed nodes?
 Yes, some features and capabilities are not available, or not yet available, when using self-managed nodes. Please see [this link](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) for a list of features and capabilities that are not available for self-managed nodes.
-
-#### Can I use Ubuntu as the operating system?
-We are working on adding support for Ubuntu, but it is not available today.
 
 #### I don't see my GPU nodes in the OKE page in the console under worker pools
 This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are created by you and joined to the OKe cluster, rather than OKE has created for you.
