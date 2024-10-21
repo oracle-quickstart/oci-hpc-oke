@@ -5,7 +5,6 @@ add-apt-repository -y 'deb [trusted=yes] https://odx-oke.objectstorage.us-sanjos
 
 while fuser /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
     echo "Waiting for other apt instances to exit"
-    # Sleep to avoid pegging a CPU core while polling this lock
     sleep 1
 done
 
@@ -13,7 +12,7 @@ apt update
 apt install -y oci-oke-node-all*
 
 # TEMPORARY REQUIREMENT: Edit registries.conf to add unqualified registries
-cat <<EOF > /etc/containers/registries.conf
+tee /etc/containers/registries.conf <<EOF
 unqualified-search-registries = ["container-registry.oracle.com", "docker.io"]
 short-name-mode = "permissive"
 EOF

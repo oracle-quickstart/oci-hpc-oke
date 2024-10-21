@@ -32,7 +32,7 @@ graphroot = "/var/lib/oke-crio"
 EOF
 
 # TEMPORARY REQUIREMENT: Edit registries.conf to add unqualified registries
-cat <<EOF > /etc/containers/registries.conf
+tee /etc/containers/registries.conf <<EOF
 unqualified-search-registries = ["container-registry.oracle.com", "docker.io"]
 short-name-mode = "permissive"
 EOF
