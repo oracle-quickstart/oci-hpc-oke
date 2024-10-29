@@ -120,7 +120,7 @@ mpirun --allow-run-as-root \
 --mca oob_tcp_if_exclude docker,lo \
 --mca btl ^openib \
 -x NCCL_DEBUG=VERSION \
--x NCCL_IB_HCA=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9 \
+-x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9 \
 -x NCCL_SOCKET_IFNAME=eth0 \
 -x NCCL_IB_TC=41 \
 -x NCCL_IB_SL=0 \
