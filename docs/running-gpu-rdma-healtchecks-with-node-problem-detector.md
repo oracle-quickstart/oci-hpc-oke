@@ -25,7 +25,7 @@ helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-char
 ```
 
 #### Checking if any nodes report errors
-After you deploy the Helm chart, wait for about 5 minutes to give health checks some time to run. By default, the tests will run every 5 minutes. You can edit `values.yaml` to change the frequency.
+After you deploy the Helm chart, wait for about 10 minutes to give health checks some time to run. Because it takes some time to configure the RDMA interfaces on the node during boot, some health checks like `RdmaLink` might report incorrect results the first time they run. By default, the tests will run every 5 minutes. You can edit `values.yaml` to change the frequency.
 
 You can see new conditions are added to each GPU shape when you run `kubectl describe node <NODE NAME>`. Example output below is redacted for a cleaner look.
 
