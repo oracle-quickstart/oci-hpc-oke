@@ -56,5 +56,5 @@ kubectl get nodes -o json | jq -r '.items[]
 
 Example output that lists the node name, OCID, serial, and the error:
 ```
-10.140.30.89    ocid1.instance.oc1.ap-melbourne-1.anwwklj   2210xcr0bv  Node has missing GPU(s)
+10.140.30.89    ocid1.instance.oc1.ap-melbourne-1.anww...   2210xcr0bv  Node has missing GPU(s)
 ```
