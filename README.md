@@ -36,7 +36,9 @@ You can easily deploy the cluster using the **Deploy to Oracle Cloud** button be
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
-The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
+The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J ubuntu@<bastion IP> ubuntu@<operator IP>`.
+
+You can also find this information under the **Application information** tab in the OCI Resource Manager stack.
 
 ### Wait until you see all nodes in the cluster
 
@@ -59,7 +61,7 @@ kubectl -n kube-system create serviceaccount kubeconfig-sa
 
 kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
 
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/oke-kubeconfig-sa-token.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/service-account/oke-kubeconfig-sa-token.yaml
 
 TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
 
@@ -146,22 +148,22 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 
 ##### BM.GPU.H100
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.H100.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H100.8-nccl-test.yaml
 ```
 
 ##### BM.GPU.A100-v2.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.A100-v2.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.A100-v2.8-nccl-test.yaml
 ```
 
 ##### BM.GPU4.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU4.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU4.8-nccl-test.yaml
 ```
 
 ##### BM.GPU.B4.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/BM.GPU.B4.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.B4.8-nccl-test.yaml
 ```
 
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
