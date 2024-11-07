@@ -30,18 +30,19 @@ After you deploy the Helm chart, wait for about 5 minutes to give health checks 
 You can see new conditions are added to each GPU shape when you run `kubectl describe node <NODE NAME>`. Example output below is redacted for a cleaner look.
 
 ```
-Conditions:                                                                                                                                                                                                                                                        │
-│   Type                    Status    Reason                        Message                                                                                                                        │
-│   ----                    ------    ------                        -------                                                                                                                        │
-│   RdmaLinkFlapping        False     RdmaLinkFlappingHasNoIssues   No flapping RDMA links                                                                                                         │
-│   OcaVersion              False     OcaVersionHasNoIssues         OCA version is up to date                                                                                                      │
-│   GpuRowRemap             False     GpuRowRemapHasNoIssues        No Row Remapping issues detected with GPUs                                                                                     │
-│   RdmaWpaAuth             False     RdmaWpaAuthHasNoIssues        All RDMA links are authenticated                                                                                               │
-│   RdmaRttcc               False     RdmaRttccHasNoIssues          RTCCC is disabled on all RDMA interfaces                                                                                       │
-│   GpuEcc                  False     GpuEccHasNoIssues             No ECC issues detected with GPUs                                                                                               │
-│   GpuBus                  False     GpuBusHasNoIssues             No GPU Bus issues detected with GPUs                                                                                           │
-│   GpuCount                True      GpuCountHasIssues             Node has missing GPU(s)                                                                                                        │
-│   RdmaLink                False     RdmaLinkHasNoIssues           All RDMA links are up                                                                                                          │
+Conditions:     
+                                                                                                                                                                                                                  
+    Type                    Status    Reason                        Message   
+    ----                    ------    ------                        -------                  
+    RdmaLinkFlapping        False     RdmaLinkFlappingHasNoIssues   No flapping RDMA links                    
+    OcaVersion              False     OcaVersionHasNoIssues         OCA version is up to date   
+    GpuRowRemap             False     GpuRowRemapHasNoIssues        No Row Remapping issues detected with GPUs
+    RdmaWpaAuth             False     RdmaWpaAuthHasNoIssues        All RDMA links are authenticated          
+    RdmaRttcc               False     RdmaRttccHasNoIssues          RTCCC is disabled on all RDMA interfaces  
+    GpuEcc                  False     GpuEccHasNoIssues             No ECC issues detected with GPUs          
+    GpuBus                  False     GpuBusHasNoIssues             No GPU Bus issues detected with GPUs      
+    GpuCount                True      GpuCountHasIssues             Node has missing GPU(s)                   
+    RdmaLink                False     RdmaLinkHasNoIssues           All RDMA links are up                     
 ```
 
 You can also run the following command to get a list of all nodes that report a problem.
