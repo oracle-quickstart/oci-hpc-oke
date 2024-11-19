@@ -129,7 +129,7 @@ Wait until all network operator pods are running with `kubectl get pods -n netwo
 
 ### Deploy the Virtual Function Configuration daemonset
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/vf-config.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/vf-config.yaml
 ```
 
 ### Confirm that the GPUs are VFs are correctly exposed
@@ -149,12 +149,12 @@ NODE            GPUs   RDMA-VFs
 ### Create Network Attachment Definition
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/network-attachment-definition.yaml
 ```
 
 ### Create the IP Pool for Nvidia IPAM
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/ubuntu/manifests/ip-pool.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/ip-pool.yaml
 ```
 
 ### Create the topology config map
@@ -165,7 +165,7 @@ You can find the topology files in the [topology directory](../manifests/topolog
 ```
 SHAPE=<your GPU shape>
 
-curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/topology/$SHAPE.xml
+curl -s -o ./topo.xml https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/topology/$SHAPE.xml
 
 kubectl create configmap topology --from-file topo.xml
 ```
