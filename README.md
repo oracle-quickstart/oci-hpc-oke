@@ -1,10 +1,10 @@
 # Running RDMA (remote direct memory access) GPU workloads on OKE
-Oracle Cloud Infrastructure Container Engine for Kubernetes (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
+Oracle Cloud Infrastructure Kubernetes Engine (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
 
 Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
 
 ### Supported Operating Systems
-For the A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8), Ubuntu 22.04 is supported.
+For the Nvidia A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8) and AMD MI300x shape (BM.GPU.MI300X.8), Ubuntu 22.04 is supported.
 
 ### Required policies
 The OCI Resource Manager stack template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
@@ -17,17 +17,26 @@ Below policies are required. The OCI Resource Manager stack will create them for
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
 
-You can use the below image for both CPU and GPU pools.
+You can use the below images for both CPU and GPU pools.
 
 > [!NOTE]  
 > The GPU image has the GPU drivers pre-installed.
 
 #### Image to import and use for the H100 and A100 nodes
-You can use the instructions [here.](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
+You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
 
-[GPU driver v535 with CUDA 12.2](https://objectstorage.ca-toronto-1.oraclecloud.com/p/KOcEZeDpEAASLSKzumODnVr42mFwM_p9n1_Nra2FsV_F6BcpAkoH66HZxN4cCtIb/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.09.18-0)
+**Images for NVIDIA shapes**
 
-[GPU driver v550 with CUDA 12.4](https://objectstorage.ca-toronto-1.oraclecloud.com/p/EDngSWYfn3HjrN0xbfBSVCctRVKVvNf3NOW7DdInKMtgiZwiUqy7PsA_xifmI1oq/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-550-CUDA-12.4-2024.09.18-0)
+- [GPU driver 535.183.06 & CUDA 12.2](https://objectstorage.ca-toronto-1.oraclecloud.com/p/KOcEZeDpEAASLSKzumODnVr42mFwM_p9n1_Nra2FsV_F6BcpAkoH66HZxN4cCtIb/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.09.18-0)
+
+- [GPU driver 550.90.12 & CUDA 12.4](https://objectstorage.ca-toronto-1.oraclecloud.com/p/EDngSWYfn3HjrN0xbfBSVCctRVKVvNf3NOW7DdInKMtgiZwiUqy7PsA_xifmI1oq/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-550-CUDA-12.4-2024.09.18-0)
+
+- [GPU driver 560.35.03 & CUDA 12.6](https://objectstorage.ca-toronto-1.oraclecloud.com/p/a_KKMCajcBpt9EfqgmnZbtUInpc6gdC5s2g1wz7b0KUCLW28DSvTKwMeOSgW5O0R/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-560-CUDA-12.6-2024.09.18-0)
+
+**Image for AMD shapes**
+
+- [ROCm 6.2](https://objectstorage.us-ashburn-1.oraclecloud.com/p/tpswnRAUmrJ49uLAGk_ku6B13hyGzf_Gv1vrggtDWhOywSM5YGzoMPiO88gc3Cv-/n/imagegen/b/GPU-imaging/o/Ubuntu-22-OFED-5.9-0.5.6.0.127-ROCM-6.2-90-2024.08.12-0.oci)
+
 
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
@@ -238,11 +247,20 @@ Yes, some features and capabilities are not available, or not yet available, whe
 #### I don't see my GPU nodes in the OKE page in the console under worker pools
 This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are created by you and joined to the OKe cluster, rather than OKE has created for you.
 
-#### Can I use Multi-Instance GPU (MIG)?
-Yes, you can configure GPU Operator with MIG. Please see the instructions [here](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html).
-
 #### If I don't need RDMA connectivity between my H100 or A100 nodes, do I still need to follow the instructions in this repo?
 No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console. H100 need to have flannel as a POD networking type and make use of a custom images. We are working on a better experience on H100 without RDMA. 
 
 #### I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error
 Please follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm#configuringimagecapabilities_topic-using_the_console) to add the capability of the shape that you are getting the error to your imported image.
+
+#### How can I add more SSH keys to my nodes besides the one I chose during deployment?
+You can follow the instructions [here](./docs/adding-ssh-keys-to-worker-nodes.md) to add more SSH keys to some/all of your nodes.
+
+#### I'm having an issue when running a PyTorch job using RDMA.
+Please see the instructions [here](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md) for the best practices on running PyTorch jobs.
+
+#### I have large container images. Can I import them from a shared location instead of downloading them?
+Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here.](./docs/importing-images-from-fss-skopeo.md)
+
+#### How can I run GPU & RDMA health checks in my nodes?
+You can deploy the health check script with Node Problem Detector by following the instructions [here.](./docs/running-gpu-rdma-healtchecks-with-node-problem-detector.md)
