@@ -240,27 +240,39 @@ Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0'
 #
 ```
 
-## FAQ
-#### Are there any features that are not supported when using self-managed nodes?
-Yes, some features and capabilities are not available, or not yet available, when using self-managed nodes. Please see [this link](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) for a list of features and capabilities that are not available for self-managed nodes.
+## Frequently Asked Questions
 
-#### I don't see my GPU nodes in the OKE page in the console under worker pools
-This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are created by you and joined to the OKe cluster, rather than OKE has created for you.
+If you have a question that is not listed below, you can create an issue in the repo.
 
-#### If I don't need RDMA connectivity between my H100 or A100 nodes, do I still need to follow the instructions in this repo?
-No, if you don't need RDMA connectivity between your nodes, you can deploy an OKE cluster without using any self-managed nodes. The easiest way to do it is using the web console. H100 need to have flannel as a POD networking type and make use of a custom images. We are working on a better experience on H100 without RDMA. 
+- [Are there any features that are not supported when using self-managed nodes?](#are-there-any-features-that-are-not-supported-when-using-self-managed-nodes)
+- [I don't see my GPU nodes in the OKE page in the console under worker pools](#i-dont-see-my-gpu-nodes-in-the-oke-page-in-the-console-under-worker-pools)
+- [I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error](#im-getting-the-400-invalidparameter-shape--is-incompatible-with-image-error)
+- [How can I add more SSH keys to my nodes besides the one I chose during deployment?](#how-can-i-add-more-ssh-keys-to-my-nodes-besides-the-one-i-chose-during-deployment)
+- [I'm having an issue when running a PyTorch job using RDMA](#im-having-an-issue-when-running-a-pytorch-job-using-rdma)
+- [I have large container images. Can I import them from a shared location instead of downloading them?](#i-have-large-container-images-can-i-import-them-from-a-shared-location-instead-of-downloading-them)
+- [How can I run GPU & RDMA health checks in my nodes?](#how-can-i-run-gpu--rdma-health-checks-in-my-nodes)
+- [Can I autoscale my RDMA enabled nodes in a Cluster Network?](#can-i-autoscale-my-rdma-enabled-nodes-in-a-cluster-network)
 
-#### I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error
+### Are there any features that are not supported when using self-managed nodes?
+Some features and capabilities are not available, or not yet available, when using self-managed nodes. Please see [this link](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) for a list of features and capabilities that are not available for self-managed nodes.
+
+### I don't see my GPU nodes in the OKE page in the console under worker pools
+This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are not listed in the console in the OKE page.
+
+### I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error
 Please follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm#configuringimagecapabilities_topic-using_the_console) to add the capability of the shape that you are getting the error to your imported image.
 
-#### How can I add more SSH keys to my nodes besides the one I chose during deployment?
-You can follow the instructions [here](./docs/adding-ssh-keys-to-worker-nodes.md) to add more SSH keys to some/all of your nodes.
+### How can I add more SSH keys to my nodes besides the one I chose during deployment?
+You can follow the instructions [here](./docs/adding-ssh-keys-to-worker-nodes.md) to add more SSH keys to your nodes.
 
-#### I'm having an issue when running a PyTorch job using RDMA.
+### I'm having an issue when running a PyTorch job using RDMA
 Please see the instructions [here](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md) for the best practices on running PyTorch jobs.
 
-#### I have large container images. Can I import them from a shared location instead of downloading them?
+### I have large container images. Can I import them from a shared location instead of downloading them?
 Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here.](./docs/importing-images-from-fss-skopeo.md)
 
-#### How can I run GPU & RDMA health checks in my nodes?
+### How can I run GPU & RDMA health checks in my nodes?
 You can deploy the health check script with Node Problem Detector by following the instructions [here.](./docs/running-gpu-rdma-healtchecks-with-node-problem-detector.md)
+
+### Can I autoscale my RDMA enabled nodes in a Cluster Network?
+You can setup autoscaling for your nodes in a Cluster Network using the instructions [here.](./docs/using-cluster-autoscaler-with-cluster-networks.md)
