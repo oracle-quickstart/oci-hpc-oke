@@ -55,7 +55,7 @@ spec:
             while :; do { [[ $exit ]] && break; }; sleep 1; done
           ports:
           - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-          image: ord.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.02-nccl-2.20.5-1
+          image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
           name: mpimaster
           resources:
             limits:
@@ -91,7 +91,7 @@ spec:
           - /bin/bash
           - -c
           - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-          image: ord.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.02-nccl-2.20.5-1
+          image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
           name: mpiworker
           ports:
           - { name: mpijob-port, containerPort: 2222, protocol: TCP }
