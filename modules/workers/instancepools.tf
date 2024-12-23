@@ -110,10 +110,10 @@ resource "oci_core_instance_pool" "autoscaled_workers" {
       EOT
     }
 
-    precondition {
-      condition     = var.cni_type == "flannel"
-      error_message = "Instance Pools require a cluster with `cni_type = flannel`."
-    }
+    # precondition {
+    #   condition     = var.cni_type == "flannel"
+    #   error_message = "Instance Pools require a cluster with `cni_type = flannel`."
+    # }
 
     precondition {
       condition     = each.value.autoscale == false
