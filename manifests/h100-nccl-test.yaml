@@ -78,7 +78,7 @@ spec:
                     -x NCCL_TOPO_FILE=/topo/topo.xml \
                     -mca coll_hcoll_enable 0 -mca coll ^hcoll \
                     /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 8G -c 1; sleep 3600
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
               volumeMounts:
               - { mountPath: /topo, name: topo }
               - { mountPath: /host, name: root }
@@ -110,7 +110,7 @@ spec:
                 - /bin/bash
                 - -c
                 - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
               securityContext:
                 capabilities:
                   add: ["IPC_LOCK"]
