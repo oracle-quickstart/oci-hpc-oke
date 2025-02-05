@@ -14,6 +14,13 @@ module "oke" {
   
   kubernetes_version = var.kubernetes_version
   cluster_type = var.cluster_type
+  cluster_addons = {
+    "NvidiaGpuPlugin" = {
+      remove_addon_resources_on_delete = true
+      override_existing                = true
+      configurations = []
+    }
+  }    
   bastion_allowed_cidrs = ["0.0.0.0/0"]
   allow_worker_ssh_access     = true
   control_plane_allowed_cidrs = ["0.0.0.0/0"]
