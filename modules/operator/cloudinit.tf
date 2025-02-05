@@ -115,17 +115,17 @@ data "cloudinit_config" "operator" {
       merge_type = local.default_cloud_init_merge_type
   }
 
-  # Enable Nvidia GPU device plugin add-on
-  part {
-      content_type = "text/cloud-config"
-      content = jsonencode({
-        runcmd = [
-          "oci ce cluster install-addon --cluster-id ${var.cluster_id} --addon-name NvidiaGpuPlugin --region ${var.region}",
-        ]
-      })
-      filename   = "30-gpudeviceaddon.yml"
-      merge_type = local.default_cloud_init_merge_type
-  }
+  # # Enable Nvidia GPU device plugin add-on
+  # part {
+  #     content_type = "text/cloud-config"
+  #     content = jsonencode({
+  #       runcmd = [
+  #         "oci ce cluster install-addon --cluster-id ${var.cluster_id} --addon-name NvidiaGpuPlugin --region ${var.region}",
+  #       ]
+  #     })
+  #     filename   = "30-gpudeviceaddon.yml"
+  #     merge_type = local.default_cloud_init_merge_type
+  # }
 
   # kubectl installation
   part {
