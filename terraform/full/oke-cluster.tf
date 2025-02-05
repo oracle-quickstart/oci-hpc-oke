@@ -86,6 +86,13 @@ module "oke" {
   bastion_upgrade             = false
   cluster_name                = local.cluster_name
   cluster_type                = "enhanced"
+  cluster_addons = {
+    "NvidiaGpuPlugin" = {
+      remove_addon_resources_on_delete = true
+      override_existing                = true
+      configurations = []
+    }
+  }    
   cni_type                    = "flannel"
   control_plane_allowed_cidrs = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public     = true
