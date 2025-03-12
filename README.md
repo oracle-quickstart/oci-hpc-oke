@@ -41,7 +41,9 @@ NAME           STATUS     ROLES    AGE     VERSION
 
 ### Deploy the AMD GPU device plugin
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/mi300x/manifests/ds-amdgpu-deviceplugin.yaml
+helm repo add amd-gpu-helm https://rocm.github.io/k8s-device-plugin/
+
+helm install --generate-name amd-gpu-helm/amd-gpu --version 0.19.0 -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/mi300x/manifests/amd-device-plugin-values.yaml
 ```
 
 ### Run the test pod to confirm the GPUs are available
