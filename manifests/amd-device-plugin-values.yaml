@@ -49,4 +49,4 @@ tolerations:
 
 node_selector_enabled: true
 node_selector:
-  node.kubernetes.io/instance-type=: "BM.GPU.MI300X.8"
+  node.kubernetes.io/instance-type: "BM.GPU.MI300X.8"
