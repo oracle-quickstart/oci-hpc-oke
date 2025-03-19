@@ -5,8 +5,8 @@
 output "state_id" { value = module.oke.state_id }
 
 # Identity
-output "dynamic_group_ids" { value = module.oke.dynamic_group_ids }
-output "policy_statements" { value = module.oke.policy_statements }
+# output "dynamic_group_ids" { value = module.oke.dynamic_group_ids }
+# output "policy_statements" { value = module.oke.policy_statements }
 
 # Network
 output "vcn_id" { value = module.oke.vcn_id }
@@ -63,23 +63,20 @@ output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-r
 #output "fss_export_set_id" { value = oci_file_storage_export_set.fss.0.id }
 
 # Monitoring
+output "grafana_public_ip" {
+  value = format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{"\n"}{.items[0].status.loadBalancer.ingress[0].ip}{"\n\n"}'", var.monitoring_namespace)
+}
+
 output "grafana_admin_password" {
   value = nonsensitive(random_password.grafana_admin_password.result)
 }
-output "prometheus_stack_version" { value = local.prometheus_stack_version }
-output "prometheus_pushgateway_version" { value = local.prometheus_pushgateway_version }
-output "prometheus_adapter_version" { value = local.prometheus_adapter_version }
-output "metrics_server_version" { value = local.metrics_server_version }
-output "dcgm_exporter_version" { value = local.dcgm_exporter_version }
 
 output "prom_server_port_forward" {
-  value = format("kubectl port-forward -n %v svc/prom-kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
+  value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
 }
-output "prom_pushgateway_port_forward" {
-  value = format("kubectl port-forward -n %v svc/prom-pushgateway-prometheus-pushgateway 9091:9091", var.monitoring_namespace)
-}
+
 output "grafana_port_forward" {
-  value = format("kubectl port-forward -n %v svc/prom-grafana 3000:80", var.monitoring_namespace)
+  value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-grafana 3000:80", var.monitoring_namespace)
 }
 
 output "access_k8s_public_endpoint" {

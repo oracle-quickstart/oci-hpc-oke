@@ -5,15 +5,6 @@ data "oci_containerengine_clusters" "oke" {
   compartment_id = var.compartment_ocid
 }
 
-data "kubernetes_nodes" "pool" {
-  depends_on = [module.oke]
-  metadata {
-    labels = {
-      "oke.oraclecloud.com/pool.name" = "oke-ops"
-    }
-  }
-}
-
 locals {
   vcn_name                 = format("%v-%v", var.vcn_name, local.state_id)
   cluster_endpoints        = module.oke.cluster_endpoints
@@ -23,45 +14,17 @@ locals {
   cluster_id               = module.oke.cluster_id
   cluster_apiserver        = try(trimspace(module.oke.apiserver_private_host), "")
   cluster_name             = format("%v-%v", var.cluster_name, local.state_id)
-  # Kubernetes labels
-  labels_gpu_stack = tomap({
-    "app.kubernetes.io/part-of" = "oke-gpu-stack"
-    "app.kubernetes.io/version" = "1"
-  })
-  monitoring_version = "1"
-  monitoring_labels = merge(local.labels_gpu_stack, tomap({
-    "app.kubernetes.io/name"    = var.monitoring_namespace
-    "app.kubernetes.io/version" = local.monitoring_version
-  }))
+
   kube_exec_args = concat(
     ["--region", var.region],
     var.oci_profile != null ? ["--profile", var.oci_profile] : [],
     ["ce", "cluster", "generate-token"],
     ["--cluster-id", module.oke.cluster_id],
   )
-  # Node resources for Prometheus
-  node             = element(tolist(one(data.kubernetes_nodes.pool[*].nodes)), 1)
-  node_allocatable = lookup(element(lookup(local.node, "status", [{}]), 1), "allocatable", {})
-  node_memory      = lookup(local.node_allocatable, "memory", "8000000Ki")
-  node_memory_bytes = (
-    length(regexall("Ki$", local.node_memory)) > 0
-    ? parseint(trimsuffix(local.node_memory, "Ki"), 10) * 1000
-    : parseint(local.node_memory)
-  )
-  prom_server_memory_request_bytes = (
-    length(regexall("%$", var.prom_server_memory_request)) > 0
-    ? local.node_memory_bytes * (parseint(trimsuffix(var.prom_server_memory_request, "%"), 10) * 0.01)
-    : var.prom_server_memory_request
-  )
-  prom_server_memory_limit_bytes = (
-    length(regexall("%$", var.prom_server_memory_limit)) > 0
-    ? local.node_memory_bytes * (parseint(trimsuffix(var.prom_server_memory_limit, "%"), 10) * 0.01)
-    : var.prom_server_memory_limit
-  )
 }
 
 module "oke" {
-  source                            = "github.com/oracle-quickstart/oci-hpc-oke.git?ref=5.1.8&depth=1"
+  source                            = "github.com/oracle-terraform-modules/terraform-oci-oke.git?ref=3d2ccd1a0cca3589b339417de91ef616b4490973"
   providers                         = { oci.home = oci.home }
   region                            = var.region
   tenancy_id                        = var.tenancy_ocid
@@ -83,17 +46,17 @@ module "oke" {
   bastion_shape = {
     shape = var.bastion_shape, ocpus = 4, memory = 16, boot_volume_size = 50
   }
-  bastion_upgrade             = false
-  cluster_name                = local.cluster_name
-  cluster_type                = "enhanced"
+  bastion_upgrade = false
+  cluster_name    = local.cluster_name
+  cluster_type    = "enhanced"
   cluster_addons = {
     "NvidiaGpuPlugin" = {
       remove_addon_resources_on_delete = true
       override_existing                = true
-      configurations = []
+      configurations                   = []
     }
-  }    
-  cni_type                    = "flannel"
+  }
+  cni_type                    = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
   control_plane_allowed_cidrs = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public     = true
   create_bastion              = var.create_bastion
@@ -107,16 +70,14 @@ module "oke" {
   load_balancers              = "internal"
   lockdown_default_seclist    = true
   # TODO input variable + schema for image selection
-  #operator_image_type         = "custom"
-  #operator_image_id = data.oci_core_images.linux.images.0.id
   operator_image_type                = "platform"
   operator_image_os                  = "Canonical Ubuntu" # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = "22.04"
   operator_user                      = "ubuntu"
   operator_await_cloudinit           = false
-  operator_install_oci_cli           = true
   operator_install_kubectl_from_repo = true
-  operator_install_helm              = true
+  operator_install_helm_from_repo    = true
+  operator_install_oci_cli_from_repo = true
   operator_install_k9s               = true
   operator_install_kubectx           = true
   operator_shape = {
@@ -148,6 +109,7 @@ module "oke" {
     pub_lb   = { create = "always", newbits = 11 }
     fss      = { create = "always", newbits = 11 }
     workers  = { create = "always", newbits = 4 }
+    pods     = { create = "always", newbits = 4 }
   }
   nsgs = {
     bastion  = { create = "always" }
@@ -157,6 +119,7 @@ module "oke" {
     pub_lb   = { create = "always" }
     fss      = { create = "always" }
     workers  = { create = "always" }
+    pods     = { create = "always" }
   }
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
