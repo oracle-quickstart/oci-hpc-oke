@@ -27,21 +27,19 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 **Images for NVIDIA shapes**
 
-- [GPU driver 535.183.06 & CUDA 12.2](https://objectstorage.ca-toronto-1.oraclecloud.com/p/KOcEZeDpEAASLSKzumODnVr42mFwM_p9n1_Nra2FsV_F6BcpAkoH66HZxN4cCtIb/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.09.18-0)
+- [GPU driver 560 & CUDA 12.6](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-560-CUDA-12.6-2025-03-05.01)
 
-- [GPU driver 550.90.12 & CUDA 12.4](https://objectstorage.ca-toronto-1.oraclecloud.com/p/EDngSWYfn3HjrN0xbfBSVCctRVKVvNf3NOW7DdInKMtgiZwiUqy7PsA_xifmI1oq/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-550-CUDA-12.4-2024.09.18-0)
-
-- [GPU driver 560.35.03 & CUDA 12.6](https://objectstorage.ca-toronto-1.oraclecloud.com/p/a_KKMCajcBpt9EfqgmnZbtUInpc6gdC5s2g1wz7b0KUCLW28DSvTKwMeOSgW5O0R/n/hpc_limited_availability/b/images/o/Ubuntu-22-OCA-OFED-23.10-2.1.3.1-GPU-560-CUDA-12.6-2024.09.18-0)
+- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025-03-06.01)
 
 **Image for AMD shapes**
 
-- [ROCm 6.2](https://objectstorage.us-ashburn-1.oraclecloud.com/p/tpswnRAUmrJ49uLAGk_ku6B13hyGzf_Gv1vrggtDWhOywSM5YGzoMPiO88gc3Cv-/n/imagegen/b/GPU-imaging/o/Ubuntu-22-OFED-5.9-0.5.6.0.127-ROCM-6.2-90-2024.08.12-0.oci)
+- [ROCm 6.3](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-ROCM-632-2025-03-05.01)
 
 
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v25.2.0/oke-rdma-quickstart-v25.2.0.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v25.3.0/oke-rdma-quickstart-v25.3.0.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 

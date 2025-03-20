@@ -20,7 +20,7 @@ Please note depending on the shape and its configuration, some health checks wil
 You can deploy using the Node Problem Detector Helm chart. The health check scripts are created as a `ConfigMap`, so please make sure you use the `values.yaml` in the link below.
 
 ```
-helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.15 \
+helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.18 \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/node-problem-detector/values.yaml
 ```
 

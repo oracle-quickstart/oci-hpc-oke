@@ -1,17 +1,10 @@
 # Copyright (c) 2024 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
-locals {
-  scrape_interval = format("%vs", var.scrape_interval_seconds)
-  scrape_timeout  = format("%vs", var.scrape_timeout_seconds)
-  retention       = format("%vh", var.retention_hours)
-  retention_size  = format("%vGB", var.retention_gb)
-}
-
 variable "compartment_ocid" { type = string }
 variable "create_policies" { default = true }
 variable "create_vcn" { default = true }
-variable "kubernetes_version" { default = "v1.29.1" }
+variable "kubernetes_version" { default = "v1.31.1" }
 variable "region" { type = string }
 variable "tenancy_ocid" { type = string }
 variable "vcn_cidrs" { default = "10.140.0.0/16" } # TODO input in RMS schema
@@ -186,22 +179,27 @@ variable "nvme_raid_level" { default = 0 }
 # MONITORING
 # Installation
 
-variable "install_monitoring" {
+variable "install_node_problem_detector_kube_prometheus_stack" {
   default = true
   type    = bool
 }
-variable "install_prometheus_stack" {
-  default = true
-  type    = bool
-}
-variable "install_prometheus_adapter" {
-  default = false
-  type    = bool
-}
-variable "install_prometheus_pushgateway" {
-  default = true
-  type    = bool
-}
+
+# variable "install_monitoring" {
+#   default = true
+#   type    = bool
+# }
+# variable "install_prometheus_stack" {
+#   default = true
+#   type    = bool
+# }
+# variable "install_prometheus_adapter" {
+#   default = false
+#   type    = bool
+# }
+# variable "install_prometheus_pushgateway" {
+#   default = true
+#   type    = bool
+# }
 variable "install_grafana" {
   default = true
   type    = bool
@@ -210,68 +208,89 @@ variable "install_grafana_dashboards" {
   default = true
   type    = bool
 }
-variable "install_metrics_server" {
-  default = true
-  type    = bool
-}
+# variable "install_metrics_server" {
+#   default = true
+#   type    = bool
+# }
 
 variable "install_dcgm_exporter" {
   default = true
   type    = bool
 }
 
+# variable "install_node_problem_detector" {
+#   default = true
+#   type    = bool
+# }
+
 variable "monitoring_namespace" {
   default = "monitoring"
   type    = string
 }
-variable "prometheus_stack_chart_version" {
-  default = "62.3.1"
-  type    = string
-}
-variable "prometheus_pushgateway_chart_version" {
-  default = "2.14.0"
-  type    = string
-}
-variable "prometheus_adapter_chart_version" {
-  default = "4.11.0"
-  type    = string
-}
-variable "metrics_server_chart_version" {
-  default = "3.12.1"
+
+variable "node_problem_detector_chart_version" {
+  default = "2.3.18"
   type    = string
 }
 
+variable "prometheus_stack_chart_version" {
+  default = "69.8.2"
+  type    = string
+}
+# variable "prometheus_pushgateway_chart_version" {
+#   default = "3.0.0"
+#   type    = string
+# }
+# variable "prometheus_adapter_chart_version" {
+#   default = "4.13.0"
+#   type    = string
+# }
+# variable "metrics_server_chart_version" {
+#   default = "3.12.2"
+#   type    = string
+# }
+
 variable "dcgm_exporter_chart_version" {
-  default = "3.5.0"
+  default = "4.0.4"
   type    = string
 }
 
 # Configuration
-variable "prom_server_memory_request" {
-  default = "90%"
-  type    = string
+# variable "prom_server_memory_request" {
+#   default = "90%"
+#   type    = string
+# }
+# variable "prom_server_memory_limit" {
+#   default = "90%"
+#   type    = string
+# }
+# variable "retention_hours" {
+#   default = 48
+#   type    = number
+# }
+# variable "retention_gb" {
+#   default = 1000
+#   type    = number
+# }
+# variable "retention_storageclass" {
+#   default = "oci-bv"
+#   type    = string
+# }
+# variable "scrape_interval_seconds" {
+#   default = 30
+#   type    = string
+# }
+# variable "scrape_timeout_seconds" {
+#   default = 25
+#   type    = string
+# }
+
+variable "override_hostnames" {
+  default = false
+  type    = bool
 }
-variable "prom_server_memory_limit" {
-  default = "90%"
-  type    = string
-}
-variable "retention_hours" {
-  default = 48
-  type    = number
-}
-variable "retention_gb" {
-  default = 1000
-  type    = number
-}
-variable "retention_storageclass" {
-  default = "oci-bv"
-  type    = string
-}
-variable "scrape_interval_seconds" {
-  default = 30
-  type    = string
-}
-variable "scrape_timeout_seconds" {
-  default = 25
+
+variable "cni_type" {
+  default = "npn"
   type    = string
 }
