@@ -6,9 +6,9 @@ spec:
   restartPolicy: OnFailure
   containers:
   - name: amd-version-check
-    image: rocm/rocm-terminal
+    image: rocm/rocm-terminal:6.3.2
     command: ["/bin/sh"]
-    args: ["-c", "amd-smi version; amd-smi list"]
+    args: ["-c", "pip install pyyaml; amd-smi version; amd-smi list"]
     resources:
       limits:
          amd.com/gpu: "8"
