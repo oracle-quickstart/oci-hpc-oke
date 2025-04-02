@@ -10,11 +10,15 @@ Please note depending on the shape and its configuration, some health checks wil
 | GpuEcc           	| Checks for GPU ECC errors                                    	|
 | GpuRowRemap      	| Checks for GPU Row Remapping Errors                          	|
 | GpuBus           	| Checks if any GPU has fallen off the bus                     	|
+| GpuPcie           | Checks if PCIE has the expected bandwidth                     	|
+| GpuFabricManager           	| Checks if Fabric Manager is running                     	|
+| GpuBadPages           	| Checks if any AMD GPU has bad pages                     	|
 | RdmaLink         	| Checks if RDMA links are up                                  	|
 | RdmaLinkFlapping 	| Checks if there's any RDMA links that are flapping           	|
 | RdmaWpaAuth      	| Checks if all RDMA interfaces are authenticated              	|
 | RdmaRttcc        	| Checks if RTTCC is disabled on the RDMA interfaces           	|
 | OcaVersion       	| Checks if node has the correct Oracle Cloud Agent version    	|
+| CpuProfile           	| Checks if the CPU profile is set to performance                     	|
 
 #### Deployment
 You can deploy using the Node Problem Detector Helm chart. The health check scripts are created as a `ConfigMap`, so please make sure you use the `values.yaml` in the link below.

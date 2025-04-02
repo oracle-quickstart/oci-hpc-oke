@@ -25,82 +25,9 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 23,
+  "id": 2,
   "links": [],
   "panels": [
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 15,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "last"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "text": {},
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "{__name__=\"problem_gauge\", reason=~\".*(Gpu|Cpu|Rdma|Oca).*Count.*HasIssues$\"}",
-          "instant": true,
-          "interval": "",
-          "legendFormat": "",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Number of Firing Alerts",
-      "type": "stat"
-    },
     {
       "datasource": {
         "type": "prometheus",
@@ -142,7 +69,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 0
       },
       "id": 7,
       "interval": "5m",
@@ -251,8 +178,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "OKE GPU & RDMA Node Problem Detector",
+  "title": "GPU & RDMA Node Problem Detector",
   "uid": "vfUp2mrMz",
-  "version": 12,
+  "version": 2,
   "weekStart": ""
 }

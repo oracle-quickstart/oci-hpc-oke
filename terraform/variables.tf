@@ -11,7 +11,7 @@ variable "vcn_cidrs" { default = "10.140.0.0/16" } # TODO input in RMS schema
 variable "vcn_name" { default = "oke-gpu-quickstart" }
 
 variable "create_bastion" { default = true }
-variable "bastion_shape" { default = "VM.Standard.E4.Flex" }
+variable "bastion_shape" { default = "VM.Standard.E5.Flex" }
 variable "bastion_allowed_cidrs" { default = ["0.0.0.0/0"] }
 variable "bastion_image_type" {
   default     = "platform"
@@ -43,7 +43,7 @@ variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
 
 variable "create_operator" { default = false }
 variable "operator_shape_config" { default = false }
-variable "operator_shape_name" { default = "VM.Standard.E4.Flex" }
+variable "operator_shape_name" { default = "VM.Standard.E5.Flex" }
 variable "operator_shape_ocpus" { default = 2 }
 variable "operator_shape_memory" { default = 2 }
 variable "operator_shape_boot" { default = 50 }
@@ -79,7 +79,7 @@ variable "worker_ops_boot_volume_size" { default = 128 }
 variable "worker_ops_memory" { default = 64 }
 variable "worker_ops_ocpus" { default = 16 }
 variable "worker_ops_pool_size" { default = 3 }
-variable "worker_ops_shape" { default = "VM.Standard.E4.Flex" }
+variable "worker_ops_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_ops_image_type" { default = "Custom" }
 variable "worker_ops_image_custom_id" { default = "" }
 variable "worker_ops_ad" { default = "" }
@@ -93,7 +93,7 @@ variable "worker_cpu_image_type" { default = "Custom" }
 variable "worker_cpu_memory" { default = 32 }
 variable "worker_cpu_ocpus" { default = 4 }
 variable "worker_cpu_pool_size" { default = 1 }
-variable "worker_cpu_shape" { default = "VM.Standard.E4.Flex" }
+variable "worker_cpu_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_cpu_ad" { default = "" }
 
 variable "worker_gpu_boot_volume_size" { default = 512 }
