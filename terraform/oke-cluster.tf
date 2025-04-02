@@ -49,13 +49,29 @@ module "oke" {
   bastion_upgrade = false
   cluster_name    = local.cluster_name
   cluster_type    = "enhanced"
-  cluster_addons = {
-    "NvidiaGpuPlugin" = {
-      remove_addon_resources_on_delete = true
-      override_existing                = true
-      configurations                   = []
-    }
-  }
+  cluster_addons = merge(
+    {
+      "NvidiaGpuPlugin" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
+        configurations                   = [
+          {
+            key   = "isDcgmExporterDisabled"
+            value = "true"
+          }
+        ]
+      }
+    },
+    anytrue([
+      var.worker_rdma_shape == "BM.GPU.MI300X.8",
+      var.worker_gpu_shape == "BM.GPU.MI300X.8"
+    ]) ? {
+      "AmdGpuPlugin" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
+      }
+    } : {}
+  )
   cni_type                    = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
   control_plane_allowed_cidrs = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public     = true

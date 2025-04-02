@@ -1,6 +1,3 @@
-# Copyright (c) 2024 Oracle Corporation and/or its affiliates.
-# Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
-
 resource "helm_release" "node-problem_detector" {
   count             = var.install_node_problem_detector_kube_prometheus_stack ? 1 : 0
   depends_on        = [helm_release.prometheus]

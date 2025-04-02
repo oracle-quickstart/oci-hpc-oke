@@ -21,7 +21,7 @@ locals {
   ) : ""
 
   runcmd_nvme_raid = var.nvme_raid_enabled ? format(
-    "curl -sL -o /var/run/oke-nvme-raid.sh https://raw.githubusercontent.com/OguzPastirmaci/misc/refs/heads/master/oke-nvme-provisioner/nvme-requires-fix.sh && (bash /var/run/oke-nvme-raid.sh '%v' || echo 'Error initializing RAID' >&2)",
+    "curl -sL -o /var/run/oke-nvme-raid.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-nvme-raid.sh && (bash /var/run/oke-nvme-raid.sh '%v' || echo 'Error initializing RAID' >&2)",
     var.nvme_raid_level,
   ) : ""
 

@@ -64,7 +64,7 @@ output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-r
 
 # Monitoring
 output "grafana_public_ip" {
-  value = format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{"\n"}{.items[0].status.loadBalancer.ingress[0].ip}{"\n\n"}'", var.monitoring_namespace)
+  value = format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'", var.monitoring_namespace)
 }
 
 output "grafana_admin_password" {

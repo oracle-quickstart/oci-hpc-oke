@@ -33,7 +33,10 @@ locals {
     "Allow dynamic-group %v to use vnics in compartment id %v",
     "Allow dynamic-group %v to use network-security-groups in compartment id %v",
     "Allow dynamic-group %v to inspect compartments in compartment id %v",
-    "Allow dynamic-group %v to {CLUSTER_JOIN} in compartment id %v"
+    "Allow dynamic-group %v to {CLUSTER_JOIN} in compartment id %v",
+    "Allow dynamic-group %v to read metrics in compartment id %v",
+    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='gpu_infrastructure_health'",
+    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='rdma_infrastructure_health'"
   ]
 
   wris_template = [
