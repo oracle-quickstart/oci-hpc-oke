@@ -1,0 +1,111 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  annotations:
+  name: rccl-tests-job0
+spec:
+  minAvailable: 0
+  plugins:
+    ssh: []
+    svc: []
+  queue: default
+  schedulerName: volcano
+  tasks:
+  - name: mpimaster
+    policies:
+    - action: CompleteJob
+      event: TaskCompleted
+    replicas: 1
+    template:
+      metadata:
+      spec:
+        containers:
+        - command:
+          - /bin/bash
+          - -c
+          - |
+            sysctl --system
+            NUM_GPUS=8
+            NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
+            NP=$(($NUM_HOSTS*$NUM_GPUS))
+            mpirun --allow-run-as-root \
+            -mca plm_rsh_args "-p 2222" \
+            --bind-to numa \
+            --mca oob_tcp_if_exclude docker,lo \
+            --mca btl ^openib \
+            -x NCCL_DEBUG=VERSION \
+            -x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9 \
+            -x NCCL_SOCKET_IFNAME=eth0 \
+            -x NCCL_IB_TC=41 \
+            -x NCCL_IB_SL=0 \
+            -x NCCL_IB_GID_INDEX=3 \
+            -x NCCL_IB_QPS=2 \
+            -x NCCL_IB_SPLIT_DATA_ON_QPS=4 \
+            -x NCCL_ALGO=Ring \
+            -hostfile /etc/volcano/mpiworker.host \
+            -N 8 -np $NP \
+            /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
+          ports:
+          - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+          image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.2.1-ofed-5.9-0.5.6.0.127
+          imagePullPolicy: Always
+          name: mpimaster
+          resources:
+            limits:
+              ephemeral-storage: 32Gi
+            requests:
+              cpu: 8
+              ephemeral-storage: 32Gi
+              memory: 2Gi
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [IPC_LOCK, SYS_PTRACE]
+          volumeMounts:
+          - { mountPath: /dev/shm, name: shm }
+          workingDir: /workspace
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        restartPolicy: OnFailure
+        terminationGracePeriodSeconds: 2
+        volumes:
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+  - minAvailable: 0
+    name: mpiworker
+    replicas: 2
+    template:
+      spec:
+        containers:
+        - command:
+          - /bin/bash
+          - -c
+          - sysctl --system; mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+          ports:
+          - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+          image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.2.1-ofed-5.9-0.5.6.0.127
+          imagePullPolicy: Always
+          name: mpiworker
+          resources:
+            limits:
+              ephemeral-storage: 32Gi
+              amd.com/gpu: 8
+            requests:
+              cpu: 200
+              ephemeral-storage: 32Gi
+              memory: 1024Gi
+              amd.com/gpu: 8
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [IPC_LOCK, SYS_PTRACE]
+          volumeMounts:
+          - { mountPath: /dev/shm, name: shm }
+          workingDir: /workspace
+        dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
+        restartPolicy: OnFailure
+        terminationGracePeriodSeconds: 2
+        tolerations:
+        - { key: amd.com/gpu, operator: Exists }
+        volumes:
+        - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}

@@ -176,6 +176,11 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.B4.8-nccl-test.yaml
 ```
 
+##### BM.GPU.MI300X.8
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/BM.GPU.MI300X.8.yaml
+```
+
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
 
 ```sh

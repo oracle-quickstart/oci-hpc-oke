@@ -54,7 +54,7 @@ module "oke" {
       "NvidiaGpuPlugin" = {
         remove_addon_resources_on_delete = true
         override_existing                = true
-        configurations                   = [
+        configurations = [
           {
             key   = "isDcgmExporterDisabled"
             value = "true"
@@ -65,27 +65,26 @@ module "oke" {
     anytrue([
       var.worker_rdma_shape == "BM.GPU.MI300X.8",
       var.worker_gpu_shape == "BM.GPU.MI300X.8"
-    ]) ? {
+      ]) ? {
       "AmdGpuPlugin" = {
         remove_addon_resources_on_delete = true
         override_existing                = true
       }
     } : {}
   )
-  cni_type                    = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
-  control_plane_allowed_cidrs = flatten(tolist([var.control_plane_allowed_cidrs]))
-  control_plane_is_public     = true
-  create_bastion              = var.create_bastion
-  create_cluster              = true
-  create_iam_defined_tags     = false
-  create_iam_resources        = false
-  create_iam_tag_namespace    = false
-  create_operator             = var.create_operator
-  create_vcn                  = var.create_vcn
-  kubernetes_version          = var.kubernetes_version
-  load_balancers              = "internal"
-  lockdown_default_seclist    = true
-  # TODO input variable + schema for image selection
+  cni_type                           = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
+  control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
+  control_plane_is_public            = true
+  create_bastion                     = var.create_bastion
+  create_cluster                     = true
+  create_iam_defined_tags            = false
+  create_iam_resources               = false
+  create_iam_tag_namespace           = false
+  create_operator                    = var.create_operator
+  create_vcn                         = var.create_vcn
+  kubernetes_version                 = var.kubernetes_version
+  load_balancers                     = "internal"
+  lockdown_default_seclist           = true
   operator_image_type                = "platform"
   operator_image_os                  = "Canonical Ubuntu" # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = "22.04"
@@ -103,7 +102,7 @@ module "oke" {
     boot_volume_size = var.operator_shape_boot
   }
   output_detail = true
-  pods_cidr     = "10.240.0.0/12" # TODO input var (but keep expanded default)
+  pods_cidr     = "10.240.0.0/12"
   # services_cidr                     = "10.96.0.0/16"
   #preferred_load_balancer           = "internal"
   ssh_public_key                    = trimspace(var.ssh_public_key)
@@ -139,7 +138,7 @@ module "oke" {
   }
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
-      protocol = "all", port = -1, source = "10.0.0.0/8", source_type = "CIDR_BLOCK",
+      protocol = "all", port = -1, source = var.vcn_cidrs, source_type = "CIDR_BLOCK",
     }
   }
 }
