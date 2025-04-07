@@ -3,10 +3,7 @@
 
 # Terraform
 output "state_id" { value = module.oke.state_id }
-
-# Identity
-# output "dynamic_group_ids" { value = module.oke.dynamic_group_ids }
-# output "policy_statements" { value = module.oke.policy_statements }
+output "stack_version" { value = "v25.3.1" }
 
 # Network
 output "vcn_id" { value = module.oke.vcn_id }
@@ -35,32 +32,26 @@ output "cluster_id" { value = module.oke.cluster_id }
 output "cluster_name" { value = local.cluster_name }
 output "cluster_public_endpoint" { value = local.cluster_public_endpoint }
 output "cluster_private_endpoint" { value = local.cluster_private_endpoint }
-output "cluster_kubeconfig" { value = module.oke.cluster_kubeconfig }
 output "cluster_ca_cert" { value = base64decode(module.oke.cluster_ca_cert) }
 output "control_plane_subnet_id" { value = module.oke.control_plane_subnet_id }
 output "control_plane_subnet_cidr" { value = module.oke.control_plane_subnet_cidr }
 output "control_plane_nsg_id" { value = module.oke.control_plane_nsg_id }
 output "int_lb_subnet_id" { value = module.oke.int_lb_subnet_id }
 output "int_lb_subnet_cidr" { value = module.oke.int_lb_subnet_cidr }
+output "int_lb_nsg_id" { value = module.oke.int_lb_nsg_id }
 output "pub_lb_subnet_id" { value = module.oke.pub_lb_subnet_id }
 output "pub_lb_subnet_cidr" { value = module.oke.pub_lb_subnet_cidr }
+output "pub_lb_nsg_id" { value = module.oke.pub_lb_nsg_id }
+
 
 # Workers
 output "worker_subnet_id" { value = module.oke.worker_subnet_id }
 output "worker_nsg_id" { value = module.oke.worker_nsg_id }
+output "worker_subnet_cidr" { value = module.oke.worker_subnet_cidr }
 output "worker_ops_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-ops", null) }
 output "worker_cpu_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-cpu", null) }
 output "worker_gpu_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-gpu", null) }
 output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-rdma", null) }
-
-# Storage
-#output "fss_ad" { value = oci_file_storage_file_system.fss.0.availability_domain }
-#output "fss_filesystem_id" { value = oci_file_storage_file_system.fss.0.id }
-#output "fss_volume_name" { value = local.fss_volume_name }
-#output "fss_nsg_id" { value = local.fss_nsg_id }
-#output "fss_subnet_id" { value = local.fss_subnet_id }
-#output "fss_mount_target_id" { value = oci_file_storage_mount_target.fss.0.id }
-#output "fss_export_set_id" { value = oci_file_storage_export_set.fss.0.id }
 
 # Monitoring
 output "grafana_public_ip" {

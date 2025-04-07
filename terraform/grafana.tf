@@ -48,7 +48,10 @@ resource "kubernetes_config_map_v1" "grafana_alerts" {
 
 
 resource "random_password" "grafana_admin_password" {
-  length           = 12
-  special          = true
+  length           = 16
+  min_lower        = 1
+  min_upper        = 1
+  min_numeric      = 1
+  min_special      = 1
   override_special = "!#$%&*()-_=+[]:?"
 }

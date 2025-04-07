@@ -7,7 +7,7 @@ variable "create_vcn" { default = true }
 variable "kubernetes_version" { default = "v1.31.1" }
 variable "region" { type = string }
 variable "tenancy_ocid" { type = string }
-variable "vcn_cidrs" { default = "10.140.0.0/16" } # TODO input in RMS schema
+variable "vcn_cidrs" { default = "10.140.0.0/16" }
 variable "vcn_name" { default = "oke-gpu-quickstart" }
 
 variable "create_bastion" { default = true }
@@ -76,8 +76,8 @@ variable "fss_ad" { default = "" }
 variable "create_bv_high" { default = false }
 
 variable "worker_ops_boot_volume_size" { default = 128 }
-variable "worker_ops_memory" { default = 64 }
-variable "worker_ops_ocpus" { default = 16 }
+variable "worker_ops_memory" { default = 32 }
+variable "worker_ops_ocpus" { default = 8 }
 variable "worker_ops_pool_size" { default = 3 }
 variable "worker_ops_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_ops_image_type" { default = "Custom" }
@@ -184,22 +184,6 @@ variable "install_node_problem_detector_kube_prometheus_stack" {
   type    = bool
 }
 
-# variable "install_monitoring" {
-#   default = true
-#   type    = bool
-# }
-# variable "install_prometheus_stack" {
-#   default = true
-#   type    = bool
-# }
-# variable "install_prometheus_adapter" {
-#   default = false
-#   type    = bool
-# }
-# variable "install_prometheus_pushgateway" {
-#   default = true
-#   type    = bool
-# }
 variable "install_grafana" {
   default = true
   type    = bool
@@ -208,20 +192,11 @@ variable "install_grafana_dashboards" {
   default = true
   type    = bool
 }
-# variable "install_metrics_server" {
-#   default = true
-#   type    = bool
-# }
 
 variable "install_dcgm_exporter" {
   default = true
   type    = bool
 }
-
-# variable "install_node_problem_detector" {
-#   default = true
-#   type    = bool
-# }
 
 variable "monitoring_namespace" {
   default = "monitoring"
@@ -237,18 +212,6 @@ variable "prometheus_stack_chart_version" {
   default = "69.8.2"
   type    = string
 }
-# variable "prometheus_pushgateway_chart_version" {
-#   default = "3.0.0"
-#   type    = string
-# }
-# variable "prometheus_adapter_chart_version" {
-#   default = "4.13.0"
-#   type    = string
-# }
-# variable "metrics_server_chart_version" {
-#   default = "3.12.2"
-#   type    = string
-# }
 
 variable "dcgm_exporter_chart_version" {
   default = "4.0.4"
