@@ -25,6 +25,9 @@ You can use the below images for both CPU and GPU pools.
 #### Images to use
 You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
 
+**Image to use for non-GPU nodes**
+[Link to import](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
+
 **Images for NVIDIA shapes**
 
 - [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
@@ -152,7 +155,7 @@ kubectl create serviceaccount -n default mpi-worker-view
 kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
 ```
 
-#### Run the NCCL test
+#### Run the NCCL/RCCL tests
 > [!IMPORTANT]  
 > The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
 
