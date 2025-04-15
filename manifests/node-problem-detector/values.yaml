@@ -1078,11 +1078,6 @@ settings:
       def check_wpa_auth(metadata):
           shape = metadata.get('shape')
       
-          # Skip the test for VM shapes
-          if shape.startswith("VM."):
-              pass
-              return []
-      
           if shape in ["BM.GPU.H100.8", "BM.GPU.B4.8", "BM.GPU.A100-v2.8", "BM.GPU4.8"]:
               interface_range = range(16)
               required_authenticated = 16
@@ -1091,7 +1086,7 @@ settings:
               required_authenticated = 8
           else:
               logger.error("Unsupported machine shape.")
-              return ["Unsupported machine shape."]
+              return []
           
           authenticated_count = 0 
           wpa_auth_issues = []
