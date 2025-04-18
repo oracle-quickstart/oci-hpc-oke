@@ -286,3 +286,6 @@ You can deploy the health check script with Node Problem Detector by following t
 
 ### Can I autoscale my RDMA enabled nodes in a Cluster Network?
 You can setup autoscaling for your nodes in a Cluster Network using the instructions [here.](./docs/using-cluster-autoscaler-with-cluster-networks.md)
+
+### How do I use network locality information when running workloads on OKE?
+You can follow the instructions [here.](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
