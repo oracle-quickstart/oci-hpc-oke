@@ -173,7 +173,7 @@ spec:
 
 ```
 
-### Using `kueue`
+### Using Kueue
 You will need to [enable the feature gate](https://kueue.sigs.k8s.io/docs/installation/#change-the-feature-gates-configuration) for [Topology Aware Scheduling (TAS)](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling) in Kueue. Topology Aware Scheduling is currently in alpha state since Kueue v0.9.
 
 The following example uses `node.kubernetes.io/instance-type: "BM.GPU.H100.8"` to select H100s, but you can use any label that exists on all your nodes that you're targeting with the Resource Flavor.
@@ -262,5 +262,107 @@ spec:
             memory: "200Mi"
       restartPolicy: Never
 ```
+
+### Using Node Ordering script as an Init Container with MPI Operator
+If your workload can use an ordered list of hosts or a rankfile (e.g. `mpirun`), you can use the Python script to generate that file using an Init Container and then use the generated ordered host list or rankfile in your job.
+
+The script creates the files using the same information available in instance metadata service.
+
+Example with MPI Operator:
+
+```yaml
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+          spec:
+            initContainers:
+            - name: node-ordering
+              image: iad.ocir.io/hpc_limited_availability/node-ordering:mpi-operator-v0.1
+              volumeMounts:
+              - name: node-ordering
+                mountPath: "/node-ordering"
+              - name: mpi-job-config
+                mountPath: /etc/mpi
+              - name: ssh-auth
+                mountPath: /root/.ssh
+            volumes:
+            - name: node-ordering
+              emptyDir: {}    
+            containers:
+            - image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+              name: nccl-tests
+              volumeMounts:
+              - name: node-ordering
+                mountPath: "/node-ordering"
+              env:
+              - name: OMPI_ALLOW_RUN_AS_ROOT
+                value: "1"
+              - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+                value: "1"           
+              command: ["/bin/bash", "-c"]
+              args: ["mpirun \
+                    -mca coll ^hcoll -mca plm_rsh_args "-p 2222" \
+                    -mca coll_hcoll_enable 0 \
+                    --bind-to numa \
+                    -hostfile /node-ordering/ordered_hostfile \
+                    -x NCCL_SOCKET_NTHREADS=16 \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_QPS_PER_CONNECTION=16 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+                    "]
+              resources:
+                requests:
+                  cpu: 2
+                  memory: 128Mi
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+        spec:
+          containers:
+          - image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+            securityContext:
+              capabilities:
+                add: [ "IPC_LOCK" ]
+            name: nccl
+            resources:
+              requests:
+                cpu: 100
+                memory: 750Gi
+                nvidia.com/gpu: 8
+              limits:
+                nvidia.com/gpu: 8
+            volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
+          volumes:
+            - emptyDir:
+                medium: Memory
+              name: dshm                
+```                
+
 
 
