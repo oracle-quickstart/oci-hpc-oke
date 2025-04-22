@@ -279,12 +279,12 @@ spec:
       restartPolicy: Never
 ```
 
-### Using Node Ordering script as an Init Container with MPI Operator
+### Using Node Ordering script as an Init Container
 If your workload can use an ordered hostfile or a rankfile (e.g. `mpirun`), you can use the [Node Ordering script](../docker/node-ordering/node_ordering.py) to generate the ordered hostfile/rankfile using an Init Container and then use the generated hostlist/rankfile in your job.
 
 The script creates the files using the same `customerLocalBlock` information available in instance metadata service.
 
-Example for running the RCCL tests with MPI Operator:
+Here's an example for running the RCCL tests with [MPI Operator](https://github.com/kubeflow/mpi-operator):
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1
