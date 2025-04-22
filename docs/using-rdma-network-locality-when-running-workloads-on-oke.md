@@ -25,6 +25,16 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
   "customerNetworkBlock": "ocid1.computenetworkblock.oc1.iad.anuwclddsdef..."
 ```
 
+## Which shapes are supported?
+**H100, H200, B200, MI300x**
+- Kubernetes Node Affinity
+- Kubernetes Pod Affinity
+- Kueue
+- Node Ordering script as Init Container
+
+**A100**
+- Node Ordering script as Init Container
+
 ## How do I use network locality information when running workloads on OKE?
 When the locality information is available in the instance metadata service, OKE will add the following labels to your nodes during bootstrapping:
 
@@ -44,13 +54,13 @@ oci.oraclecloud.com/rdma.local_block_id=4tjxbt4s6ua
 oci.oraclecloud.com/rdma.network_block_id=7xmzl4p4wba
 ```
 
-You can use these labels to create affinity rules for your workloads. Visit [this link](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) if you want to learn more about using affinity rules on Kubernetes.
+### Using Kubernetes node affinity
+You can use the labels explained above to create affinity rules for your workloads. Visit [this link](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) if you want to learn more about using affinity rules on Kubernetes.
 
 Note that because we're using soft rules (`preferredDuringSchedulingIgnoredDuringExecution`), the scheduler will try to find a node that meets the rules. If a matching node is not available, the scheduler will still schedule the pod.
 
 You can use hard rules instead (`requiredDuringSchedulingIgnoredDuringExecution`), but that means the scheduler can't schedule the pod unless the rules are met. So your jobs might not start depending on node availability.
 
-### Using node affinity
 When using node affinity, you will need to provide the values of the `oci.oraclecloud.com/rdma.local_block_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.hpc_island_id` labels. Instead of hardcoding them, you can use tools like `sed` or `yq` to change them when you're scheduling jobs. Or if you're using Helm, you can templatize those values.
 
 ```yaml
@@ -106,7 +116,13 @@ spec:
               memory: "256Mi"
 ```
 
-### Using pod affinity
+### Using Kubernetes pod affinity
+You can use the labels explained above to create affinity rules for your workloads. Visit [this link](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) if you want to learn more about using affinity rules on Kubernetes.
+
+Note that because we're using soft rules (`preferredDuringSchedulingIgnoredDuringExecution`), the scheduler will try to find a node that meets the rules. If a matching node is not available, the scheduler will still schedule the pod.
+
+You can use hard rules instead (`requiredDuringSchedulingIgnoredDuringExecution`), but that means the scheduler can't schedule the pod unless the rules are met. So your jobs might not start depending on node availability.
+
 When using pod affinity, because you're relying on the `topologyKey` instead of node labels, you don't need to provide the values for the `oci.oraclecloud.com/rdma.local_block_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.hpc_island_id` labels.
 
 > [!NOTE]  
@@ -173,7 +189,7 @@ spec:
 
 ```
 
-### Using `kueue`
+### Using Kueue
 You will need to [enable the feature gate](https://kueue.sigs.k8s.io/docs/installation/#change-the-feature-gates-configuration) for [Topology Aware Scheduling (TAS)](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling) in Kueue. Topology Aware Scheduling is currently in alpha state since Kueue v0.9.
 
 The following example uses `node.kubernetes.io/instance-type: "BM.GPU.H100.8"` to select H100s, but you can use any label that exists on all your nodes that you're targeting with the Resource Flavor.
@@ -263,4 +279,116 @@ spec:
       restartPolicy: Never
 ```
 
+### Using Node Ordering script as an Init Container
+If your workload can use an ordered hostfile or a rankfile (e.g. `mpirun`), you can use the [Node Ordering script](../docker/node-ordering/node_ordering.py) to generate the ordered hostfile/rankfile using an Init Container and then use the generated hostlist/rankfile in your job.
+
+The script creates the files using the same `customerLocalBlock` information available in instance metadata service.
+
+Here's an example for running the RCCL tests with [MPI Operator](https://github.com/kubeflow/mpi-operator):
+
+```yaml
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: rccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+          spec:
+            initContainers:
+            - name: node-ordering
+              image: iad.ocir.io/hpc_limited_availability/node-ordering:mpi-operator-port-2222-v0.1
+              volumeMounts:
+              - name: node-ordering
+                mountPath: "/node-ordering"
+              - name: mpi-job-config
+                mountPath: /etc/mpi
+              - name: ssh-auth
+                mountPath: /root/.ssh
+            volumes:
+            - name: node-ordering
+              emptyDir: {}
+            containers:
+            - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+              name: nccl-tests
+              volumeMounts:
+              - name: node-ordering
+                mountPath: "/node-ordering"
+              env:
+              - name: OMPI_ALLOW_RUN_AS_ROOT
+                value: "1"
+              - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+                value: "1"
+              command:
+              - /bin/bash
+              - -c
+              - |
+               sysctl --system
+               NUM_GPUS=8
+               NUM_HOSTS=$(cat /node-ordering/ordered_hostfile | wc -l)
+               NP=$(($NUM_HOSTS*$NUM_GPUS))
+               mpirun --allow-run-as-root \
+               -mca plm_rsh_args "-p 2222" \
+               --bind-to numa \
+               --mca oob_tcp_if_exclude docker,lo \
+               --mca btl ^openib \
+               -x NCCL_DEBUG=VERSION \
+               -x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9 \
+               -x NCCL_SOCKET_IFNAME=eth0 \
+               -x NCCL_IB_TC=41 \
+               -x NCCL_IB_SL=0 \
+               -x NCCL_IB_GID_INDEX=3 \
+               -x NCCL_IB_QPS=2 \
+               -x NCCL_IB_SPLIT_DATA_ON_QPS=4 \
+               -x NCCL_ALGO=Ring \
+               -hostfile /node-ordering/ordered_hostfile \
+               -N 8 -np $NP \
+               /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
+              resources:
+                requests:
+                  cpu: 2
+                  memory: 128Mi
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+        spec:
+          dnsPolicy: ClusterFirstWithHostNet
+          hostNetwork: true
+          containers:
+          - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+            securityContext:
+              privileged: true
+              capabilities:
+                add: [IPC_LOCK, SYS_PTRACE]
+            name: nccl
+            command:
+            - /bin/bash
+            - -c
+            - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            resources:
+              requests:
+                cpu: 100
+                memory: 750Gi
+                amd.com/gpu: 8
+              limits:
+                amd.com/gpu: 8
+            volumeMounts:
+              - mountPath: /dev/shm
+                name: dshm
+          volumes:
+            - emptyDir:
+                medium: Memory
+              name: dshm
+```                
+
+### Using Volcano
+Volcano added the [Network Topology Aware Scheduling](https://volcano.sh/en/docs/network_topology_aware_scheduling/) feature in v1.11.0. The feature currently requires you to create the topology information manually. Once the functionality to [support identifying network topology from node labels and converted into hyperNode resources](https://github.com/volcano-sh/volcano/pull/4146) is added to Volcano, this section of the guide will be updated with the instructions.
 

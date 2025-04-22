@@ -1,0 +1,2 @@
+# Building the Node Ordering container
+The Node Ordering script [node_ordering.py](./node_ordering.py) uses port 2222 by default. If you want to use a different port, change the port in [line 84](./node_ordering.py?plain=1#L84).
