@@ -65,7 +65,7 @@ RUN apt-get update \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Mellanox OFED (latest)
+# Mellanox OFED
 RUN wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add -
 RUN cd /etc/apt/sources.list.d/ && wget https://linux.mellanox.com/public/repo/mlnx_ofed/${MELLANOX_OFED_VERSION}/ubuntu22.04/mellanox_mlnx_ofed.list
 
