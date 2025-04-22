@@ -4,7 +4,7 @@
 variable "compartment_ocid" { type = string }
 variable "create_policies" { default = true }
 variable "create_vcn" { default = true }
-variable "kubernetes_version" { default = "v1.31.1" }
+variable "kubernetes_version" { default = "v1.32.1" }
 variable "region" { type = string }
 variable "tenancy_ocid" { type = string }
 variable "vcn_cidrs" { default = "10.140.0.0/16" }
@@ -40,6 +40,12 @@ variable "bastion_image_id" {
 
 variable "cluster_name" { default = "oke-gpu-quickstart" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
+
+variable "max_pods_per_node" {
+  default     = 110
+  description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Ignored when when cni_type != 'npn'."
+  type        = number
+}
 
 variable "create_operator" { default = false }
 variable "operator_shape_config" { default = false }
