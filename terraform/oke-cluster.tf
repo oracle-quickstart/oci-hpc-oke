@@ -85,6 +85,7 @@ module "oke" {
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = "internal"
   lockdown_default_seclist           = true
+  max_pods_per_node                  = var.max_pods_per_node
   operator_image_type                = "platform"
   operator_image_os                  = "Canonical Ubuntu" # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = "22.04"
