@@ -97,7 +97,7 @@ variable "worker_cpu_image_os_version" { default = "8" }
 variable "worker_cpu_image_os" { default = "Oracle Linux" }
 variable "worker_cpu_image_type" { default = "Custom" }
 variable "worker_cpu_memory" { default = 32 }
-variable "worker_cpu_ocpus" { default = 4 }
+variable "worker_cpu_ocpus" { default = 6 }
 variable "worker_cpu_pool_size" { default = 1 }
 variable "worker_cpu_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_cpu_ad" { default = "" }
@@ -199,7 +199,12 @@ variable "install_grafana_dashboards" {
   type    = bool
 }
 
-variable "install_dcgm_exporter" {
+variable "install_nvidia_dcgm_exporter" {
+  default = true
+  type    = bool
+}
+
+variable "install_amd_device_metrics_exporter" {
   default = true
   type    = bool
 }
@@ -221,6 +226,11 @@ variable "prometheus_stack_chart_version" {
 
 variable "dcgm_exporter_chart_version" {
   default = "4.0.4"
+  type    = string
+}
+
+variable "amd_device_metrics_exporter_chart_version" {
+  default = "v1.2.1"
   type    = string
 }
 

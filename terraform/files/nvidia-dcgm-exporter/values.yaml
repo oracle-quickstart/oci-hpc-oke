@@ -30,7 +30,8 @@ nodeSelector:
   nvidia.com/gpu: "true"
 
 tolerations:
-  - operator: Exists
+  - effect: NoSchedule
+    operator: Exists
 
 customMetrics: |
   # Format
