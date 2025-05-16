@@ -25,9 +25,7 @@ while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/
    sleep 1
 done
 
-apt-get -y update
-
-apt-get -y install $oke_package_name
+apt-get -y update && apt-get -y install $oke_package_name
 
 # OKE bootstrap
 oke bootstrap
