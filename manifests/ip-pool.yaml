@@ -2,7 +2,7 @@ apiVersion: nv-ipam.nvidia.com/v1alpha1
 kind: IPPool
 metadata:
   name: default
-  namespace: nvidia-network-operator
+  namespace: network-operator
 spec:
   subnet: 192.168.0.0/16
   perNodeBlockSize: 100
