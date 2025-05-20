@@ -53,15 +53,6 @@ echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 
 - [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
 
-### Deploy the cluster using the Terraform template
-You can find the template in the [terraform directory](./terraform/).
-
-Make sure to update the variables in the `worker pools` blocks.
-
-You can find more information on setting up Terraform for OCI [here](https://docs.oracle.com/en-us/iaas/developer-tutorials/tutorials/tf-provider/01-summary.htm).
-
-The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J opc@<bastion IP> opc@<operator IP>`.
-
 ### Wait until you see all nodes in the cluster
 
 ```sh
