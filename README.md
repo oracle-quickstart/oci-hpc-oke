@@ -36,11 +36,14 @@ The GPU pool requires you to use an image provided by the Oracle HPC team, you c
 
 For the non-GPU worker pools, you can use the default OKE images (no need to specify them in the Terraform template).
 
-> [!NOTE]  
-> The GPU image has the GPU drivers pre-installed (GPU driver version 535.154.05 with CUDA 12.2). Deploying the GPU driver as a container with the GPU Operator is currently not supported.
-
 #### Images to use
-You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
+It's important to have the below settings in your image. The GPU image listed below has those already, so you can use it without needing any changes.
+
+- Set RDMA subsystem namespace awareness mode to `exclusive` via `ib_core` module parameter:
+```console
+echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
+```
+- Copy [`oci-vf-config`](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/oci-vf-config) and [`oci-create-vfs`](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/oci-create-vfs) to `/usr/bin`.
 
 **Image to use for non-GPU nodes**
 
@@ -49,10 +52,6 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 **Images for NVIDIA shapes**
 
 - [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
-
-- [GPU driver 560 & CUDA 12.6](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-560-CUDA-12.6-2025.03.26-0)
-
-- [GPU driver 550 & CUDA 12.4](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-550-CUDA-12.4-2025.03.26-0)
 
 ### Deploy the cluster using the Terraform template
 You can find the template in the [terraform directory](./terraform/).
