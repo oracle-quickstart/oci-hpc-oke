@@ -131,7 +131,7 @@ helm install --wait \
 
 ### Deploy SR-IOV CNI
 ```
-[kubectl apply -f [https://raw.githubusercontent.com/openshift/sriov-cni/master/images/k8s-v1.16/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/sriov-cni-daemonset.yaml))
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/sriov-cni-daemonset.yaml
 ```
 
 ### Deploy RDMA CNI
@@ -143,17 +143,17 @@ Wait until all network operator pods are running with `kubectl get pods -n netwo
 
 ### Deploy the Virtual Function Configuration daemonset
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/vf-config.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/vf-config.yaml
 ```
 ### Create Network Attachment Definition
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/network-attachment-definition.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/network-attachment-definition.yaml
 ```
 
 ### Create the IP Pool for Nvidia IPAM
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/ip-pool.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/ip-pool.yaml
 ```
 
 ### Create the topology ConfigMap
