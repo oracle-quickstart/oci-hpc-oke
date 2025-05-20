@@ -21,8 +21,6 @@ The Goal of Network Operator is to manage all networking related components to e
 For the A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8), Oracle Linux 8 with the Red Hat Compatible Kernel (RHCK) is supported.
 
 ### Required policies
-The Terraform deployment template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
-
 You must create the necessary OKE policies:
 
 - [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
