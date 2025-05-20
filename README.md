@@ -49,7 +49,7 @@ echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 
 **Images for NVIDIA shapes**
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
+- [GPU driver 570 & CUDA 12.8](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_DA3uxLCkOCLniSkfce_xyS1AOyBsqxHyWpLHkjb3lNshklPur2VuX3jLkLPcbPZ/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0-VF)
 
 ### Wait until you see all nodes in the cluster
 
