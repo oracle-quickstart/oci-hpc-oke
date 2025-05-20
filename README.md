@@ -128,7 +128,7 @@ helm install --wait \
 helm install --wait \
   -n network-operator --create-namespace \
   network-operator nvidia/network-operator \
-  --version v23.10.0 \
+  --version v24.7.0 \
   --set deployCR=true \
   --set nfd.enabled=false \
   --set rdmaSharedDevicePlugin.deploy=false \
