@@ -41,7 +41,7 @@ It's important to have the below settings in your image. The GPU image listed be
 ```console
 echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 ```
-- Copy [`oci-vf-config`](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/oci-vf-config) and [`oci-create-vfs`](https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/oci-create-vfs) to `/usr/bin`.
+- Copy [`oci-vf-config`](https://github.com/oracle-quickstart/oci-hpc-oke/blob/vf/manifests/oci-vf-config) and [`oci-create-vfs`](https://github.com/oracle-quickstart/oci-hpc-oke/blob/vf/manifests/oci-create-vfs) to `/usr/bin`.
 
 **Image to use for non-GPU nodes**
 
