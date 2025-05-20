@@ -18,12 +18,6 @@ spec:
       template:
         spec:
           volumes:
-            - name: topo
-              configMap:
-                name: nccl-topology
-                items:
-                - key: topo.xml
-                  path: topo.xml
             - name: root
               hostPath:
                 path: /
@@ -45,7 +39,7 @@ spec:
           terminationGracePeriodSeconds: 2
           tolerations:
             - key: nvidia.com/gpu
-              operator: Exists          
+              operator: Exists
           containers:
             - command:
                 - /bin/bash
@@ -67,11 +61,9 @@ spec:
                     -x NCCL_IB_TC=41 \
                     -x NCCL_IB_SL=0 \
                     -x NCCL_IB_HCA=mlx5 \
-                    -x NCCL_TOPO_FILE=/topo/topo.xml \
                     /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 8G -c 1; sleep 3600
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.2-1
               volumeMounts:
-              - { mountPath: /topo, name: topo }
               - { mountPath: /host, name: root }
               securityContext:
                 capabilities:
@@ -101,7 +93,7 @@ spec:
                 - /bin/bash
                 - -c
                 - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-23.10-nccl-2.19.3-1
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.2-1
               securityContext:
                 capabilities:
                   add: ["IPC_LOCK"]
@@ -119,7 +111,6 @@ spec:
                   nvidia.com/sriov_rdma_vf: 16
                   ephemeral-storage: 1Gi
               volumeMounts:
-              - { mountPath: /topo, name: topo }
               - mountPath: /dev/shm
                 name: shm
           restartPolicy: OnFailure
@@ -128,12 +119,6 @@ spec:
             - key: nvidia.com/gpu
               operator: Exists
           volumes:
-          - name: topo
-            configMap:
-              name: nccl-topology
-              items:
-              - key: topo.xml
-                path: topo.xml
           - name: root
             hostPath:
               path: /
