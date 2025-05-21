@@ -51,7 +51,7 @@ spec:
                   sleep 15 ; continue ;
                 done
 
-                service stop oracle-cloud-agent || true
+                snap stop oracle-cloud-agent || true
                 echo 0 | tee /sys/class/net/rdma*/device/sriov_numvfs || true
                 sleep 30
                 rdma system show
