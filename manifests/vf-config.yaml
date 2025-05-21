@@ -57,7 +57,7 @@ spec:
                 rdma system show
                 oci-vf-config; sleep 2
                 echo 4220 | tee /sys/class/net/rdma*/mtu || true
-                service start oracle-cloud-agent || echo "Error restarting" >&2
+                snap start oracle-cloud-agent || echo "Error restarting" >&2
                 crictl rmp -f "\$(crictl pods | grep sriov-device | awk '{print \$1}' | tail -1)" || true
               EOF
               while :; do { [[ $exit ]] && break; }; sleep 1; done # Sleep forever, exit gracefully
