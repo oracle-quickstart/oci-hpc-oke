@@ -41,7 +41,6 @@ It's important to have the below settings in your image. The GPU image listed be
 ```console
 echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 ```
-- Copy [`oci-vf-config`](https://github.com/oracle-quickstart/oci-hpc-oke/blob/vf/manifests/oci-vf-config) and [`oci-create-vfs`](https://github.com/oracle-quickstart/oci-hpc-oke/blob/vf/manifests/oci-create-vfs) to `/usr/bin`.
 
 **Image to use for non-GPU nodes**
 
@@ -56,12 +55,12 @@ echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 ```sh
 kubectl get nodes
 
-NAME           STATUS     ROLES    AGE     VERSION
-10.0.103.73    Ready      <none>   2d23h   v1.25.6
-10.0.127.206   Ready      node     2d3h    v1.25.6
-10.0.127.32    Ready      node     2d3h    v1.25.6
-10.0.83.93     Ready      <none>   2d23h   v1.25.6
-10.0.96.81     Ready      node     2d23h   v1.25.6
+NAME            STATUS   ROLES    AGE     VERSION
+10.140.48.77    Ready    node     4h32m   v1.32.1
+10.140.49.170   Ready    <none>   4h22m   v1.32.1
+10.140.51.249   Ready    node     4h33m   v1.32.1
+10.140.57.93    Ready    <none>   4h22m   v1.32.1
+10.140.58.183   Ready    node     4h32m   v1.32.1
 ```
 
 ### Get the latest Helm 3 version
@@ -95,41 +94,16 @@ Wait until all network operator pods are running with `kubectl get pods -n gpu-o
 > [!IMPORTANT]  
 > The device name you will use when deploying the Network Operator is different between A100 and H100 shapes. Please make sure that you are running the correct command based on your shape.
 
-#### A100 shapes (BM.GPU.A100-v2.8, BM.GPU4.8)
-```
-helm install --wait \
-  -n network-operator --create-namespace \
-  network-operator nvidia/network-operator \
-  --version v24.7.0 \
-  --set deployCR=true \
-  --set nfd.enabled=false \
-  --set rdmaSharedDevicePlugin.deploy=false \
-  --set nvPeerDriver.deploy=true \
-  --set sriovDevicePlugin.deploy=true \
-  --set secondaryNetwork.ipamPlugin.deploy=false \
-  --set nvIpam.deploy=true \
-  --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101a"], "isRdma": [true]}]'
-```
 
-#### H100 shapes (BM.GPU.H100.8)
 ```
-helm install --wait \
-  -n network-operator --create-namespace \
-  network-operator nvidia/network-operator \
-  --version v24.7.0 \
-  --set deployCR=true \
-  --set nfd.enabled=false \
-  --set rdmaSharedDevicePlugin.deploy=false \
-  --set nvPeerDriver.deploy=true \
-  --set sriovDevicePlugin.deploy=true \
-  --set secondaryNetwork.ipamPlugin.deploy=false \
-  --set nvIpam.deploy=true \
-  --set-json sriovDevicePlugin.resources='[{"name": "sriov_rdma_vf", "drivers": ["mlx5_core"], "devices": ["101e"], "isRdma": [true]}]'
-```
-
-### Deploy SR-IOV CNI
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/sriov-cni-daemonset.yaml
+helm install network-operator nvidia/network-operator \
+   -n nvidia-network-operator \
+   --create-namespace \
+   --version v25.1.0 \
+   --set nfd.enabled=false \
+   --set sriovNetworkOperator.enabled=true \
+   --set sriovNetworkOperator.configurationMode=systemd \
+   --wait
 ```
 
 ### Deploy RDMA CNI
@@ -139,10 +113,6 @@ kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni
 
 Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
 
-### Deploy the Virtual Function Configuration daemonset
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/vf-config.yaml
-```
 ### Create Network Attachment Definition
 
 ```sh
@@ -160,7 +130,7 @@ Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will s
 By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
 
 ```
-kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov_rdma_vf'
+kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
 
 NODE            GPUs   RDMA-VFs
 10.79.148.115   8      16
