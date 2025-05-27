@@ -91,10 +91,6 @@ Wait until all network operator pods are running with `kubectl get pods -n gpu-o
 
 ### Deploy Network Operator
 
-> [!IMPORTANT]  
-> The device name you will use when deploying the Network Operator is different between A100 and H100 shapes. Please make sure that you are running the correct command based on your shape.
-
-
 ```
 helm install network-operator nvidia/network-operator \
    -n nvidia-network-operator \
@@ -105,6 +101,98 @@ helm install network-operator nvidia/network-operator \
    --set sriovNetworkOperator.configurationMode=systemd \
    --wait
 ```
+
+### Create the NIC Cluster Policy
+
+
+```
+cat <<EOF > nic-cluster-policy.yaml
+apiVersion: mellanox.com/v1alpha1
+kind: NicClusterPolicy
+metadata:
+   name: nic-cluster-policy
+spec:
+   secondaryNetwork:
+     cniPlugins:
+       image: plugins
+       repository: ghcr.io/k8snetworkplumbingwg
+       version: v1.5.0
+       imagePullSecrets: []
+     multus:
+       image: multus-cni
+       repository: ghcr.io/k8snetworkplumbingwg
+       version: v4.1.0
+       imagePullSecrets: []
+   nvIpam:
+     image: nvidia-k8s-ipam
+     repository: ghcr.io/mellanox
+     version: v0.3.7
+     enableWebhook: false
+EOF
+```
+
+### Create a SRIOV Network Node Policy to create the Virtual Functions (VFs)
+After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator. Below is an example for the BM.GPU.B4.8 A100 shape.
+
+```
+cat <<EOF > BM.GPU.B4.8-policy.yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-b4-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:0c:00.0
+    - 0000:0c:00.1
+    - 0000:16:00.0
+    - 0000:16:00.1
+    - 0000:47:00.0
+    - 0000:47:00.1
+    - 0000:4b:00.0
+    - 0000:4b:00.1
+    - 0000:89:00.0
+    - 0000:89:00.1
+    - 0000:93:00.0
+    - 0000:93:00.1
+    - 0000:c3:00.0
+    - 0000:c3:00.1
+    - 0000:d1:00.0
+    - 0000:d1:00.1
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.B4.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+EOF
+```
+
+### Create a SRIOV Network Pool Config
+As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example reboots all nodes that VFs are configured.
+
+```
+cat <<EOF > sriov-network-pool-config-percentage.yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkPoolConfig
+metadata:
+  name: bm-gpu-b4-8
+  namespace: nvidia-network-operator
+spec:
+  maxUnavailable: "100%"
+  nodeSelector:
+    matchExpressions:
+      - key: node.kubernetes.io/instance-type
+        operator: In
+        values:
+          - BM.GPU.B4.8
+EOF
+```
+
 
 ### Deploy RDMA CNI
 ```
