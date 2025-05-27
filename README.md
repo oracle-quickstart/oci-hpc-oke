@@ -108,7 +108,7 @@ spec:
 EOF
 ```
 
-### Create a SRIOV Network Node Policy to create the Virtual Functions (VFs)
+### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
 After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator. Below is an example for the BM.GPU.B4.8 A100 shape.
 
 ```
@@ -149,7 +149,7 @@ spec:
 EOF
 ```
 
-### Create a SRIOV Network Pool Config
+### Create an SRIOV Network Pool Config
 As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example reboots all nodes that VFs are configured.
 
 ```
