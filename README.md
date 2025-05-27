@@ -3,29 +3,6 @@
 > [!IMPORTANT]  
 > Using virtual functions for RDMA is currently not a supported configuration on OKE.
 
-Oracle Cloud Infrastructure Container Engine for Kubernetes (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
-
-Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
-
-This guide has the instructions for deploying an OKE cluster using H100 & A100 bare metal nodes with RDMA connectivity using the [GPU Operator](https://github.com/NVIDIA/gpu-operator) and [Network Operator](https://github.com/Mellanox/network-operator).
-
-### What is NVIDIA GPU Operator?
-Kubernetes provides access to special hardware resources such as NVIDIA GPUs, NICs, Infiniband adapters and other devices through the device plugin framework. However, configuring and managing nodes with these hardware resources requires configuration of multiple software components such as drivers, container runtimes or other libraries which are difficult and prone to errors. The NVIDIA GPU Operator uses the operator framework within Kubernetes to automate the management of all NVIDIA software components needed to provision GPU. These components include the NVIDIA drivers (to enable CUDA), Kubernetes device plugin for GPUs, the NVIDIA Container Runtime, automatic node labelling, DCGM based monitoring and others.
-
-### What is NVIDIA Network Operator?
-NVIDIA Network Operator leverages Kubernetes CRDs and Operator SDK to manage Networking related Components in order to enable Fast networking, RDMA and GPUDirect for workloads in a Kubernetes cluster.
-
-The Goal of Network Operator is to manage all networking related components to enable execution of RDMA and GPUDirect RDMA workloads in a kubernetes cluster.
-
-### Supported Operating Systems
-For the A100 and H100 shapes (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8), Oracle Linux 8 with the Red Hat Compatible Kernel (RHCK) is supported.
-
-### Required policies
-You must create the necessary OKE policies:
-
-- [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
-- [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
-
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
 
 You will need a CPU and a GPU pool. The Terraform template deploys an operational/system worker pool (CPU) and a GPU worker pool.
@@ -102,8 +79,9 @@ helm install network-operator nvidia/network-operator \
    --wait
 ```
 
-### Create the NIC Cluster Policy
+Wait until all network operator pods are running with `kubectl get pods -n nvidia-network-operator`.
 
+### Create a NIC Cluster Policy
 
 ```
 cat <<EOF > nic-cluster-policy.yaml
@@ -193,27 +171,119 @@ spec:
 EOF
 ```
 
+### Create an IP Pool for Nvidia IPAM
 
-### Deploy RDMA CNI
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/rdma-cni/master/deployment/rdma-cni-daemonset.yaml
+cat <<EOF > nv-ipam-ip-pool.yaml
+apiVersion: nv-ipam.nvidia.com/v1alpha1
+kind: IPPool
+metadata:
+  name: my-pool
+  namespace: nvidia-network-operator
+spec:
+  subnet: 192.168.0.0/16
+  perNodeBlockSize: 100
+  gateway: 192.168.0.1
+EOF
 ```
 
-Wait until all network operator pods are running with `kubectl get pods -n network-operator`.
+### Create a Network Attachment Definition
 
-### Create Network Attachment Definition
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/network-attachment-definition.yaml
+```
+cat <<EOF > network-attachment-definition.yaml
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: nvidia.com/sriov-rdma-vf
+  name: sriov-rdma-vf
+  namespace: default
+spec:
+  config: |-
+    {
+      "cniVersion": "1.0.0",
+      "name": "sriov-rdma-vf",
+      "plugins": [
+        {
+          "type": "sriov",
+          "spoofchk": "off",
+          "ipam": {
+            "type": "nv-ipam",
+            "poolName": "my-pool"
+          }
+        },
+        { "type": "tuning",
+          "sysctl": {
+            "net.ipv4.conf.all.arp_announce": "2",
+            "net.ipv4.conf.all.arp_filter": "1",
+            "net.ipv4.conf.all.arp_ignore": "1",
+            "net.ipv4.conf.all.rp_filter": "0",
+            "net.ipv4.conf.all.accept_local": "1"
+          },
+          "mtu": 4220
+        },
+        { "type": "rdma" },
+        { "type": "sbr" }
+      ]
+    }
+EOF
 ```
 
-### Create the IP Pool for Nvidia IPAM
+### Deploy RDMA CNI daemonset
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/ip-pool.yaml
+cat <<EOF > rdma-cni-daemonset.yaml
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-rdma-cni-ds
+  namespace: kube-system
+  labels:
+    tier: node
+    app: rdma-cni
+    name: rdma-cni
+spec:
+  selector:
+    matchLabels:
+      name: rdma-cni
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: rdma-cni
+        name: rdma-cni
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: rdma-cni
+          image: ghcr.io/k8snetworkplumbingwg/rdma-cni
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "50Mi"
+            limits:
+              cpu: "100m"
+              memory: "50Mi"
+          volumeMounts:
+            - name: cnibin
+              mountPath: /host/opt/cni/bin
+      volumes:
+        - name: cnibin
+          hostPath:
+            path: /opt/cni/bin
+EOF
 ```
 
 ### Confirm that the GPUs are Virtual Functions (VFs) are correctly exposed
-Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov_rdma_vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
+Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov-rdma-vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
 
 By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
 
@@ -233,7 +303,7 @@ Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resourc
       template:
         metadata:
           annotations:
-            k8s.v1.cni.cncf.io/networks: oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov,oci-rdma-sriov
+            k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
 ```
 
 ### Optional - Deploy Volcano and run the NCCL test
@@ -252,15 +322,139 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 > [!IMPORTANT]  
 > The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest.
 
-##### H100
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/h100-nccl-test.yaml
+cat <<EOF > nccl-tests-nv-ipam-ippool.yaml
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: nccl-allreduce-job0
+spec:
+  minAvailable: 1
+  schedulerName: volcano
+  plugins:
+    ssh: []
+    svc: []
+  queue: default
+  tasks:
+    - replicas: 1
+      name: mpimaster
+      policies:
+        - event: TaskCompleted
+          action: CompleteJob
+      template:
+        spec:
+          volumes:
+            - name: root
+              hostPath:
+                path: /
+                type: Directory
+          initContainers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  until [[ "$(kubectl get pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker -o json | jq '.items | length')" != 0 ]]; do
+                    echo "Waiting for MPI worker pods..."
+                    sleep 3
+                  done
+                  echo "Waiting for MPI worker pods to be ready..."
+                  kubectl wait pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker --for=condition=Ready --timeout=600s && sleep 2
+              image: aga.ocir.io/hpc_limited_availability/oke/kubectl:latest
+              name: wait-for-workers
+          serviceAccount: mpi-worker-view
+          terminationGracePeriodSeconds: 2
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+          containers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  MPI_HOST=$(cat /etc/volcano/mpiworker.host | tr "\n" ",")
+                  mkdir -p /var/run/sshd; /usr/sbin/sshd
+                  mpirun --allow-run-as-root \
+                    -np 16 -npernode 8 --bind-to numa \
+                    -hostfile /etc/volcano/mpiworker.host \
+                    --mca pml ucx -mca coll ^hcoll \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x coll_hcoll_enable=0 \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_HCA=mlx5 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 8G -c 1; sleep 3600
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+              volumeMounts:
+              - { mountPath: /host, name: root }
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+              name: mpimaster
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /workspace
+              resources:
+                requests:
+                  cpu: 2
+                  memory: 128Mi 
+                  ephemeral-storage: 16Gi
+          restartPolicy: OnFailure
+    - replicas: 2
+      minAvailable: 2
+      name: mpiworker
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
+        spec:
+          containers:
+            - name: mpiworker
+              command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /workspace
+              resources:
+                requests:
+                  nvidia.com/gpu: 8
+                  nvidia.com/sriov-rdma-vf: 16
+                  ephemeral-storage: 1Gi
+                limits:
+                  nvidia.com/gpu: 8
+                  nvidia.com/sriov-rdma-vf: 16
+                  ephemeral-storage: 1Gi
+              volumeMounts:
+              - mountPath: /dev/shm
+                name: shm
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 15
+          tolerations:
+            - key: nvidia.com/gpu
+              operator: Exists
+          volumes:
+          - name: root
+            hostPath:
+              path: /
+              type: Directory
+          - name: shm
+            emptyDir:
+              medium: Memory
+              sizeLimit: 8Gi
+EOF
 ```
 
-##### A100
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/a100-nccl-test.yaml
-```
+
 
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
 
