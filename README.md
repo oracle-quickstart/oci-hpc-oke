@@ -321,7 +321,7 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 #### Run the NCCL test
 
 ```
-cat <<EOF > nccl-tests-nv-ipam-ippool.yaml
+cat <<'EOF' > nccl-tests-nv-ipam-ippool.yaml
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
 metadata:
