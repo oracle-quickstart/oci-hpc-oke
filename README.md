@@ -319,8 +319,6 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 ```
 
 #### Run the NCCL test
-> [!IMPORTANT]  
-> The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest.
 
 ```
 cat <<EOF > nccl-tests-nv-ipam-ippool.yaml
