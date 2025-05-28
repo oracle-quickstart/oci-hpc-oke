@@ -15,7 +15,7 @@ For the non-GPU worker pools, you can use the default OKE images (no need to spe
 It's important to have the below settings in your image. The GPU image listed below has those already, so you can use it without needing any changes.
 
 - Set RDMA subsystem namespace awareness mode to `exclusive` via `ib_core` module parameter:
-```console
+```
 echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 ```
 
@@ -61,7 +61,8 @@ helm install --wait \
   --version v25.3.0 \
   --set driver.enabled=false \
   --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
+  --set driver.rdma.useHostMofed=true \
+  --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
@@ -108,6 +109,10 @@ spec:
 EOF
 ```
 
+```
+kubectl apply -f nic-cluster-policy.yaml
+```
+
 ### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
 After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator. Below is an example for the BM.GPU.B4.8 A100 shape.
 
@@ -149,6 +154,10 @@ spec:
 EOF
 ```
 
+```console
+kubectl apply -f BM.GPU.B4.8-policy.yaml
+```
+
 ### Create an SRIOV Network Pool Config
 As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example reboots all nodes that VFs are configured.
 
@@ -170,6 +179,10 @@ spec:
 EOF
 ```
 
+```console
+kubectl apply -f sriov-network-pool-config-percentage.yaml
+```
+
 ### Create an IP Pool for Nvidia IPAM
 
 ```
@@ -184,6 +197,10 @@ spec:
   perNodeBlockSize: 100
   gateway: 192.168.0.1
 EOF
+```
+
+```
+kubectl apply -f nv-ipam-ip-pool.yaml
 ```
 
 ### Create a Network Attachment Definition
@@ -226,6 +243,10 @@ spec:
       ]
     }
 EOF
+```
+
+```
+kubectl apply -f network-attachment-definition.yaml
 ```
 
 ### Deploy RDMA CNI daemonset
@@ -281,6 +302,10 @@ spec:
 EOF
 ```
 
+```
+kubectl apply -f rdma-cni-daemonset.yaml
+```
+
 ### Confirm that the GPUs are Virtual Functions (VFs) are correctly exposed
 Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov-rdma-vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
 
@@ -288,7 +313,9 @@ By default, we create one Virtual Function per Physical Function. So for the H10
 
 ```
 kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
+```
 
+```
 NODE            GPUs   RDMA-VFs
 10.79.148.115   8      16
 10.79.151.167   8      16
@@ -451,7 +478,9 @@ spec:
 EOF
 ```
 
-
+```
+kubectl apply -f nccl-tests-nv-ipam-ippool.yaml
+```
 
 The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
 
