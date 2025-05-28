@@ -75,8 +75,7 @@ helm install network-operator nvidia/network-operator \
    --create-namespace \
    --version v25.1.0 \
    --set nfd.enabled=false \
-   --set sriovNetworkOperator.enabled=true \
-   --set sriov-network-operator.configDaemonNodeSelector.configurationMode=systemd
+   --set sriovNetworkOperator.enabled=true
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n nvidia-network-operator`.
@@ -111,6 +110,14 @@ EOF
 
 ```
 kubectl apply -f nic-cluster-policy.yaml
+```
+
+### Enable Parallel NIC Configuration for SR-IOV and change configuration mode to `systemd` (optional but recommended)
+
+```
+kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io -n nvidia-network-operator default --patch '{ "spec": { "featureGates": { "parallelNicConfig": true  } } }' --type='merge'
+
+kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io -n nvidia-network-operator default --patch '{ "spec": { "configurationMode": "systemd"} }' --type='merge'
 ```
 
 ### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
