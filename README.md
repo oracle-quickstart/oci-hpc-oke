@@ -322,7 +322,7 @@ Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will s
 By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
 
 ```
-kubectl get nodes -l 'node.kubernetes.io/instance-type in (BM.GPU.H100.8, BM.GPU.A100-v2.8, BM.GPU4.8, BM.GPU.B4.8)' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
+kubectl get nodes -l 'nvidia.com/gpu=true' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
 ```
 
 ```
