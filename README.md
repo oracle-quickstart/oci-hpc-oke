@@ -83,7 +83,7 @@ Wait until all network operator pods are running with `kubectl get pods -n nvidi
 
 ### Create a NIC Cluster Policy
 
-```
+```yaml
 cat <<EOF > nic-cluster-policy.yaml
 apiVersion: mellanox.com/v1alpha1
 kind: NicClusterPolicy
@@ -116,7 +116,7 @@ kubectl apply -f nic-cluster-policy.yaml
 ### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
 After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator. Below is an example for the BM.GPU.B4.8 A100 shape.
 
-```
+```yaml
 cat <<EOF > BM.GPU.B4.8-policy.yaml
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
@@ -161,7 +161,7 @@ kubectl apply -f BM.GPU.B4.8-policy.yaml
 ### Create an SRIOV Network Pool Config
 As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example reboots all nodes that VFs are configured.
 
-```
+```yaml
 cat <<EOF > sriov-network-pool-config-percentage.yaml
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkPoolConfig
@@ -179,13 +179,13 @@ spec:
 EOF
 ```
 
-```console
+```
 kubectl apply -f sriov-network-pool-config-percentage.yaml
 ```
 
 ### Create an IP Pool for Nvidia IPAM
 
-```
+```yaml
 cat <<EOF > nv-ipam-ip-pool.yaml
 apiVersion: nv-ipam.nvidia.com/v1alpha1
 kind: IPPool
@@ -205,7 +205,7 @@ kubectl apply -f nv-ipam-ip-pool.yaml
 
 ### Create a Network Attachment Definition
 
-```
+```yaml
 cat <<EOF > network-attachment-definition.yaml
 apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
@@ -250,7 +250,8 @@ kubectl apply -f network-attachment-definition.yaml
 ```
 
 ### Deploy RDMA CNI daemonset
-```
+
+```yaml
 cat <<EOF > rdma-cni-daemonset.yaml
 ---
 apiVersion: apps/v1
@@ -346,7 +347,7 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 
 #### Run the NCCL test
 
-```
+```yaml
 cat <<'EOF' > nccl-tests-nv-ipam-ippool.yaml
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
