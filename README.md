@@ -154,7 +154,7 @@ spec:
 EOF
 ```
 
-```console
+```
 kubectl apply -f BM.GPU.B4.8-policy.yaml
 ```
 
