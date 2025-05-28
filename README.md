@@ -123,6 +123,8 @@ kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io -n nvidia-network-o
 ### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
 After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator. Below is an example for the BM.GPU.B4.8 A100 shape.
 
+You can find the node policies in the `manifests/sriov-network-node-policy` directory.
+
 ```yaml
 cat <<EOF > BM.GPU.B4.8-policy.yaml
 apiVersion: sriovnetwork.openshift.io/v1
