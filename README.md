@@ -76,7 +76,7 @@ helm install network-operator nvidia/network-operator \
    --version v25.1.0 \
    --set nfd.enabled=false \
    --set sriovNetworkOperator.enabled=true \
-   --set sriovNetworkOperator.configurationMode=systemd
+   --set sriov-network-operator.configDaemonNodeSelector.configurationMode=systemd
 ```
 
 Wait until all network operator pods are running with `kubectl get pods -n nvidia-network-operator`.
