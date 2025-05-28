@@ -1,0 +1,33 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-h200-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:0c:00.0
+    - 0000:0c:01.0
+    - 0000:16:00.0
+    - 0000:16:01.0
+    - 0000:48:00.0
+    - 0000:48:01.0
+    - 0000:4c:00.0
+    - 0000:4c:01.0
+    - 0000:8a:00.0
+    - 0000:8a:01.0
+    - 0000:94:00.0
+    - 0000:94:01.0
+    - 0000:c4:00.0
+    - 0000:c4:01.0
+    - 0000:d2:00.0
+    - 0000:d2:01.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.H200.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
