@@ -241,7 +241,7 @@ helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
     --namespace nvidia-dra-driver-gpu \
     --set nvidiaCtkPath=/usr/local/nvidia/toolkit/nvidia-ctk \
     --set resources.gpus.enabled=false \
-    -f https://raw.githubusercontent.com/OguzPastirmaci/misc/refs/heads/master/oke-gb200/dra-values.yaml
+    -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/gb200/manifests/dra/values.yaml
 ```
 
 ### Validate that the DRA driver components are running and in a Ready state
@@ -341,6 +341,157 @@ kubectl delete -f imex-channel-injection.yaml
 
 computedomain.resource.nvidia.com "imex-channel-injection" deleted
 pod "imex-channel-injection" deleted
+```
+
+### Run a single rack `nvbandwidth` test
+
+```yaml
+cat <<EOF > nvbandwidth-test-job.yaml
+---
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: nvbandwidth-test-compute-domain
+spec:
+  numNodes: 2
+  channel:
+    resourceClaimTemplate:
+      name: nvbandwidth-test-compute-domain-channel
+
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nvbandwidth-test
+spec:
+  slotsPerWorker: 4
+  launcherCreationPolicy: WaitForWorkersReady
+  runPolicy:
+    cleanPodPolicy: Running
+  sshAuthMountPath: /home/mpiuser/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            nvbandwidth-test-replica: mpi-launcher
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+          containers:
+          - image: ghcr.io/nvidia/k8s-samples:nvbandwidth-v0.7-8d103163
+            name: mpi-launcher
+            securityContext:
+              runAsUser: 1000
+            command:
+            - mpirun
+            args:
+            - --bind-to
+            - core
+            - --map-by
+            - ppr:4:node
+            - -np
+            - "8"
+            - --report-bindings
+            - -q
+            - nvbandwidth
+            - -t
+            - multinode_device_to_device_memcpy_read_ce
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            nvbandwidth-test-replica: mpi-worker
+        spec:
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: nvbandwidth-test-replica
+                    operator: In
+                    values:
+                    - mpi-worker
+                topologyKey: nvidia.com/gpu.clique
+          containers:
+          - image: ghcr.io/nvidia/k8s-samples:nvbandwidth-v0.7-8d103163
+            name: mpi-worker
+            securityContext:
+              runAsUser: 1000
+            env:
+            command:
+            - /usr/sbin/sshd
+            args:
+            - -De
+            - -f
+            - /home/mpiuser/.sshd_config
+            resources:
+              limits:
+                nvidia.com/gpu: 4
+              claims:
+              - name: compute-domain-channel
+          resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: nvbandwidth-test-compute-domain-channel
+EOF
+```
+
+```
+kubectl apply -f nvbandwidth-test-job.yaml
+```
+
+```
+kubectl logs --tail=-1 -l job-name=nvbandwidth-test-launcher
+Warning: Permanently added '[nvbandwidth-test-worker-0.nvbandwidth-test.default.svc]:2222' (ECDSA) to the list of known hosts.
+Warning: Permanently added '[nvbandwidth-test-worker-1.nvbandwidth-test.default.svc]:2222' (ECDSA) to the list of known hosts.
+[nvbandwidth-test-worker-0:00025] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-0:00025] MCW rank 1 bound to socket 0[core 1[hwt 0]]: [./B/./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-0:00025] MCW rank 2 bound to socket 0[core 2[hwt 0]]: [././B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-0:00025] MCW rank 3 bound to socket 0[core 3[hwt 0]]: [./././B/./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-1:00025] MCW rank 4 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-1:00025] MCW rank 5 bound to socket 0[core 1[hwt 0]]: [./B/./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-1:00025] MCW rank 6 bound to socket 0[core 2[hwt 0]]: [././B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[nvbandwidth-test-worker-1:00025] MCW rank 7 bound to socket 0[core 3[hwt 0]]: [./././B/./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+nvbandwidth Version: v0.7
+Built from Git version: v0.7
+
+MPI version: Open MPI v4.1.4, package: Debian OpenMPI, ident: 4.1.4, repo rev: v4.1.4, May 26, 2022
+CUDA Runtime Version: 12080
+CUDA Driver Version: 12080
+Driver Version: 570.124.06
+
+Process 0 (nvbandwidth-test-worker-0): device 0: HGX GB200 (00000008:01:00)
+Process 1 (nvbandwidth-test-worker-0): device 1: HGX GB200 (00000009:01:00)
+Process 2 (nvbandwidth-test-worker-0): device 2: HGX GB200 (00000018:01:00)
+Process 3 (nvbandwidth-test-worker-0): device 3: HGX GB200 (00000019:01:00)
+Process 4 (nvbandwidth-test-worker-1): device 0: HGX GB200 (00000008:01:00)
+Process 5 (nvbandwidth-test-worker-1): device 1: HGX GB200 (00000009:01:00)
+Process 6 (nvbandwidth-test-worker-1): device 2: HGX GB200 (00000018:01:00)
+Process 7 (nvbandwidth-test-worker-1): device 3: HGX GB200 (00000019:01:00)
+
+Running multinode_device_to_device_memcpy_read_ce.
+memcpy CE GPU(row) -> GPU(column) bandwidth (GB/s)
+           0         1         2         3         4         5         6         7
+ 0       N/A    798.02    798.25    798.02    798.02    797.88    797.73    797.95
+ 1    798.10       N/A    797.80    798.02    798.02    798.25    797.88    798.02
+ 2    797.95    797.95       N/A    797.73    797.80    797.95    797.95    797.65
+ 3    798.10    798.02    797.95       N/A    798.02    798.10    797.88    797.73
+ 4    797.80    798.02    798.02    798.02       N/A    797.95    797.80    798.02
+ 5    797.80    797.95    798.10    798.10    797.95       N/A    797.95    797.88
+ 6    797.73    797.95    798.10    798.02    797.95    797.88       N/A    797.80
+ 7    797.88    798.02    797.95    798.02    797.88    797.95    798.02       N/A
+
+SUM multinode_device_to_device_memcpy_read_ce 44685.29
+
+NOTE: The reported results may not reflect the full capabilities of the platform.
+Performance can vary with software drivers, hardware clocks, and system topology.
 ```
 
 ### RUN NCCL-tests
