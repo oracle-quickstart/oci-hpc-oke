@@ -224,6 +224,7 @@ https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70
 ```
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
+```
 
 ```
 helm install gpu-operator nvidia/gpu-operator \
@@ -237,7 +238,8 @@ helm install gpu-operator nvidia/gpu-operator \
     --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
 ```
 
-### Install Dynamic Resource Allocation driver
+### Install Dynamic Resource Allocation (DRA) driver
+
 ```
 helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
     --version=25.3.0-rc.2 \
