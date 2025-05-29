@@ -51,7 +51,7 @@ oci compute compute-gpu-memory-fabric list --compartment-id $COMPARTMENT_ID
 ### Create cloud-init
 Follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcloudinitforselfmanagednodes.htm#contengcloudinitforselfmanagednodes) for getting the API Server Host IP and CA cert.
 
-```
+```yaml
 #cloud-config
 apt:
   sources:
