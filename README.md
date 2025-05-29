@@ -434,7 +434,7 @@ spec:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                 - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
+                  - key: node-role.kubernetes.io/node
                     operator: Exists
           containers:
           - image: ghcr.io/nvidia/k8s-samples:nvbandwidth-v0.7-8d103163
