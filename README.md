@@ -193,9 +193,10 @@ oci --region ${REGION} compute-management instance-configuration create --compar
 }'
 ```
 
-### Create a Memory Cluster
+### Create a GPU Memory Cluster
 
 #### Python
+
 ```python
 import oci
 signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
@@ -213,11 +214,13 @@ oci compute compute-gpu-memory-cluster create \
   --compute-cluster-id $CC_ID \
   --instance-configuration-id $IC_ID \
   --gpu-memory-fabric-id $GPU_MEMORY_FABRIC_ID \
-  --size $SIZE \
+  --size $GPU_MEMORY_CLUSTER_SIZE \
   --display-name $DISPLAY_NAME
 ```
 
-### Manage a Memory Cluster
+### Manage a GPU Memory Cluster
+
+#### Python
 Add a node
 
 ```python
@@ -228,13 +231,21 @@ update_details=oci.core.models.UpdateComputeGpuMemoryClusterDetails(size=3)
 output = compute_client.update_compute_gpu_memory_cluster("ocid1.computegpumemorycluster.oc1.....",update_details)
 ```
 
-Remove a node Randomly
+Remove a node randomly
 ```python
 import oci
 signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
 compute_client = oci.core.ComputeClient(config={}, signer=signer)
 update_details=oci.core.models.UpdateComputeGpuMemoryClusterDetails(size=1)
 output = compute_client.update_compute_gpu_memory_cluster("ocid1.computegpumemorycluster.oc1.....",update_details)
+```
+
+#### OCI CLI
+
+```
+oci compute compute-gpu-memory-cluster update \
+  --compute-gpu-memory-cluster-id $GPU_MEMORY_CLUSTER_ID \
+  --size $GPU_MEMORY_CLUSTER_SIZE
 ```
 
 You can also delete a node from the console and the size will be automatically updated. 
