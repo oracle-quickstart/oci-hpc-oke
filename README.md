@@ -276,7 +276,7 @@ helm repo update
 
 ```
 helm install gpu-operator nvidia/gpu-operator \
-    --version="v25.3.0" \
+    --version=v25.3.0 \
     --create-namespace \
     --namespace gpu-operator \
     --set cdi.enabled=true \
@@ -546,7 +546,7 @@ NOTE: The reported results may not reflect the full capabilities of the platform
 Performance can vary with software drivers, hardware clocks, and system topology.
 ```
 
-### RUN NCCL-tests
+### RUN NCCL tests
 
 #### Install MPI Operator
 ```
@@ -657,7 +657,7 @@ kind: ComputeDomain
 metadata:
   name: nccl-test-compute-domain
 spec:
-  numNodes: 2
+  numNodes: 4
   channel:
     resourceClaimTemplate:
       name: nccl-test-compute-domain-channel
@@ -705,7 +705,7 @@ spec:
                 -np $NP \
                 /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
-      replicas: 2
+      replicas: 4
       template:
         metadata:
           labels:
