@@ -218,6 +218,15 @@ oci compute compute-gpu-memory-cluster create \
   --display-name $DISPLAY_NAME
 ```
 
+### List GPU Memory Clusters
+
+#### OCI CLI
+
+```
+oci compute compute-gpu-memory-cluster-collection list-compute-gpu-memory-clusters \
+  --compartment-id $COMPARTMENT_ID
+```
+
 ### Manage a GPU Memory Cluster
 
 #### Python
