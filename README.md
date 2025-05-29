@@ -1,254 +1,607 @@
-# Running RDMA (remote direct memory access) GPU workloads on OKE
-Oracle Cloud Infrastructure Kubernetes Engine (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
+# Running RDMA GPU workloads on OKE with GB200s
 
-Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
+### Prerequisites
+- Your cluster needs to have v1.32+ and the `DynamicResourceAllocation` feature gate must be enabled on the cluster. Reach out to your cloud architect to enable it (needs a ticket with OKE).
 
-### Supported Operating Systems
-- Ubuntu 22.04
+- Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [here](./cloud-init.yaml#L16).
 
-### Required policies
-The OCI Resource Manager stack template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
+### Create a Compute Cluster
+Can be done from the console or in Python.
 
-Below policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please find more information about the policies below.
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+cc_details=oci.core.models.CreateComputeClusterDetails(compartment_id="ocid1.compartment.oc1..,availability_domain="XXXX:AP-SYDNEY-1-AD-1",display_name=CN_name)
+cn = compute_client.create_compute_cluster(create_compute_cluster_details=cc_details).data
+cn_id=cn.id
+```
+### Required policies (any-user can be replaced by the group launching the cluster)
 
-- [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
-- [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
+```python
+Allow any-user to use compute-hpc-islands in tenancy
+Allow any-user to use compute-network-blocks in tenancy
+Allow any-user to use compute-local-blocks in tenancy
+Allow any-user to use compute-bare-metal-hosts in tenancy
+Allow any-user to use compute-gpu-memory-fabrics in tenancy
+```
 
-## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
-You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
+### Gather the memory fabric ID
 
-You can use the below images for both CPU and GPU pools.
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+compute_client.list_compute_gpu_memory_fabrics(compartment_id="ocid1.tenancy.oc1..").data
+```
 
-> [!NOTE]  
-> The GPU image has the GPU drivers pre-installed.
+### Create cloud-init
+Follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcloudinitforselfmanagednodes.htm#contengcloudinitforselfmanagednodes) for getting the API Server Host IP and CA cert.
 
-#### Images to use
-You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
+```
+#cloud-config
+apt:
+  sources:
+    oke-node: {source: 'deb [trusted=yes] https://objectstorage.us-sanjose-1.oraclecloud.com/p/45eOeErEDZqPGiymXZwpeebCNb5lnwzkcQIhtVf6iOF44eet_efdePaF7T8agNYq/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-jammy/kubernetes-1.32 stable main'}
+packages:
+  - oci-oke-node-all-1.32.1
+write_files:
+  - path: /etc/oke/oke-apiserver
+    permissions: '0644'
+    content: <API SERVER HOST IP>
+  - encoding: b64
+    path: /etc/kubernetes/ca.crt
+    permissions: '0644'
+    content: <CA cert>
+runcmd:
+  - oke bootstrap --apiserver-host <API SERVER HOST IP> --ca "<CA cert>" --kubelet-extra-args "--feature-gates=DynamicResourceAllocation=true"
+ssh_authorized_keys:
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqftxN9j+mN75JKR...
+```
 
-**Image to use for non-GPU nodes**
+### Create an Instance Configuration
 
-- [Link to import the image](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
+```
+REGION=
+COMPARTMENT_ID=
+AD=
+WORKER_SUBNET_ID=
+WORKER_SUBNET_NSG_ID=
+POD_SUBNET_ID=
+POD_SUBNET_NSG_ID=
+IMAGE_ID=
+BASE64_ENCODED_CLOUD_INIT=$(cat cloud-init.yml| base64 -b 0)
 
-**Images for NVIDIA shapes**
+oci --region ${REGION} compute-management instance-configuration create --compartment-id ${COMPARTMENT_ID} --display-name gb200-oke --instance-details \
+'{
+  "instanceType": "compute",
+  "launchDetails": {
+    "availabilityDomain": "$AD",
+    "compartmentId": "$COMPARTMENT_ID",
+    "createVnicDetails": {
+      "assignIpv6Ip": false,
+      "assignPublicIp": false,
+      "assignPrivateDnsRecord": true,
+      "subnetId": "$SUBNET_ID",
+      "nsgIds": [ "$SUBNET_NSG_ID" ]
+    },
+    "metadata": {
+      "user_data": "$BASE64_ENCODED_CLOUD_INIT",
+      "oke-native-pod-networking": "true", "oke-max-pods": "60",
+      "pod-subnets": "ocid1.subnet.oc1.ap-sydney-1.aaaaaaaaphfdh4jq3oxgvqb7hf7ms4xi36jei7b77bj34mawhmfwnr5ypgvq",
+      "pod-nsgids": "ocid1.networksecuritygroup.oc1.ap-sydney-1.aaaaaaaanqxbsqv6itn4w4wusip4tow5kv2ltmo7lenpa2mrkqgmio6qgnaq"
+    },
+    "displayName": "gb200-instance",
+    "shape": "BM.GPU.GB200.4",
+    "sourceDetails": {
+      "sourceType": "image",
+      "imageId": "$IMAGE_ID"
+    },
+    "agentConfig": {
+      "isMonitoringDisabled": false,
+      "isManagementDisabled": false,
+      "pluginsConfig": [
+        {
+          "name": "WebLogic Management Service",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Vulnerability Scanning",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Oracle Java Management Service",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Oracle Autonomous Linux",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "OS Management Service Agent",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "OS Management Hub Agent",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Management Agent",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Custom Logs Monitoring",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Compute RDMA GPU Monitoring",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Compute Instance Run Command",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Compute Instance Monitoring",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Compute HPC RDMA Auto-Configuration",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Compute HPC RDMA Authentication",
+          "desiredState": "ENABLED"
+        },
+        {
+          "name": "Cloud Guard Workload Protection",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Block Volume Management",
+          "desiredState": "DISABLED"
+        },
+        {
+          "name": "Bastion",
+          "desiredState": "DISABLED"
+        }
+      ]
+    },
+    "isPvEncryptionInTransitEnabled": false,
+    "instanceOptions": {
+      "areLegacyImdsEndpointsDisabled": false
+    },
+    "availabilityConfig": {
+      "recoveryAction": "RESTORE_INSTANCE"
+    }
+  }
+}'
+```
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
+### Create a Memory Cluster
 
-- [GPU driver 560 & CUDA 12.6](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-560-CUDA-12.6-2025.03.26-0)
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+details=oci.core.models.CreateComputeGpuMemoryClusterDetails(availability_domain="XXXX:AP-SYDNEY-1-AD-1",compartment_id="ocid1.compartment.oc1..",compute_cluster_id="ocid1.computecluster.oc1.ap-sydney-1.",instance_configuration_id="ocid1.instanceconfiguration.oc1.ap-sydney-1.",size=2,gpu_memory_fabric_id="ocid1.computegpumemoryfabric.oc1.ap-sydney-1.",display_name="memoryFabric1")
+output=compute_client.create_compute_gpu_memory_cluster(details)
+```
 
-- [GPU driver 550 & CUDA 12.4](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-550-CUDA-12.4-2025.03.26-0)
+### Manage a Memory Cluster
+Add a node
 
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+update_details=oci.core.models.UpdateComputeGpuMemoryClusterDetails(size=3)
+output = compute_client.update_compute_gpu_memory_cluster("ocid1.computegpumemorycluster.oc1.....",update_details)
+```
 
-**Image for AMD shapes**
+Remove a node Randomly
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+update_details=oci.core.models.UpdateComputeGpuMemoryClusterDetails(size=1)
+output = compute_client.update_compute_gpu_memory_cluster("ocid1.computegpumemorycluster.oc1.....",update_details)
+```
 
-- [ROCm 6.3](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-AMD-ROCM-632-2025.03.26-0)
+You can also delete a node from the console and the size will be automatically updated. 
 
+### Import the image
+https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.01.31-1-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.05.27-0
 
-### Deploy the cluster using the Oracle Cloud Resource Manager template
-You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
-
+### Deploy an OKE cluster
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v25.5.0/oke-rdma-quickstart-v25.5.0.zip)
 
-For the image ID, use the ID of the image that you imported in the previous step.
+- Kubernetes version must be at least v1.32
+- Choose VCN-native pod networking
 
-The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J ubuntu@<bastion IP> ubuntu@<operator IP>`.
+### Install GPU Operator
+```
+helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
+helm repo update
 
-You can also find this information under the **Application information** tab in the OCI Resource Manager stack.
-
-### Wait until you see all nodes in the cluster
-
-```sh
-kubectl get nodes
-
-NAME           STATUS     ROLES    AGE     VERSION
-10.0.103.73    Ready      <none>   2d23h   v1.25.6
-10.0.127.206   Ready      node     2d3h    v1.25.6
-10.0.127.32    Ready      node     2d3h    v1.25.6
-10.0.83.93     Ready      <none>   2d23h   v1.25.6
-10.0.96.82     Ready      node     2d23h   v1.25.6
+helm install --wait \
+  -n gpu-operator --create-namespace \
+  gpu-operator nvidia/gpu-operator \
+  --version v25.3.0 \
+  --set driver.enabled=false \
+  --set driver.rdma.enabled=true \
+  --set driver.rdma.useHostMofed=true
 ```
 
-### Add a Service Account Authentication Token (optional but recommended)
-More info [here.](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm)
-
+### Install Dynamic Resource Allocation driver
 ```
-kubectl -n kube-system create serviceaccount kubeconfig-sa
-
-kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
-
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/service-account/oke-kubeconfig-sa-token.yaml
-
-TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
-
-kubectl config set-credentials kubeconfig-sa --token=$TOKEN
-
-kubectl config set-context --current --user=kubeconfig-sa
+helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
+    --version=25.3.0-rc.2 \
+    --create-namespace \
+    --namespace nvidia-dra-driver-gpu \
+    --set nvidiaCtkPath=/usr/local/nvidia/toolkit/nvidia-ctk \
+    --set resources.gpus.enabled=false \
+    -f https://raw.githubusercontent.com/OguzPastirmaci/misc/refs/heads/master/oke-gb200/dra-values.yaml
 ```
 
-### Using the host RDMA network interfaces in manifests
-In order to use the RDMA interfaces on the host in your pods, you should have the below sections in your manifests:
+### Validate that the DRA driver components are running and in a Ready state
+
+```
+kubectl get pod -n nvidia-dra-driver-gpu
+
+NAME                                                           READY   STATUS    RESTARTS   AGE
+nvidia-dra-driver-k8s-dra-driver-controller-67cb99d84b-5q7kj   1/1     Running   0          7m26s
+nvidia-dra-driver-k8s-dra-driver-kubelet-plugin-7kdg9          1/1     Running   0          7m27s
+nvidia-dra-driver-k8s-dra-driver-kubelet-plugin-bd6gn          1/1     Running   0          7m27s
+nvidia-dra-driver-k8s-dra-driver-kubelet-plugin-bzm6p          1/1     Running   0          7m26s
+nvidia-dra-driver-k8s-dra-driver-kubelet-plugin-xjm4p          1/1     Running   0          7m27s
+```
+
+### Confirm that all GPU nodes are labeled with clique ids
+
+```
+kubectl get nodes -l node.kubernetes.io/instance-type=BM.GPU.GB200.4 -o custom-columns="NODE:.metadata.name,CLIQUE:.metadata.labels.nvidia\.com/gpu\.clique"
+
+NODE            CLIQUE
+10.140.61.148   61248eac-4785-4fbf-9cbd-231635e37e9d.20663
+10.140.63.103   61248eac-4785-4fbf-9cbd-231635e37e9d.20663
+```
+
+### Run a simple test to validate IMEX daemons are started and IMEX channels are injected
 
 ```yaml
+cat <<'EOF' > imex-channel-injection.yaml
+---
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: imex-channel-injection
 spec:
-  hostNetwork: true
-  dnsPolicy: ClusterFirstWithHostNet
-  volumes:
-  - { name: devinf, hostPath: { path: /dev/infiniband }}
-  - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-```
-
-```yaml
-securityContext:
-      privileged: true
-      capabilities:
-        add: [ "IPC_LOCK" ]
-```
-```yaml
-    volumeMounts:
-    - { mountPath: /dev/infiniband, name: devinf }
-    - { mountPath: /dev/shm, name: shm }
-```
-Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](./manifests/)
-
-```yaml
+  numNodes: 1
+  channel:
+    resourceClaimTemplate:
+      name: imex-channel-0
+---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: rdma-test-pod-1
+  name: imex-channel-injection
 spec:
-  hostNetwork: true
-  dnsPolicy: ClusterFirstWithHostNet
-  volumes:
-  - { name: devinf, hostPath: { path: /dev/infiniband }}
-  - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-  restartPolicy: OnFailure
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu.clique
+            operator: Exists
+  tolerations:
+  - key: "nvidia.com/gpu"
+    value: "present"
+    operator: "Equal"
+    effect: "NoSchedule"
   containers:
-  - image: oguzpastirmaci/mofed-perftest:5.4-3.6.8.1-ubuntu20.04-amd64
-    name: mofed-test-ctr
-    securityContext:
-      privileged: true
-      capabilities:
-        add: [ "IPC_LOCK" ]
-    volumeMounts:
-    - { mountPath: /dev/infiniband, name: devinf }
-    - { mountPath: /dev/shm, name: shm }
+  - name: ctr
+    image: ubuntu:22.04
+    command: ["bash", "-c"]
+    args: ["ls -la /dev/nvidia-caps-imex-channels; trap 'exit 0' TERM; sleep 9999 & wait"]
     resources:
-      requests:
-        cpu: 8
-        ephemeral-storage: 32Gi
-        memory: 2Gi
-    command:
-    - sh
-    - -c
-    - |
-      ls -l /dev/infiniband /sys/class/net
-      sleep 1000000
+      claims:
+      - name: imex-channel-0
+  resourceClaims:
+  - name: imex-channel-0
+    resourceClaimTemplateName: imex-channel-0
+EOF
 ```
 
-### Optional - Deploy Volcano and run the NCCL test
-Volcano is needed for running the optional NCCL test. It's not required for the regular operation of the cluster, you can remove it after you finish running the NCCL test.
+```
+kubectl apply -f imex-channel-injection.yaml
 
-#### Deploy Volcano
-```sh
-helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
-helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
-
-kubectl create serviceaccount -n default mpi-worker-view
-kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
+computedomain.resource.nvidia.com/imex-channel-injection created
+pod/imex-channel-injection created
 ```
 
-#### Run the NCCL/RCCL tests
-> [!IMPORTANT]  
-> The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
-
-##### BM.GPU.H100
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H100.8-nccl-test.yaml
+kubectl get pods -n nvidia-dra-driver-gpu -l resource.nvidia.com/computeDomain
+
+NAME                                 READY   STATUS    RESTARTS   AGE
+imex-channel-injection-vmvtq-h7wls   1/1     Running   0          75s
 ```
 
-##### BM.GPU.A100-v2.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.A100-v2.8-nccl-test.yaml
+kubectl logs imex-channel-injection
+
+total 0
+drwxr-xr-x 2 root root     60 May 24 05:59 .
+drwxr-xr-x 6 root root    380 May 24 05:59 ..
+crw-rw-rw- 1 root root 234, 0 May 24 05:59 channel0
 ```
 
-##### BM.GPU4.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU4.8-nccl-test.yaml
+kubectl delete -f imex-channel-injection.yaml
+
+computedomain.resource.nvidia.com "imex-channel-injection" deleted
+pod "imex-channel-injection" deleted
 ```
 
-##### BM.GPU.B4.8
+### RUN NCCL-tests
+
+#### Install MPI Operator
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.B4.8-nccl-test.yaml
+kubectl create -f https://github.com/kubeflow/mpi-operator/releases/download/v0.6.0/mpi-operator.yaml
 ```
 
-##### BM.GPU.MI300X.8
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/BM.GPU.MI300X.8.yaml
+#### Single rack test
+```yaml
+cat <<'EOF' > nccl-test-single-rack-job.yaml
+---
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: nccl-test-compute-domain
+spec:
+  numNodes: 2
+  channel:
+    resourceClaimTemplate:
+      name: nccl-test-compute-domain-channel
+
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test
+spec:
+  slotsPerWorker: 4
+  launcherCreationPolicy: WaitForWorkersReady
+  runPolicy:
+    cleanPodPolicy: Running
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-launcher
+        spec:
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command: ["bash", "-c"]
+            args:
+              - |
+                NUM_GPUS=4
+                NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                NP=$(($NUM_HOSTS*$NUM_GPUS))
+                mpirun --allow-run-as-root \
+                --bind-to none \
+                --map-by ppr:4:node \
+                --mca coll ^hcoll \
+                -x NCCL_DEBUG=WARN \
+                -x NCCL_MNNVL_ENABLE=1 \
+                -x NCCL_CUMEM_ENABLE=1 \
+                -x NCCL_NET_PLUGIN=sys \
+                -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4 \
+                -x NCCL_NVLS_ENABLE=1 \
+                -x NCCL_IB_DISABLE=1 \
+                -x NCCL_SOCKET_IFNAME=eth0 \
+                -np $NP \
+                /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-worker
+        spec:
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                  - key: nccl-test-replica
+                    operator: In
+                    values:
+                    - mpi-worker
+                topologyKey: nvidia.com/gpu.clique
+          containers:
+          - name: mpi-worker
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command:
+              - /bin/bash
+              - -c
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+            resources:
+              limits:
+                nvidia.com/gpu: 4
+              claims:
+              - name: compute-domain-channel
+          resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: nccl-test-compute-domain-channel
+EOF
 ```
 
-The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
+#### Multi rack test
 
-```sh
-Defaulted container "mpimaster" out of: mpimaster, wait-for-workers (init)
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-0.nccl-allreduce-job0' (ED25519) to the list of known hosts.
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0' (ED25519) to the list of known hosts.
-# nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
-#
-# Using devices
-#  Rank  0 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-0 device  0 [0x0f] NVIDIA A100-SXM4-40GB
-#  Rank  1 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-0 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank  2 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-0 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank  3 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-0 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank  4 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-0 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank  5 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-0 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank  6 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-0 device  6 [0xd6] NVIDIA A100-SXM4-40GB
-#  Rank  7 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-0 device  7 [0xda] NVIDIA A100-SXM4-40GB
-#  Rank  8 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-1 device  0 [0x0f] NVIDIA A100-SXM4-40GB
-#  Rank  9 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-1 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank 10 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-1 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank 11 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-1 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank 12 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-1 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank 13 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-1 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank 14 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-1 device  6 [0xd6] NVIDIA A100-SXM4-40GB
-#  Rank 15 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-1 device  7 [0xda] NVIDIA A100-SXM4-40GB
-#
-#                                                              out-of-place                       in-place
-#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
-#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)
-           8             2     float     sum      -1    36.47    0.00    0.00      0    34.74    0.00    0.00      0
-          16             4     float     sum      -1    38.86    0.00    0.00      0    35.65    0.00    0.00      0
-          32             8     float     sum      -1    38.53    0.00    0.00      0    35.41    0.00    0.00      0
-          64            16     float     sum      -1    39.25    0.00    0.00      0    37.05    0.00    0.00      0
-         128            32     float     sum      -1    38.85    0.00    0.01      0    37.21    0.00    0.01      0
-         256            64     float     sum      -1    40.68    0.01    0.01      0    38.52    0.01    0.01      0
-         512           128     float     sum      -1    39.27    0.01    0.02      0    39.35    0.01    0.02      0
-        1024           256     float     sum      -1    41.97    0.02    0.05      0    40.56    0.03    0.05      0
-        2048           512     float     sum      -1    43.36    0.05    0.09      0    41.29    0.05    0.09      0
-        4096          1024     float     sum      -1    44.54    0.09    0.17      0    43.36    0.09    0.18      0
-        8192          2048     float     sum      -1    48.16    0.17    0.32      0    46.51    0.18    0.33      0
-       16384          4096     float     sum      -1    49.40    0.33    0.62      0    48.00    0.34    0.64      0
-       32768          8192     float     sum      -1    49.66    0.66    1.24      0    49.17    0.67    1.25      0
-       65536         16384     float     sum      -1    51.69    1.27    2.38      0    50.09    1.31    2.45      0
-      131072         32768     float     sum      -1    54.86    2.39    4.48      0    53.31    2.46    4.61      0
-      262144         65536     float     sum      -1    67.95    3.86    7.23      0    65.81    3.98    7.47      0
-      524288        131072     float     sum      -1    73.94    7.09   13.29      0    72.87    7.20   13.49      0
-     1048576        262144     float     sum      -1    85.58   12.25   22.97      0    84.50   12.41   23.27      0
-     2097152        524288     float     sum      -1    99.19   21.14   39.64      0    100.1   20.94   39.27      0
-     4194304       1048576     float     sum      -1    127.0   33.03   61.93      0    127.8   32.81   61.52      0
-     8388608       2097152     float     sum      -1    174.3   48.13   90.25      0    168.4   49.80   93.38      0
-    16777216       4194304     float     sum      -1    282.7   59.35  111.29      0    265.9   63.11  118.32      0
-    33554432       8388608     float     sum      -1    452.3   74.18  139.08      0    452.0   74.24  139.19      0
-    67108864      16777216     float     sum      -1    821.7   81.67  153.13      0    812.7   82.57  154.83      0
-   134217728      33554432     float     sum      -1   1542.0   87.04  163.20      0   1546.1   86.81  162.76      0
-   268435456      67108864     float     sum      -1   3042.7   88.22  165.42      0   3065.9   87.55  164.16      0
-   536870912     134217728     float     sum      -1   6436.0   83.42  156.41      0   6070.5   88.44  165.82      0
-  1073741824     268435456     float     sum      -1   9187.8  116.87  219.12      0   9073.4  118.34  221.89      0
-  2147483648     536870912     float     sum      -1    18289  117.42  220.16      0    17557  122.31  229.34      0
-  4294967296    1073741824     float     sum      -1    34176  125.67  235.63      0    34417  124.79  233.98      0
-  8589934592    2147483648     float     sum      -1    67689  126.90  237.94      0    67811  126.68  237.52      0
+```yaml
+cat <<'EOF' > nccl-test-multi-rack-job.yaml
+---
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: nccl-test-compute-domain
+spec:
+  numNodes: 2
+  channel:
+    resourceClaimTemplate:
+      name: nccl-test-compute-domain-channel
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test
+spec:
+  slotsPerWorker: 4
+  launcherCreationPolicy: WaitForWorkersReady
+  runPolicy:
+    cleanPodPolicy: Running
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command: ["bash", "-c"]
+            args:
+              - |
+                NUM_GPUS=4
+                NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                NP=$(($NUM_HOSTS*$NUM_GPUS))
+                mpirun --allow-run-as-root \
+                --bind-to none \
+                --map-by ppr:4:node \
+                --mca coll ^hcoll \
+                -x NCCL_DEBUG=WARN \
+                -x NCCL_MNNVL_ENABLE=1 \
+                -x NCCL_CUMEM_ENABLE=1 \
+                -x NCCL_NET_PLUGIN=sys \
+                -x NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_3,mlx5_4 \
+                -x NCCL_NVLS_ENABLE=1 \
+                -x NCCL_SOCKET_IFNAME=eth0 \
+                -np $NP \
+                /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-worker
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+          - { name: devinf, hostPath: { path: /dev/infiniband }}
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - BM.GPU.GB200.4
+          containers:
+          - name: mpi-worker
+            securityContext:
+              privileged: true
+              capabilities:
+                add: [ "IPC_LOCK" ]
+            volumeMounts:
+            - { mountPath: /dev/infiniband, name: devinf }
+            - { mountPath: /dev/shm, name: shm }
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command:
+              - /bin/bash
+              - -c
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+            resources:
+              limits:
+                nvidia.com/gpu: 4
+              claims:
+              - name: compute-domain-channel
+          resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: nccl-test-compute-domain-channel
+EOF
+```
+
+Wait until the `nccl-test-launcher` pod is in `Running` state, it might take a couple of minutes. Seeing warnings that say `Failed to prepare dynamic resources: NodePrepareResources failed: rpc error: code = DeadlineExceeded desc = context deadline exceeded` in the `nccl-test-worker` pods is normal.
+
+```
+kubectl logs --tail=20 -f -l job-name=nccl-test-launcher
+```
+
+```
+nccl-test-worker-0:60:109 [0] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+           8             2     float     sum      -1    21.57    0.00    0.00      0    21.24    0.00    0.00      0
+          16             4     float     sum      -1    21.06    0.00    0.00      0    20.90    0.00    0.00      0
+          32             8     float     sum      -1    21.99    0.00    0.00      0    21.77    0.00    0.00      0
+          64            16     float     sum      -1    24.87    0.00    0.00      0    24.70    0.00    0.00      0
+         128            32     float     sum      -1    26.53    0.00    0.01      0    26.21    0.00    0.01      0
+         256            64     float     sum      -1    26.77    0.01    0.02      0    26.31    0.01    0.02      0
+         512           128     float     sum      -1    27.06    0.02    0.03      0    26.83    0.02    0.03      0
+        1024           256     float     sum      -1    27.39    0.04    0.07      0    26.93    0.04    0.07      0
+        2048           512     float     sum      -1    27.89    0.07    0.13      0    27.36    0.07    0.13      0
+        4096          1024     float     sum      -1    27.96    0.15    0.26      0    27.67    0.15    0.26      0
+        8192          2048     float     sum      -1    28.26    0.29    0.51      0    28.05    0.29    0.51      0
+       16384          4096     float     sum      -1    28.49    0.57    1.01      0    28.13    0.58    1.02      0
+       32768          8192     float     sum      -1    28.93    1.13    1.98      0    28.87    1.13    1.99      0
+       65536         16384     float     sum      -1    29.95    2.19    3.83      0    29.35    2.23    3.91      0
+      131072         32768     float     sum      -1    30.64    4.28    7.49      0    30.09    4.36    7.62      0
+      262144         65536     float     sum      -1    30.58    8.57   15.00      0    30.18    8.69   15.20      0
+      524288        131072     float     sum      -1    30.86   16.99   29.73      0    30.54   17.17   30.04      0
+     1048576        262144     float     sum      -1    32.18   32.58   57.02      0    31.49   33.30   58.28      0
+     2097152        524288     float     sum      -1    35.89   58.44  102.27      0    34.74   60.37  105.65      0
+     4194304       1048576     float     sum      -1    52.72   79.55  139.22      0    52.39   80.06  140.10      0
+     8388608       2097152     float     sum      -1    67.94  123.47  216.07      0    68.24  122.92  215.12      0
+    16777216       4194304     float     sum      -1    102.8  163.15  285.52      0    100.5  166.96  292.18      0
+    33554432       8388608     float     sum      -1    159.5  210.38  368.17      0    157.8  212.69  372.21      0
+    67108864      16777216     float     sum      -1    265.3  252.91  442.59      0    264.6  253.66  443.90      0
+   134217728      33554432     float     sum      -1    386.9  346.95  607.15      0    384.4  349.19  611.07      0
+   268435456      67108864     float     sum      -1    698.9  384.07  672.13      0    697.3  384.95  673.67      0
+   536870912     134217728     float     sum      -1   1314.7  408.37  714.65      0   1314.0  408.58  715.02      0
+  1073741824     268435456     float     sum      -1   2544.0  422.06  738.61      0   2549.1  421.23  737.15      0
+  2147483648     536870912     float     sum      -1   4557.5  471.20  824.59      0   4557.1  471.24  824.67      0
+  4294967296    1073741824     float     sum      -1   9015.4  476.40  833.71      0   9019.7  476.18  833.31      0
+  8589934592    2147483648     float     sum      -1    17887  480.23  840.41      0    17885  480.29  840.50      0
+ 17179869184    4294967296     float     sum      -1    35549  483.27  845.72      0    35568  483.01  845.27      0
+ 34359738368    8589934592     float     sum      -1    70981  484.07  847.12      0    70956  484.24  847.42      0
+nccl-test-worker-0:61:113 [1] NCCL INFO comm 0xbae114ae20b0 rank 1 nranks 8 cudaDev 1 busId 901000 - Destroy COMPLETE
+nccl-test-worker-1:62:114 [2] NCCL INFO comm 0xb1a0b3217270 rank 6 nranks 8 cudaDev 2 busId 1801000 - Destroy COMPLETE
+nccl-test-worker-1:61:115 [1] NCCL INFO comm 0xb32f014e00f0 rank 5 nranks 8 cudaDev 1 busId 901000 - Destroy COMPLETE
+nccl-test-worker-0:62:116 [2] NCCL INFO comm 0xb94bc7fa3350 rank 2 nranks 8 cudaDev 2 busId 1801000 - Destroy COMPLETE
+nccl-test-worker-0:60:114 [0] NCCL INFO comm 0xb39ac578e8e0 rank 0 nranks 8 cudaDev 0 busId 801000 - Destroy COMPLETE
+nccl-test-worker-0:63:115 [3] NCCL INFO comm 0xb3e5a8f93ba0 rank 3 nranks 8 cudaDev 3 busId 1901000 - Destroy COMPLETE
+nccl-test-worker-1:63:113 [3] NCCL INFO comm 0xc72d0ce64500 rank 7 nranks 8 cudaDev 3 busId 1901000 - Destroy COMPLETE
+nccl-test-worker-1:60:112 [0] NCCL INFO comm 0xaf585d78bbe0 rank 4 nranks 8 cudaDev 0 busId 801000 - Destroy COMPLETE
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 66.4834
+# Avg bus bandwidth    : 260.778
 #
 ```
+
+
+
+
+
 
 ## Frequently Asked Questions
 
