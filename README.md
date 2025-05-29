@@ -3,7 +3,7 @@
 ### Prerequisites
 - Your cluster needs to have v1.32+ and the `DynamicResourceAllocation` feature gate must be enabled on the cluster. Reach out to your cloud architect to enable it (needs a ticket with OKE).
 
-- Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [here](./cloud-init.yaml#L16).
+- Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [below](https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200?tab=readme-ov-file#create-cloud-init).
 
 ### Create a Compute Cluster
 Can be done from the console or in Python.
@@ -230,7 +230,8 @@ helm install --wait \
   --version v25.3.0 \
   --set driver.enabled=false \
   --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
+  --set driver.rdma.useHostMofed=true \
+  --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
 ```
 
 ### Install Dynamic Resource Allocation driver
