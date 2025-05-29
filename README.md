@@ -5,17 +5,6 @@
 
 - Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [below](https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200?tab=readme-ov-file#create-cloud-init).
 
-### Create a Compute Cluster
-Can be done from the console or in Python.
-
-```python
-import oci
-signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-compute_client = oci.core.ComputeClient(config={}, signer=signer)
-cc_details=oci.core.models.CreateComputeClusterDetails(compartment_id="ocid1.compartment.oc1..,availability_domain="XXXX:AP-SYDNEY-1-AD-1",display_name=CN_name)
-cn = compute_client.create_compute_cluster(create_compute_cluster_details=cc_details).data
-cn_id=cn.id
-```
 ### Required policies (any-user can be replaced by the group launching the cluster)
 
 ```python
@@ -26,13 +15,37 @@ Allow any-user to use compute-bare-metal-hosts in tenancy
 Allow any-user to use compute-gpu-memory-fabrics in tenancy
 ```
 
+### Create a Compute Cluster
+
+#### Python
+```python
+import oci
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+compute_client = oci.core.ComputeClient(config={}, signer=signer)
+cc_details=oci.core.models.CreateComputeClusterDetails(compartment_id="ocid1.compartment.oc1..,availability_domain="XXXX:AP-SYDNEY-1-AD-1",display_name=CN_name)
+cn = compute_client.create_compute_cluster(create_compute_cluster_details=cc_details).data
+cn_id=cn.id
+```
+#### OCI CLI
+
+```
+oci compute compute-cluster create --availability-domain $AD --compartment-id $COMPARTMENT_ID --display-name $DISPLAY_NAME
+```
+
 ### Gather the memory fabric ID
 
+#### Python
 ```python
 import oci
 signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
 compute_client = oci.core.ComputeClient(config={}, signer=signer)
 compute_client.list_compute_gpu_memory_fabrics(compartment_id="ocid1.tenancy.oc1..").data
+```
+
+#### OCI CLI
+
+```
+oci compute compute-gpu-memory-fabric list --compartment-id $COMPARTMENT_ID
 ```
 
 ### Create cloud-init
@@ -62,6 +75,7 @@ ssh_authorized_keys:
 
 ### Create an Instance Configuration
 
+#### OCI CLI
 ```
 REGION=
 COMPARTMENT_ID=
@@ -181,12 +195,26 @@ oci --region ${REGION} compute-management instance-configuration create --compar
 
 ### Create a Memory Cluster
 
+#### Python
 ```python
 import oci
 signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
 compute_client = oci.core.ComputeClient(config={}, signer=signer)
 details=oci.core.models.CreateComputeGpuMemoryClusterDetails(availability_domain="XXXX:AP-SYDNEY-1-AD-1",compartment_id="ocid1.compartment.oc1..",compute_cluster_id="ocid1.computecluster.oc1.ap-sydney-1.",instance_configuration_id="ocid1.instanceconfiguration.oc1.ap-sydney-1.",size=2,gpu_memory_fabric_id="ocid1.computegpumemoryfabric.oc1.ap-sydney-1.",display_name="memoryFabric1")
 output=compute_client.create_compute_gpu_memory_cluster(details)
+```
+
+#### OCI CLI
+
+```
+oci compute compute-gpu-memory-cluster create \
+  --availability-domain $AD \
+  --compartment-id $COMPARTMENT_ID \
+  --compute-cluster-id $CC_ID \
+  --instance-configuration-id $IC_ID \
+  --gpu-memory-fabric-id $GPU_MEMORY_FABRIC_ID \
+  --size $SIZE \
+  --display-name $DISPLAY_NAME
 ```
 
 ### Manage a Memory Cluster
