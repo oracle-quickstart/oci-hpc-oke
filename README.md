@@ -55,6 +55,7 @@ write_files:
     content: <CA cert>
 runcmd:
   - oke bootstrap --apiserver-host <API SERVER HOST IP> --ca "<CA cert>" --kubelet-extra-args "--feature-gates=DynamicResourceAllocation=true"
+  - systemctl disable --now nvidia-imex.service && systemctl mask nvidia-imex.service
 ssh_authorized_keys:
   - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqftxN9j+mN75JKR...
 ```
@@ -224,14 +225,16 @@ https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
 
-helm install --wait \
-  -n gpu-operator --create-namespace \
-  gpu-operator nvidia/gpu-operator \
-  --version v25.3.0 \
-  --set driver.enabled=false \
-  --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true \
-  --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
+```
+helm install gpu-operator nvidia/gpu-operator \
+    --version="v25.3.0" \
+    --create-namespace \
+    --namespace gpu-operator \
+    --set cdi.enabled=true \
+    --set driver.enabled=false \
+    --set driver.rdma.enabled=true \
+    --set driver.rdma.useHostMofed=true \
+    --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
 ```
 
 ### Install Dynamic Resource Allocation driver
