@@ -32,7 +32,7 @@ cn_id=cn.id
 oci compute compute-cluster create --availability-domain $AD --compartment-id $COMPARTMENT_ID --display-name $DISPLAY_NAME
 ```
 
-### Gather the memory fabric ID
+### Gather the GPU Memory Fabric ID
 
 #### Python
 ```python
