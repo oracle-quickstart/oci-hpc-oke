@@ -32,7 +32,7 @@ cn_id=cn.id
 oci compute compute-cluster create --availability-domain $AD --compartment-id $COMPARTMENT_ID --display-name $DISPLAY_NAME
 ```
 
-### Gather the GPU Memory Fabric ID
+### List GPU Memory Fabric IDs
 
 #### Python
 ```python
@@ -636,6 +636,9 @@ EOF
 ```
 
 #### Multi rack test
+
+> [!NOTE]  
+> Multi-rack NCCL tests in GB200 using DRA is still in early days. Let us know if you come across any issues.
 
 ```yaml
 cat <<'EOF' > nccl-test-multi-rack-job.yaml
