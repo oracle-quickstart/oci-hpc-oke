@@ -657,7 +657,7 @@ kind: ComputeDomain
 metadata:
   name: nccl-test-compute-domain
 spec:
-  numNodes: 30
+  numNodes: 32
   channel:
     resourceClaimTemplate:
       name: nccl-test-compute-domain-channel
@@ -707,7 +707,7 @@ spec:
                 -np $NP \
                 /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
-      replicas: 30
+      replicas: 32
       template:
         metadata:
           labels:
