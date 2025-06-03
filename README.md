@@ -657,7 +657,7 @@ kind: ComputeDomain
 metadata:
   name: nccl-test-compute-domain
 spec:
-  numNodes: 4
+  numNodes: 30
   channel:
     resourceClaimTemplate:
       name: nccl-test-compute-domain-channel
@@ -670,7 +670,7 @@ spec:
   slotsPerWorker: 4
   launcherCreationPolicy: WaitForWorkersReady
   runPolicy:
-    cleanPodPolicy: Running
+    cleanPodPolicy: "Running"
   sshAuthMountPath: /root/.ssh
   mpiReplicaSpecs:
     Launcher:
@@ -685,13 +685,15 @@ spec:
           containers:
           - name: mpi-launcher
             image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             command: ["bash", "-c"]
             args:
               - |
                 NUM_GPUS=4
                 NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
                 NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
+                mpirun --allow-run-as-root -mca plm_rsh_args "-p 2222" \
                 --bind-to none \
                 --map-by ppr:4:node \
                 --mca coll ^hcoll \
@@ -705,7 +707,7 @@ spec:
                 -np $NP \
                 /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
-      replicas: 4
+      replicas: 30
       template:
         metadata:
           labels:
@@ -727,18 +729,20 @@ spec:
                     - BM.GPU.GB200.4
           containers:
           - name: mpi-worker
-            securityContext:
-              privileged: true
-              capabilities:
-                add: [ "IPC_LOCK" ]
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             volumeMounts:
             - { mountPath: /dev/infiniband, name: devinf }
             - { mountPath: /dev/shm, name: shm }
+            securityContext:
+              privileged: true
+              capabilities:
+                add: ["IPC_LOCK"]
             image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
             command:
               - /bin/bash
               - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
             resources:
               limits:
                 nvidia.com/gpu: 4
