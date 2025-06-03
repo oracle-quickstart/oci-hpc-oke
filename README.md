@@ -169,7 +169,7 @@ kubectl apply -f BM.GPU.B4.8-policy.yaml
 ```
 
 ### Create an SRIOV Network Pool Config
-As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example reboots all nodes that VFs are configured.
+As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example for `BM.GPU.B4.8` reboots all nodes that VFs are configured.
 
 ```yaml
 cat <<EOF > sriov-network-pool-config-percentage.yaml
