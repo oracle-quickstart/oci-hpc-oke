@@ -43,7 +43,7 @@ image:
   # the Helm chart YAML (effectively implementing the default value to be
   # the current version). Also note that a "v" is prefixed to the
   # `appVersion` value.
-  tag: "d4ede35b-ubi9"
+  tag: "f537b969-ubi9"
 
 serviceAccount:
   # Specifies whether a service account should be created
