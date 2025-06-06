@@ -25,7 +25,7 @@ nvidiaDriverRoot: /
 # Specify the path of CTK binary (nvidia-ctk) on the host,
 # as it should appear in the the generated CDI specification.
 # The path depends on the system that runs on the node.
-nvidiaCtkPath: /usr/local/nvidia/toolkit/nvidia-ctk
+#nvidiaCtkPath: /usr/local/nvidia/toolkit/nvidia-ctk
 
 nameOverride: ""
 fullnameOverride: ""
