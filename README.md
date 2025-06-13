@@ -290,3 +290,11 @@ You can setup autoscaling for your nodes in a Cluster Network using the instruct
 
 ### How do I use network locality information when running workloads on OKE?
 You can follow the instructions [here.](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+
+## Contributing
+
+This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
+
+## Security
+
+Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process
