@@ -276,14 +276,13 @@ helm repo update
 
 ```
 helm install gpu-operator nvidia/gpu-operator \
-    --version=v25.3.0 \
+    --version=v25.3.1 \
     --create-namespace \
     --namespace gpu-operator \
     --set cdi.enabled=true \
     --set driver.enabled=false \
     --set driver.rdma.enabled=true \
-    --set driver.rdma.useHostMofed=true \
-    --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
+    --set driver.rdma.useHostMofed=true
 ```
 
 ### Install Dynamic Resource Allocation (DRA) driver
