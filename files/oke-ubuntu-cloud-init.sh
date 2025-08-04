@@ -25,6 +25,10 @@ while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/
    sleep 1
 done
 
+for f in /etc/apt/sources.list.d/*nvidia*; do
+  [ -f "$f" ] && mv "$f" "${f}.bak"
+done
+
 apt-get -y update && apt-get -y install $oke_package_name
 
 # OKE bootstrap
