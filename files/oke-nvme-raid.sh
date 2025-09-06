@@ -8,13 +8,29 @@ level="${1:-0}"
 pattern="${2:-/dev/nvme*n1}"
 mount_primary="${3:-/mnt/nvme}"
 mount_extra=(/var/lib/{containers,kubelet,logs/pods})
-md_device="/dev/md/0"
 
 # Enumerate NVMe devices, exit if absent
 devices=($pattern)
 if [ ${#devices[@]} -eq 0 ]; then
   echo "No NVMe devices" >&2
   exit 0
+fi
+
+# Used for boot volume replacement - check if an array exists
+legacy_dev_paths=(/dev/md/0 /dev/md/0_0 /dev/md127)
+mdadm --assemble --scan --quiet || true
+
+md_device=""
+for cand in "${legacy_dev_paths[@]}"; do
+  if [[ -e $cand ]]; then
+    md_device="$cand"
+    break
+  fi
+done
+
+# If no device was found in the above loop, use default /dev/md/0
+if [[ -z "$md_device" ]]; then
+  md_device="/dev/md/0"
 fi
 
 # Determine config for detected device count and RAID level
