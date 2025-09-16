@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 # shellcheck disable=SC2086,SC2174
 set -o errexit -o nounset -o pipefail -x
@@ -14,6 +13,14 @@ devices=($pattern)
 if [ ${#devices[@]} -eq 0 ]; then
   echo "No NVMe devices" >&2
   exit 0
+fi
+
+# Exit if cannot detect OS (Ubuntu and Oracle Linux are supported)
+if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+else
+    echo "Cannot detect OS: /etc/os-release missing"
+    exit 0
 fi
 
 # Used for boot volume replacement - check if an array exists
@@ -93,9 +100,24 @@ for mount in "${mount_extra[@]}"; do
       WantedBy=multi-user.target
 EOF
     systemd-analyze verify "${mount_unit_name}"
-    systemctl enable "${mount_unit_name}" --now  
+    systemctl enable "${mount_unit_name}" --now
 done
 
-mdadm --detail --scan --verbose >> /etc/mdadm/mdadm.conf
-
-update-initramfs -u
+case "$ID" in
+    ubuntu)
+        MDADM_CONF="/etc/mdadm/mdadm.conf"
+        [[ -f $MDADM_CONF ]] || touch "$MDADM_CONF"
+        mdadm --detail --scan --verbose >> "$MDADM_CONF"
+        update-initramfs -u
+        ;;
+    ol)
+        MDADM_CONF="/etc/mdadm.conf"
+        [[ -f $MDADM_CONF ]] || touch "$MDADM_CONF"
+        mdadm --detail --scan --verbose >> "$MDADM_CONF"
+        dracut --force
+        ;;
+    *)
+        echo "Unsupported OS: $ID"
+        exit 1
+        ;;
+esac
