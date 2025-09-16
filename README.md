@@ -1,23 +1,20 @@
 # Running RDMA (remote direct memory access) GPU workloads on OKE
-Oracle Cloud Infrastructure Kubernetes Engine (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
-
-Please visit the [OKE documentation page](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm) for more information.
+Oracle Cloud Infrastructure Kubernetes Engine (OKE)[https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm] is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
 
 ### Supported Operating Systems
 - Ubuntu 22.04
+- Oracle Linux 8 (except for the GPU & RDMA worker pool)
 
 ### Required policies
-The OCI Resource Manager stack template uses the [Self Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) functionality of OKE.
-
-Below policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please find more information about the policies below.
+The following policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please find more information about the policies below.
 
 - [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
 - [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
 
 ## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
-You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy addidional CPU/GPU worker pools.
+You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy additional CPU/GPU worker pools.
 
-You can use the below images for both CPU and GPU pools.
+You can use the following images for both CPU and GPU pools.
 
 > [!NOTE]  
 > The GPU image has the GPU drivers pre-installed.
@@ -31,26 +28,24 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 **Images for NVIDIA shapes**
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0)
+- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.07.22-0)
 
-- [GPU driver 560 & CUDA 12.6](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-560-CUDA-12.6-2025.03.26-0)
-
-- [GPU driver 550 & CUDA 12.4](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-550-CUDA-12.4-2025.03.26-0)
+- [GPU driver 550 & CUDA 12.4](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-GPU-550-CUDA-12.4-2025.07.22-0)
 
 
 **Image for AMD shapes**
 
-- [ROCm 6.3](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-AMD-ROCM-632-2025.03.26-0)
+- [ROCm 6.3.2](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-AMD-ROCM-632-2025.07.23-0)
 
 
 ### Deploy the cluster using the Oracle Cloud Resource Manager template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v25.5.1/oke-rdma-quickstart-v25.5.1.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
 
 For the image ID, use the ID of the image that you imported in the previous step.
 
-The template will deploy a `bastion` instance and an `operator` instance. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J ubuntu@<bastion IP> ubuntu@<operator IP>`.
+The template will deploy a `bastion` instance and an `operator` instance by default. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J ubuntu@<bastion IP> ubuntu@<operator IP>`.
 
 You can also find this information under the **Application information** tab in the OCI Resource Manager stack.
 
@@ -60,15 +55,15 @@ You can also find this information under the **Application information** tab in 
 kubectl get nodes
 
 NAME           STATUS     ROLES    AGE     VERSION
-10.0.103.73    Ready      <none>   2d23h   v1.25.6
-10.0.127.206   Ready      node     2d3h    v1.25.6
-10.0.127.32    Ready      node     2d3h    v1.25.6
-10.0.83.93     Ready      <none>   2d23h   v1.25.6
-10.0.96.82     Ready      node     2d23h   v1.25.6
+10.0.103.73    Ready      <none>   2d23h   v1.31.1
+10.0.127.206   Ready      node     2d3h    v1.31.1
+10.0.127.32    Ready      node     2d3h    v1.31.1
+10.0.83.93     Ready      <none>   2d23h   v1.31.1
+10.0.96.82     Ready      node     2d23h   v1.31.1
 ```
 
 ### Add a Service Account Authentication Token (optional but recommended)
-More info [here.](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm)
+More info [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm).
 
 ```
 kubectl -n kube-system create serviceaccount kubeconfig-sa
@@ -107,7 +102,7 @@ securityContext:
     - { mountPath: /dev/infiniband, name: devinf }
     - { mountPath: /dev/shm, name: shm }
 ```
-Here's a simple example. You can also look at the NCCL test manifests in the repo [here.](./manifests/)
+Here's a simple example. You can also look at the NCCL test manifests in the repo [here](./manifests/).
 
 ```yaml
 apiVersion: v1
@@ -162,6 +157,11 @@ kubectl create rolebinding default-view --namespace default --serviceaccount def
 
 ##### BM.GPU.H100
 ```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H200.8-nccl-test.yaml
+```
+
+##### BM.GPU.H100
+```
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H100.8-nccl-test.yaml
 ```
 
@@ -185,7 +185,7 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/BM.GPU.MI300X.8.yaml
 ```
 
-The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
+The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check its logs for the NCCL test result.
 
 ```sh
 Defaulted container "mpimaster" out of: mpimaster, wait-for-workers (init)
@@ -280,16 +280,16 @@ You can follow the instructions [here](./docs/adding-ssh-keys-to-worker-nodes.md
 Please see the instructions [here](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md) for the best practices on running PyTorch jobs.
 
 ### I have large container images. Can I import them from a shared location instead of downloading them?
-Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here.](./docs/importing-images-from-fss-skopeo.md)
+Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here](./docs/importing-images-from-fss-skopeo.md).
 
 ### How can I run GPU & RDMA health checks in my nodes?
-You can deploy the health check script with Node Problem Detector by following the instructions [here.](./docs/running-gpu-rdma-healtchecks-with-node-problem-detector.md)
+You can deploy the health check script with Node Problem Detector by following the instructions [here](./docs/running-gpu-rdma-healtchecks-with-node-problem-detector.md).
 
 ### Can I autoscale my RDMA enabled nodes in a Cluster Network?
-You can setup autoscaling for your nodes in a Cluster Network using the instructions [here.](./docs/using-cluster-autoscaler-with-cluster-networks.md)
+You can set up autoscaling for your nodes in a Cluster Network using the instructions [here](./docs/using-cluster-autoscaler-with-cluster-networks.md).
 
 ### How do I use network locality information when running workloads on OKE?
-You can follow the instructions [here.](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+You can follow the instructions [here](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md).
 
 ## Contributing
 
