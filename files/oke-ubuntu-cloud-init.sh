@@ -30,6 +30,11 @@ Suites: stable
 Components: main
 Trusted: yes
 EOF
+            # Wait for apt lock and install the package
+            while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
+                echo "Waiting for dpkg/apt lock"
+                sleep 1
+            done
 
             apt-get -y update
             apt-get -y install "$oke_package_name"
