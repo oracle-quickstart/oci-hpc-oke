@@ -9,9 +9,9 @@ This readme contains the manifests required to run the NCCL-tests active health 
 
 When the CronJob runs, the applier script performs the following steps:
 
-1. **Enumerate GPU nodes** Look for nodes that have (`nvidia.com/gpu=true`) label.
+1. **Enumerate GPU nodes**: Look for nodes that have the `nvidia.com/gpu=true` label.
 2. **Check current usage:** It sums the GPU requests across running pods on each node. Only nodes with zero GPU usage are considered idle.
-3. **Exclude recently tested nodes:** If a node is labeled `oke.oraclecloud.com/active-health-checks-nccl-tests-last-run` with in the last 24 hours, it is skipped.
+3. **Exclude recently tested nodes:** If a node is labeled `oke.oraclecloud.com/active-health-checks-nccl-tests-last-run` within the last 24 hours, it is skipped.
 4. **Require at least two nodes:** Both worker nodes must be available. If fewer than two nodes remain, the job exits gracefully.
 5. **Shape detection:** The selected node’s `node.kubernetes.io/instance-type` label determines which ConfigMap manifest to apply.
 6. **Job creation:** A Volcano `Job` is created with a launcher (`mpimaster`) and workers (`mpiworker`). The launcher waits for SSH connectivity to the workers before running the NCCL test.
@@ -31,7 +31,7 @@ The manifest assumes there's a namespace called `monitoring`. If you want to dep
    ```bash
    kubectl create job -n monitoring --from=cronjob/active-health-checks-nccl-tests-applier test-$(date +%s)
    
-   kubectl logs -n monitoring job/shape-test-<timestamp>
+   kubectl logs -n monitoring job/test-<timestamp>
    ```
 
 3. **Watch Volcano job**
