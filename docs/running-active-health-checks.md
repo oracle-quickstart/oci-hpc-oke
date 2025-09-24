@@ -19,6 +19,9 @@ When the CronJob runs, the applier script performs the following steps:
 
 If all nodes are excluded (either busy or already tested), the job exits without creating a Volcano job, logging the reason.
 
+> [!NOTE]  
+> The test jobs run as low priority jobs and can be evicted if higher priority workloads are pending. This ensures that health checks do not interfere with production workloads.
+
 ## Usage
 The manifest assumes there's a namespace called `monitoring`. If you want to deploy to another namespace, edit the manifest accordingly.
 
