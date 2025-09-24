@@ -3,7 +3,7 @@
 > [!NOTE]  
 > This is a preview feature. We are actively adding more tests.
 
-This directory contains the manifests required to run the NCCL-based active health checks on GPU nodes using Volcano. It includes a smart applier CronJob that only schedules tests on idle nodes that were not already tested in the last 24 hours (configurable).
+This readme contains the manifests required to run the NCCL-tests active health checks on GPU nodes using Volcano. It includes a smart applier Kubernetes CronJob that only schedules tests on idle nodes that were not already tested in the last 24 hours (configurable).
 
 ## Node selection logic
 
