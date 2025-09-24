@@ -27,7 +27,7 @@ The manifest assumes there's a namespace called `monitoring`. If you want to dep
 
 1. **Apply manifests**
    ```bash
-   kubectl apply -f https://github.com/oracle-quickstart/oci-hpc-oke/tree/main/manifests/active-health-checks/active-health-checks-nccl-tests.yaml
+   kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-nccl-tests.yaml
    ```
 
 2. **Run ad-hoc test**
@@ -46,7 +46,7 @@ The manifest assumes there's a namespace called `monitoring`. If you want to dep
 
 4. **Clean up**
    ```bash
-   kubectl delete job -n monitoring -l job-name
+   kubectl delete job -n monitoring -l <job-name>
    
    kubectl delete cronjob active-health-checks-nccl-tests-applier -n monitoring
    ```
