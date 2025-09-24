@@ -770,6 +770,7 @@ spec:
   failedJobsHistoryLimit: 0
   jobTemplate:
     spec:
+      backoffLimit: 1
       template:
         spec:
           serviceAccountName: active-health-checks-runner
