@@ -12,7 +12,11 @@ fi
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape)
 if [[ "$SHAPE" == BM.GPU.GB200* ]] || [[ "$SHAPE" == BM.GPU.GB300* ]]; then
     echo "Disabling nvidia-imex.service for shape: $SHAPE"
-    systemctl disable --now nvidia-imex.service && systemctl mask nvidia-imex.service
+    if systemctl list-unit-files | grep -q nvidia-imex.service; then
+        systemctl disable --now nvidia-imex.service && systemctl mask nvidia-imex.service
+    else
+        echo "nvidia-imex.service not found, skipping"
+    fi
 fi
 
 case "$ID" in
