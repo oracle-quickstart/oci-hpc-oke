@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oke-ons-webhook.fullname" . }}
+  labels:
+    {{- include "oke-ons-webhook.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.deploy.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "oke-ons-webhook.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        token_name: {{ include "oke-ons-webhook.fullname" . }}
+        {{- include "oke-ons-webhook.selectorLabels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: code-volume
+          configMap:
+            name: {{ include "oke-ons-webhook.fullname" . }}
+    {{- with .Values.deploy.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "oke-ons-webhook.fullname" . }}-sa
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.deploy.image.repository }}:{{ .Values.deploy.image.tag }}"
+          args: ["/bin/sh", "-c", "uv run /app/script.py"]
+          imagePullPolicy: {{ .Values.deploy.image.pullPolicy }}
+          volumeMounts:
+            - name: code-volume
+              mountPath: /app
+          env:
+            - name: TOKEN_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['token_name']
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          {{- with .Values.deploy.env }} 
+            {{- range $key, $value := . }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          {{- with .Values.deploy.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
