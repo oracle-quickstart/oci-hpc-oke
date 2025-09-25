@@ -1,0 +1,30 @@
+# Default values for oke-ons-webhook.
+
+nameOverride: ""
+fullnameOverride: ""
+
+deploy:
+  grafana_initial_password: ""
+  replicaCount: 1
+  imagePullSecrets: []
+  image:
+    repository: astral/uv
+    pullPolicy: IfNotPresent
+    tag: "alpine"
+  
+  affinity: {}
+
+  env: {}
+
+  nodeSelector: {}
+
+  resources: {}
+
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+service:
+  type: ClusterIP
+  port: 80

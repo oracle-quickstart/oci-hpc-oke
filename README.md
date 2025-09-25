@@ -1,5 +1,5 @@
 # Running RDMA (remote direct memory access) GPU workloads on OKE
-Oracle Cloud Infrastructure Kubernetes Engine (OKE)[https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengoverview.htm] is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
+Oracle Cloud Infrastructure Kubernetes Engine (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
 
 ### Supported Operating Systems
 - Ubuntu 22.04

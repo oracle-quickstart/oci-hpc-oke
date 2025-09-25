@@ -1,0 +1,1664 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "GPU Metrics Dashboard for a single cluster node.\n",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 7,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "count by (Hostname) (\n  sum by (Hostname, gpu) (DCGM_EXP_GPU_HEALTH_STATUS == 0)\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Avail GPU",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "orange",
+                "value": 85
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) / max by (Hostname) (DCGM_FI_DEV_SLOWDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) * 100)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Max Temp / Slowdown",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "orange",
+                "value": 85
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) / max by (Hostname) (DCGM_FI_DEV_SHUTDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) * 100)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Max Temp / Shutdown",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"})",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Avg GPU Util",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "${__field.labels.gpu}",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 15,
+          "valueSize": 15
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_XID_ERRORS{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Last Xid by GPU",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Temperature",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "watts"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Powerdraw",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_MEMORY_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Memory Temperature",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "rotkhz"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_SM_CLOCK{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "SM Clock",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "legendFormat": "{{ gpu }}",
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Memory Copy Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 20
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
+          "legendFormat": "{{ gpu }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "NVLink Rx + Tx Combined B/W",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 20
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
+          "legendFormat": "{{ gpu }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "NVLink Tx B/W",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 20
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "calcs": [
+            "p99",
+            "p95",
+            "p90"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
+          "legendFormat": "{{ gpu }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "NVLink Rx B/W",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "delta"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "(\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n)\n+\n(\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n)\n",
+          "legendFormat": "{{ device }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "ROCEv2 Rx + Tx Combined B/W",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [
+            "delta"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "sum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m]))\nor\nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) ",
+          "legendFormat": "{{ device }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "ROCEv2 Tx B/W",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "calcs": [
+            "delta"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "sum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m]))\nor\nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) ",
+          "legendFormat": "{{ device }}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "ROCEv2 Rx B/W",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 1,
+        "name": "PROMETHEUS_DS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "definition": "label_values(up,worker_pool_name)",
+        "includeAll": true,
+        "label": "Worker Pool",
+        "multi": true,
+        "name": "worker_pool_name",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(up,worker_pool_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${PROMETHEUS_DS}"
+        },
+        "definition": "label_values(up,hostname)",
+        "includeAll": true,
+        "label": "Node",
+        "multi": true,
+        "name": "hostname",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(up,hostname)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${PROMETHEUS_DS}"
+        },
+        "includeAll": true,
+        "label": "Display Name",
+        "multi": true,
+        "name": "oci_name",
+        "options": [],
+        "query": "label_values(up, oci_name)",
+        "refresh": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "GPU Metrics",
+  "uid": "gpu-metrics-single",
+  "version": 8
+}

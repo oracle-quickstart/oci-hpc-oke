@@ -1,0 +1,20 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: ons-webhook
+    receivers:
+    - uid: ons
+      type: webhook
+      settings:
+        url: http://oke-ons-webhook/grafana-webhook
+        httpMethod: POST
+policies:
+    - orgId: 1
+      receiver: ons-webhook
+      group_by:
+        - grafana_folder
+        - alertname
+        - hostname
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h

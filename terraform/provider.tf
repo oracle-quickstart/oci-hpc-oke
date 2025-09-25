@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 data "oci_identity_region_subscriptions" "home" {
@@ -29,10 +29,11 @@ provider "oci" {
 }
 
 provider "helm" {
-  kubernetes {
-    host                   = local.cluster_public_endpoint
+  kubernetes = {
+    host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
     cluster_ca_certificate = base64decode(local.cluster_ca_cert)
-    exec {
+    tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
+    exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "oci"
       args        = local.kube_exec_args
@@ -41,8 +42,20 @@ provider "helm" {
 }
 
 provider "kubernetes" {
-  host                   = local.cluster_public_endpoint
+  host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
   cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "oci"
+    args        = local.kube_exec_args
+  }
+}
+
+provider "kubectl" {
+  host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
+  cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"

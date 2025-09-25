@@ -2,7 +2,7 @@ apiVersion: 1
 groups:
     - orgId: 1
       name: Node Problem Detector
-      folder: OKE
+      folder: Alerts
       interval: 1m
       rules:
         - uid: oke_npd_rdma_wpa_auth
@@ -54,3 +54,6 @@ groups:
           annotations: {}
           labels: {}
           isPaused: false
+          notification_settings:
+            receiver: ons-webhook
+            repeat_interval: 24h

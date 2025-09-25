@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 data "oci_identity_availability_domains" "all" {
@@ -17,7 +17,7 @@ locals {
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
   group_name           = format("oke-gpu-%v", local.state_id)
-  fss_group_name       = format("oke-gpu-%v-fss", local.state_id)
+  storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
 
@@ -28,6 +28,7 @@ locals {
     "Allow dynamic-group %v to manage compute-management-family in compartment id %v",
     "Allow dynamic-group %v to manage instance-family in compartment id %v",
     "Allow dynamic-group %v to manage volume-family in compartment id %v",
+    "Allow dynamic-group %v to use ons-topics in compartment id %v",
     "Allow dynamic-group %v to use subnets in compartment id %v",
     "Allow dynamic-group %v to use virtual-network-family in compartment id %v",
     "Allow dynamic-group %v to use vnics in compartment id %v",
@@ -88,16 +89,21 @@ resource "oci_identity_policy" "oke_quickstart_all" {
   }
 }
 
-resource "oci_identity_policy" "oke_quickstart_fss" {
+resource "oci_identity_policy" "oke_quickstart_storage" {
   provider       = oci.home
-  count          = var.create_fss ? 1 : 0
+  count          = alltrue([var.create_policies, anytrue([var.create_fss, var.create_lustre])]) ? 1 : 0
   compartment_id = var.compartment_ocid
-  name           = local.fss_group_name
-  description    = format("FSS policies for OKE Terraform state %v", local.state_id)
-  statements = [
-    "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-    "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-  ]
+  name           = local.storage_group_name
+  description    = format("FSS and Lustre FS policies for OKE Terraform state %v", local.state_id)
+  statements = flatten([
+    var.create_fss ? [
+      "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+      "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+    ] : [],
+    var.create_lustre ? [
+      "Allow service lustrefs to use virtual-network-family in compartment id ${var.compartment_ocid}",
+    ] : [],
+  ])
   lifecycle {
     ignore_changes = [defined_tags]
   }

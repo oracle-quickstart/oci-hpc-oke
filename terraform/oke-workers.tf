@@ -1,10 +1,10 @@
-# Copyright (c) 2024 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
   create_workers = true
   ssh_authorized_keys = compact([
-    trimspace(var.ssh_public_key),
+    trimspace(local.ssh_public_key),
   ])
 
   worker_ops_image_id    = coalesce(var.worker_ops_image_custom_id, "none")
@@ -48,7 +48,7 @@ locals {
   }
 
   worker_pools = {
-    "oke-ops" = {
+    "oke-system" = {
       create           = local.create_workers
       description      = "OKE-managed VM Node Pool for cluster operations and monitoring"
       placement_ads    = [substr(var.worker_ops_ad, -1, 0)]
@@ -88,9 +88,10 @@ locals {
       image_id         = local.worker_gpu_image_id
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
       node_labels      = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
-      create                  = local.create_workers && var.worker_rdma_enabled
+      create                  = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
       description             = "OKE self-managed Cluster Network with RDMA"
       placement_ads           = [substr(var.worker_rdma_ad, -1, 0)]
       mode                    = "cluster-network"
@@ -120,6 +121,6 @@ locals {
           "OS Management Service Agent"         = "DISABLED"
         }
       }
-    }
+    },
   }
 }

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: oke-ons-webhook
+description: A Helm chart for deploying Grafana Alert Webhook in OKE to push notifications to Topics.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - grafana
+  - webhook
+  - topics
+  - notifications
+home: https://github.com/oci-hpc/oke-ons-webhook
+sources:
+  - https://github.com/oci-hpc/oke-ons-webhook
+maintainers:
+  - name: Andrei Ilas
+    email: andrei.ilas@oracle.com
