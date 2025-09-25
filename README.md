@@ -263,7 +263,7 @@ You can also delete a node from the console and the size will be automatically u
 https://objectstorage.us-ashburn-1.oraclecloud.com/p/D62MHqp6A_NlJ-UAK2Yo2tKnrosEHyJmUzRMme4Z6LvarsBfbEeydI-PwAa-nvGD/n/imagegen/b/GPU-imaging/o/Canonical-Ubuntu-22.04-aarch64-2025.07.24-0-OCA-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.08.12-0
 
 ### Deploy an OKE cluster
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/download/v25.5.0/oke-rdma-quickstart-v25.5.0.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
 
 - Kubernetes version must be at least v1.32
 - Choose VCN-native pod networking
