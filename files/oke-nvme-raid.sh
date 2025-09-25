@@ -43,6 +43,12 @@ fi
 # Determine config for detected device count and RAID level
 count=${#devices[@]}; bs=4; chunk=256
 stride=$((chunk/bs)) # chunk size / block size
+
+# If only 1 device, force RAID level 0
+if [[ $count -eq 1 ]]; then
+  level=0
+fi
+
 eff_count=$count # $level == 0
 if [[ $level == 10 ]]; then eff_count=$((count/2)); fi
 if [[ $level == 5 ]]; then eff_count=$((count-1)); fi

@@ -8,6 +8,13 @@ else
     exit 1
 fi
 
+# Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
+SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape)
+if [[ "$SHAPE" == BM.GPU.GB200* ]] || [[ "$SHAPE" == BM.GPU.GB300* ]]; then
+    echo "Disabling nvidia-imex.service for shape: $SHAPE"
+    systemctl disable --now nvidia-imex.service && systemctl mask nvidia-imex.service
+fi
+
 case "$ID" in
     ubuntu)
         echo "Detected Ubuntu"
