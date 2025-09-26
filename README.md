@@ -1,7 +1,7 @@
 # Running RDMA GPU workloads on OKE with GB200s
 
 ### Prerequisites
-- Your cluster needs to have v1.32+ and the `DynamicResourceAllocation` feature gate must be enabled on the cluster. Reach out to your cloud architect to enable it (needs a ticket with OKE).
+- Your k8s version of the cluster must be at least v1.32.
 
 - Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [below](https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200?tab=readme-ov-file#create-cloud-init).
 
