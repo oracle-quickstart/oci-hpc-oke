@@ -45,7 +45,7 @@ compute_client.list_compute_gpu_memory_fabrics(compartment_id="ocid1.tenancy.oc1
 #### OCI CLI
 
 ```
-oci compute compute-gpu-memory-fabric list --compartment-id $COMPARTMENT_ID
+oci compute compute-gpu-memory-fabric list --compartment-id $TENANCY_ID
 ```
 
 ### Create cloud-init
