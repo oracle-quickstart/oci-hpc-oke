@@ -276,7 +276,7 @@ helm repo update
 
 ```
 helm install gpu-operator nvidia/gpu-operator \
-    --version=v25.3.2 \
+    --version=v25.3.4 \
     --create-namespace \
     --namespace gpu-operator \
     --set cdi.enabled=true \
