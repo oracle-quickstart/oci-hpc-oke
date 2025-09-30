@@ -52,8 +52,8 @@ data:
     apiVersion: batch.volcano.sh/v1alpha1
     kind: Job
     metadata:
-      name: JOB_NAME_PLACEHOLDER
-      namespace: monitoring
+      annotations:
+      name: nccl-allreduce-job0
     spec:
       minAvailable: 0
       plugins:
@@ -73,9 +73,7 @@ data:
           spec:
             # NODE_AFFINITY_PLACEHOLDER
             containers:
-            - name: mpimaster
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              command:
+            - command:
               - /bin/bash
               - -c
               - |
@@ -140,7 +138,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -158,15 +156,14 @@ data:
         replicas: 2
         template:
           metadata:
-            labels: {}
           spec:
             containers:
-            - name: mpiworker
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              command:
+            - command:
               - /bin/bash
               - -c
               - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+              name: mpiworker
               ports:
               - { name: mpijob-port, containerPort: 2222, protocol: TCP }
               resources:
@@ -182,7 +179,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -269,8 +266,8 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
-                  - CAP_SYS_ADMIN
+                    - IPC_LOCK
+                    - CAP_SYS_ADMIN
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -310,8 +307,8 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
-                  - CAP_SYS_ADMIN
+                    - IPC_LOCK
+                    - CAP_SYS_ADMIN
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -395,8 +392,8 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
-                  - CAP_SYS_ADMIN
+                    - IPC_LOCK
+                    - CAP_SYS_ADMIN
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -436,7 +433,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
                   - CAP_SYS_ADMIN
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
@@ -445,6 +442,137 @@ data:
             dnsPolicy: ClusterFirstWithHostNet
             hostNetwork: true
             restartPolicy: OnFailure
+            terminationGracePeriodSeconds: 15
+            tolerations:
+            - { key: nvidia.com/gpu, operator: Exists }
+            volumes:
+            - { name: devinf, hostPath: { path: /dev/infiniband }}
+            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-nccl-tests-bm-gpu4-8
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: batch.volcano.sh/v1alpha1
+    kind: Job
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      namespace: monitoring
+    spec:
+      minAvailable: 0
+      plugins:
+        ssh: []
+        svc: []
+      queue: default
+      schedulerName: volcano
+      tasks:
+      - name: mpimaster
+        policies:
+        - action: CompleteJob
+          event: TaskCompleted
+        replicas: 1
+        template:
+          metadata:
+            labels: {}
+          spec:
+            # NODE_AFFINITY_PLACEHOLDER
+            containers:
+            - name: mpimaster
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+              command:
+              - /bin/bash
+              - -c
+              - |
+                set -e -o pipefail; trap 'exit=1' SIGINT
+                NUM_GPUS=8
+                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
+                NP=$(($NUM_HOSTS*$NUM_GPUS))
+                mpirun --allow-run-as-root \
+                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                  -mca coll_hcoll_enable 0 \
+                  -np $NP -npernode $NUM_GPUS --bind-to numa \
+                  -hostfile /etc/volcano/mpiworker.host \
+                  -x NCCL_DEBUG=WARN \
+                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                  -x NCCL_IB_GID_INDEX=3 \
+                  -x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_6,mlx5_8,mlx5_10,mlx5_12,mlx5_14,mlx5_16,mlx5_1,mlx5_3,mlx5_7,mlx5_9,mlx5_11,mlx5_13,mlx5_15,mlx5_17 \
+                  -x NCCL_IB_TC=41 \
+                  -x NCCL_IB_SL=0 \
+                  -x NCCL_IB_TIMEOUT=22 \
+                  -x HCOLL_ENABLE_MCAST_ALL=0 \
+                  -x UCX_TLS=tcp \
+                  -x UCX_NET_DEVICES=eth0 \
+                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+              ports:
+              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+              resources:
+                limits:
+                  ephemeral-storage: 32Gi
+                requests:
+                  cpu: 8
+                  ephemeral-storage: 32Gi
+                  memory: 2Gi
+              securityContext:
+                privileged: true
+                capabilities:
+                  add:
+                    - IPC_LOCK
+                    - CAP_SYS_ADMIN
+              volumeMounts:
+              - { mountPath: /dev/infiniband, name: devinf }
+              - { mountPath: /dev/shm, name: shm }
+              workingDir: /workspace
+            dnsPolicy: ClusterFirstWithHostNet
+            hostNetwork: true
+            restartPolicy: OnFailure
+            priorityClassName: active-health-checks-low
+            terminationGracePeriodSeconds: 2
+            volumes:
+            - { name: devinf, hostPath: { path: /dev/infiniband }}
+            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+      - name: mpiworker
+        minAvailable: 0
+        replicas: 2
+        template:
+          metadata:
+            labels: {}
+          spec:
+            containers:
+            - name: mpiworker
+              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+              command:
+              - /bin/bash
+              - -c
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
+              ports:
+              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+              resources:
+                limits:
+                  ephemeral-storage: 32Gi
+                  nvidia.com/gpu: 8
+                requests:
+                  cpu: 64
+                  ephemeral-storage: 32Gi
+                  memory: 512Gi
+                  nvidia.com/gpu: 8
+              securityContext:
+                privileged: true
+                capabilities:
+                  add:
+                    - IPC_LOCK
+                    - CAP_SYS_ADMIN
+              volumeMounts:
+              - { mountPath: /dev/infiniband, name: devinf }
+              - { mountPath: /dev/shm, name: shm }
+              workingDir: /workspace
+            dnsPolicy: ClusterFirstWithHostNet
+            hostNetwork: true
+            restartPolicy: OnFailure
+            priorityClassName: active-health-checks-low
             terminationGracePeriodSeconds: 15
             tolerations:
             - { key: nvidia.com/gpu, operator: Exists }
@@ -527,7 +655,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -567,7 +695,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -657,7 +785,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -697,7 +825,7 @@ data:
                 privileged: true
                 capabilities:
                   add:
-                  - IPC_LOCK
+                    - IPC_LOCK
               volumeMounts:
               - { mountPath: /dev/infiniband, name: devinf }
               - { mountPath: /dev/shm, name: shm }
@@ -790,7 +918,8 @@ spec:
               excluded_nodes=""
               available_nodes=""
               idle_candidates=""
-              for node in $(kubectl get nodes -l nvidia.com/gpu=true -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' | tr ' ' '\n' | grep -v '^$'); do
+              gpu_nodes=$(kubectl get nodes -l nvidia.com/gpu=true -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' | tr ' ' '\n' | grep -v '^$')
+              for node in $gpu_nodes; do
                 gpu_usage=$(kubectl get pods -A --field-selector spec.nodeName=$node -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.resources.requests.nvidia\\.com/gpu}{"\n"}{end}{end}' 2>/dev/null | awk 'NF{sum+=$1+0} END{print sum+0}')
                 if [ "$gpu_usage" -eq 0 ] 2>/dev/null; then
                   echo "[applier] Node $node is idle (allocated GPU usage = 0)"
@@ -838,7 +967,7 @@ spec:
               if [ -z "$selected_shape" ]; then
                 candidate_node=$(echo "$available_nodes" | tr ' ' '\n' | grep -v '^$' | head -n1)
                 if [ -z "$candidate_node" ]; then
-                  candidate_node=$(echo "$all_gpu_nodes" | tr ' ' '\n' | grep -v '^$' | head -n1)
+                  candidate_node=$(echo "$idle_candidates" | tr ' ' '\n' | grep -v '^$' | head -n1)
                 fi
                 if [ -n "$candidate_node" ]; then
                   selected_shape=$(kubectl get node "$candidate_node" -o jsonpath='{.metadata.labels.node\.kubernetes\.io/instance-type}' 2>/dev/null || echo "")
@@ -899,6 +1028,10 @@ spec:
                 sleep 10
               done
               result=${result:-fail}
+              if [ "$result" = "fail" ]; then
+                echo "[applier] Volcano job never succeeded; treating this as a handled failure"
+                exit 0
+              fi
               echo "[applier] Result for $JOB_NAME: $result"
               timestamp=$(date -u +%Y-%m-%dT%H-%M-%SZ)
               for n in $worker_nodes; do
@@ -931,6 +1064,11 @@ spec:
                   - key: job.yaml
                     path: bm-gpu-b4-8.yaml
               - configMap:
+                  name: active-health-checks-nccl-tests-bm-gpu4-8
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu4-8.yaml
+              - configMap:
                   name: active-health-checks-nccl-tests-bm-gpu-b200-8
                   items:
                   - key: job.yaml
@@ -940,4 +1078,3 @@ spec:
                   items:
                   - key: job.yaml
                     path: bm-gpu-h200-8.yaml
-

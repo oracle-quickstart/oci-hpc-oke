@@ -1,0 +1,121 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: bm-gpu-b4-8
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: BM.GPU.B4.8
+    nvidia.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: bm-gpu-b4-8-nccl-tests-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+    flavors:
+    - name: bm-gpu-b4-8
+      resources:
+      - name: cpu
+        nominalQuota: "200"
+      - name: memory
+        nominalQuota: "1024Gi"
+      - name: nvidia.com/gpu
+        nominalQuota: "16"
+      - name: ephemeral-storage
+        nominalQuota: "64Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: bm-gpu-b4-8-nccl-tests
+spec:
+  clusterQueue: bm-gpu-b4-8-nccl-tests-queue
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test
+  labels:
+    kueue.x-k8s.io/queue-name: bm-gpu-b4-8-nccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: "Running"
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            command: ["bash", "-c"]
+            args:
+              - |
+                set -e -o pipefail; trap 'exit=1' SIGINT
+                NUM_GPUS=8
+                NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                NP=$(($NUM_HOSTS*$NUM_GPUS))
+                while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                  echo "Waiting for workers to be ready..."
+                  sleep 5
+                done
+                echo "All workers are ready!"
+                mpirun --allow-run-as-root \
+                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                  -mca coll_hcoll_enable 0 \
+                  -np $NP -npernode $NUM_GPUS --bind-to numa \
+                  -x NCCL_DEBUG=WARN \
+                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                  -x NCCL_IB_GID_INDEX=3 \
+                  -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
+                  -x NCCL_IB_TC=41 \
+                  -x NCCL_IB_SL=0 \
+                  -x NCCL_IB_TIMEOUT=22 \
+                  -x HCOLL_ENABLE_MCAST_ALL=0 \
+                  -x UCX_TLS=tcp \
+                  -x UCX_NET_DEVICES=eth0 \
+                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-worker
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          volumes:
+          - { name: devinf, hostPath: { path: /dev/infiniband }}
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+          containers:
+          - name: mpi-worker
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            volumeMounts:
+            - { mountPath: /dev/infiniband, name: devinf }
+            - { mountPath: /dev/shm, name: shm }
+            securityContext:
+              privileged: true
+              capabilities:
+                add: ["IPC_LOCK"]
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command:
+              - /bin/bash
+              - -c
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+            resources:
+              limits:
+                nvidia.com/gpu: 8

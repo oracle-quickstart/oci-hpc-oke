@@ -142,111 +142,88 @@ spec:
 ### Optional - Deploy Volcano and run the NCCL test
 Volcano is needed for running the optional NCCL test. It's not required for the regular operation of the cluster, you can remove it after you finish running the NCCL test.
 
-#### Deploy Volcano
+#### Deploy MPI Operator & Kueue
 ```sh
-helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
-helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
 
-kubectl create serviceaccount -n default mpi-worker-view
-kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.13.4" --create-namespace --namespace=kueue-system
 ```
 
 #### Run the NCCL/RCCL tests
 > [!IMPORTANT]  
-> The NCCL parameters are different between the H100 and A100 shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
+> The NCCL parameters are different between different shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
+
+##### BM.GPU.GB200-v2.4
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200-v2.4.yaml
+```
+
+##### BM.GPU.GB200.4
+```
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200.4.yaml
+```
 
 ##### BM.GPU.H200
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H200.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.H200.8.yaml
 ```
 
 ##### BM.GPU.H100
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.H100.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml
 ```
 
 ##### BM.GPU.A100-v2.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.A100-v2.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.A100-v2.8.yaml
 ```
 
 ##### BM.GPU4.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU4.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU4.8.yaml
 ```
 
 ##### BM.GPU.B4.8
 ```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/BM.GPU.B4.8-nccl-test.yaml
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B4.8.yaml
 ```
 
-##### BM.GPU.MI300X.8
-```
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/BM.GPU.MI300X.8.yaml
-```
-
-The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check its logs for the NCCL test result.
+The initial pull of the container will take long. Once the launcher pod `nccl-test-launcher-XXXXX` starts running, you can check its logs for the NCCL test result.
 
 ```sh
-Defaulted container "mpimaster" out of: mpimaster, wait-for-workers (init)
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-0.nccl-allreduce-job0' (ED25519) to the list of known hosts.
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0' (ED25519) to the list of known hosts.
-# nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
+Waiting for workers to be ready...
+All workers are ready!
+Warning: Permanently added '[nccl-test-worker-1.nccl-test.default.svc]:2222' (ED25519) to the list of known hosts.
+Warning: Permanently added '[nccl-test-worker-0.nccl-test.default.svc]:2222' (ED25519) to the list of known hosts.
+# nThread 1 nGpus 1 minBytes 1073741824 maxBytes 4294967296 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
-#  Rank  0 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-0 device  0 [0x0f] NVIDIA A100-SXM4-40GB
-#  Rank  1 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-0 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank  2 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-0 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank  3 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-0 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank  4 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-0 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank  5 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-0 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank  6 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-0 device  6 [0xd6] NVIDIA A100-SXM4-40GB
-#  Rank  7 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-0 device  7 [0xda] NVIDIA A100-SXM4-40GB
-#  Rank  8 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-1 device  0 [0x0f] NVIDIA A100-SXM4-40GB
-#  Rank  9 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-1 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank 10 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-1 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank 11 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-1 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank 12 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-1 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank 13 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-1 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank 14 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-1 device  6 [0xd6] NVIDIA A100-SXM4-40GB
-#  Rank 15 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-1 device  7 [0xda] NVIDIA A100-SXM4-40GB
+#  Rank  0 Group  0 Pid     88 on inst-fufd1-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank  1 Group  0 Pid     89 on inst-fufd1-oke-rdma device  1 [0000:15:00] NVIDIA A100-SXM4-40GB
+#  Rank  2 Group  0 Pid     90 on inst-fufd1-oke-rdma device  2 [0000:51:00] NVIDIA A100-SXM4-40GB
+#  Rank  3 Group  0 Pid     91 on inst-fufd1-oke-rdma device  3 [0000:54:00] NVIDIA A100-SXM4-40GB
+#  Rank  4 Group  0 Pid     92 on inst-fufd1-oke-rdma device  4 [0000:8d:00] NVIDIA A100-SXM4-40GB
+#  Rank  5 Group  0 Pid     93 on inst-fufd1-oke-rdma device  5 [0000:92:00] NVIDIA A100-SXM4-40GB
+#  Rank  6 Group  0 Pid     94 on inst-fufd1-oke-rdma device  6 [0000:d6:00] NVIDIA A100-SXM4-40GB
+#  Rank  7 Group  0 Pid     95 on inst-fufd1-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+#  Rank  8 Group  0 Pid     88 on inst-aqu5j-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank  9 Group  0 Pid     89 on inst-aqu5j-oke-rdma device  1 [0000:15:00] NVIDIA A100-SXM4-40GB
+#  Rank 10 Group  0 Pid     90 on inst-aqu5j-oke-rdma device  2 [0000:51:00] NVIDIA A100-SXM4-40GB
+#  Rank 11 Group  0 Pid     91 on inst-aqu5j-oke-rdma device  3 [0000:54:00] NVIDIA A100-SXM4-40GB
+#  Rank 12 Group  0 Pid     92 on inst-aqu5j-oke-rdma device  4 [0000:8d:00] NVIDIA A100-SXM4-40GB
+#  Rank 13 Group  0 Pid     93 on inst-aqu5j-oke-rdma device  5 [0000:92:00] NVIDIA A100-SXM4-40GB
+#  Rank 14 Group  0 Pid     94 on inst-aqu5j-oke-rdma device  6 [0000:d6:00] NVIDIA A100-SXM4-40GB
+#  Rank 15 Group  0 Pid     96 on inst-aqu5j-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+NCCL version 2.25.1+cuda12.8
 #
-#                                                              out-of-place                       in-place
+#                                                              out-of-place                       in-place          
 #       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
-#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)
-           8             2     float     sum      -1    36.47    0.00    0.00      0    34.74    0.00    0.00      0
-          16             4     float     sum      -1    38.86    0.00    0.00      0    35.65    0.00    0.00      0
-          32             8     float     sum      -1    38.53    0.00    0.00      0    35.41    0.00    0.00      0
-          64            16     float     sum      -1    39.25    0.00    0.00      0    37.05    0.00    0.00      0
-         128            32     float     sum      -1    38.85    0.00    0.01      0    37.21    0.00    0.01      0
-         256            64     float     sum      -1    40.68    0.01    0.01      0    38.52    0.01    0.01      0
-         512           128     float     sum      -1    39.27    0.01    0.02      0    39.35    0.01    0.02      0
-        1024           256     float     sum      -1    41.97    0.02    0.05      0    40.56    0.03    0.05      0
-        2048           512     float     sum      -1    43.36    0.05    0.09      0    41.29    0.05    0.09      0
-        4096          1024     float     sum      -1    44.54    0.09    0.17      0    43.36    0.09    0.18      0
-        8192          2048     float     sum      -1    48.16    0.17    0.32      0    46.51    0.18    0.33      0
-       16384          4096     float     sum      -1    49.40    0.33    0.62      0    48.00    0.34    0.64      0
-       32768          8192     float     sum      -1    49.66    0.66    1.24      0    49.17    0.67    1.25      0
-       65536         16384     float     sum      -1    51.69    1.27    2.38      0    50.09    1.31    2.45      0
-      131072         32768     float     sum      -1    54.86    2.39    4.48      0    53.31    2.46    4.61      0
-      262144         65536     float     sum      -1    67.95    3.86    7.23      0    65.81    3.98    7.47      0
-      524288        131072     float     sum      -1    73.94    7.09   13.29      0    72.87    7.20   13.49      0
-     1048576        262144     float     sum      -1    85.58   12.25   22.97      0    84.50   12.41   23.27      0
-     2097152        524288     float     sum      -1    99.19   21.14   39.64      0    100.1   20.94   39.27      0
-     4194304       1048576     float     sum      -1    127.0   33.03   61.93      0    127.8   32.81   61.52      0
-     8388608       2097152     float     sum      -1    174.3   48.13   90.25      0    168.4   49.80   93.38      0
-    16777216       4194304     float     sum      -1    282.7   59.35  111.29      0    265.9   63.11  118.32      0
-    33554432       8388608     float     sum      -1    452.3   74.18  139.08      0    452.0   74.24  139.19      0
-    67108864      16777216     float     sum      -1    821.7   81.67  153.13      0    812.7   82.57  154.83      0
-   134217728      33554432     float     sum      -1   1542.0   87.04  163.20      0   1546.1   86.81  162.76      0
-   268435456      67108864     float     sum      -1   3042.7   88.22  165.42      0   3065.9   87.55  164.16      0
-   536870912     134217728     float     sum      -1   6436.0   83.42  156.41      0   6070.5   88.44  165.82      0
-  1073741824     268435456     float     sum      -1   9187.8  116.87  219.12      0   9073.4  118.34  221.89      0
-  2147483648     536870912     float     sum      -1    18289  117.42  220.16      0    17557  122.31  229.34      0
-  4294967296    1073741824     float     sum      -1    34176  125.67  235.63      0    34417  124.79  233.98      0
-  8589934592    2147483648     float     sum      -1    67689  126.90  237.94      0    67811  126.68  237.52      0
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)       
+  1073741824     268435456     float     sum      -1    10776   99.64  186.83      0    10781   99.60  186.75      0
+  2147483648     536870912     float     sum      -1    21287  100.88  189.15      0    21299  100.82  189.05      0
+  4294967296    1073741824     float     sum      -1    42381  101.34  190.02      0    42364  101.38  190.09      0
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 66.4834
+# Avg bus bandwidth    : 188.648 
 #
 ```
 
