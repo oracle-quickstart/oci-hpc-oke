@@ -22,10 +22,9 @@
 # For driver installed directly on a host, a value of `/` is used.
 nvidiaDriverRoot: /
 
-# Specify the path of CTK binary (nvidia-ctk) on the host,
-# as it should appear in the the generated CDI specification.
-# The path depends on the system that runs on the node.
-#nvidiaCtkPath: /usr/local/nvidia/toolkit/nvidia-ctk
+# Optional path to the nvidia-cdi-hook executable.
+# If not specified, the default path inferred from the nvidia-container-toolkit library version will be used.
+nvidiaCDIHookPath: ""
 
 nameOverride: ""
 fullnameOverride: ""
@@ -60,6 +59,68 @@ resources:
   computeDomains:
     enabled: true
 
+# Feature gates configuration following Kubernetes patterns
+# Configure feature gates as key-value pairs (feature_name: true/false)
+# Examples:
+# featureGates:
+#   ExampleFeature: false              # Project-specific alpha feature
+#   ContextualLogging: true            # Kubernetes logging feature (enabled by default)
+#   LoggingAlphaOptions: false         # Kubernetes logging alpha features
+#   LoggingBetaOptions: true           # Kubernetes logging beta features
+featureGates: {}
+
+# Webhook configuration
+webhook:
+  enabled: false
+  replicas: 1
+  servicePort: 443
+  containerPort: 443
+  priorityClassName: "system-cluster-critical"
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
+  podAnnotations: {}
+  podSecurityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  containers:
+    webhook:
+      securityContext:
+        privileged: false
+      resources: {}
+  serviceAccount:
+    # Specifies whether a service account should be created
+    create: true
+    # Annotations to add to the service account
+    name: ""
+  # failurePolicy defines how the API server should handle requests if the webhook call fails.
+  # Options:
+  #   - Fail   : reject the request if the webhook call fails either due to cert errors, timeout or if the service is unreachable.
+  #   - Ignore : allow the request to continue if the webhook call fails.
+  failurePolicy: Fail
+  # TLS certificate configuration
+  tls:
+    # Certificate management mode: "cert-manager" or "secret"
+    # - "cert-manager": Use cert-manager to automatically generate and manage certificates
+    # - "secret": Use a user-provided secret containing tls.crt and tls.key
+    mode: "cert-manager"
+    certManager:
+      # Issuer type: "selfsigned", "clusterissuer", or "issuer"
+      issuerType: "selfsigned"
+      # Issuer name (required when issuerType is "clusterissuer" or "issuer")
+      issuerName: ""
+      # Additional DNS names for the certificate
+      dnsNames: []
+    secret:
+      # Name of the secret containing tls.crt and tls.key
+      name: ""
+      # Base64-encoded CA certificate bundle for validating the webhook's TLS certificate (base64 encoded)
+      # Required when using secret mode.
+      # Note: Only include intermediate CA certificates, not root CA certificates
+      caBundle: ""
+
 controller:
   priorityClassName: "system-node-critical"
   podAnnotations: {}
@@ -72,6 +133,7 @@ controller:
   containers:
     computeDomain:
       securityContext: {}
+      env: []
       resources: {}
   affinity:
     nodeAffinity:
@@ -85,6 +147,8 @@ kubeletPlugin:
   priorityClassName: "system-node-critical"
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
   podAnnotations: {}
   podSecurityContext: {}
   nodeSelector: {}
@@ -93,6 +157,8 @@ kubeletPlugin:
     value: "present"
     operator: "Equal"
     effect: "NoSchedule"
+  kubeletRegistrarDirectoryPath: /var/lib/kubelet/plugins_registry
+  kubeletPluginsDirectoryPath: /var/lib/kubelet/plugins
   containers:
     init:
       securityContext: {}
@@ -101,10 +167,16 @@ kubeletPlugin:
       securityContext:
         privileged: true
       resources: {}
+      # Port running a gRPC health service checked by a livenessProbe.
+      # Set to a negative value to disable the service and the probe.
+      healthcheckPort: -1
     gpus:
       securityContext:
         privileged: true
       resources: {}
+      # Port running a gRPC health service checked by a livenessProbe.
+      # Set to a negative value to disable the service and the probe.
+      healthcheckPort: -1
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
