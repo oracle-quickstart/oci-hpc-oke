@@ -139,8 +139,8 @@ spec:
       sleep 1000000
 ```
 
-### Optional - Deploy Volcano and run the NCCL test
-Volcano is needed for running the optional NCCL test. It's not required for the regular operation of the cluster, you can remove it after you finish running the NCCL test.
+### Optional - Deploy Kueue & MPI Operator to run NCCL tests
+Kueue & MPI Operator are needed for running the optional NCCL tests.
 
 #### Deploy MPI Operator & Kueue
 ```sh

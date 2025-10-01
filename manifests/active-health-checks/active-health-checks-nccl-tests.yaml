@@ -19,8 +19,11 @@ kind: ClusterRole
 metadata:
   name: active-health-checks-runner-role
 rules:
-  - apiGroups: ["batch.volcano.sh"]
-    resources: ["jobs"]
+  - apiGroups: ["kubeflow.org"]
+    resources: ["mpijobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["resourceflavors", "clusterqueues", "localqueues"]
     verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["pods"]
@@ -45,409 +48,177 @@ subjects:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: active-health-checks-nccl-tests-bm-gpu-h100-8
+  name: active-health-checks-nccl-tests-bm-gpu-gb200-4
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
     metadata:
-      annotations:
-      name: nccl-allreduce-job0
+      namespace: monitoring
+      name: bm-gpu-gb200-4
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-            labels: {}
-          spec:
-            # NODE_AFFINITY_PLACEHOLDER
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                HOSTFILE=/etc/volcano/mpiworker.host
-                # Number of mpiworker replicas expected
-                EXPECTED=${WORKER_REPLICAS:-2}
-                until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge "$EXPECTED" ]; do
-                  echo "[master] Waiting for hostfile ($HOSTFILE) to list $EXPECTED workers..."
-                  sleep 2
-                done
-                WORKERS=$(sort -u "$HOSTFILE")
-                for h in $WORKERS; do
-                  echo "[master] Waiting for $h:2222..."
-                  for i in $(seq 1 60); do
-                    if (echo > /dev/tcp/$h/2222) >/dev/null 2>&1; then
-                      echo "[master] $h:2222 is ready"
-                      break
-                    fi
-                    sleep 2
-                  done
-                done
-                NUM_HOSTS=$(sed -n '$=' "$HOSTFILE")
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile "$HOSTFILE" \
-                  -x NCCL_CROSS_NIC=2 \
-                  -x NCCL_SOCKET_NTHREADS=16 \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_CUMEM_ENABLE=0 \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=16 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=22 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  -x RX_QUEUE_LEN=8192 \
-                  -x IB_RX_QUEUE_LEN=8192 \
-                  -x NCCL_SOCKET_IFNAME=eth0 \
-                  -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpimaster
-              resources:
-                limits:
-                  ephemeral-storage: 16Gi
-                requests:
-                  cpu: 4
-                  ephemeral-storage: 16Gi
-                  memory: 1Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            priorityClassName: active-health-checks-low
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - name: mpiworker
-        minAvailable: 2
-        replicas: 2
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  nvidia.com/gpu: 8
-                  ephemeral-storage: 32Gi
-                requests:
-                  cpu: 100
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-                  ephemeral-storage: 32Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            priorityClassName: active-health-checks-low
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: active-health-checks-nccl-tests-bm-gpu-a100-v2-8
-  namespace: monitoring
-data:
-  job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.GB200.4
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
     metadata:
-      annotations:
-      name: nccl-allreduce-job0
+      namespace: monitoring
+      name: bm-gpu-gb200-4-nccl-tests-queue
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-          spec:
-            minAvailable: 1
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile /etc/volcano/mpiworker.host \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=22 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
-            
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpimaster
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                requests:
-                  cpu: 8
-                  ephemeral-storage: 32Gi
-                  memory: 2Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-                    - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - minAvailable: 0
-        name: mpiworker
-        replicas: 2
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 64
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-                    - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: active-health-checks-nccl-tests-bm-gpu-b4-8
-  namespace: monitoring
-data:
-  job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-gb200-4
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "80"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
     metadata:
-      annotations:
-      name: nccl-allreduce-job0
+      namespace: monitoring
+      name: bm-gpu-gb200-4-nccl-tests
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile /etc/volcano/mpiworker.host \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=22 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpimaster
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                requests:
-                  cpu: 8
-                  ephemeral-storage: 32Gi
-                  memory: 2Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
+      clusterQueue: bm-gpu-gb200-4-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      namespace: monitoring
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-gb200-4-nccl-tests
+    spec:
+      slotsPerWorker: 4
+      runPolicy:
+        cleanPodPolicy: Running
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              priorityClassName: active-health-checks-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    set -e -o pipefail
+                    trap 'exit=1' SIGINT
+                    NUM_GPUS=4
+                    HOSTFILE=/etc/mpi/hostfile
+                    until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do
+                      echo "[launcher] Waiting for hostfile ($HOSTFILE) to list expected workers..."
+                      sleep 2
+                    done
+                    WORKERS=$(sort -u "$HOSTFILE" | awk '{print $1}')
+                    for h in $WORKERS; do
+                      echo "[launcher] Waiting for $h:2222..."
+                      for i in $(seq 1 60); do
+                        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 "$h" exit >/dev/null 2>&1; then
+                          echo "[launcher] $h:2222 is ready"
+                          break
+                        fi
+                        sleep 2
+                      done
+                    done
+                    NUM_HOSTS=$(sed -n '$=' "$HOSTFILE")
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    mpirun --allow-run-as-root \
+                      -mca coll ^hcoll -mca plm_rsh_args "-p 2222" \
+                      -mca coll_hcoll_enable 0 \
+                      -np $NP -npernode $NUM_GPUS --bind-to numa \
+                      -hostfile "$HOSTFILE" \
+                      -x NCCL_DEBUG=WARN \
+                      -x NCCL_CUMEM_ENABLE=0 \
+                      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                      -x NCCL_IB_GID_INDEX=3 \
+                      -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
+                      -x NCCL_IB_TC=41 \
+                      -x NCCL_IB_SL=0 \
+                      -x NCCL_IB_TIMEOUT=22 \
+                      -x HCOLL_ENABLE_MCAST_ALL=0 \
+                      -x UCX_TLS=tcp \
+                      -x UCX_NET_DEVICES=eth0 \
+                      -x RX_QUEUE_LEN=8192 \
+                      -x IB_RX_QUEUE_LEN=8192 \
+                      -x NCCL_SOCKET_IFNAME=eth0 \
+                      -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                      /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+                resources:
+                  limits:
+                    cpu: "4"
+                    memory: 1Gi
+                    nvidia.com/gpu: 0
+                    ephemeral-storage: 16Gi
+                  requests:
+                    cpu: "4"
+                    memory: 1Gi
+                    nvidia.com/gpu: 0
+                    ephemeral-storage: 16Gi
+              restartPolicy: OnFailure
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              priorityClassName: active-health-checks-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              containers:
+              - name: mpi-worker
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                resources:
+                  limits:
+                    cpu: "100"
+                    memory: 512Gi
+                    nvidia.com/gpu: 4
+                    ephemeral-storage: 32Gi
+                  requests:
+                    cpu: "100"
+                    memory: 512Gi
+                    nvidia.com/gpu: 4
+                    ephemeral-storage: 32Gi
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add:
                     - IPC_LOCK
-                    - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - minAvailable: 0
-        name: mpiworker
-        replicas: 2
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 64
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-                  - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              restartPolicy: OnFailure
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -456,129 +227,439 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-4-8
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU4.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-4-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-4-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-4-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-4-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
     metadata:
       name: JOB_NAME_PLACEHOLDER
       namespace: monitoring
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-4-8-nccl-tests
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-            labels: {}
-          spec:
-            # NODE_AFFINITY_PLACEHOLDER
-            containers:
-            - name: mpimaster
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile /etc/volcano/mpiworker.host \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_6,mlx5_8,mlx5_10,mlx5_12,mlx5_14,mlx5_16,mlx5_1,mlx5_3,mlx5_7,mlx5_9,mlx5_11,mlx5_13,mlx5_15,mlx5_17 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=22 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                requests:
-                  cpu: 8
-                  ephemeral-storage: 32Gi
-                  memory: 2Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: Running
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              priorityClassName: active-health-checks-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    set -e -o pipefail
+                    trap 'exit=1' SIGINT
+                    NUM_GPUS=8
+                    HOSTFILE=/etc/mpi/hostfile
+                    until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do
+                      echo "[launcher] Waiting for hostfile ($HOSTFILE) to list expected workers..."
+                      sleep 2
+                    done
+                    WORKERS=$(sort -u "$HOSTFILE" | awk '{print $1}')
+                    for h in $WORKERS; do
+                      echo "[launcher] Waiting for $h:2222..."
+                      for i in $(seq 1 60); do
+                        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 "$h" exit >/dev/null 2>&1; then
+                          echo "[launcher] $h:2222 is ready"
+                          break
+                        fi
+                        sleep 2
+                      done
+                    done
+                    NUM_HOSTS=$(sed -n '$=' "$HOSTFILE")
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    mpirun --allow-run-as-root \
+                      -mca coll ^hcoll -mca plm_rsh_args "-p 2222" \
+                      -mca coll_hcoll_enable 0 \
+                      -np $NP -npernode $NUM_GPUS --bind-to numa \
+                      -hostfile "$HOSTFILE" \
+                      -x NCCL_DEBUG=WARN \
+                      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                      -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                      -x NCCL_IB_GID_INDEX=3 \
+                      -x NCCL_IB_HCA==mlx5_0,mlx5_2,mlx5_6,mlx5_8,mlx5_10,mlx5_12,mlx5_14,mlx5_16,mlx5_1,mlx5_3,mlx5_7,mlx5_9,mlx5_11,mlx5_13,mlx5_15,mlx5_17 \
+                      -x NCCL_IB_TC=41 \
+                      -x NCCL_IB_SL=0 \
+                      -x NCCL_IB_TIMEOUT=22 \
+                      -x HCOLL_ENABLE_MCAST_ALL=0 \
+                      -x UCX_TLS=tcp \
+                      -x UCX_NET_DEVICES=eth0 \
+                      /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+                resources:
+                  limits:
+                    cpu: "4"
+                    memory: 1Gi
+                    nvidia.com/gpu: 0
+                    ephemeral-storage: 16Gi
+                  requests:
+                    cpu: "4"
+                    memory: 1Gi
+                    nvidia.com/gpu: 0
+                    ephemeral-storage: 16Gi
+              restartPolicy: OnFailure
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              priorityClassName: active-health-checks-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              containers:
+              - name: mpi-worker
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                resources:
+                  limits:
+                    cpu: "100"
+                    memory: 512Gi
+                    nvidia.com/gpu: 8
+                    ephemeral-storage: 32Gi
+                  requests:
+                    cpu: "100"
+                    memory: 512Gi
+                    nvidia.com/gpu: 8
+                    ephemeral-storage: 32Gi
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add:
                     - IPC_LOCK
-                    - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            priorityClassName: active-health-checks-low
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - name: mpiworker
-        minAvailable: 0
-        replicas: 2
-        template:
-          metadata:
-            labels: {}
-          spec:
-            containers:
-            - name: mpiworker
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 64
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-                    - CAP_SYS_ADMIN
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            priorityClassName: active-health-checks-low
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-nccl-tests-bm-gpu-h100-8
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-h100-8
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.H100.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-h100-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-h100-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-h100-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-h100-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      namespace: monitoring
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-h100-8-nccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    NUM_GPUS=8
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                    -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                    -mca coll_hcoll_enable 0 \
+                    -np $NP -npernode $NUM_GPUS --bind-to numa \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 8
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-nccl-tests-bm-gpu-a100-v2-8
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-a100-v2-8
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.A100-v2.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-a100-v2-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-a100-v2-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-a100-v2-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-a100-v2-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-a100-v2-8-nccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    set -e -o pipefail; trap 'exit=1' SIGINT
+                    NUM_GPUS=8
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                      -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                      -mca coll_hcoll_enable 0 \
+                      -np $NP -npernode $NUM_GPUS --bind-to numa \
+                      -x NCCL_DEBUG=WARN \
+                      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                      -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                      -x NCCL_IB_GID_INDEX=3 \
+                      -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
+                      -x NCCL_IB_TC=41 \
+                      -x NCCL_IB_SL=0 \
+                      -x NCCL_IB_TIMEOUT=22 \
+                      -x HCOLL_ENABLE_MCAST_ALL=0 \
+                      -x UCX_TLS=tcp \
+                      -x UCX_NET_DEVICES=eth0 \
+                      /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 8
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -587,128 +668,267 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
     metadata:
-      annotations:
-      name: nccl-allreduce-job0
+      namespace: monitoring
+      name: bm-gpu-b200-8
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile /etc/volcano/mpiworker.host \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_CUMEM_ENABLE=0 \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=2 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=16 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  -x RX_QUEUE_LEN=8192 \
-                  -x IB_RX_QUEUE_LEN=8192 \
-                  -x NCCL_SOCKET_IFNAME=eth0 \
-                  -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
-                while :; do { [[ $exit ]] && break; }; sleep 1; done
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.06-nccl-2.27.7-1
-              name: mpimaster
-              resources:
-                limits:
-                  ephemeral-storage: 16Gi
-                requests:
-                  cpu: 4
-                  ephemeral-storage: 16Gi
-                  memory: 1Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - minAvailable: 0
-        name: mpiworker
-        replicas: 2
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.06-nccl-2.27.7-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 100
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.B200.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-b200-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-b200-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-b200-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-b200-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-b200-8-nccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    NUM_GPUS=8
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                    -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                    -mca coll_hcoll_enable 0 \
+                    -np $NP -npernode $NUM_GPUS --bind-to numa \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 8
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-nccl-tests-bm-gpu-b4-8
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-b4-8
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.B4.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-b4-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-b4-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-b4-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-b4-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-b4-8-nccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    set -e -o pipefail; trap 'exit=1' SIGINT
+                    NUM_GPUS=8
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                      -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                      -mca coll_hcoll_enable 0 \
+                      -np $NP -npernode $NUM_GPUS --bind-to numa \
+                      -x NCCL_DEBUG=WARN \
+                      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                      -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                      -x NCCL_IB_GID_INDEX=3 \
+                      -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
+                      -x NCCL_IB_TC=41 \
+                      -x NCCL_IB_SL=0 \
+                      -x NCCL_IB_TIMEOUT=22 \
+                      -x HCOLL_ENABLE_MCAST_ALL=0 \
+                      -x UCX_TLS=tcp \
+                      -x UCX_NET_DEVICES=eth0 \
+                      /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 8
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -717,173 +937,286 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: batch.volcano.sh/v1alpha1
-    kind: Job
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
     metadata:
-      annotations:
-      name: nccl-allreduce-job0
+      namespace: monitoring
+      name: bm-gpu-h200-8
     spec:
-      minAvailable: 0
-      plugins:
-        ssh: []
-        svc: []
-      queue: default
-      schedulerName: volcano
-      tasks:
-      - name: mpimaster
-        policies:
-        - action: CompleteJob
-          event: TaskCompleted
-        replicas: 1
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - |
-                set -e -o pipefail; trap 'exit=1' SIGINT
-                NUM_GPUS=8
-                NUM_HOSTS=$(sed -n '$=' /etc/volcano/mpiworker.host)
-                NP=$(($NUM_HOSTS*$NUM_GPUS))
-                mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                  -mca coll_hcoll_enable 0 \
-                  -np $NP -npernode $NUM_GPUS --bind-to numa \
-                  -hostfile /etc/volcano/mpiworker.host \
-                  -x NCCL_DEBUG=WARN \
-                  -x NCCL_CUMEM_ENABLE=0 \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=2 \
-                  -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
-                  -x NCCL_IB_TC=41 \
-                  -x NCCL_IB_SL=0 \
-                  -x NCCL_IB_TIMEOUT=16 \
-                  -x HCOLL_ENABLE_MCAST_ALL=0 \
-                  -x UCX_TLS=tcp \
-                  -x UCX_NET_DEVICES=eth0 \
-                  -x RX_QUEUE_LEN=8192 \
-                  -x IB_RX_QUEUE_LEN=8192 \
-                  -x NCCL_SOCKET_IFNAME=eth0 \
-                  -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1
-                while :; do { [[ $exit ]] && break; }; sleep 1; done
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.06-nccl-2.27.7-1
-              name: mpimaster
-              resources:
-                limits:
-                  ephemeral-storage: 16Gi
-                requests:
-                  cpu: 4
-                  ephemeral-storage: 16Gi
-                  memory: 1Gi
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 2
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - minAvailable: 0
-        name: mpiworker
-        replicas: 2
-        template:
-          metadata:
-          spec:
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.06-nccl-2.27.7-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 100
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                    - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-      - minAvailable: 2
-        name: mpiworker
-        replicas: 2
-        template:
-          metadata:
-            labels: {}
-          spec:
-            minAvailable: 2
-            containers:
-            - command:
-              - /bin/bash
-              - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
-              name: mpiworker
-              ports:
-              - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-              resources:
-                limits:
-                  ephemeral-storage: 32Gi
-                  nvidia.com/gpu: 8
-                requests:
-                  cpu: 100
-                  ephemeral-storage: 32Gi
-                  memory: 512Gi
-                  nvidia.com/gpu: 8
-              securityContext:
-                privileged: true
-                capabilities:
-                  add:
-                  - IPC_LOCK
-              volumeMounts:
-              - { mountPath: /dev/infiniband, name: devinf }
-              - { mountPath: /dev/shm, name: shm }
-              workingDir: /workspace
-            dnsPolicy: ClusterFirstWithHostNet
-            hostNetwork: true
-            restartPolicy: OnFailure
-            priorityClassName: active-health-checks-low
-            terminationGracePeriodSeconds: 15
-            tolerations:
-            - { key: nvidia.com/gpu, operator: Exists }
-            volumes:
-            - { name: devinf, hostPath: { path: /dev/infiniband }}
-            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.H200.8
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-h200-8-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-h200-8
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "160"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-h200-8-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-h200-8-nccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-h200-8-nccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    NUM_GPUS=8
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                    -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                    -mca coll_hcoll_enable 0 \
+                    -np $NP -npernode $NUM_GPUS --bind-to numa \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 8
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-nccl-tests-bm-gpu-gb200-v2-4
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-gb200-v2.4
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.GB200-v2.4
+        nvidia.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-gb200-4-nccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-gb200-v2.4
+          resources:
+          - name: cpu
+            nominalQuota: "2500"
+          - name: memory
+            nominalQuota: "11000Gi"
+          - name: nvidia.com/gpu
+            nominalQuota: "80"
+          - name: ephemeral-storage
+            nominalQuota: "1000Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-gb200-v2.4-nccl-tests
+    spec:
+      clusterQueue: bm-gpu-gb200-4-nccl-tests-queue
+    ---
+    apiVersion: resource.nvidia.com/v1beta1
+    kind: ComputeDomain
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-gb200-v2.4-nccl-tests-compute-domain
+    spec:
+      numNodes: 2
+      channel:
+        resourceClaimTemplate:
+          name: bm-gpu-gb200-v2.4-nccl-tests-compute-domain-channel
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-gb200-v2.4-nccl-tests
+    spec:
+      slotsPerWorker: 4
+      runPolicy:
+        cleanPodPolicy: "Running"
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-launcher
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                  - |
+                    NUM_GPUS=4
+                    NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                    NP=$(($NUM_HOSTS*$NUM_GPUS))
+                    while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                      echo "Waiting for workers to be ready..."
+                      sleep 5
+                    done
+                    echo "All workers are ready!"
+                    mpirun --allow-run-as-root \
+                    -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                    -mca coll_hcoll_enable 0 \
+                    -np $NP -npernode $NUM_GPUS --bind-to numa \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x UCX_TLS=tcp \
+                    -x UCX_NET_DEVICES=eth0 \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x NCCL_SOCKET_IFNAME=eth0 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                nccl-test-replica: mpi-worker
+            spec:
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              volumes:
+              - { name: devinf, hostPath: { path: /dev/infiniband }}
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+              containers:
+              - name: mpi-worker
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                volumeMounts:
+                - { mountPath: /dev/infiniband, name: devinf }
+                - { mountPath: /dev/shm, name: shm }
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: ["IPC_LOCK"]
+                image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+                command:
+                  - /bin/bash
+                  - -c
+                  - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+                resources:
+                  limits:
+                    nvidia.com/gpu: 4
+                  claims:
+                  - name: compute-domain-channel
+              resourceClaims:
+              - name: compute-domain-channel
+                resourceClaimTemplateName: bm-gpu-gb200-v2.4-nccl-tests-compute-domain-channel
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -911,7 +1244,7 @@ spec:
             - |
               set -euo pipefail
               JOB_NAME="active-health-checks-nccl-tests-$(date +%s)"
-              echo "[applier] Creating Volcano Job: $JOB_NAME"
+              echo "[applier] Creating MPIJob: $JOB_NAME"
               
               # Check which nodes were tested recently and should be excluded
               current_date=$(date -u +%Y-%m-%d)
@@ -984,9 +1317,9 @@ spec:
               if [ -n "$excluded_nodes" ]; then
                 echo "[applier] Creating node affinity to exclude recently tested nodes: $excluded_nodes"
                 node_values=$(echo "$excluded_nodes" | tr ' ' '\n' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//')
-                affinity_block="            affinity:\n              nodeAffinity:\n                requiredDuringSchedulingIgnoredDuringExecution:\n                  nodeSelectorTerms:\n                  - matchExpressions:\n                    - key: kubernetes.io/hostname\n                      operator: NotIn\n                      values: [$node_values]"
+                affinity_block="              affinity:\n                nodeAffinity:\n                  requiredDuringSchedulingIgnoredDuringExecution:\n                    nodeSelectorTerms:\n                    - matchExpressions:\n                      - key: kubernetes.io/hostname\n                        operator: NotIn\n                        values: [$node_values]"
                 sed "s/JOB_NAME_PLACEHOLDER/${JOB_NAME}/g" "$manifest_path" | \
-                sed "s|            # NODE_AFFINITY_PLACEHOLDER|$affinity_block|" | \
+                sed "s|              # NODE_AFFINITY_PLACEHOLDER|$affinity_block|" | \
                 kubectl apply -f -
               else
                 echo "[applier] No nodes to exclude - applying job without node affinity"
@@ -994,45 +1327,55 @@ spec:
                 sed "/# NODE_AFFINITY_PLACEHOLDER/d" | \
                 kubectl apply -f -
               fi
-              echo "[applier] Waiting for Volcano job $JOB_NAME to complete..."
+              echo "[applier] Waiting for MPIJob $JOB_NAME to complete..."
               # Capture worker nodes early while pods are still running
               worker_nodes=""
               for i in $(seq 1 30); do
-                worker_nodes=$(kubectl get pods -n monitoring -l volcano.sh/job-name="$JOB_NAME",volcano.sh/task-spec=mpiworker -o jsonpath='{.items[*].spec.nodeName}' | tr ' ' '\n' | sort -u)
+                worker_nodes=$(kubectl get pods -n monitoring -l kubeflow.org/job-name="$JOB_NAME",mpi-job-role=worker -o jsonpath='{.items[*].spec.nodeName}' | tr ' ' '\n' | sort -u)
                 [ -n "$worker_nodes" ] && echo "[applier] Found worker nodes: $worker_nodes" && break
                 sleep 2
               done
               
               for i in $(seq 1 720); do # up to ~2h
-                phase=$(kubectl get vcjob -n monitoring "$JOB_NAME" -o jsonpath='{.status.state.phase}' 2>/dev/null || true)
-                [ -n "$phase" ] && echo "[applier] Phase: $phase"
+                phase=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Running")].status}' 2>/dev/null || true)
+                [ -n "$phase" ] && echo "[applier] Running condition status: $phase"
                 
-                # Check if master pod completed successfully (this indicates the NCCL test finished)
-                master_pod=$(kubectl get pods -n monitoring -l volcano.sh/job-name="$JOB_NAME",volcano.sh/task-spec=mpimaster -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                if [ -n "$master_pod" ]; then
-                  master_status=$(kubectl get pod "$master_pod" -n monitoring -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-                  if [ "$master_status" = "Succeeded" ]; then
-                    echo "[applier] Master pod completed successfully - NCCL test finished"
+                # Check if launcher pod completed successfully (this indicates the NCCL test finished)
+                launcher_pod=$(kubectl get pods -n monitoring -l kubeflow.org/job-name="$JOB_NAME",mpi-job-role=launcher -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                if [ -n "$launcher_pod" ]; then
+                  launcher_status=$(kubectl get pod "$launcher_pod" -n monitoring -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+                  if [ "$launcher_status" = "Succeeded" ]; then
+                    echo "[applier] Launcher pod completed successfully - NCCL test finished"
                     result=pass; break
-                  elif [ "$master_status" = "Failed" ]; then
-                    echo "[applier] Master pod failed - NCCL test failed"
+                  elif [ "$launcher_status" = "Failed" ]; then
+                    echo "[applier] Launcher pod failed - NCCL test failed"
                     result=fail; break
                   fi
                 fi
                 
-                # Also check overall job phase for other failure cases
-                case "$phase" in
-                  Failed|Aborted|Terminated)
-                    result=fail; break ;;
-                esac
+                # Also check overall MPIJob completion
+                mpijob_completion=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.completionTime}' 2>/dev/null || true)
+                if [ -n "$mpijob_completion" ]; then
+                  job_condition=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null || echo "False")
+                  if [ "$job_condition" = "True" ]; then
+                    result=pass
+                  else
+                    result=fail
+                  fi
+                  break
+                fi
                 sleep 10
               done
               result=${result:-fail}
-              if [ "$result" = "fail" ]; then
-                echo "[applier] Volcano job never succeeded; treating this as a handled failure"
-                exit 0
-              fi
               echo "[applier] Result for $JOB_NAME: $result"
+              echo "[applier] Worker nodes captured: '$worker_nodes'"
+              
+              # If worker_nodes is empty, try to get them from the available nodes list
+              if [ -z "$worker_nodes" ]; then
+                echo "[applier] Warning: worker_nodes is empty, using available nodes for labeling"
+                worker_nodes=$(echo "$available_nodes" | tr ' ' '\n' | awk '{print $1}')
+              fi
+              
               timestamp=$(date -u +%Y-%m-%dT%H-%M-%SZ)
               for n in $worker_nodes; do
                 echo "[applier] Labeling node $n with oke.oraclecloud.com/active-health-checks-nccl-tests=$result"
@@ -1040,6 +1383,10 @@ spec:
                 echo "[applier] Labeling node $n with oke.oraclecloud.com/active-health-checks-nccl-tests-last-run=$timestamp"
                 kubectl label node "$n" "oke.oraclecloud.com/active-health-checks-nccl-tests-last-run=$timestamp" --overwrite
               done
+              if [ "$result" = "fail" ]; then
+                echo "[applier] MPIJob failed but nodes have been labeled"
+                exit 0
+              fi
             volumeMounts:
             - name: manifest
               mountPath: /manifests
@@ -1048,6 +1395,16 @@ spec:
           - name: manifest
             projected:
               sources:
+              - configMap:
+                  name: active-health-checks-nccl-tests-bm-gpu-gb200-4
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu-gb200-4.yaml
+              - configMap:
+                  name: active-health-checks-nccl-tests-bm-gpu4-8
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu4-8.yaml
               - configMap:
                   name: active-health-checks-nccl-tests-bm-gpu-h100-8
                   items:
@@ -1059,22 +1416,22 @@ spec:
                   - key: job.yaml
                     path: bm-gpu-a100-v2-8.yaml
               - configMap:
-                  name: active-health-checks-nccl-tests-bm-gpu-b4-8
-                  items:
-                  - key: job.yaml
-                    path: bm-gpu-b4-8.yaml
-              - configMap:
-                  name: active-health-checks-nccl-tests-bm-gpu4-8
-                  items:
-                  - key: job.yaml
-                    path: bm-gpu4-8.yaml
-              - configMap:
                   name: active-health-checks-nccl-tests-bm-gpu-b200-8
                   items:
                   - key: job.yaml
                     path: bm-gpu-b200-8.yaml
               - configMap:
+                  name: active-health-checks-nccl-tests-bm-gpu-b4-8
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu-b4-8.yaml
+              - configMap:
                   name: active-health-checks-nccl-tests-bm-gpu-h200-8
                   items:
                   - key: job.yaml
                     path: bm-gpu-h200-8.yaml
+              - configMap:
+                  name: active-health-checks-nccl-tests-bm-gpu-gb200-v2-4
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu-gb200-v2-4.yaml
