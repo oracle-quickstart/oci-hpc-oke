@@ -88,7 +88,7 @@ variable "public_subnet_route_table" {
 
 
 # Bastion
-variable "create_bastion" { default = false }
+variable "create_bastion" { default = true }
 variable "bastion_shape_config" { default = false }
 variable "bastion_shape_name" { default = "VM.Standard.E5.Flex" }
 variable "bastion_shape_ocpus" { default = 1 }
@@ -126,7 +126,7 @@ variable "bastion_user" {
 }
 
 # Operator
-variable "create_operator" { default = false }
+variable "create_operator" { default = true }
 variable "operator_shape_config" { default = false }
 variable "operator_shape_name" { default = "VM.Standard.E5.Flex" }
 variable "operator_shape_ocpus" { default = 1 }

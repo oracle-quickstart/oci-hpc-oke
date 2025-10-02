@@ -33,10 +33,10 @@ locals {
 
   nsgs = merge(
     {
-      bastion  = { create = "auto" }
-      operator = { create = "auto" }
+      bastion  = var.create_bastion ? { create = "auto" } : { create = "never"}
+      operator = var.create_operator ? { create = "auto" } : { create = "never"}
       int_lb   = { create = "auto" }
-      pub_lb   = { create = "auto" }
+      pub_lb   = alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : { create = "auto"}
       cp       = { create = "auto" }
       workers  = { create = "auto" }
       pods     = { create = "auto" }
@@ -49,7 +49,7 @@ locals {
   subnets = merge(
     {
       bastion = merge(
-        { create = "auto" },
+        var.create_bastion ? { create = "auto" } : { create = "never" },
         (var.create_vcn && var.bastion_sn_cidr == null) || (!var.create_vcn && var.bastion_sn_id == null) ?
         { newbits = 13, netnum = 1 } : {},
         var.create_vcn && var.bastion_sn_cidr != null ?
@@ -58,7 +58,7 @@ locals {
         { id = var.bastion_sn_id } : {}
       )
       operator = var.create_operator ? merge(
-        { create = "auto" },
+        var.create_bastion && var.create_operator ? { create = "auto" } : { create = "never" },
         (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && var.operator_sn_id == null) ?
         { newbits = 13, netnum = 2 } : {},
         var.create_vcn && var.operator_sn_cidr != null ?
@@ -82,7 +82,8 @@ locals {
         var.create_vcn && var.pub_lb_sn_cidr != null ?
         { cidr = var.pub_lb_sn_cidr } : {},
         var.vcn_id != null && var.pub_lb_sn_id != null ?
-        { id = var.pub_lb_sn_id } : {}
+        { id = var.pub_lb_sn_id } : {},
+        alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : {}
       )
       cp = merge(
         { create = "auto" },
@@ -104,7 +105,7 @@ locals {
       )
       pods = merge(
         { create = "auto" },
-        (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && var.pods_sn_id == null) ?
+        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && var.pods_sn_id == null) ?
         { newbits = 2, netnum = 2 } : {},
         var.create_vcn && var.pods_sn_cidr != null ?
         { cidr = var.pods_sn_cidr } : {},
