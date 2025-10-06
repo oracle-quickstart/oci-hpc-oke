@@ -19,13 +19,13 @@ spec:
     - name: bm-gpu-gb200-v2.4
       resources:
       - name: cpu
-        nominalQuota: "200"
+        nominalQuota: "20000"
       - name: memory
-        nominalQuota: "1024Gi"
+        nominalQuota: "102400Gi"
       - name: nvidia.com/gpu
-        nominalQuota: "8"
+        nominalQuota: "1600"
       - name: ephemeral-storage
-        nominalQuota: "64Gi"
+        nominalQuota: "6400Gi"
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
@@ -81,26 +81,19 @@ spec:
                   sleep 5
                 done
                 echo "All workers are ready!"
-                mpirun --allow-run-as-root \
-                -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
-                -mca coll_hcoll_enable 0 \
-                -np $NP -npernode $NUM_GPUS --bind-to numa \
+                mpirun --allow-run-as-root -mca plm_rsh_args "-p 2222" \
+                --bind-to none \
+                --map-by ppr:4:node \
+                --mca coll ^hcoll \
                 -x NCCL_DEBUG=WARN \
-                -x NCCL_CUMEM_ENABLE=0 \
-                -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                -x NCCL_IB_GID_INDEX=3 \
-                -x NCCL_IB_HCA==mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11 \
-                -x NCCL_IB_TC=41 \
-                -x NCCL_IB_SL=0 \
-                -x NCCL_IB_TIMEOUT=22 \
-                -x HCOLL_ENABLE_MCAST_ALL=0 \
-                -x UCX_TLS=tcp \
-                -x UCX_NET_DEVICES=eth0 \
-                -x RX_QUEUE_LEN=8192 \
-                -x IB_RX_QUEUE_LEN=8192 \
+                -x NCCL_MNNVL_ENABLE=1 \
+                -x NCCL_CUMEM_ENABLE=1 \
+                -x NCCL_NET_PLUGIN=sys \
+                -x NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_3,mlx5_4 \
+                -x NCCL_NVLS_ENABLE=1 \
                 -x NCCL_SOCKET_IFNAME=eth0 \
-                -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+                -np $NP \
+                /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
       replicas: 2
       template:
