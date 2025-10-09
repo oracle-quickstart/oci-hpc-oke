@@ -3,7 +3,7 @@ apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: active-health-checks-low
-value: 1
+value: -1000
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Very low priority for active health check jobs to be preempted by others"
