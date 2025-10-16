@@ -27,9 +27,9 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
 
 ## Which shapes are supported?
 **H100, H200, B200, MI300x**
+- Kueue
 - Kubernetes Node Affinity
 - Kubernetes Pod Affinity
-- Kueue
 - Node Ordering script as Init Container
 
 **A100**
@@ -52,6 +52,184 @@ oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 oci.oraclecloud.com/rdma.hpc_island_id=af7ubvouuyq
 oci.oraclecloud.com/rdma.local_block_id=4tjxbt4s6ua
 oci.oraclecloud.com/rdma.network_block_id=7xmzl4p4wba
+```
+
+> [!NOTE]  
+> We recommend using Kueue.
+>
+
+### Using Kueue with Topology Aware Scheduling
+
+Kueue supports **Topology Aware Scheduling (TAS)**, which allows you to create a hierarchy of nodes based on node labels.
+
+Topology Aware Scheduling is a beta feature and is enabled by default starting with **v0.14**.
+
+You can deploy Kueue using Helm with:
+```bash
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" --create-namespace --namespace=kueue-system
+```
+
+This example shows how to:
+
+- Define a **Topology** for OCI RDMA domains  
+- Create a **ResourceFlavor** for H100 GPU nodes  
+- Configure a **ClusterQueue** and **LocalQueue**  
+- Run a **Job** that uses Topology Aware Scheduling
+
+In this setup, we use the node label:
+
+```yaml
+node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+```
+
+This label targets OCI bare metal H100 GPU nodes. You can replace it with any label that exists on the target nodes in your environment.
+
+---
+
+#### 1. Create a Topology
+
+Define how nodes are grouped at different hierarchy levels.
+
+Save the following as `topology.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1alpha1
+kind: Topology
+metadata:
+  name: "oci-topology"
+spec:
+  levels:
+  - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.network_block_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.local_block_id"
+  - nodeLabel: "kubernetes.io/hostname"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f topology.yaml
+```
+
+---
+
+#### 2. Create a ResourceFlavor
+
+Define a flavor for your node type and reference the topology.
+
+Save the following as `resourceflavor.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: "tas-flavor"
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+  topologyName: "oci-topology"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f resourceflavor.yaml
+```
+
+---
+
+#### 3. Create a ClusterQueue
+
+Define a shared queue of resources available to all namespaces.
+
+Save the following as `clusterqueue.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: "tas-cluster-queue"
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: "tas-flavor"
+      resources:
+      - name: "cpu"
+        nominalQuota: 100
+      - name: "memory"
+        nominalQuota: 100Gi
+```
+
+Apply it:
+
+```bash
+kubectl apply -f clusterqueue.yaml
+```
+
+---
+
+#### 4. Create a LocalQueue
+
+Create a namespace-specific queue linked to the cluster queue.
+
+Save the following as `localqueue.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: tas-user-queue
+spec:
+  clusterQueue: tas-cluster-queue
+```
+
+Apply it:
+
+```bash
+kubectl apply -f localqueue.yaml
+```
+
+---
+
+#### 5. Run an Example Job
+
+The annotation `kueue.x-k8s.io/podset-preferred-topology` tells Kueue to **prefer placing all pods within the same topology domain**. If that is not possible, Kueue will progressively move up the hierarchy until it finds a level where the job fits. If no level can contain all pods, they are distributed across multiple topology domains.
+
+Save the following as `job.yaml`:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: tas-sample-preferred-
+  labels:
+    kueue.x-k8s.io/queue-name: tas-user-queue
+spec:
+  parallelism: 2
+  completions: 2
+  completionMode: Indexed
+  template:
+    metadata:
+      annotations:
+        kueue.x-k8s.io/podset-preferred-topology: "oci.oraclecloud.com/rdma.local_block_id"
+    spec:
+      containers:
+      - name: dummy-job
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        args: ["pause"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: "200Mi"
+      restartPolicy: Never
+```
+
+Apply it:
+
+```bash
+kubectl apply -f job.yaml
 ```
 
 ### Using Kubernetes node affinity
@@ -189,95 +367,7 @@ spec:
 
 ```
 
-### Using Kueue
-You will need to [enable the feature gate](https://kueue.sigs.k8s.io/docs/installation/#change-the-feature-gates-configuration) for [Topology Aware Scheduling (TAS)](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling) in Kueue. Topology Aware Scheduling is currently in alpha state since Kueue v0.9.
 
-The following example uses `node.kubernetes.io/instance-type: "BM.GPU.H100.8"` to select H100s, but you can use any label that exists on all your nodes that you're targeting with the Resource Flavor.
-
-#### Create a Topology
-```yaml
-apiVersion: kueue.x-k8s.io/v1alpha1
-kind: Topology
-metadata:
-  name: "oci-topology"
-spec:
-  levels:
-  - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
-  - nodeLabel: "oci.oraclecloud.com/rdma.network_block_id"
-  - nodeLabel: "oci.oraclecloud.com/rdma.local_block_id"
-  - nodeLabel: "kubernetes.io/hostname"
-```
-
-#### Create a Resource Flavor
-```yaml
-kind: ResourceFlavor
-apiVersion: kueue.x-k8s.io/v1beta1
-metadata:
-  name: "tas-flavor"
-spec:
-  nodeLabels:
-    node.kubernetes.io/instance-type: "BM.GPU.H100.8"
-  topologyName: "oci-topology"
-```
-
-#### Create a Cluster Queue
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: ClusterQueue
-metadata:
-  name: "tas-cluster-queue"
-spec:
-  namespaceSelector: {}
-  resourceGroups:
-  - coveredResources: ["cpu", "memory"]
-    flavors:
-    - name: "tas-flavor"
-      resources:
-      - name: "cpu"
-        nominalQuota: 100
-      - name: "memory"
-        nominalQuota: 100Gi
-```
-
-#### Create a Local Queue
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: LocalQueue
-metadata:
-  name: tas-user-queue
-spec:
-  clusterQueue: tas-cluster-queue
-```
-
-#### Run example job
-`kueue.x-k8s.io/podset-preferred-topology` indicates that a PodSet requires Topology Aware Scheduling, but scheduling all pods within pods on nodes within the same topology domain is a preference rather than requirement. The levels are evaluated one-by-one going up from the level indicated by the annotation. If the PodSet cannot fit within a given topology domain then the next topology level up is considered. If the PodSet cannot fit at the highest topology level, then it gets admitted as distributed among multiple topology domains.
-
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  generateName: tas-sample-preferred
-  labels:
-    kueue.x-k8s.io/queue-name: tas-user-queue
-spec:
-  parallelism: 2
-  completions: 2
-  completionMode: Indexed
-  template:
-    metadata:
-      annotations:
-        kueue.x-k8s.io/podset-preferred-topology: "oci.oraclecloud.com/rdma.local_block_id"
-    spec:
-      containers:
-      - name: dummy-job
-        image: registry.k8s.io/e2e-test-images/agnhost:2.53
-        args: ["pause"]
-        resources:
-          requests:
-            cpu: "1"
-            memory: "200Mi"
-      restartPolicy: Never
-```
 
 ### Using Node Ordering script as an Init Container
 If your workload can use an ordered hostfile or a rankfile (e.g. `mpirun`), you can use the [Node Ordering script](../docker/node-ordering/node_ordering.py) to generate the ordered hostfile/rankfile using an Init Container and then use the generated hostlist/rankfile in your job.
