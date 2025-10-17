@@ -1,12 +1,20 @@
-Running PyTorch jobs on OKE using host network with RDMA
-=========
+# Running PyTorch Jobs on OKE Using Host Network with RDMA
 
-To enable RDMA with OKE, we use the host network to attach the RDMA interfaces on the node to the pod (`hostNetwork: true` and `dnsPolicy: ClusterFirstWithHostNet`). This means the pod will have the hostname of the node it's running on. Because Pytorch relies on using hostnames to discover workers, there are some additional information we need to use in the manifests.
+This guide explains how to run distributed PyTorch training jobs on Oracle Kubernetes Engine (OKE) with RDMA support. To enable RDMA connectivity, pods must use the host network (`hostNetwork: true` and `dnsPolicy: ClusterFirstWithHostNet`), which attaches the node's RDMA interfaces directly to the pod. This configuration requires special handling for PyTorch's worker discovery mechanism, as pods inherit the hostname of their host node.
 
-In this guide, we will use [yolov5](https://github.com/ultralytics/yolov5) as the example workload.
+This guide demonstrates both Volcano and Training Operator approaches, using [YOLOv5](https://github.com/ultralytics/yolov5) as the example workload.
+
+## Prerequisites
+
+- OKE cluster with RDMA-enabled GPU nodes
+- kubectl configured with cluster access
+- Understanding of PyTorch distributed training concepts
+- Familiarity with Kubernetes Job orchestrators (Volcano or Training Operator)
+
+## Required Manifest Sections for RDMA
 
 > [!IMPORTANT]
-> To use the RDMA interfaces on the host in your pods, you should have the below sections in your manifests. The example manifests below will have these sections.
+> All manifests in this guide include the following required sections for RDMA support. You must include these in your own PyTorch job manifests.
 
 ```yaml
 spec:
@@ -29,8 +37,14 @@ securityContext:
     - { mountPath: /dev/shm, name: shm }
 ```
 
-Table of Contents
-=================
+These sections ensure:
+- **hostNetwork: true** - Pod uses the host's network namespace, providing access to RDMA interfaces
+- **dnsPolicy: ClusterFirstWithHostNet** - DNS resolution works correctly with host networking
+- **InfiniBand device mount** - Provides access to `/dev/infiniband` for RDMA operations
+- **Shared memory** - Allocates sufficient shared memory for multi-GPU communication
+- **IPC_LOCK capability** - Required for pinning memory in RDMA operations
+
+## Table of Contents
 
    * [Volcano](#volcano)
       * [Using c10d as the backend](#using-c10d-as-the-backend)
@@ -40,18 +54,26 @@ Table of Contents
       * [Using etcd as the backend](#using-etcd-as-the-backend-1)
 
 ## Volcano
-With Volcano, we recommend not using the [Pytorch plugin](https://github.com/volcano-sh/volcano/blob/master/docs/user-guide/how_to_use_pytorch_plugin.md) because it's based on the old master/worker design instead of Torch Elastic.
 
-### Using `c10d` as the backend
+Volcano is a batch scheduling system built on Kubernetes for high-performance workloads. 
 
-1. Install Volcano.
+> [!NOTE]
+> We recommend not using the [PyTorch plugin](https://github.com/volcano-sh/volcano/blob/master/docs/user-guide/how_to_use_pytorch_plugin.md) as it is based on the legacy master/worker design rather than PyTorch Elastic (torchrun).
 
-```sh
+### Using `c10d` as the Backend
+
+The `c10d` backend is PyTorch's native distributed communication backend, providing built-in rendezvous functionality.
+
+#### Step 1: Install Volcano
+
+```bash
 helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
 helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
 ```
 
-2. Add an environment varible for the job ID to your PyTorch job manifest.
+#### Step 2: Configure Job Environment Variables
+
+Add an environment variable for the job ID to your PyTorch job manifest:
 
 ```yaml
 - name: JOB_ID
@@ -60,7 +82,9 @@ helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
       fieldPath: metadata.annotations['scheduling.k8s.io/group-name']  
 ```                
 
-3. Add the following to your `torchrun` command:
+#### Step 3: Configure torchrun Parameters
+
+Add the following parameters to your `torchrun` command:
 
 ```sh
 --rdzv-id=$JOB_ID
@@ -80,8 +104,12 @@ Explanation of the above parameters:
 | \--local_addr    | Volcano adds the `VC_WORKER_HOSTS` and `VC_TASK_INDEX` variables. We tell `torchrun` to use the pod's FQDN as the local address.                                                                          |
 | \--nnodes        | Volcano adds the `VC_WORKER_NUM`, which is the number of workers in the job.                                                                                                                              |
 
+#### Step 4: Deploy the PyTorch Job
 
-4. Here's an example with `yolov5` and Volcano. Note that the NCCL environment variables are for the `BM.GPU.B4.8` A100 shape. Change them depending on the shape you have.
+Here's a complete example using YOLOv5 with Volcano:
+
+> [!IMPORTANT]
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: batch.volcano.sh/v1alpha1
@@ -179,16 +207,20 @@ spec:
         - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
 ```
 
-### Using `etcd` as the backend
+### Using `etcd` as the Backend
 
-1. Install Volcano.
+The `etcd` backend provides an alternative rendezvous mechanism using a centralized etcd service.
 
-```sh
+#### Step 1: Install Volcano
+
+```bash
 helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
 helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
 ```
 
-2. Create an `etcd` pod and related services.
+#### Step 2: Deploy etcd Service
+
+Create an `etcd` pod and related services for rendezvous coordination:
 
 ```yaml
 apiVersion: v1
@@ -285,7 +317,9 @@ spec:
     etcd_node: etcd-server
 ```
 
-3. Add an environment varible for the job ID to your PyTorch job manifest.
+#### Step 3: Configure Job Environment Variables
+
+Add an environment variable for the job ID to your PyTorch job manifest:
 
 ```yaml
 - name: JOB_ID
@@ -294,7 +328,9 @@ spec:
       fieldPath: metadata.annotations['scheduling.k8s.io/group-name']  
 ```      
 
-4. Add the following to your `torchrun` command:
+#### Step 4: Configure torchrun Parameters
+
+Add the following parameters to your `torchrun` command:
 ```sh
 --rdzv-id=$JOB_ID
 --rdzv-backend=etcd-v2
@@ -313,7 +349,12 @@ Explanation of the above parameters:
 | \--local_addr    | Volcano adds the `VC_WORKER_HOSTS` and `VC_TASK_INDEX` variables. We tell `torchrun` to use the pod's FQDN as the local address. |
 | \--nnodes        | Volcano adds the `VC_WORKER_NUM`, which is the number of workers in the job.                                                     |
 
-5. Here's an example with `yolov5` and Volcano. Note that the NCCL environment variables are for the `BM.GPU.B4.8` A100 shape. Change them depending on the shape you have.
+#### Step 5: Deploy the PyTorch Job
+
+Here's a complete example using YOLOv5 with Volcano and etcd:
+
+> [!IMPORTANT]
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: batch.volcano.sh/v1alpha1
@@ -412,14 +453,21 @@ spec:
 
 ## Training Operator
 
-### Using `c10d` as the backend
+Training Operator (formerly known as Kubeflow Training Operator) provides Kubernetes custom resources for distributed training workloads.
 
-1. Install the Training Operator.
-```sh
+### Using `c10d` as the Backend
+
+The `c10d` backend provides native PyTorch distributed training support.
+
+#### Step 1: Install Training Operator
+
+```bash
 kubectl apply -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.1"
 ```
 
-2. Add environment varibles for the pod name and the replica index to your PyTorch job manifest.
+#### Step 2: Configure Job Environment Variables
+
+Add environment variables for the pod name and replica index to your PyTorch job manifest:
 
 ```yaml
 - name: REPLICA_INDEX
@@ -432,7 +480,9 @@ kubectl apply -k "github.com/kubeflow/training-operator.git/manifests/overlays/s
       fieldPath: metadata.name
 ```                    
 
-3. Add the following to your `torchrun` command.
+#### Step 3: Configure torchrun Parameters
+
+Add the following parameters to your `torchrun` command:
 
 ```sh
 PET_RDZV_CONF=is_host=$(if [ $REPLICA_INDEX == 0 ]; then echo "true"; else echo "false"; fi)
@@ -447,7 +497,12 @@ Explanation of the above parameters:
 | \--rdzv-conf  | We added the `REPLICA_INDEX` variable, which is the sequence number of a job container for multi-node training. The value of the first pod is 0. We tell `torchrun` to use the first pod as the host. |
 | \--local_addr | We added the `POD_NAME` variable, and we tell `torchrun` to use it as the local address of the pod.                                                                                                   |
 
-4. Here's an example with `yolov5` and Training Operator. Note that the NCCL environment variables are for the `BM.GPU.B4.8` A100 shape. Change them depending on the shape you have.
+#### Step 4: Deploy the PyTorch Job
+
+Here's a complete example using YOLOv5 with Training Operator:
+
+> [!IMPORTANT]
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: "kubeflow.org/v1"
@@ -539,14 +594,19 @@ spec:
               path: /dev/infiniband
 ```
 
-### Using `etcd` as the backend
+### Using `etcd` as the Backend
 
-1. Install the Training Operator
-```sh
+The `etcd` backend provides an alternative rendezvous mechanism for Training Operator.
+
+#### Step 1: Install Training Operator
+
+```bash
 kubectl apply -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.1"
 ```
 
-2. Create an `etcd` pod and related services.
+#### Step 2: Deploy etcd Service
+
+Create an `etcd` pod and related services for rendezvous coordination:
 
 ```yaml
 apiVersion: v1
@@ -643,7 +703,9 @@ spec:
     etcd_node: etcd-server
 ```
 
-3.  In your PyTorch job manifest, use the headless service you created in the previous step as the `rendezvous` host.
+#### Step 3: Configure Rendezvous Endpoint
+
+In your PyTorch job manifest, configure the etcd headless service as the rendezvous endpoint:
 
 ```yaml
 spec:
@@ -653,7 +715,9 @@ spec:
     rdzvPort: 2379
 ```
 
-4. Add an environment variable for the names of the Pytorch pods.
+#### Step 4: Configure Job Environment Variables
+
+Add an environment variable for the pod name:
 
 ```yaml
 - name: POD_NAME
@@ -662,18 +726,26 @@ spec:
       fieldPath: metadata.name
 ```
 
-5. Add the following to your `torchrun` command:
-```sh
+#### Step 5: Configure torchrun Parameters
+
+Add the following parameter to your `torchrun` command:
+
+```bash
 --local_addr=$POD_NAME
 ```
 
-Explanation of the above parameters:
+Explanation:
 
 | Parameter     | Explanation                                                                                         |
 | ------------- | --------------------------------------------------------------------------------------------------- |
 | \--local_addr | We added the `POD_NAME` variable, and we tell `torchrun` to use it as the local address of the pod. |
 
-6. Here's an example with `yolov5` and Training Operator. Note that the NCCL environment variables are for the `BM.GPU.B4.8` A100 shape. Change them depending on the shape you have.
+#### Step 6: Deploy the PyTorch Job
+
+Here's a complete example using YOLOv5 with Training Operator and etcd:
+
+> [!IMPORTANT]
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: "kubeflow.org/v1"

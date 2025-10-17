@@ -1,18 +1,20 @@
-# Using network locality when running workloads on OKE
+# Using RDMA Network Locality When Running Workloads on OKE
+
+This guide explains how to leverage RDMA network topology information to optimize workload placement and performance in Oracle Kubernetes Engine (OKE). By using network locality, you can ensure that distributed workloads are scheduled on nodes with optimal network proximity, reducing latency and maximizing throughput for GPU-accelerated applications.
 
 > [!IMPORTANT]  
 > To use the instructions in this guide, you must have a dedicated capacity pool and you must create a capacity topology. Otherwise, `rdmaTopologyData` in instance metadata service and related node labels in OKE will not be available.
 
-## What is network locality?
+## Overview of Network Locality
 Generative AI workloads drive a different set of engineering tradeoffs than traditional cloud workloads. So, we designed a purpose-built GenAI network tailored to the needs of the best-of-breed Generative AI workloads.
 
 When possible, running a job using the nodes in the same Local Block will provide the best performance. Because the number of nodes in a Local Block is limited; depending on the number of nodes you have, the number of your concurrent jobs running, and the size of your jobs, you might need to use the nodes from another Local Block in the same Network Block or from another Network Block.
 
 Local Block is the first latency band (Tier-0), Network Block is the second latency band (Tier-1), and HPC Island is the third latency band (Tier-2) in OCI's RDMA networks. You can read [this blog post](https://blogs.oracle.com/cloud-infrastructure/post/first-principles-zettascale-oci-superclusters) and watch the [YouTube video](https://www.youtube.com/watch?v=cZy22n5Ih78) for learning more about OCI's RDMA network design.
 
-![OCI Cluster Network Fabric](./tiers.png)
+![OCI Cluster Network Fabric](./images/tiers.png)
 
-## What type of network tier information will I have?
+## Network Tier Information
 When you have a dedicated capacity pool and a capacity topology created for the availability domain, the following information will be available in the instance metadata service for bare metal GPU shapes:
 
 ```
@@ -23,19 +25,20 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
   "customerHostId": "ocid1.computebaremetalhost.oc1.iad.anuwcljrg5pyaeycu...",
   "customerLocalBlock": "ocid1.computelocalblock.oc1.iad.anuwcljrg5pyaeyc...",
   "customerNetworkBlock": "ocid1.computenetworkblock.oc1.iad.anuwclddsdef..."
+}  
 ```
 
-## Which shapes are supported?
+## Supported Shapes and Methods
 **H100, H200, B200, MI300x**
+- Kueue
 - Kubernetes Node Affinity
 - Kubernetes Pod Affinity
-- Kueue
 - Node Ordering script as Init Container
 
 **A100**
 - Node Ordering script as Init Container
 
-## How do I use network locality information when running workloads on OKE?
+## Using Network Locality in OKE
 When the locality information is available in the instance metadata service, OKE will add the following labels to your nodes during bootstrapping:
 
 ```
@@ -54,7 +57,185 @@ oci.oraclecloud.com/rdma.local_block_id=4tjxbt4s6ua
 oci.oraclecloud.com/rdma.network_block_id=7xmzl4p4wba
 ```
 
-### Using Kubernetes node affinity
+> [!NOTE]  
+> We recommend using Kueue for the best scheduling flexibility and ease of configuration.
+
+### Using Kueue with Topology Aware Scheduling
+
+Kueue supports **Topology Aware Scheduling (TAS)**, which allows you to create a hierarchy of nodes based on node labels.
+
+Topology Aware Scheduling is a beta feature and is enabled by default starting with **v0.14**.
+
+#### Prerequisites
+
+Install Kueue using Helm:
+
+```bash
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" --create-namespace --namespace=kueue-system
+```
+
+Verify the installation:
+
+```bash
+kubectl get pods -n kueue-system
+```
+
+#### Configuration Overview
+
+This example demonstrates how to:
+
+- Define a **Topology** for OCI RDMA domains  
+- Create a **ResourceFlavor** for H100 GPU nodes  
+- Configure a **ClusterQueue** and **LocalQueue**  
+- Run a **Job** that uses Topology Aware Scheduling
+
+In this setup, we use the node label:
+
+```yaml
+node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+```
+
+This label targets OCI bare metal H100 GPU nodes. You can replace it with any label that exists on the target nodes in your environment.
+
+### Step 1: Create a Topology
+
+Define how nodes are grouped at different hierarchy levels.
+
+Save the following as `topology.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1alpha1
+kind: Topology
+metadata:
+  name: "oci-topology"
+spec:
+  levels:
+  - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.network_block_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.local_block_id"
+  - nodeLabel: "kubernetes.io/hostname"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f topology.yaml
+```
+
+### Step 2: Create a ResourceFlavor
+
+Define a flavor for your node type and reference the topology.
+
+Save the following as `resourceflavor.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: "tas-flavor"
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+  topologyName: "oci-topology"
+```
+
+Apply it:
+
+```bash
+kubectl apply -f resourceflavor.yaml
+```
+
+### Step 3: Create a ClusterQueue
+
+Define a shared queue of resources available to all namespaces.
+
+Save the following as `clusterqueue.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: "tas-cluster-queue"
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory"]
+    flavors:
+    - name: "tas-flavor"
+      resources:
+      - name: "cpu"
+        nominalQuota: 100
+      - name: "memory"
+        nominalQuota: 100Gi
+```
+
+Apply it:
+
+```bash
+kubectl apply -f clusterqueue.yaml
+```
+
+### Step 4: Create a LocalQueue
+
+Create a namespace-specific queue linked to the cluster queue.
+
+Save the following as `localqueue.yaml`:
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: tas-user-queue
+spec:
+  clusterQueue: tas-cluster-queue
+```
+
+Apply it:
+
+```bash
+kubectl apply -f localqueue.yaml
+```
+
+### Step 5: Run an Example Job
+
+The annotation `kueue.x-k8s.io/podset-preferred-topology` tells Kueue to **prefer placing all pods within the same topology domain**. If that is not possible, Kueue will progressively move up the hierarchy until it finds a level where the job fits. If no level can contain all pods, they are distributed across multiple topology domains.
+
+Save the following as `job.yaml`:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: tas-sample-preferred-
+  labels:
+    kueue.x-k8s.io/queue-name: tas-user-queue
+spec:
+  parallelism: 2
+  completions: 2
+  completionMode: Indexed
+  template:
+    metadata:
+      annotations:
+        kueue.x-k8s.io/podset-preferred-topology: "oci.oraclecloud.com/rdma.local_block_id"
+    spec:
+      containers:
+      - name: dummy-job
+        image: registry.k8s.io/e2e-test-images/agnhost:2.53
+        args: ["pause"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: "200Mi"
+      restartPolicy: Never
+```
+
+Apply it:
+
+```bash
+kubectl apply -f job.yaml
+```
+
+### Using Kubernetes Node Affinity
 You can use the labels explained above to create affinity rules for your workloads. Visit [this link](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) if you want to learn more about using affinity rules on Kubernetes.
 
 Note that because we're using soft rules (`preferredDuringSchedulingIgnoredDuringExecution`), the scheduler will try to find a node that meets the rules. If a matching node is not available, the scheduler will still schedule the pod.
@@ -101,7 +282,7 @@ spec:
                   - key: oci.oraclecloud.com/rdma.hpc_island_id
                     operator: In
                     values:
-                      - af7ubvouuyq      
+                      - af7ubvouuyq
       containers:
         - name: nginx
           image: nginx
@@ -116,7 +297,7 @@ spec:
               memory: "256Mi"
 ```
 
-### Using Kubernetes pod affinity
+### Using Kubernetes Pod Affinity
 You can use the labels explained above to create affinity rules for your workloads. Visit [this link](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) if you want to learn more about using affinity rules on Kubernetes.
 
 Note that because we're using soft rules (`preferredDuringSchedulingIgnoredDuringExecution`), the scheduler will try to find a node that meets the rules. If a matching node is not available, the scheduler will still schedule the pod.
@@ -173,7 +354,7 @@ spec:
                       operator: In
                       values:
                         - pod-affinity-app
-                topologyKey: oci.oraclecloud.com/rdma.hpc_island_id                
+                topologyKey: oci.oraclecloud.com/rdma.hpc_island_id
       containers:
         - name: nginx
           image: nginx
@@ -186,105 +367,21 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-
 ```
 
-### Using Kueue
-You will need to [enable the feature gate](https://kueue.sigs.k8s.io/docs/installation/#change-the-feature-gates-configuration) for [Topology Aware Scheduling (TAS)](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling) in Kueue. Topology Aware Scheduling is currently in alpha state since Kueue v0.9.
+### Using Node Ordering Script as an Init Container
 
-The following example uses `node.kubernetes.io/instance-type: "BM.GPU.H100.8"` to select H100s, but you can use any label that exists on all your nodes that you're targeting with the Resource Flavor.
+For workloads that use MPI (Message Passing Interface) and can leverage an ordered hostfile or rankfile, you can use the [Node Ordering script](../docker/node-ordering/node_ordering.py) to optimize node selection. This approach is particularly useful for:
 
-#### Create a Topology
-```yaml
-apiVersion: kueue.x-k8s.io/v1alpha1
-kind: Topology
-metadata:
-  name: "oci-topology"
-spec:
-  levels:
-  - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
-  - nodeLabel: "oci.oraclecloud.com/rdma.network_block_id"
-  - nodeLabel: "oci.oraclecloud.com/rdma.local_block_id"
-  - nodeLabel: "kubernetes.io/hostname"
-```
+- MPI-based workloads that accept hostfiles (e.g., `mpirun`)
+- Distributed training jobs that benefit from network locality
+- Custom scheduling requirements not covered by Kubernetes schedulers
 
-#### Create a Resource Flavor
-```yaml
-kind: ResourceFlavor
-apiVersion: kueue.x-k8s.io/v1beta1
-metadata:
-  name: "tas-flavor"
-spec:
-  nodeLabels:
-    node.kubernetes.io/instance-type: "BM.GPU.H100.8"
-  topologyName: "oci-topology"
-```
+The script generates ordered hostfiles/rankfiles using the `customerLocalBlock` information from the instance metadata service, ensuring nodes are ordered by network proximity.
 
-#### Create a Cluster Queue
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: ClusterQueue
-metadata:
-  name: "tas-cluster-queue"
-spec:
-  namespaceSelector: {}
-  resourceGroups:
-  - coveredResources: ["cpu", "memory"]
-    flavors:
-    - name: "tas-flavor"
-      resources:
-      - name: "cpu"
-        nominalQuota: 100
-      - name: "memory"
-        nominalQuota: 100Gi
-```
+#### Example: RCCL Tests with MPI Operator
 
-#### Create a Local Queue
-```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
-kind: LocalQueue
-metadata:
-  name: tas-user-queue
-spec:
-  clusterQueue: tas-cluster-queue
-```
-
-#### Run example job
-`kueue.x-k8s.io/podset-preferred-topology` indicates that a PodSet requires Topology Aware Scheduling, but scheduling all pods within pods on nodes within the same topology domain is a preference rather than requirement. The levels are evaluated one-by-one going up from the level indicated by the annotation. If the PodSet cannot fit within a given topology domain then the next topology level up is considered. If the PodSet cannot fit at the highest topology level, then it gets admitted as distributed among multiple topology domains.
-
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  generateName: tas-sample-preferred
-  labels:
-    kueue.x-k8s.io/queue-name: tas-user-queue
-spec:
-  parallelism: 2
-  completions: 2
-  completionMode: Indexed
-  template:
-    metadata:
-      annotations:
-        kueue.x-k8s.io/podset-preferred-topology: "oci.oraclecloud.com/rdma.local_block_id"
-    spec:
-      containers:
-      - name: dummy-job
-        image: registry.k8s.io/e2e-test-images/agnhost:2.53
-        args: ["pause"]
-        resources:
-          requests:
-            cpu: "1"
-            memory: "200Mi"
-      restartPolicy: Never
-```
-
-### Using Node Ordering script as an Init Container
-If your workload can use an ordered hostfile or a rankfile (e.g. `mpirun`), you can use the [Node Ordering script](../docker/node-ordering/node_ordering.py) to generate the ordered hostfile/rankfile using an Init Container and then use the generated hostlist/rankfile in your job.
-
-The script creates the files using the same `customerLocalBlock` information available in instance metadata service.
-
-Here's an example for running the RCCL tests with [MPI Operator](https://github.com/kubeflow/mpi-operator):
+The following example demonstrates running RCCL tests with the [MPI Operator](https://github.com/kubeflow/mpi-operator) using the Node Ordering script:
 
 ```yaml
 apiVersion: kubeflow.org/v2beta1
@@ -387,8 +484,8 @@ spec:
             - emptyDir:
                 medium: Memory
               name: dshm
-```                
+```
 
 ### Using Volcano
-Volcano added the [Network Topology Aware Scheduling](https://volcano.sh/en/docs/network_topology_aware_scheduling/) feature in v1.11.0. The feature currently requires you to create the topology information manually. Once the functionality to [support identifying network topology from node labels and converted into hyperNode resources](https://github.com/volcano-sh/volcano/pull/4146) is added to Volcano, this section of the guide will be updated with the instructions.
 
+Volcano added the [Network Topology Aware Scheduling](https://volcano.sh/en/docs/network_topology_aware_scheduling/) feature in v1.11.0. The feature currently requires you to create the topology information manually. Once the functionality to [support identifying network topology from node labels and converted into hyperNode resources](https://github.com/volcano-sh/volcano/pull/4146) is added to Volcano, this section of the guide will be updated with the instructions.
