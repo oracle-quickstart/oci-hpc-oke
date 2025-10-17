@@ -25,6 +25,7 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
   "customerHostId": "ocid1.computebaremetalhost.oc1.iad.anuwcljrg5pyaeycu...",
   "customerLocalBlock": "ocid1.computelocalblock.oc1.iad.anuwcljrg5pyaeyc...",
   "customerNetworkBlock": "ocid1.computenetworkblock.oc1.iad.anuwclddsdef..."
+}  
 ```
 
 ## Supported Shapes and Methods
