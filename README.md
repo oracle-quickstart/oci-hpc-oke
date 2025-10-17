@@ -1,44 +1,40 @@
-# Running RDMA (remote direct memory access) GPU workloads on OKE
-Oracle Cloud Infrastructure Kubernetes Engine (OKE) is a fully-managed, scalable, and highly available service that you can use to deploy your containerized applications to the cloud.
+# Running RDMA (Remote Direct Memory Access) GPU Workloads on OKE
 
-### Supported Operating Systems
+This guide provides instructions for deploying and managing GPU workloads with RDMA connectivity on Oracle Cloud Infrastructure Kubernetes Engine (OKE). OKE is a fully-managed, scalable, and highly available Kubernetes service that enables you to deploy containerized applications to the cloud.
+
+## Supported Operating Systems
 - Ubuntu 22.04
 - Oracle Linux 8 (except for the GPU & RDMA worker pool)
 
-### Required policies
-The following policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please find more information about the policies below.
+## Required Policies
+The following policies are required. The OCI Resource Manager stack will create them for you if you have the necessary permissions. If you don't have the permissions, please refer to the policy documentation below.
 
 - [Policy Configuration for Cluster Creation and Deployment](https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengpolicyconfig.htm)
 - [Creating a Dynamic Group and a Policy for Self-Managed Nodes](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdynamicgrouppolicyforselfmanagednodes.htm)
 
-## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
-You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys an operational worker pool by default and you choose to deploy additional CPU/GPU worker pools.
+## Deploying an OKE Cluster with GPUs and RDMA Connectivity
+
+You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys a system worker pool by default, and you can choose to deploy additional CPU/GPU worker pools.
 
 You can use the following images for both CPU and GPU pools.
 
 > [!NOTE]  
 > The GPU image has the GPU drivers pre-installed.
 
-#### Images to use
-You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the below image to your tenancy.
+### Images to Use
 
-**Image to use for non-GPU nodes**
+You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the images below to your tenancy.
 
-- [Link to import the image](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
-
-**Images for NVIDIA shapes**
+#### Images for NVIDIA Shapes
 
 - [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.07.22-0)
-
 - [GPU driver 550 & CUDA 12.4](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-GPU-550-CUDA-12.4-2025.07.22-0)
 
-
-**Image for AMD shapes**
+#### Images for AMD Shapes
 
 - [ROCm 6.3.2](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-AMD-ROCM-632-2025.07.23-0)
 
-
-### Deploy the cluster using the Oracle Cloud Resource Manager template
+### Deploy the Cluster Using the Oracle Cloud Resource Manager Template
 You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
@@ -49,7 +45,11 @@ The template will deploy a `bastion` instance and an `operator` instance by defa
 
 You can also find this information under the **Application information** tab in the OCI Resource Manager stack.
 
-### Wait until you see all nodes in the cluster
+![Application Information Tab](./docs/images/rms-application-information.png)
+
+### Verify Node Availability
+
+Wait until all nodes are ready in the cluster:
 
 ```sh
 kubectl get nodes
@@ -62,8 +62,9 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.82     Ready      node     2d23h   v1.31.1
 ```
 
-### Add a Service Account Authentication Token (optional but recommended)
-More info [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm).
+### Add a Service Account Authentication Token (Optional but Recommended)
+
+For more information, see [Adding a Service Account Token](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm).
 
 ```
 kubectl -n kube-system create serviceaccount kubeconfig-sa
@@ -79,8 +80,9 @@ kubectl config set-credentials kubeconfig-sa --token=$TOKEN
 kubectl config set-context --current --user=kubeconfig-sa
 ```
 
-### Using the host RDMA network interfaces in manifests
-In order to use the RDMA interfaces on the host in your pods, you should have the below sections in your manifests:
+### Using Host RDMA Network Interfaces in Manifests
+
+To use the RDMA interfaces on the host in your pods, include the following sections in your manifests:
 
 ```yaml
 spec:
@@ -139,56 +141,60 @@ spec:
       sleep 1000000
 ```
 
-### Optional - Deploy Kueue & MPI Operator to run NCCL tests
-Kueue & MPI Operator are needed for running the optional NCCL tests.
+## Optional: Deploy Kueue & MPI Operator to Run NCCL Tests
 
-#### Deploy MPI Operator & Kueue
+Kueue and MPI Operator are required for running the optional NCCL tests.
+
+### Deploy MPI Operator and Kueue
 ```sh
 kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
 
 helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" --create-namespace --namespace=kueue-system
 ```
 
-#### Run the NCCL/RCCL tests
-> [!IMPORTANT]  
-> The NCCL parameters are different between different shapes. Please make sure that you are using the correct manifest for your bare metal GPU shapes.
+### Run the NCCL/RCCL Tests
 
-##### BM.GPU.GB200-v2.4
-```
+> [!IMPORTANT]  
+> The NCCL parameters differ between GPU shapes. Ensure that you use the correct manifest for your specific bare metal GPU shape.
+
+#### BM.GPU.GB200-v2.4
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200-v2.4.yaml
 ```
 
-##### BM.GPU.GB200.4
-```
+#### BM.GPU.GB200.4
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200.4.yaml
 ```
 
-##### BM.GPU.H200
-```
+#### BM.GPU.H200
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.H200.8.yaml
 ```
 
-##### BM.GPU.H100
-```
+#### BM.GPU.H100
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml
 ```
 
-##### BM.GPU.A100-v2.8
-```
+#### BM.GPU.A100-v2.8
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.A100-v2.8.yaml
 ```
 
-##### BM.GPU4.8
-```
+#### BM.GPU4.8
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU4.8.yaml
 ```
 
-##### BM.GPU.B4.8
-```
+#### BM.GPU.B4.8
+```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B4.8.yaml
 ```
 
-The initial pull of the container will take long. Once the launcher pod `nccl-test-launcher-XXXXX` starts running, you can check its logs for the NCCL test result.
+The initial container image pull may take some time. Once the launcher pod `nccl-test-launcher-XXXXX` starts running, you can check its logs for the NCCL test results.
+
+### Example Output
 
 ```sh
 Waiting for workers to be ready...
@@ -260,7 +266,7 @@ Please see the instructions [here](./docs/running-pytorch-jobs-on-oke-using-host
 Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here](./docs/importing-images-from-fss-skopeo.md).
 
 ### How can I run GPU & RDMA health checks in my nodes?
-You can deploy the health check script with Node Problem Detector by following the instructions [here](./docs/running-gpu-rdma-healtchecks-with-node-problem-detector.md).
+You can deploy the health check script with Node Problem Detector by following the instructions [here](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md).
 
 ### Can I autoscale my RDMA enabled nodes in a Cluster Network?
 You can set up autoscaling for your nodes in a Cluster Network using the instructions [here](./docs/using-cluster-autoscaler-with-cluster-networks.md).
