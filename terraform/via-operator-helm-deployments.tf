@@ -31,7 +31,7 @@ module "nginx" {
   helm_template_values_override = templatefile(
     "${path.root}/files/nginx-ingress/values.yaml.tpl",
     {
-      min_bw    = 100,
+      min_bw    = 10,
       max_bw    = 100,
       lb_nsg_id = module.oke.pub_lb_nsg_id,
       state_id  = local.state_id
