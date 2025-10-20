@@ -1,31 +1,29 @@
-## base docker image
+## Base docker image
 ARG ROCM_IMAGE_NAME=rocm/dev-ubuntu-22.04
-ARG ROCM_IMAGE_TAG=6.3.2
+ARG ROCM_IMAGE_TAG=7.0.2
 FROM "${ROCM_IMAGE_NAME}:${ROCM_IMAGE_TAG}"
 
-## rccl repo
-ARG RCCL_REPO=https://github.com/ROCm/rccl
-ARG RCCL_BRANCH=develop
+## Re-declare to use in build stage (inherits value from above)
+ARG ROCM_IMAGE_TAG
 
-## rccl-tests repo
+## RCCL repo
+ARG RCCL_VERSION=rocm-${ROCM_IMAGE_TAG}
+
+## RCCL tests repo
 ARG RCCL_TESTS_REPO=https://github.com/ROCm/rccl-tests
 ARG RCCL_TESTS_BRANCH=develop
 
-## Mellanox OFED version
-ARG MELLANOX_OFED_VERSION
+## AMD GPU Targets
+ARG GPU_TARGETS=gfx942
 
-## creating scratch space
-RUN mkdir -p /workspace
-WORKDIR /workspace
+ENV WORKDIR=/workspace
+RUN mkdir -p ${WORKDIR}
+WORKDIR ${WORKDIR}
 
-## install dependencies
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
-    openssh-server \
-    iputils-ping \
-    net-tools \
     make \
     rocm-cmake \
     ninja-build \
@@ -60,65 +58,76 @@ RUN apt-get update \
     python3-dev \
     python3-tk \
     python3-yaml \
-    wget \
+    vim \
+    less \
+    openssh-client \
+    openssh-server \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Mellanox OFED
-RUN wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add -
-RUN cd /etc/apt/sources.list.d/ && wget https://linux.mellanox.com/public/repo/mlnx_ofed/${MELLANOX_OFED_VERSION}/ubuntu22.04/mellanox_mlnx_ofed.list
-
-RUN apt-get -qq update \
-    && apt-get -qq install -y --no-install-recommends \
-    ibverbs-utils libibverbs-dev libibumad3 libibumad-dev librdmacm-dev rdmacm-utils infiniband-diags ibverbs-utils \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.28.0/cmake-3.28.0-linux-x86_64.sh \
     && chmod +x cmake-3.28.0-linux-x86_64.sh \
     && bash ./cmake-3.28.0-linux-x86_64.sh --prefix=/usr --exclude-subdir --skip-license \
     && rm cmake-3.28.0-linux-x86_64.sh
 
+# Mellanox OFED
+RUN wget -qO - https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add -
+    RUN cd /etc/apt/sources.list.d/ && wget https://linux.mellanox.com/public/repo/mlnx_ofed/${MELLANOX_OFED_VERSION:-latest}/ubuntu22.04/mellanox_mlnx_ofed.list
+    RUN apt-get -qq update \
+        && apt-get -qq install -y --no-install-recommends \
+        ibverbs-utils libibverbs-dev libibumad3 libibumad-dev librdmacm-dev rdmacm-utils infiniband-diags ibverbs-utils \
+        && rm -rf /var/lib/apt/lists/*
+    
+## Set ROCm path
+ENV ROCM_PATH=/opt/rocm
+
 ## Install UCX
 ENV UCX_INSTALL_PREFIX=/opt/ucx
-RUN wget https://github.com/openucx/ucx/releases/download/v1.16.0/ucx-1.16.0.tar.gz \
+RUN wget https://github.com/openucx/ucx/releases/download/v1.19.0/ucx-1.19.0.tar.gz \
     && mkdir -p ucx \
-    && tar -zxf ucx-1.16.0.tar.gz -C ucx --strip-components=1 \
+    && tar -zxf ucx-1.19.0.tar.gz -C ucx --strip-components=1 \
     && cd ucx \
     && mkdir build \
     && cd build \
-    && ../configure --prefix=${UCX_INSTALL_PREFIX} --with-rocm=/opt/rocm \
+    && ../configure --prefix=${UCX_INSTALL_PREFIX} --with-rocm=${ROCM_PATH} \
     && make -j$(nproc) install \
     && cd ../.. \
-    && rm -rf ucx ucx-1.16.0.tar.gz
+    && rm -rf ucx ucx-1.19.0.tar.gz
 
 ## Install OpenMPI
 ENV MPI_INSTALL_PREFIX=/opt/ompi
-RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.gz \
+RUN wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.8.tar.gz \
     && mkdir -p ompi4 \
-    && tar -zxf openmpi-4.1.6.tar.gz -C ompi4 --strip-components=1 \
+    && tar -zxf openmpi-4.1.8.tar.gz -C ompi4 --strip-components=1 \
     && cd ompi4 \
     && mkdir build \
     && cd build \
     && ../configure --prefix=${MPI_INSTALL_PREFIX} --with-ucx=${UCX_INSTALL_PREFIX} --disable-oshmem --disable-mpi-fortran --enable-orterun-prefix-by-default \
     && make -j$(nproc) install \
     && cd ../.. \
-    && rm -rf ompi4 openmpi-4.1.6.tar.gz
+    && rm -rf ompi4 openmpi-4.1.8.tar.gz
 
-## building RCCL
-ENV RCCL_INSTALL_PREFIX=/opt/rocm
-RUN git clone --recurse-submodules -b "${RCCL_BRANCH}" "${RCCL_REPO}" ./rccl \
+## Build RCCL
+ENV RCCL_INSTALL_PREFIX=${WORKDIR}/rccl/install
+RUN git clone --recurse-submodules -b ${RCCL_VERSION} --depth 1 https://github.com/ROCm/rccl \
     && cd ./rccl \
-    && ./install.sh -t -j$(nproc) --amdgpu_targets="gfx942" --prefix=${RCCL_INSTALL_PREFIX}
+    && ./install.sh --amdgpu_targets=${GPU_TARGETS} --prefix=${RCCL_INSTALL_PREFIX}
 
-## building RCCL-Tests
+## Build RCCL-Tests
 RUN git clone -b "${RCCL_TESTS_BRANCH}" "${RCCL_TESTS_REPO}" ./rccl-tests \
     && cd ./rccl-tests \
-    && make MPI=1 MPI_HOME=${MPI_INSTALL_PREFIX} NCCL_HOME=${RCCL_INSTALL_PREFIX} -j$(nproc)
+    && mkdir build \
+    && cd build \
+    && cmake -DCMAKE_BUILD_TYPE=Release -DUSE_MPI=ON -DCMAKE_PREFIX_PATH="${RCCL_INSTALL_PREFIX};${MPI_INSTALL_PREFIX}" -DGPU_TARGETS=${GPU_TARGETS} .. \
+    && make -j$(nproc)
 
-## set environment variables
-ENV PATH="${RCCL_INSTALL_PREFIX}/bin:${MPI_INSTALL_PREFIX}/bin:${PATH}"
-ENV LD_LIBRARY_PATH="${RCCL_INSTALL_PREFIX}/lib:${MPI_INSTALL_PREFIX}/lib:${LD_LIBRARY_PATH}"
+## Set environment variables
+ENV PATH="${MPI_INSTALL_PREFIX}/bin:${ROCM_PATH}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${RCCL_INSTALL_PREFIX}:${MPI_INSTALL_PREFIX}/lib:${ROCM_PATH}/lib"
+ENV UCX_WARN_UNUSED_ENV_VARS=n
+ENV OMPI_ALLOW_RUN_AS_ROOT=1
+ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
 # Configure SSH
 RUN sed -i 's/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g' /etc/ssh/ssh_config && \

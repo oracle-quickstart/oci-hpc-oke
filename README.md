@@ -161,7 +161,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" -
 ### Run the NCCL/RCCL Tests
 
 > [!IMPORTANT]  
-> The NCCL parameters differ between GPU shapes. Ensure that you use the correct manifest for your specific bare metal GPU shape.
+> The NCCL/RCCL parameters differ between GPU shapes. Ensure that you use the correct manifest for your specific bare metal GPU shape.
 
 #### BM.GPU.GB200-v2.4
 ```sh
@@ -196,6 +196,11 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 #### BM.GPU.B4.8
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B4.8.yaml
+```
+
+#### BM.GPU.MI300X.8
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI300X.8.yaml
 ```
 
 The initial container image pull may take some time. Once the launcher pod `nccl-test-launcher-XXXXX` starts running, you can check its logs for the NCCL test results.
