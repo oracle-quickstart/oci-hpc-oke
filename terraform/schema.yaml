@@ -40,6 +40,9 @@ variableGroups:
       - worker_gpu_image_id
       - worker_rdma_image_id
       - oke_ons_webhook_chart_version
+      # Monitoring
+      - wildcard_dns_domain
+      - monitoring_advanced_options
 
   - title: "Identity"
     variables:
@@ -195,6 +198,7 @@ variableGroups:
     - nginx_chart_version
     - install_grafana
     - install_grafana_dashboards
+    - use_lets_encrypt_prod_endpoint
     - setup_alerting
 
   - title: "Stack Configuration"
@@ -920,6 +924,19 @@ variables:
       - monitoring_advanced_options
       - install_node_problem_detector_kube_prometheus_stack
       - install_grafana
+  use_lets_encrypt_prod_endpoint:
+    title: Use Let's Encrypt production endpoint
+    description:  Use Let's Encrypt production endpoint instead of staging.
+    type: boolean
+    default: true
+    required: false
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+      - install_grafana
+      - create_public_subnets
   setup_alerting:
     title: Enable Grafana Alerting
     description: Configure Grafana to send notifications to an OCI Notification Topic
