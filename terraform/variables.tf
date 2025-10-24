@@ -260,7 +260,22 @@ variable "setup_alerting" {
 }
 
 variable "avoid_waiting_for_delete_target" {
+  default = false
+  type    = bool
+}
+
+variable "use_lets_encrypt_prod_endpoint" {
   default = true
+  type    = bool
+}
+
+variable "wildcard_dns_domain" {
+  default = "endpoint.oci-hpc.ai"
+  type    = string
+}
+
+variable "monitoring_advanced_options" {
+  default = false
   type    = bool
 }
 
