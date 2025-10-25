@@ -1,23 +1,35 @@
-# Running Active Health Checks for GPU Nodes (preview)
+# Running Active Health Checks for GPU Nodes (Preview)
 
 > [!NOTE]  
-> This is a preview feature. We are actively adding more tests.
+> This is a preview feature. Additional tests are being actively developed and added.
 
-This repository contains Kubernetes manifests for automated active health checks on GPU nodes. These checks run periodically to validate GPU functionality and label nodes with their health status.
+Active health checks provide automated, periodic validation of GPU & RDMA functionality on OKE nodes. These checks run as CronJobs that test GPU nodes during idle periods and apply labels indicating the health status of each node.
 
 ## Overview
 
-Three types of active health checks are provided:
+### Available Health Check Types
+
+Three types of active health checks are available:
 
 1. **NCCL Tests** - Multi-node GPU communication tests using NVIDIA NCCL
 2. **GPU Fryer** - Single-node GPU stress testing
 3. **DCGM Diagnostics** - Host-level GPU diagnostics using NVIDIA DCGM
 
+### How It Works
+
 Each health check runs as a CronJob that:
-- Selects idle GPU nodes that haven't been tested in the last 24 hours
-- Runs the appropriate test workload
-- Labels nodes with pass/fail results and timestamps
-- Automatically cleans up completed jobs
+- Identifies idle GPU nodes that have not been tested in the last 24 hours
+- Executes the appropriate test workload
+- Applies labels to nodes with pass/fail results and timestamps
+- Automatically cleans up completed jobs after 5 minutes
+
+## Prerequisites
+
+- OKE cluster with GPU nodes
+- kubectl access with cluster-admin privileges
+- Kueue installed (for NCCL tests)
+- MPI Operator installed (for NCCL tests)
+- Monitoring namespace (or permission to create it)
 
 ## Architecture
 
@@ -53,30 +65,48 @@ All three health checks use the same RBAC configuration:
 - **ServiceAccount**: `active-health-checks-runner` (in `monitoring` namespace)
 - **ClusterRole**: `active-health-checks-runner-role`
 
-### Manual Test Execution
-
-To manually trigger a test outside the schedule:
-
-```bash
-# Create a one-off job from the CronJob
-kubectl create job -n monitoring manual-test --from=cronjob/active-health-checks-nccl-tests-applier
-kubectl create job -n monitoring manual-test --from=cronjob/active-health-checks-gpu-fryer-applier
-kubectl create job -n monitoring manual-test --from=cronjob/active-health-checks-dcgm-diag-applier
-```
+The RBAC permissions allow the health check jobs to:
+- List and describe nodes
+- Read pod information to determine GPU allocation
+- Label nodes with test results
 
 ## Deployment
 
-### Deploy Kueue and MPI Operator
+### Step 1: Install Prerequisites
+
+Install Kueue and MPI Operator (required for NCCL tests):
+
 ```bash
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.13.4" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" --create-namespace --namespace=kueue-system
 
 kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
 ```
+
+### Step 2: Deploy Active Health Checks
+
+Deploy all three health check CronJobs:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-nccl-tests.yaml
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-gpu-fryer.yaml
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-dcgm-diag.yaml
+```
+
+### Step 3: Verify Deployment
+
+Check that the CronJobs have been created:
+
+```bash
+kubectl get cronjobs -n monitoring
+```
+
+**Example output:**
+
+```
+NAME                                       SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+active-health-checks-dcgm-diag-applier     0 * * * *     False     0        <none>          10s
+active-health-checks-gpu-fryer-applier     0 * * * *     False     0        <none>          10s
+active-health-checks-nccl-tests-applier    0 * * * *     False     0        <none>          10s
 ```
 
 ## Node Selection Logic
@@ -98,3 +128,106 @@ This ensures:
 - Each node is tested at most once per day
 - Tests run on available capacity
 
+## Monitoring Health Check Results
+
+### View Node Labels
+
+Check the health status labels on a specific node:
+
+```bash
+kubectl get node <node-name> --show-labels | grep active-health-checks
+```
+
+View all nodes with their health check labels:
+
+```bash
+kubectl get nodes -o custom-columns=NAME:.metadata.name,NCCL:.metadata.labels.oke\.oraclecloud\.com/active-health-checks-nccl-tests,GPU_FRYER:.metadata.labels.oke\.oraclecloud\.com/active-health-checks-gpu-fryer,DCGM:.metadata.labels.oke\.oraclecloud\.com/active-health-checks-dcgm-diag
+```
+
+### Identify Failed Nodes
+
+List nodes that have failed any health check:
+
+```bash
+kubectl get nodes -l oke.oraclecloud.com/active-health-checks-nccl-tests=fail -o wide
+kubectl get nodes -l oke.oraclecloud.com/active-health-checks-gpu-fryer=fail -o wide
+kubectl get nodes -l oke.oraclecloud.com/active-health-checks-dcgm-diag=fail -o wide
+```
+
+### View Health Check Job Logs
+
+Check the logs of recent health check jobs:
+
+```bash
+# List recent jobs
+kubectl get jobs -n monitoring
+
+# View logs from a specific job
+kubectl logs -n monitoring job/<job-name>
+```
+
+## Manual Test Execution
+
+To manually trigger a health check outside the regular schedule:
+
+```bash
+# Create a one-off job from the CronJob
+kubectl create job -n monitoring manual-nccl-test --from=cronjob/active-health-checks-nccl-tests-applier
+kubectl create job -n monitoring manual-fryer-test --from=cronjob/active-health-checks-gpu-fryer-applier
+kubectl create job -n monitoring manual-dcgm-test --from=cronjob/active-health-checks-dcgm-diag-applier
+```
+
+To run a test immediately on a specific node, you can temporarily modify the node labels to remove the last-run timestamp:
+
+```bash
+kubectl label node <node-name> oke.oraclecloud.com/active-health-checks-nccl-tests-last-run-
+```
+
+The next CronJob execution will then select this node for testing.
+
+## Configuration
+
+### Adjusting Test Schedule
+
+By default, health checks run every hour (`0 * * * *`). To modify the schedule:
+
+1. Edit the CronJob:
+   ```bash
+   kubectl edit cronjob active-health-checks-nccl-tests-applier -n monitoring
+   ```
+
+2. Update the `schedule` field to your desired cron expression.
+
+### Customizing Test Parameters
+
+Each health check manifest can be customized with different parameters:
+- **NCCL Tests**: Number of nodes, GPU count, NCCL parameters
+- **GPU Fryer**: Stress duration, temperature thresholds
+- **DCGM Diagnostics**: Diagnostic level, specific tests to run
+
+Download and modify the manifests locally before applying them for custom configurations.
+
+## Suspending Health Checks
+
+To temporarily disable health checks (e.g., during maintenance):
+
+```bash
+# Suspend a specific health check
+kubectl patch cronjob active-health-checks-nccl-tests-applier -n monitoring -p '{"spec":{"suspend":true}}'
+
+# Resume the health check
+kubectl patch cronjob active-health-checks-nccl-tests-applier -n monitoring -p '{"spec":{"suspend":false}}'
+```
+
+## Uninstalling
+
+To remove active health checks:
+
+```bash
+kubectl delete -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-nccl-tests.yaml
+kubectl delete -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-gpu-fryer.yaml
+kubectl delete -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/active-health-checks/active-health-checks-dcgm-diag.yaml
+```
+
+> [!NOTE]
+> Node labels applied by health checks will remain after uninstalling. To remove them, manually delete the labels from each node.

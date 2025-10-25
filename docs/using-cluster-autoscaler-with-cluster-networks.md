@@ -1,28 +1,65 @@
-Using Cluster Autoscaler with Cluster Networks
-=========
+# Using Cluster Autoscaler with Cluster Networks
 
-You can configure the Cluster Autoscaler to work with Cluster Networks. The current implementation of the Cluster Autoscaler on OKE doesn't directly support [Cluster Networks](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm), but it supports [Instance Pools](https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/instancemanagement.htm#Instance). Because each Cluster Network has an Instance Pool associated with it, we can use the Instance Pool to configure autoscaling.
+This guide explains how to configure Cluster Autoscaler to automatically scale nodes in an OKE Cluster Network. While Cluster Autoscaler does not directly support [Cluster Networks](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm), it can manage [Instance Pools](https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/instancemanagement.htm#Instance). Since each Cluster Network has an associated Instance Pool, you can configure autoscaling by targeting the Instance Pool.
 
-1. Get the ID of the Instace Pool associated with your Cluster Network.
+## Overview
 
-You can either use the OCI CLI or the web console to get the Instance Pool ID associated with your Cluster Network.
+Cluster Autoscaler automatically adjusts the number of nodes in your cluster based on workload demands. When configured with a Cluster Network's Instance Pool, it provides:
+- Automatic scale-up when pods cannot be scheduled due to insufficient resources
+- Automatic scale-down when nodes are underutilized
+- Cost optimization by running only the required number of nodes
+- Seamless integration with RDMA-enabled GPU workloads
 
-**Using OCI CLI**
+## Prerequisites
 
-```sh
-CLUSTER_NETWORK_ID=<your cluster network ID>
+- OKE cluster with a Cluster Network deployed
+- kubectl configured with cluster-admin access
+- OCI CLI installed (for retrieving Instance Pool ID)
+- Understanding of Instance Principals or OCI API authentication
+- Appropriate IAM policies for Cluster Autoscaler
+
+## Procedure
+
+### Step 1: Get the Instance Pool ID
+
+Retrieve the Instance Pool ID associated with your Cluster Network.
+
+You can retrieve the Instance Pool ID using either the OCI CLI or the OCI Console.
+
+#### Option A: Using OCI CLI
+
+```bash
+CLUSTER_NETWORK_ID=<your-cluster-network-id>
 
 oci compute-management cluster-network get --cluster-network-id $CLUSTER_NETWORK_ID | jq -r '.data["instance-pools"][0].id'
 ```
 
-**Using the web console**
+This command returns the OCID of the Instance Pool associated with your Cluster Network.
 
-Go to Menu > Compute > Cluster Networks > "Your Cluster".
+**Example output:**
 
-Under Instace Pools, click on the name of your Instance Pool. You can find the OCID of your Instance Pool in this page.
+```
+ocid1.instancepool.oc1.phx.aaaaaaaxxxxxx
+```
 
+#### Option B: Using the OCI Console
 
-2. Configure Cluster Autoscaler to use the Instance Pool.
+1. Navigate to **Menu > Compute > Cluster Networks**
+2. Click on your Cluster Network name
+3. Under **Instance Pools**, click on the Instance Pool name
+4. Copy the OCID displayed on the Instance Pool details page
+
+### Step 2: Configure Cluster Autoscaler
+
+Configure Cluster Autoscaler to use the Instance Pool ID from Step 1. In the deployment manifest, update the `--nodes` parameter with your Instance Pool OCID.
+
+The `--nodes` parameter format is: `--nodes=<min>:<max>:<instance-pool-ocid>`
+
+- **min**: Minimum number of nodes (e.g., 0 or 1)
+- **max**: Maximum number of nodes (e.g., 10)
+- **instance-pool-ocid**: The OCID from Step 1
+
+Example configuration snippet:
 
 ```yaml
 ...
@@ -35,7 +72,14 @@ Under Instace Pools, click on the name of your Instance Pool. You can find the O
             - --nodes=1:10:ocid1.instancepool.oc1.phx.aaaaaaaaqdxy35acq32zjfvk55qkwwctxhsprmz633k62q
 ```
 
-Exmaple manifest using [Instance Principals](https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm) for authentication. Make sure you have the correct image tag for your region and Kubernetes version. You can find the available regions/images in step 4b [here.](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengusingclusterautoscaler_topic-Working_with_the_Cluster_Autoscaler.htm#contengusingclusterautoscaler_topic-Working_with_the_Cluster_Autoscaler-step-copy-CA-config-file)
+### Step 3: Deploy Cluster Autoscaler
+
+Deploy Cluster Autoscaler using the complete manifest below. This example uses [Instance Principals](https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/callingservicesfrominstances.htm) for authentication.
+
+> [!IMPORTANT]
+> - Replace `{{ image tag }}` with the correct image tag for your region and Kubernetes version
+> - Replace the Instance Pool OCID in the `--nodes` parameter
+> - Find available images in [Step 4b of the OCI documentation](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengusingclusterautoscaler_topic-Working_with_the_Cluster_Autoscaler.htm#contengusingclusterautoscaler_topic-Working_with_the_Cluster_Autoscaler-step-copy-CA-config-file)
 
 
 ```yaml
@@ -203,3 +247,47 @@ spec:
             - name: OCI_SDK_APPEND_USER_AGENT
               value: "oci-oke-cluster-autoscaler"
 ```
+
+Save the manifest to a file (e.g., `cluster-autoscaler.yaml`) and apply it:
+
+```bash
+kubectl apply -f cluster-autoscaler.yaml
+```
+
+### Step 4: Verify Deployment
+
+Check that Cluster Autoscaler is running:
+
+```bash
+kubectl get deployment cluster-autoscaler -n kube-system
+```
+
+**Example output:**
+
+```
+NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
+cluster-autoscaler   1/1     1            1           2m
+```
+
+View the Cluster Autoscaler logs to confirm it's configured correctly:
+
+```bash
+kubectl logs -n kube-system deployment/cluster-autoscaler --tail=50
+```
+
+## Disabling or Removing Cluster Autoscaler
+
+To temporarily disable Cluster Autoscaler, scale the deployment to zero replicas:
+
+```bash
+kubectl scale deployment cluster-autoscaler -n kube-system --replicas=0
+```
+
+To completely remove Cluster Autoscaler:
+
+```bash
+kubectl delete -f cluster-autoscaler.yaml
+```
+
+> [!WARNING]
+> Removing Cluster Autoscaler will stop automatic scaling. Manual intervention will be required to adjust node count.
