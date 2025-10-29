@@ -556,11 +556,9 @@ variables:
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
     visible: true
-    default: true
   bastion_is_public:
     title: Create the bastion in a public subnet
     type: boolean
-    default: true
     visible: 
       and:
       - create_bastion
@@ -640,17 +638,12 @@ variables:
     description: Provision an OCI Compute instance configured with access to interact with the OKE Kubernetes endpoint.
     type: boolean
     required: false
-    default: true
-    visible: ${create_bastion}
   operator_shape_config:
     title: Configure operator shape
     type: boolean
     default: false
     required: false
-    visible: 
-      and:
-      - create_operator
-      - create_bastion
+    visible: ${create_operator}
   operator_shape_name:
     title: Shape
     type: oci:core:instanceshape:name
@@ -1729,5 +1722,4 @@ outputs:
       type: string
       visible: false
   
-
 

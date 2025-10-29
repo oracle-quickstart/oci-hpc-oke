@@ -1,0 +1,433 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: active-health-checks-rccl-tests-low
+value: -100000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Very low priority for active health check jobs to be preempted by others"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: active-health-checks-runner
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: active-health-checks-runner-role
+rules:
+  - apiGroups: ["kubeflow.org"]
+    resources: ["mpijobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["resourceflavors", "clusterqueues", "localqueues"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: active-health-checks-runner-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: active-health-checks-runner-role
+subjects:
+  - kind: ServiceAccount
+    name: active-health-checks-runner
+    namespace: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: active-health-checks-rccl-tests-bm-gpu-mi300x-8
+  namespace: monitoring
+data:
+  job.yaml: |-
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ResourceFlavor
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-mi300x-8
+    spec:
+      nodeLabels:
+        node.kubernetes.io/instance-type: BM.GPU.MI300X.8
+        amd.com/gpu: "true"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: ClusterQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-mi300x-8-rccl-tests-queue
+    spec:
+      namespaceSelector: {}
+      resourceGroups:
+      - coveredResources: ["cpu", "memory", "amd.com/gpu", "ephemeral-storage"]
+        flavors:
+        - name: bm-gpu-mi300x-8
+          resources:
+          - name: cpu
+            nominalQuota: "5000"
+          - name: memory
+            nominalQuota: "204800Gi"
+          - name: amd.com/gpu
+            nominalQuota: "1600"
+          - name: ephemeral-storage
+            nominalQuota: "12800Gi"
+    ---
+    apiVersion: kueue.x-k8s.io/v1beta1
+    kind: LocalQueue
+    metadata:
+      namespace: monitoring
+      name: bm-gpu-mi300x-8-rccl-tests
+    spec:
+      clusterQueue: bm-gpu-mi300x-8-rccl-tests-queue
+    ---
+    apiVersion: kubeflow.org/v2beta1
+    kind: MPIJob
+    metadata:
+      name: JOB_NAME_PLACEHOLDER
+      namespace: monitoring
+      labels:
+        kueue.x-k8s.io/queue-name: bm-gpu-mi300x-8-rccl-tests
+    spec:
+      slotsPerWorker: 8
+      runPolicy:
+        cleanPodPolicy: Running
+      sshAuthMountPath: /root/.ssh
+      mpiReplicaSpecs:
+        Launcher:
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                rccl-tests-replica: mpi-launcher
+            spec:
+              priorityClassName: active-health-checks-rccl-tests-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              # NODE_AFFINITY_PLACEHOLDER
+              restartPolicy: OnFailure
+              terminationGracePeriodSeconds: 2
+              containers:
+              - name: mpi-launcher
+                image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.0.2-rccl-2.26.6-ubuntu22.04-102025.1
+                imagePullPolicy: Always
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command: ["bash", "-c"]
+                args:
+                - |
+                  set -e -o pipefail
+                  trap 'exit=1' SIGINT
+                  NUM_GPUS=8
+                  HOSTFILE=/etc/mpi/hostfile
+                  until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do
+                    echo "[launcher] Waiting for hostfile ($HOSTFILE) to list expected workers..."
+                    sleep 2
+                  done
+                  
+                  WORKERS=$(sort -u "$HOSTFILE" | awk '{print $1}')
+                  for h in $WORKERS; do
+                    echo "[launcher] Waiting for $h:2222..."
+                    for i in $(seq 1 60); do
+                      if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 "$h" exit >/dev/null 2>&1; then
+                        echo "[launcher] $h:2222 is ready"
+                        break
+                      fi
+                      sleep 2
+                    done
+                  done
+                  
+                  NUM_HOSTS=$(sed -n '$=' "$HOSTFILE")
+                  NP=$(($NUM_HOSTS*$NUM_GPUS))
+                  
+                  mpirun \
+                    -mca coll ^hcoll \
+                    -mca pml ucx \
+                    -mca btl ^openib \
+                    -mca plm_rsh_args '-p 2222' \
+                    --allow-run-as-root \
+                    -np $NP \
+                    -npernode $NUM_GPUS \
+                    --bind-to numa \
+                    -x RX_QUEUE_LEN=8192 \
+                    -x IB_RX_QUEUE_LEN=8192 \
+                    -x UCX_NET_DEVICES=mlx5_0:1 \
+                    -x HCOLL_ENABLE_MCAST_ALL=0 \
+                    -x coll_hcoll_enable=0 \
+                    -x NCCL_CUMEM_ENABLE=0 \
+                    -x NCCL_IB_TIMEOUT=22 \
+                    -x NCCL_IB_SL=0 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_GID_INDEX=3 \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_IB_QPS_PER_CONNECTION=1 \
+                    -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                    -x NCCL_IB_HCA='=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9' \
+                    -x NCCL_PXN_DISABLE=0 \
+                    -x NCCL_NET_PLUGIN=none \
+                    -x LD_LIBRARY_PATH \
+                    /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1 -n 50
+                resources:
+                  limits:
+                    cpu: "4"
+                    memory: 2Gi
+                    ephemeral-storage: 32Gi
+                  requests:
+                    cpu: "2"
+                    memory: 2Gi
+                    ephemeral-storage: 32Gi
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: [IPC_LOCK, SYS_PTRACE]
+                volumeMounts:
+                - { mountPath: /dev/shm, name: shm }
+                workingDir: /workspace
+              volumes:
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+        Worker:
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                rccl-tests-replica: mpi-worker
+            spec:
+              priorityClassName: active-health-checks-rccl-tests-low
+              hostNetwork: true
+              dnsPolicy: ClusterFirstWithHostNet
+              restartPolicy: OnFailure
+              terminationGracePeriodSeconds: 2
+              tolerations:
+              - { key: amd.com/gpu, operator: Exists }
+              containers:
+              - name: mpi-worker
+                image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.0.2-rccl-2.26.6-ubuntu22.04-102025.1
+                imagePullPolicy: Always
+                ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+                command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+                resources:
+                  limits:
+                    cpu: "100"
+                    memory: 1024Gi
+                    amd.com/gpu: 8
+                    ephemeral-storage: 32Gi
+                  requests:
+                    cpu: "100"
+                    memory: 1024Gi
+                    amd.com/gpu: 8
+                    ephemeral-storage: 32Gi
+                securityContext:
+                  privileged: true
+                  capabilities:
+                    add: [IPC_LOCK, SYS_PTRACE]
+                volumeMounts:
+                - { mountPath: /dev/shm, name: shm }
+                workingDir: /workspace
+              volumes:
+              - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: active-health-checks-rccl-tests-applier
+  namespace: monitoring
+spec:
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 0
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: active-health-checks-runner
+          restartPolicy: OnFailure
+          containers:
+          - name: applier
+            image: iad.ocir.io/idxzjcdglx2s/kubectl:latest
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              set -euo pipefail
+              JOB_NAME="active-health-checks-rccl-tests-$(date +%s)"
+              echo "[applier] Creating RCCL Tests MPIJob: $JOB_NAME"
+              
+              # Check which nodes were tested recently and should be excluded
+              current_date=$(date -u +%Y-%m-%d)
+              excluded_nodes=""
+              available_nodes=""
+              idle_candidates=""
+              gpu_nodes=$(kubectl get nodes -l amd.com/gpu=true -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' | tr ' ' '\n' | grep -v '^$')
+              
+              for node in $gpu_nodes; do
+                gpu_usage=$(kubectl get pods -A --field-selector spec.nodeName=$node -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.resources.requests.amd\\.com/gpu}{"\n"}{end}{end}' 2>/dev/null | awk 'NF{sum+=$1+0} END{print sum+0}')
+                if [ "$gpu_usage" -eq 0 ] 2>/dev/null; then
+                  echo "[applier] Node $node is idle (allocated GPU usage = 0)"
+                  idle_candidates="$idle_candidates $node"
+                else
+                  echo "[applier] Node $node currently uses $gpu_usage GPU(s) - skipping"
+                fi
+              done
+              
+              for node in $idle_candidates; do
+                last_run_label=$(kubectl get node "$node" -o jsonpath='{.metadata.labels.oke\.oraclecloud\.com/active-health-checks-rccl-tests-last-run}' 2>/dev/null || echo "")
+                if [ -n "$last_run_label" ]; then
+                  last_run_date=$(echo "$last_run_label" | cut -d'T' -f1)
+                  if [ "$last_run_date" = "$current_date" ]; then
+                    echo "[applier] Excluding node $node from scheduling - tested today"
+                    excluded_nodes="$excluded_nodes $node"
+                  else
+                    echo "[applier] Node $node available for testing - last tested on $last_run_date"
+                    available_nodes="$available_nodes $node"
+                  fi
+                else
+                  echo "[applier] Node $node available for testing - no previous test timestamp found"
+                  available_nodes="$available_nodes $node"
+                fi
+              done
+              
+              # Count available nodes
+              available_count=$(echo "$available_nodes" | tr ' ' '\n' | grep -v '^$' | wc -l)
+              echo "[applier] Found $available_count available nodes for testing"
+              if [ $available_count -eq 0 ]; then
+                echo "[applier] No idle nodes available; skipping job creation"
+                exit 0
+              fi
+              
+              # Check if we have at least 2 available nodes
+              if [ $available_count -lt 2 ]; then
+                echo "[applier] Not enough nodes available for testing (need at least 2, found $available_count)"
+                echo "[applier] Skipping job creation - insufficient untested nodes"
+                exit 0
+              fi
+              
+              # Create node affinity to exclude recently tested nodes
+              # Pick shape config from environment or infer from worker nodes
+              selected_shape=${GPU_SHAPE:-}
+              if [ -z "$selected_shape" ]; then
+                candidate_node=$(echo "$available_nodes" | tr ' ' '\n' | grep -v '^$' | head -n1)
+                if [ -z "$candidate_node" ]; then
+                  candidate_node=$(echo "$idle_candidates" | tr ' ' '\n' | grep -v '^$' | head -n1)
+                fi
+                if [ -n "$candidate_node" ]; then
+                  selected_shape=$(kubectl get node "$candidate_node" -o jsonpath='{.metadata.labels.node\.kubernetes\.io/instance-type}' 2>/dev/null || echo "")
+                fi
+              fi
+              selected_shape=${selected_shape:-BM.GPU.MI300X.8}
+              manifest_file=$(echo "$selected_shape" | tr '[:upper:]' '[:lower:]' | tr '.' '-')
+              manifest_path="/manifests/${manifest_file}.yaml"
+              echo "[applier] Using manifest $manifest_path for shape $selected_shape"
+              if [ ! -f "$manifest_path" ]; then
+                echo "[applier] Manifest for shape $selected_shape not found (expected $manifest_path)"
+                exit 1
+              fi
+              
+              if [ -n "$excluded_nodes" ]; then
+                echo "[applier] Creating node affinity to exclude recently tested nodes: $excluded_nodes"
+                node_values=$(echo "$excluded_nodes" | tr ' ' '\n' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//')
+                affinity_block="              affinity:\n                nodeAffinity:\n                  requiredDuringSchedulingIgnoredDuringExecution:\n                    nodeSelectorTerms:\n                    - matchExpressions:\n                      - key: kubernetes.io/hostname\n                        operator: NotIn\n                        values: [$node_values]"
+                sed "s/JOB_NAME_PLACEHOLDER/${JOB_NAME}/g" "$manifest_path" | \
+                sed "s|              # NODE_AFFINITY_PLACEHOLDER|$affinity_block|" | \
+                kubectl apply -f -
+              else
+                echo "[applier] No nodes to exclude - applying job without node affinity"
+                sed "s/JOB_NAME_PLACEHOLDER/${JOB_NAME}/g" "$manifest_path" | \
+                sed "/# NODE_AFFINITY_PLACEHOLDER/d" | \
+                kubectl apply -f -
+              fi
+              
+              echo "[applier] Waiting for MPIJob $JOB_NAME to complete..."
+              # Capture worker nodes early while pods are still running
+              worker_nodes=""
+              for i in $(seq 1 30); do
+                worker_nodes=$(kubectl get pods -n monitoring -l kubeflow.org/job-name="$JOB_NAME",mpi-job-role=worker -o jsonpath='{.items[*].spec.nodeName}' | tr ' ' '\n' | sort -u)
+                [ -n "$worker_nodes" ] && echo "[applier] Found worker nodes: $worker_nodes" && break
+                sleep 2
+              done
+              
+              result="fail"
+              for i in $(seq 1 720); do # up to ~2h
+                phase=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Running")].status}' 2>/dev/null || true)
+                [ -n "$phase" ] && echo "[applier] Running condition status: $phase"
+                
+                # Check if launcher pod completed successfully (this indicates the RCCL test finished)
+                launcher_pod=$(kubectl get pods -n monitoring -l kubeflow.org/job-name="$JOB_NAME",mpi-job-role=launcher -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                if [ -n "$launcher_pod" ]; then
+                  launcher_status=$(kubectl get pod "$launcher_pod" -n monitoring -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+                  if [ "$launcher_status" = "Succeeded" ]; then
+                    echo "[applier] Launcher pod completed successfully - RCCL test finished"
+                    result=pass; break
+                  elif [ "$launcher_status" = "Failed" ]; then
+                    echo "[applier] Launcher pod failed - RCCL test failed"
+                    result=fail; break
+                  fi
+                fi
+                
+                # Also check overall MPIJob completion
+                mpijob_completion=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.completionTime}' 2>/dev/null || true)
+                if [ -n "$mpijob_completion" ]; then
+                  job_condition=$(kubectl get mpijob.kubeflow.org -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null || echo "False")
+                  if [ "$job_condition" = "True" ]; then
+                    result=pass
+                  else
+                    result=fail
+                  fi
+                  break
+                fi
+                sleep 10
+              done
+              
+              result=${result:-fail}
+              echo "[applier] Result for $JOB_NAME: $result"
+              echo "[applier] Worker nodes captured: '$worker_nodes'"
+              
+              # If worker_nodes is empty, try to get them from the available nodes list
+              if [ -z "$worker_nodes" ]; then
+                echo "[applier] Warning: worker_nodes is empty, using available nodes for labeling"
+                worker_nodes=$(echo "$available_nodes" | tr ' ' '\n' | awk '{print $1}')
+              fi
+              
+              timestamp=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+              for n in $worker_nodes; do
+                echo "[applier] Labeling node $n with oke.oraclecloud.com/active-health-checks-rccl-tests=$result"
+                kubectl label node "$n" "oke.oraclecloud.com/active-health-checks-rccl-tests=$result" --overwrite
+                echo "[applier] Labeling node $n with oke.oraclecloud.com/active-health-checks-rccl-tests-last-run=$timestamp"
+                kubectl label node "$n" "oke.oraclecloud.com/active-health-checks-rccl-tests-last-run=$timestamp" --overwrite
+              done
+              
+              if [ "$result" = "fail" ]; then
+                echo "[applier] MPIJob failed but nodes have been labeled"
+                exit 0
+              fi
+              
+              echo "[applier] RCCL tests completed successfully"
+            volumeMounts:
+            - name: manifest
+              mountPath: /manifests
+              readOnly: true
+          volumes:
+          - name: manifest
+            projected:
+              sources:
+              - configMap:
+                  name: active-health-checks-rccl-tests-bm-gpu-mi300x-8
+                  items:
+                  - key: job.yaml
+                    path: bm-gpu-mi300x-8.yaml
+

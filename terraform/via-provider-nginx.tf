@@ -17,7 +17,7 @@ resource "helm_release" "nginx" {
     templatefile(
       "${path.root}/files/nginx-ingress/values.yaml.tpl",
       {
-        min_bw    = 100,
+        min_bw    = 10,
         max_bw    = 100,
         lb_nsg_id = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
         state_id  = local.state_id
@@ -56,4 +56,3 @@ resource "time_sleep" "wait_for_nginx_lb" {
 
   create_duration = "60s"
 }
-

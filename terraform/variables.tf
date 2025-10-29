@@ -266,7 +266,7 @@ variable "avoid_waiting_for_delete_target" {
 
 # OKE Cluster Setup
 variable "cluster_name" { default = "oke-gpu-quickstart" }
-variable "kubernetes_version" { default = "v1.33.1" }
+variable "kubernetes_version" { default = "v1.34.1" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
 variable "cni_type" {
   default = "npn"
@@ -371,4 +371,3 @@ variable "deploy_to_oke_from_orm" {
   default     = false
   description = "Should be set to true when deploying the stack from Oracle Resource Manager."
 }
-
