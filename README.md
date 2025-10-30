@@ -140,7 +140,7 @@ Apply the policy:
 kubectl apply -f nic-cluster-policy.yaml
 ```
 
-### 7. Enable SR-IOV Optimizations (Recommended)
+### 7. Enable additinonal configuration for SRIOV Network Operator (Recommended)
 
 Enable parallel NIC configuration for faster deployment:
 
