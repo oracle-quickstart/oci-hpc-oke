@@ -116,6 +116,8 @@ variableGroups:
       - worker_ops_memory
       - worker_ops_boot_volume_size
       - worker_ops_image_type
+      - worker_ops_image_use_uri
+      - worker_ops_image_custom_uri
       - worker_ops_image_compartment
       - worker_ops_image_custom_id
       
@@ -132,6 +134,8 @@ variableGroups:
       - worker_cpu_image_os
       - worker_cpu_image_os_version
       - worker_cpu_image_platform_id
+      - worker_cpu_image_use_uri
+      - worker_cpu_image_custom_uri
       - worker_cpu_image_compartment
       - worker_cpu_image_custom_id
       
@@ -146,6 +150,8 @@ variableGroups:
       - worker_gpu_image_os
       - worker_gpu_image_os_version
       - worker_gpu_image_platform_id
+      - worker_gpu_image_use_uri
+      - worker_gpu_image_custom_uri
       - worker_gpu_image_compartment
       - worker_gpu_image_custom_id
 
@@ -161,6 +167,8 @@ variableGroups:
       - worker_rdma_image_os_version
       - worker_rdma_image_type
       - worker_rdma_image_platform_id
+      - worker_rdma_image_use_uri
+      - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
   
@@ -1100,6 +1108,16 @@ variables:
     enum: [Custom]
     required: true
     visible: false
+  worker_ops_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+  worker_ops_image_custom_uri:
+    title: Image URI
+    type: string
+    visible:
+      and:
+        - eq: [worker_ops_image_type, Custom]
+        - ${worker_ops_image_use_uri}
   worker_ops_image_compartment:
     title: "Operational worker pool image compartment"
     type: oci:identity:compartment:id
@@ -1108,6 +1126,7 @@ variables:
     visible:
       and:
         - eq: [worker_ops_image_type, Custom]
+        - not: [worker_ops_image_use_uri]
   worker_ops_image_custom_id:
     title: Image
     type: oci:core:image:id
@@ -1117,6 +1136,7 @@ variables:
     visible:
       and:
         - eq: [worker_ops_image_type, Custom]
+        - not: [worker_ops_image_use_uri]
 
   # Workers - CPU pool
   worker_cpu_enabled:
@@ -1193,6 +1213,18 @@ variables:
     enum: [Custom]
     required: true
     visible: false
+  worker_cpu_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    visible: ${worker_cpu_enabled}
+  worker_cpu_image_custom_uri:
+    title: Image URI
+    type: string
+    visible:
+      and:
+        - eq: [worker_cpu_image_type, Custom]
+        - ${worker_cpu_enabled}
+        - ${worker_cpu_image_use_uri}
   worker_cpu_image_compartment:
     title: "CPU worker pool image compartment"
     type: oci:identity:compartment:id
@@ -1202,6 +1234,7 @@ variables:
       and:
         - eq: [worker_cpu_image_type, Custom]
         - ${worker_cpu_enabled}
+        - not: [worker_cpu_image_use_uri]
   worker_cpu_image_custom_id:
     title: Image
     type: oci:core:image:id
@@ -1212,6 +1245,7 @@ variables:
       and:
         - eq: [worker_cpu_image_type, Custom]
         - ${worker_cpu_enabled}
+        - not: [worker_cpu_image_use_uri]
   worker_cpu_image_os:
     title: Operating system
     type: enum
@@ -1286,6 +1320,18 @@ variables:
     enum: [Custom]
     required: true
     visible: false
+  worker_gpu_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    visible: ${worker_gpu_enabled}
+  worker_gpu_image_custom_uri:
+    title: Image URI
+    type: string
+    visible:
+      and:
+        - eq: [worker_gpu_image_type, Custom]
+        - ${worker_gpu_enabled}
+        - ${worker_gpu_image_use_uri}
   worker_gpu_image_compartment:
     title: "GPU worker pool image compartment"
     type: oci:identity:compartment:id
@@ -1295,6 +1341,7 @@ variables:
       and:
         - eq: [worker_gpu_image_type, Custom]
         - ${worker_gpu_enabled}
+        - not: [worker_gpu_image_use_uri]
   worker_gpu_image_custom_id:
     title: Image
     type: oci:core:image:id
@@ -1305,6 +1352,7 @@ variables:
       and:
         - eq: [worker_gpu_image_type, Custom]
         - ${worker_gpu_enabled}
+        - not: [worker_gpu_image_use_uri]
   worker_gpu_image_os:
     title: Operating system
     type: enum
@@ -1422,6 +1470,18 @@ variables:
       and:
         - ${worker_rdma_enabled}
         - eq: [worker_rdma_image_type, Platform]
+  worker_rdma_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    visible: ${worker_rdma_enabled}
+  worker_rdma_image_custom_uri:
+    title: Image URI
+    type: string
+    visible:
+      and:
+        - eq: [worker_rdma_image_type, Custom]
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_image_use_uri}
   worker_rdma_image_compartment:
     title: "GPU + RDMA worker pool image compartment"
     type: oci:identity:compartment:id
@@ -1431,6 +1491,7 @@ variables:
       and:
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
+        - not: [worker_rdma_image_use_uri]
   worker_rdma_image_custom_id:
     title: Image
     description: Only Ubuntu custom images are supported with GPU & RDMA worker pools. Oracle Linux images are not supported.
@@ -1442,6 +1503,7 @@ variables:
       and:
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
+        - not: [worker_rdma_image_use_uri]
 
   # SSH access to the nodes
   ssh_public_key:
