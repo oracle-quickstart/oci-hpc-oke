@@ -368,7 +368,7 @@ spec:
         k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
 ```
 
-## Testing with NCCL (Optional)
+## Running the NCCL tests (Optional)
 
 ### 13. Deploy Kueue & MPI Operator
 
@@ -385,7 +385,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
   --namespace=kueue-system
 ```
 
-### 14. Run NCCL Performance Test
+### 14. Run NCCL tests
 
 The NCCL test validates RDMA performance between GPU nodes. Deploy the test with the following manifest:
 
@@ -526,7 +526,7 @@ Apply the manifest:
 kubectl apply -f nccl-tests.yaml
 ```
 
-### 15. Monitor NCCL Test Results
+### 15. Monitor NCCL tests Results
 
 Wait for the container image to pull (this may take several minutes on first run). Once the launcher pod starts, check the logs:
 
@@ -558,76 +558,3 @@ Expected output excerpt:
 # Avg bus bandwidth    : 66.4834
 #
 ```
-
-> [!TIP]
-> The "Avg bus bandwidth" metric indicates the overall RDMA performance. Higher values indicate better network throughput.
-
-## Troubleshooting
-
-### Common Issues
-
-**Workload Not Starting**
-- Verify the ClusterQueue includes `nvidia.com/sriov-rdma-vf` in `coveredResources`
-- Check VF quota is sufficient: `kubectl describe clusterqueue`
-- Review workload conditions: `kubectl describe workload <workload-name>`
-
-**Nodes Not Rebooting**
-- Check SR-IOV operator logs: `kubectl logs -n nvidia-network-operator -l app=sriov-network-operator`
-- Verify node selector matches your nodes: `kubectl get nodes --show-labels | grep instance-type`
-- Check SR-IOV network node states: `kubectl get sriovnetworknodestates -n nvidia-network-operator`
-
-**VFs Not Appearing**
-- Ensure nodes have completed reboot and are in `Ready` state
-- Check SR-IOV device plugin pods: `kubectl get pods -n nvidia-network-operator | grep device-plugin`
-- Verify node capacity: `kubectl get node <node-name> -o json | jq '.status.capacity'`
-- Check SR-IOV policy is applied: `kubectl get sriovnetworknodepolicy -n nvidia-network-operator`
-
-### Useful Commands
-
-```bash
-# Check Kueue workload status
-kubectl get workload -A
-
-# Describe workload for detailed status
-kubectl describe workload <workload-name> -n <namespace>
-
-# Check SR-IOV network node states
-kubectl get sriovnetworknodestates -n nvidia-network-operator
-
-# View all SR-IOV policies
-kubectl get sriovnetworknodepolicy -n nvidia-network-operator
-
-# Check GPU and VF capacity on nodes
-kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, gpus: .status.capacity."nvidia.com/gpu", vfs: .status.capacity."nvidia.com/sriov-rdma-vf"}'
-
-# View MPI Operator logs
-kubectl logs -n mpi-operator -l app=mpi-operator
-
-# Check Network Operator status
-kubectl get pods -n nvidia-network-operator
-```
-
-## Additional Resources
-
-- [NVIDIA GPU Operator Documentation](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
-- [NVIDIA Network Operator Documentation](https://docs.nvidia.com/networking/software/cloud-orchestration/index.html)
-- [Kueue Documentation](https://kueue.sigs.k8s.io/)
-- [MPI Operator Documentation](https://github.com/kubeflow/mpi-operator)
-- [SR-IOV Network Device Plugin](https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin)
-- [NCCL Tests Repository](https://github.com/NVIDIA/nccl-tests)
-
-## Shape-Specific SR-IOV Policies
-
-Pre-configured SR-IOV policies for common Oracle GPU shapes are available in the [`manifests/sriov-network-node-policy/`](manifests/sriov-network-node-policy/) directory:
-
-- [`bm-gpu-b200-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-b200-8.yaml) - BM.GPU.B200.8
-- [`bm-gpu-gb200-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-gb200-4.yaml) - BM.GPU.GB200.4
-- [`bm-gpu-gm4-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-gm4-8.yaml) - BM.GPU.GM4.8
-- [`bm-gpu-h100t-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-h100t-8.yaml) - BM.GPU.H100T.8
-- [`bm-gpu-l40s-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-l40s-4.yaml) - BM.GPU.L40S.4
-- [`bm-gpu-l40s-nc-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-l40s-nc-4.yaml) - BM.GPU.L40S-NC.4
-- [`bm-gpu-mi300x-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-mi300x-8.yaml) - BM.GPU.MI300X.8
-
-## License
-
-This guide is provided as-is for experimental purposes. Always consult Oracle Cloud Infrastructure documentation for officially supported configurations.
