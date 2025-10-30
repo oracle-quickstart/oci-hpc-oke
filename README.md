@@ -31,9 +31,6 @@ echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 **GPU Nodes (NVIDIA Shapes)**
 - [Ubuntu 22.04 with GPU Driver 570, CUDA 12.8, OFED 24.10 (2025.03.26)](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_DA3uxLCkOCLniSkfce_xyS1AOyBsqxHyWpLHkjb3lNshklPur2VuX3jLkLPcbPZ/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0-VF)
 
-> [!NOTE]
-> For non-GPU worker pools, you can use the default OKE images without modifications.
-
 ## Deployment Steps
 
 ### 1. Verify Cluster Nodes
