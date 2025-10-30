@@ -3,7 +3,7 @@
 
 # Terraform
 output "state_id" { value = module.oke.state_id }
-output "stack_version" { value = "v25.9.0" }
+output "stack_version" { value = "v25.10.0" }
 
 # Network
 output "vcn_id" { value = module.oke.vcn_id }
@@ -64,7 +64,7 @@ output "grafana_fetch_endpoint_command" {
 output "grafana_url" {
   value = var.install_node_problem_detector_kube_prometheus_stack ? (
     var.preferred_kubernetes_services == "public" ?
-    format("https://grafana.%s.sslip.io", try(data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A"))) :
+    format("https://grafana.%s.%s", try(data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain):
     format("http://%s", try(data.kubernetes_service.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
   ) : "N/A"
 }

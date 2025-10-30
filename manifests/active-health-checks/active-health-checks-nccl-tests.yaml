@@ -2,8 +2,8 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: active-health-checks-low
-value: -1000
+  name: active-health-checks-nccl-tests-low
+value: -100000
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Very low priority for active health check jobs to be preempted by others"
@@ -111,7 +111,7 @@ data:
               labels:
                 nccl-test-replica: mpi-launcher
             spec:
-              priorityClassName: active-health-checks-low
+              priorityClassName: active-health-checks-nccl-tests-low
               hostNetwork: true
               dnsPolicy: ClusterFirstWithHostNet
               # NODE_AFFINITY_PLACEHOLDER
@@ -184,7 +184,7 @@ data:
               labels:
                 nccl-test-replica: mpi-worker
             spec:
-              priorityClassName: active-health-checks-low
+              priorityClassName: active-health-checks-nccl-tests-low
               hostNetwork: true
               dnsPolicy: ClusterFirstWithHostNet
               containers:
@@ -286,7 +286,7 @@ data:
               labels:
                 nccl-test-replica: mpi-launcher
             spec:
-              priorityClassName: active-health-checks-low
+              priorityClassName: active-health-checks-nccl-tests-low
               hostNetwork: true
               dnsPolicy: ClusterFirstWithHostNet
               # NODE_AFFINITY_PLACEHOLDER
@@ -355,7 +355,7 @@ data:
               labels:
                 nccl-test-replica: mpi-worker
             spec:
-              priorityClassName: active-health-checks-low
+              priorityClassName: active-health-checks-nccl-tests-low
               hostNetwork: true
               dnsPolicy: ClusterFirstWithHostNet
               containers:

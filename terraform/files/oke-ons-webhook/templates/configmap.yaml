@@ -124,9 +124,13 @@ data:
         if response.status_code == 200:
             short_url = response.json().get("url") 
             parsed_short_url = urlparse(short_url)
-            if "sslip.io" in short_url:
+            netloc = parsed_url.netloc.split(":")[0]
+            ip_only = False
+            match = re.match(r"^(\d{1,3}\.?){4}$", netloc)
+            if match:
+                ip_only = True
+            if not ip_only:
                 scheme = "https"
-                netloc = parsed_url.netloc.split(":")[0]
                 return parsed_short_url.geturl().replace(f'{parsed_short_url.scheme}://{parsed_url.netloc}/', f"{scheme}://{netloc}/")
             return short_url
         else:

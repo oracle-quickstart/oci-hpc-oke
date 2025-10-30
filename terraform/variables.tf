@@ -230,17 +230,17 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "77.5.0"
+  default = "79.0.0"
   type    = string
 }
 
 variable "dcgm_exporter_chart_version" {
-  default = "4.5.2"
+  default = "4.6.0"
   type    = string
 }
 
 variable "amd_device_metrics_exporter_chart_version" {
-  default = "v1.3.1"
+  default = "v1.4.0"
   type    = string
 }
 
@@ -260,13 +260,28 @@ variable "setup_alerting" {
 }
 
 variable "avoid_waiting_for_delete_target" {
+  default = false
+  type    = bool
+}
+
+variable "use_lets_encrypt_prod_endpoint" {
   default = true
+  type    = bool
+}
+
+variable "wildcard_dns_domain" {
+  default = "endpoint.oci-hpc.ai"
+  type    = string
+}
+
+variable "monitoring_advanced_options" {
+  default = false
   type    = bool
 }
 
 # OKE Cluster Setup
 variable "cluster_name" { default = "oke-gpu-quickstart" }
-variable "kubernetes_version" { default = "v1.33.1" }
+variable "kubernetes_version" { default = "v1.34.1" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
 variable "cni_type" {
   default = "npn"
@@ -371,4 +386,3 @@ variable "deploy_to_oke_from_orm" {
   default     = false
   description = "Should be set to true when deploying the stack from Oracle Resource Manager."
 }
-

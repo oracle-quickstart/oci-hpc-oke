@@ -58,7 +58,7 @@ locals {
         { id = var.bastion_sn_id } : {}
       )
       operator = var.create_operator ? merge(
-        var.create_bastion && var.create_operator ? { create = "auto" } : { create = "never" },
+        var.create_operator ? { create = "auto" } : { create = "never" },
         (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && var.operator_sn_id == null) ?
         { newbits = 13, netnum = 2 } : {},
         var.create_vcn && var.operator_sn_cidr != null ?
@@ -150,10 +150,9 @@ locals {
 }
 
 module "oke" {
-  # source = "/home/andrei/github/terraform-oci-oke"
-  # source = "git::https://github.com/oracle-terraform-modules/terraform-oci-oke.git"
-  # version                           = "5.3.1"
-  source    = "github.com/oracle-terraform-modules/terraform-oci-oke.git?ref=2ffe4e019b012858001bb9a209ef59d47a1a88c3"
+  source  = "oracle-terraform-modules/oke/oci"
+  version = "5.3.3"
+  
   providers = { oci.home = oci.home }
 
   region         = var.region
@@ -196,6 +195,10 @@ module "oke" {
             value = "true"
           }
         ]
+      }
+      "KubernetesMetricsServer" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
       }
     },
     var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?

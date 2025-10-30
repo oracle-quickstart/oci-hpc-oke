@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 13,
+  "id": 26,
   "links": [],
   "panels": [
     {
@@ -92,7 +92,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"RdmaRttccHasIssues\",type=\"RdmaRttcc\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"RdmaRttccHasIssues\", type=\"RdmaRttcc\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -171,7 +171,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": " min by(hostname, worker_pool_name) (problem_gauge{reason=\"OcaVersionHasIssues\",type=\"OcaVersion\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"OcaVersionHasIssues\", type=\"OcaVersion\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -250,7 +250,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": " min by(hostname, worker_pool_name) (problem_gauge{reason=\"RdmaLinkHasIssues\",type=\"RdmaLink\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"RdmaLinkHasIssues\", type=\"RdmaLink\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -329,7 +329,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"GpuBusHasIssues\",type=\"GpuBus\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"GpuBusHasIssues\", type=\"GpuBus\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -408,7 +408,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"RdmaLinkFlappingHasIssues\",type=\"RdmaLinkFlapping\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"RdmaLinkFlappingHasIssues\", type=\"RdmaLinkFlapping\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -487,7 +487,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"GpuEccHasIssues\",type=\"GpuEcc\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"GpuEccHasIssues\", type=\"GpuEcc\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -566,7 +566,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"GpuRowRemapHasIssues\",type=\"GpuRowRemap\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"GpuRowRemapHasIssues\", type=\"GpuRowRemap\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -645,7 +645,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname, worker_pool_name) (increase(DCGM_EXP_XID_ERRORS_COUNT[5m]) == bool 0)",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_EXP_XID_ERRORS_COUNT[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -724,7 +724,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_gpu_power_violation_ok{hostname=~\"$hostname\"}",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -803,7 +803,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_gpu_board_limit_violation_ok{hostname=~\"$hostname\"}",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -882,7 +882,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_gpu_thermal_violation_ok{hostname=~\"$hostname\"}",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -961,7 +961,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_gpu_sync_boost_violation_ok{hostname=~\"$hostname\"}",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1040,7 +1040,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_gpu_reliability_violation_ok{hostname=~\"$hostname\"}",
+          "expr": "min by (hostname, worker_pool_name) (\n  (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)\n  and on(hostname, worker_pool_name)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1119,7 +1119,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"PcieCorrectable\",type=\"NodeHasPcieErrors\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1198,7 +1198,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"PcieNonFatal\",type=\"NodeHasPcieErrors\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1277,7 +1277,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"PcieFatal\",type=\"NodeHasPcieErrors\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1356,7 +1356,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname, worker_pool_name) (problem_gauge{reason=\"GpuPcieHasIssues\",type=\"GpuPcie\"} == bool 0)",
+          "expr": "min by(hostname, worker_pool_name) (\n  problem_gauge{reason=\"GpuPcieHasIssues\", type=\"GpuPcie\"} == bool 0\n  and on(hostname, worker_pool_name) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1435,7 +1435,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_disk_free_ok{hostname=~\"$hostname\"}",
+          "expr": "(avg by (hostname, worker_pool_name)\n  (node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\"})\n  >= bool 50 * 1024 * 1024 * 1024)\nand on(hostname, worker_pool_name)\nup{job=\"gpu-rdma-node-problem-detector\"} == 1\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1514,7 +1514,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_memory_availability_ok{hostname=~\"$hostname\", worker_pool_name=~\"oke-gpu|oke-rdma\"}",
+          "expr": "(\n  avg by (hostname, worker_pool_name) (\n    node_memory_MemAvailable_bytes{worker_pool_name=~\"oke-gpu|oke-rdma\"}\n  )\n  >= bool 50 * 1024 * 1024 * 1024\n)\nand on(hostname, worker_pool_name)\nup{job=\"gpu-rdma-node-problem-detector\", worker_pool_name=~\"oke-gpu|oke-rdma\"} == 1\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1735,6 +1735,7 @@
         "type": "datasource"
       },
       {
+        "allowCustomValue": false,
         "current": {
           "text": "All",
           "value": [
@@ -1745,18 +1746,25 @@
           "type": "prometheus",
           "uid": "${PROMETHEUS_DS}"
         },
+        "definition": "label_values(up,hostname)",
         "includeAll": true,
         "label": "Node",
         "multi": true,
         "name": "hostname",
         "options": [],
-        "query": "label_values(up, hostname)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(up,hostname)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 1,
         "type": "query"
       },
       {
         "current": {
-          "text": "All",
+          "text": [
+            "All"
+          ],
           "value": [
             "$__all"
           ]
@@ -1786,5 +1794,5 @@
   "timezone": "browser",
   "title": "GPU Health Status",
   "uid": "gpu-health",
-  "version": 13
+  "version": 7
 }
