@@ -36,11 +36,11 @@ resource "helm_release" "prometheus" {
     },
     {
       name  = "grafana.ingress.hosts[0]",
-      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.sslip.io"
+      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].hosts[0]",
-      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.sslip.io"
+      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].secretName",

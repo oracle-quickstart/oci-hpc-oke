@@ -46,6 +46,7 @@ spec:
       runtimeClassName: {{ .Values.runtimeClassName }}
       {{- end }}
       priorityClassName: {{ .Values.priorityClassName | default "system-node-critical" }}
+      hostPID: {{ .Values.hostPID | default false }}
       {{- if .Values.hostNetwork }}
       hostNetwork: {{ .Values.hostNetwork }}
       dnsPolicy: ClusterFirstWithHostNet
@@ -137,6 +138,10 @@ spec:
         {{- if .Values.kubernetes.enablePodUID }}
         - name: "DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID"
           value: "true"
+        {{- end }}
+        {{- if .Values.kubernetes.podLabelAllowlistRegex }}
+        - name: "DCGM_EXPORTER_KUBERNETES_POD_LABEL_ALLOWLIST_REGEX"
+          value: {{ .Values.kubernetes.podLabelAllowlistRegex | join "," | quote }}
         {{- end }}
         - name: "DCGM_EXPORTER_LISTEN"
           value: "{{ .Values.service.address }}"

@@ -152,7 +152,6 @@ locals {
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
   version = "5.3.3"
-  # source    = "github.com/oracle-terraform-modules/terraform-oci-oke.git?ref=ca3e66f"
   
   providers = { oci.home = oci.home }
 

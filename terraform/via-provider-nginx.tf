@@ -46,7 +46,10 @@ resource "kubectl_manifest" "cluster_issuer" {
     helm_release.nginx
   ]
 
-  yaml_body = file("${path.root}/files/cert-manager/cluster-issuer.yaml")
+  yaml_body = (var.use_lets_encrypt_prod_endpoint ?
+    file("${path.root}/files/cert-manager/cluster-issuer-prod.yaml") :
+    file("${path.root}/files/cert-manager/cluster-issuer-staging.yaml")
+  )
 }
 
 resource "time_sleep" "wait_for_nginx_lb" {

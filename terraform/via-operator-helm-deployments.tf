@@ -1,3 +1,4 @@
+
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
@@ -22,7 +23,10 @@ module "nginx" {
   ]
   post_deployment_commands = flatten([
     "cat <<'EOF' | kubectl apply -f -",
-    split("\n", file("${path.root}/files/cert-manager/cluster-issuer.yaml")),
+    ( var.use_lets_encrypt_prod_endpoint == true ? 
+      split("\n", file("${path.root}/files/cert-manager/cluster-issuer-prod.yaml")) :
+      split("\n", file("${path.root}/files/cert-manager/cluster-issuer-staging.yaml"))
+    ),
     "EOF",
     "sleep 60" #wait for the LB to be provisioned
   ])
@@ -76,8 +80,8 @@ module "kube_prometheus_stack" {
       "--set grafana.ingress.enabled=true",
       "--set grafana.ingress.ingressClassName=nginx",
       "--set grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
-      "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.sslip.io",
-      "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.sslip.io",
+      "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
+      "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"
     ] :
     [
