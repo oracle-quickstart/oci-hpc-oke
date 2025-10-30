@@ -1,133 +1,206 @@
-# Running RDMA (remote direct memory access) GPU workloads on OKE using GPU Operator and Network Operator
+# Running RDMA GPU Workloads on OKE with NVIDIA GPU Operator and Network Operator
 
-> [!IMPORTANT]  
-> Using virtual functions for RDMA is currently not a supported configuration on OKE.
+> [!IMPORTANT]
+> Using Virtual Functions (VFs) for RDMA is currently not a supported configuration on OKE. This guide is provided for experimental and testing purposes only.
 
-## Instructions for deploying an OKE cluster with GPUs and RDMA connectivity
+## Overview
 
-You will need a CPU and a GPU pool. The Terraform template deploys an operational/system worker pool (CPU) and a GPU worker pool.
+This guide provides step-by-step instructions for deploying an Oracle Kubernetes Engine (OKE) cluster with GPU nodes and RDMA (Remote Direct Memory Access) connectivity. The setup enables high-performance GPU workloads with low-latency RDMA networking using SR-IOV Virtual Functions.
 
-The GPU pool requires you to use an image provided by the Oracle HPC team, you can find the import link below. This image included the OFED drivers and necessary packages configured for RDMA.
+## Prerequisites
 
-For the non-GPU worker pools, you can use the default OKE images (no need to specify them in the Terraform template).
+- An OKE cluster with both CPU and GPU node pools
+- `kubectl` configured to access your cluster
+- Cluster admin permissions
 
-#### Images to use
-It's important to have the below settings in your image. The GPU image listed below has those already, so you can use it without needing any changes.
+## Node Images
 
-- Set RDMA subsystem namespace awareness mode to `exclusive` via `ib_core` module parameter:
-```
+### GPU Node Requirements
+
+GPU nodes require a specialized image with pre-configured OFED drivers and RDMA packages. The image must have RDMA subsystem namespace awareness mode set to `exclusive`:
+
+```bash
 echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 ```
 
-**Image to use for non-GPU nodes**
+### Available Images
 
-- [Link to import the image](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
+**CPU Nodes (Non-GPU)**
+- [Canonical Ubuntu 22.04 - OKE Optimized (2025.03.28)](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
 
-**Images for NVIDIA shapes**
+**GPU Nodes (NVIDIA Shapes)**
+- [Ubuntu 22.04 with GPU Driver 570, CUDA 12.8, OFED 24.10 (2025.03.26)](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_DA3uxLCkOCLniSkfce_xyS1AOyBsqxHyWpLHkjb3lNshklPur2VuX3jLkLPcbPZ/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0-VF)
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_DA3uxLCkOCLniSkfce_xyS1AOyBsqxHyWpLHkjb3lNshklPur2VuX3jLkLPcbPZ/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0-VF)
+> [!NOTE]
+> For non-GPU worker pools, you can use the default OKE images without modifications.
 
-### Wait until you see all nodes in the cluster
+## Deployment Steps
 
-```sh
+### 1. Verify Cluster Nodes
+
+Wait for all nodes to be in `Ready` state:
+
+```bash
 kubectl get nodes
+```
 
+Example output:
+```
 NAME            STATUS   ROLES    AGE     VERSION
 10.140.48.77    Ready    node     4h32m   v1.32.1
 10.140.49.170   Ready    <none>   4h22m   v1.32.1
 10.140.51.249   Ready    node     4h33m   v1.32.1
-10.140.57.93    Ready    <none>   4h22m   v1.32.1
-10.140.58.183   Ready    node     4h32m   v1.32.1
 ```
 
-### Get the latest Helm 3 version
-```sh
+### 2. Install Helm 3
+
+```bash
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 get_helm.sh
 ./get_helm.sh
 ```
 
-### Add Helm repos for Network Operator and GPU Operator
-```sh
+### 3. Add NVIDIA Helm Repository
+
+```bash
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
 ```
 
-### Deploy GPU Operator
-```
+### 4. Deploy NVIDIA GPU Operator
+
+Install the GPU Operator with RDMA support enabled:
+
+```bash
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v25.3.0 \
+  --version v25.10.0 \
   --set driver.enabled=false \
   --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true \
-  --set dcgmExporter.version=4.2.3-4.1.1-ubuntu22.04
+  --set driver.rdma.useHostMofed=true
 ```
 
-Wait until all network operator pods are running with `kubectl get pods -n gpu-operator`.
+Verify all GPU Operator pods are running:
 
-### Deploy Network Operator
-
+```bash
+kubectl get pods -n gpu-operator
 ```
+
+### 5. Deploy NVIDIA Network Operator
+
+Install the Network Operator with SR-IOV support:
+
+```bash
 helm install network-operator nvidia/network-operator \
-   -n nvidia-network-operator \
-   --create-namespace \
-   --version v25.1.0 \
-   --set nfd.enabled=false \
-   --set sriovNetworkOperator.enabled=true
+  -n nvidia-network-operator \
+  --create-namespace \
+  --version v25.7.0 \
+  --set nfd.enabled=false \
+  --set sriovNetworkOperator.enabled=true
 ```
 
-Wait until all network operator pods are running with `kubectl get pods -n nvidia-network-operator`.
+Verify all Network Operator pods are running:
 
-### Create a NIC Cluster Policy
+```bash
+kubectl get pods -n nvidia-network-operator
+```
+
+### 6. Configure NIC Cluster Policy
+
+Create the NIC Cluster Policy to enable secondary network capabilities:
 
 ```yaml
-cat <<EOF > nic-cluster-policy.yaml
+cat <<'EOF' > nic-cluster-policy.yaml
 apiVersion: mellanox.com/v1alpha1
 kind: NicClusterPolicy
 metadata:
-   name: nic-cluster-policy
+  name: nic-cluster-policy
 spec:
-   secondaryNetwork:
-     cniPlugins:
-       image: plugins
-       repository: ghcr.io/k8snetworkplumbingwg
-       version: v1.5.0
-       imagePullSecrets: []
-     multus:
-       image: multus-cni
-       repository: ghcr.io/k8snetworkplumbingwg
-       version: v4.1.0
-       imagePullSecrets: []
-   nvIpam:
-     image: nvidia-k8s-ipam
-     repository: ghcr.io/mellanox
-     version: v0.3.7
-     enableWebhook: false
+  nvIpam:
+    image: nvidia-k8s-ipam
+    repository: nvcr.io/nvidia/mellanox
+    version: network-operator-v25.7.0
+    enableWebhook: false
+  secondaryNetwork:
+    cniPlugins:
+      image: plugins
+      repository: nvcr.io/nvidia/mellanox
+      version: network-operator-v25.7.0
+    multus:
+      image: multus-cni
+      repository: nvcr.io/nvidia/mellanox
+      version: network-operator-v25.7.0
 EOF
 ```
 
-```
+Apply the policy:
+
+```bash
 kubectl apply -f nic-cluster-policy.yaml
 ```
 
-### Enable Parallel NIC Configuration for SR-IOV and change configuration mode to `systemd` (optional but recommended)
+### 7. Enable SR-IOV Optimizations (Recommended)
 
+Enable parallel NIC configuration for faster deployment:
+
+```bash
+kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io \
+  -n nvidia-network-operator default \
+  --patch '{"spec": {"featureGates": {"parallelNicConfig": true}}}' \
+  --type='merge'
 ```
-kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io -n nvidia-network-operator default --patch '{ "spec": { "featureGates": { "parallelNicConfig": true  } } }' --type='merge'
 
-kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io -n nvidia-network-operator default --patch '{ "spec": { "configurationMode": "systemd"} }' --type='merge'
+Change configuration mode to `systemd` for better reliability:
+
+```bash
+kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io \
+  -n nvidia-network-operator default \
+  --patch '{"spec": {"configurationMode": "systemd"}}' \
+  --type='merge'
 ```
 
-### Create an SRIOV Network Node Policy to create the Virtual Functions (VFs)
-> [!IMPORTANT]  
-> After the VFs are created, the nodes will be drained and rebooted by the SRIOV Network Operator.
+### 8. Create IP Pool for NVIDIA IPAM
 
-Below is an example for the BM.GPU.B4.8 A100 shape. You can find the node policies for other shapes in the [manifests/sriov-network-node-policy](manifests/sriov-network-node-policy) directory.
+Configure the IP address pool for SR-IOV network interfaces:
 
 ```yaml
-cat <<EOF > BM.GPU.B4.8-policy.yaml
+cat <<'EOF' > nv-ipam-ip-pool.yaml
+apiVersion: nv-ipam.nvidia.com/v1alpha1
+kind: IPPool
+metadata:
+  name: sriov-pool
+  namespace: nvidia-network-operator
+spec:
+  subnet: 192.168.0.0/16
+  perNodeBlockSize: 100
+  gateway: 192.168.0.1
+EOF
+```
+
+Apply the IP pool:
+
+```bash
+kubectl apply -f nv-ipam-ip-pool.yaml
+```
+
+## SR-IOV Configuration
+
+### 9. Create SR-IOV Network Node Policy
+
+This step creates Virtual Functions (VFs) on your GPU nodes.
+
+> [!IMPORTANT]
+> After applying the SR-IOV Network Node Policy, the affected nodes will be **drained and rebooted** automatically by the SR-IOV Network Operator. This is expected behavior.
+
+The example below configures VFs for the `BM.GPU.B4.8` (A100) shape. For other GPU shapes, see:
+- [All GPU shapes combined policy](./manifests/sriov-network-node-policy.yaml)
+- [Individual shape policies](./manifests/sriov-network-node-policy/)
+
+**Example for BM.GPU.B4.8:**
+
+```yaml
+cat <<'EOF' > BM.GPU.B4.8-policy.yaml
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
@@ -164,15 +237,21 @@ spec:
 EOF
 ```
 
-```
+Apply the policy:
+
+```bash
 kubectl apply -f BM.GPU.B4.8-policy.yaml
 ```
 
-### Create an SRIOV Network Pool Config
-As mentioned in the previous step, the nodes will reboot after the VFs are created. You can create the percentage of concurrent reboots using a SRIOV Network Pool Config. Below example for `BM.GPU.B4.8` reboots all nodes that VFs are configured.
+### 10. Configure Node Reboot Behavior
+
+Control the percentage of nodes that can reboot concurrently during VF configuration. The example below allows 100% of `BM.GPU.B4.8` nodes to reboot simultaneously.
+
+> [!TIP]
+> For production environments, consider using a lower percentage (e.g., `25%` or `50%`) to maintain cluster availability during VF configuration.
 
 ```yaml
-cat <<EOF > sriov-network-pool-config-percentage.yaml
+cat <<'EOF' > sriov-network-pool-config-percentage.yaml
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkPoolConfig
 metadata:
@@ -189,143 +268,72 @@ spec:
 EOF
 ```
 
-```
+Apply the configuration:
+
+```bash
 kubectl apply -f sriov-network-pool-config-percentage.yaml
 ```
 
-### Create an IP Pool for Nvidia IPAM
+### 11. Create SR-IOV Network Resource
+
+Define the SR-IOV network that pods can attach to:
 
 ```yaml
-cat <<EOF > nv-ipam-ip-pool.yaml
-apiVersion: nv-ipam.nvidia.com/v1alpha1
-kind: IPPool
+cat <<'EOF' > sriovnetwork.yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
 metadata:
-  name: my-pool
+  name: sriov-rdma-vf
   namespace: nvidia-network-operator
 spec:
-  subnet: 192.168.0.0/16
-  perNodeBlockSize: 100
-  gateway: 192.168.0.1
-EOF
-```
-
-```
-kubectl apply -f nv-ipam-ip-pool.yaml
-```
-
-### Create a Network Attachment Definition
-
-```yaml
-cat <<EOF > network-attachment-definition.yaml
-apiVersion: k8s.cni.cncf.io/v1
-kind: NetworkAttachmentDefinition
-metadata:
-  annotations:
-    k8s.v1.cni.cncf.io/resourceName: nvidia.com/sriov-rdma-vf
-  name: sriov-rdma-vf
-  namespace: default
-spec:
-  config: |-
+  resourceName: sriov-rdma-vf
+  networkNamespace: default
+  spoofChk: "off"
+  ipam: |
     {
-      "cniVersion": "1.0.0",
-      "name": "sriov-rdma-vf",
-      "plugins": [
-        {
-          "type": "sriov",
-          "spoofchk": "off",
-          "ipam": {
-            "type": "nv-ipam",
-            "poolName": "my-pool"
-          }
-        },
-        { "type": "tuning",
-          "sysctl": {
-            "net.ipv4.conf.all.arp_announce": "2",
-            "net.ipv4.conf.all.arp_filter": "1",
-            "net.ipv4.conf.all.arp_ignore": "1",
-            "net.ipv4.conf.all.rp_filter": "0",
-            "net.ipv4.conf.all.accept_local": "1"
-          },
-          "mtu": 4220
-        },
-        { "type": "rdma" },
-        { "type": "sbr" }
-      ]
+      "type": "nv-ipam",
+      "poolName": "sriov-pool"
+    }
+  metaPlugins: |
+    {
+      "type": "tuning",
+      "sysctl": {
+        "net.ipv4.conf.all.arp_announce": "2",
+        "net.ipv4.conf.all.arp_filter": "1",
+        "net.ipv4.conf.all.arp_ignore": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.all.accept_local": "1"
+      },
+      "mtu": 4220
+    },
+    {
+      "type": "rdma"
+    },
+    {
+      "type": "sbr"
     }
 EOF
 ```
 
-```
-kubectl apply -f network-attachment-definition.yaml
-```
+Apply the network definition:
 
-### Deploy RDMA CNI daemonset
-
-```yaml
-cat <<EOF > rdma-cni-daemonset.yaml
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: kube-rdma-cni-ds
-  namespace: kube-system
-  labels:
-    tier: node
-    app: rdma-cni
-    name: rdma-cni
-spec:
-  selector:
-    matchLabels:
-      name: rdma-cni
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: rdma-cni
-        name: rdma-cni
-    spec:
-      hostNetwork: true
-      tolerations:
-        - operator: Exists
-          effect: NoSchedule
-      containers:
-        - name: rdma-cni
-          image: ghcr.io/k8snetworkplumbingwg/rdma-cni
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            privileged: true
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "50Mi"
-            limits:
-              cpu: "100m"
-              memory: "50Mi"
-          volumeMounts:
-            - name: cnibin
-              mountPath: /host/opt/cni/bin
-      volumes:
-        - name: cnibin
-          hostPath:
-            path: /opt/cni/bin
-EOF
+```bash
+kubectl apply -f sriovnetwork.yaml
 ```
 
-```
-kubectl apply -f rdma-cni-daemonset.yaml
+## Verification
+
+### 12. Verify VF Allocation
+
+After the nodes reboot and SR-IOV configuration completes, verify that Virtual Functions are correctly exposed:
+
+```bash
+kubectl get nodes -l 'nvidia.com/gpu=true' \
+  --sort-by=.status.capacity.\"nvidia\\.com/gpu\" \
+  -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\\.com/gpu,RDMA-VFs:status.capacity.nvidia\\.com/sriov-rdma-vf'
 ```
 
-### Confirm that the GPUs are Virtual Functions (VFs) are correctly exposed
-Once the Network Operator pods are deployed, the GPU nodes with RDMA NICs will start reporting `nvidia.com/sriov-rdma-vf` as an available resource. You can request that resource in your pod manifests for assigning RDMA VFs to pods.
-
-By default, we create one Virtual Function per Physical Function. So for the H100 and A100 bare metal shapes, you will see 16 VFs per node exposed as a resource.
-
-```
-kubectl get nodes -l 'nvidia.com/gpu=true' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
-```
-
+Expected output:
 ```
 NODE            GPUs   RDMA-VFs
 10.79.148.115   8      16
@@ -333,227 +341,293 @@ NODE            GPUs   RDMA-VFs
 10.79.156.205   8      16
 ```
 
-### Requesting VFs in manifests
-Network Operator exposes the RDMA Virtual Functions (VFs) as allocatable resources. To use them, you need to add the following annotation to your manifests. The next step in this guide has an example for running the NCCL test, you can use that manifest as an example.
+> [!NOTE]
+> By default, one Virtual Function is created per Physical Function. For H100 and A100 bare metal shapes with 16 physical NICs, you will see 16 VFs per node.
+
+### Using RDMA VFs in Pod Manifests
+
+To attach RDMA VFs to your pods, add the network annotation and resource limits. Each `sriov-rdma-vf` entry in the annotation requests one VF:
 
 ```yaml
-      template:
-        metadata:
-          annotations:
-            k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
-```
-
-### Optional - Deploy Volcano and run the NCCL test
-Volcano is needed for running the optional NCCL test. It's not required for the regular operation of the cluster, you can remove it after you finish running the NCCL test.
-
-#### Deploy Volcano
-```sh
-helm repo add volcano-sh https://volcano-sh.github.io/helm-charts
-helm install volcano volcano-sh/volcano -n volcano-system --create-namespace
-
-kubectl create serviceaccount -n default mpi-worker-view
-kubectl create rolebinding default-view --namespace default --serviceaccount default:mpi-worker-view --clusterrole view
-```
-
-#### Run the NCCL test
-
-```yaml
-cat <<'EOF' > nccl-tests-nv-ipam-ippool.yaml
-apiVersion: batch.volcano.sh/v1alpha1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
-  name: nccl-allreduce-job0
+  name: rdma-test
 spec:
-  minAvailable: 1
-  schedulerName: volcano
-  plugins:
-    ssh: []
-    svc: []
-  queue: default
-  tasks:
-    - replicas: 1
-      name: mpimaster
-      policies:
-        - event: TaskCompleted
-          action: CompleteJob
-      template:
-        spec:
-          volumes:
-            - name: root
-              hostPath:
-                path: /
-                type: Directory
-          initContainers:
-            - command:
-                - /bin/bash
-                - -c
-                - |
-                  until [[ "$(kubectl get pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker -o json | jq '.items | length')" != 0 ]]; do
-                    echo "Waiting for MPI worker pods..."
-                    sleep 3
-                  done
-                  echo "Waiting for MPI worker pods to be ready..."
-                  kubectl wait pod -l volcano.sh/job-name=nccl-allreduce-job0,volcano.sh/task-spec=mpiworker --for=condition=Ready --timeout=600s && sleep 2
-              image: aga.ocir.io/hpc_limited_availability/oke/kubectl:latest
-              name: wait-for-workers
-          serviceAccount: mpi-worker-view
-          terminationGracePeriodSeconds: 2
-          tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-          containers:
-            - command:
-                - /bin/bash
-                - -c
-                - |
-                  MPI_HOST=$(cat /etc/volcano/mpiworker.host | tr "\n" ",")
-                  mkdir -p /var/run/sshd; /usr/sbin/sshd
-                  mpirun --allow-run-as-root \
-                    -np 16 -npernode 8 --bind-to numa \
-                    -hostfile /etc/volcano/mpiworker.host \
-                    --mca pml ucx -mca coll ^hcoll \
-                    -x HCOLL_ENABLE_MCAST_ALL=0 \
-                    -x coll_hcoll_enable=0 \
-                    -x UCX_NET_DEVICES=eth0 \
-                    -x NCCL_IB_GID_INDEX=3 \
-                    -x NCCL_IB_QPS_PER_CONNECTION=4 \
-                    -x NCCL_IB_TC=41 \
-                    -x NCCL_IB_SL=0 \
-                    -x NCCL_IB_HCA=mlx5 \
-                    /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 8G -c 1; sleep 3600
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
-              volumeMounts:
-              - { mountPath: /host, name: root }
-              securityContext:
-                capabilities:
-                  add: ["IPC_LOCK"]
-              name: mpimaster
-              ports:
-                - containerPort: 22
-                  name: mpijob-port
-              workingDir: /workspace
-              resources:
-                requests:
-                  cpu: 2
-                  memory: 128Mi 
-                  ephemeral-storage: 16Gi
-          restartPolicy: OnFailure
-    - replicas: 2
-      minAvailable: 2
-      name: mpiworker
+  containers:
+  - name: app
+    image: your-image
+    resources:
+      limits:
+        nvidia.com/gpu: 8
+        nvidia.com/sriov-rdma-vf: 16
+  template:
+    metadata:
+      annotations:
+        # Request 16 RDMA VFs (one per comma-separated entry)
+        k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
+```
+
+## Testing with NCCL (Optional)
+
+### 13. Deploy Kueue & MPI Operator
+
+To validate RDMA connectivity and GPU performance, install Kueue for job queueing and the MPI Operator for multi-node workloads:
+
+```bash
+# Install MPI Operator
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
+
+# Install Kueue
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
+  --version="0.14.2" \
+  --create-namespace \
+  --namespace=kueue-system
+```
+
+### 14. Run NCCL Performance Test
+
+The NCCL test validates RDMA performance between GPU nodes. Deploy the test with the following manifest:
+
+```yaml
+cat <<'EOF' > nccl-tests.yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: bm-gpu-b4-8
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: BM.GPU.B4.8
+    nvidia.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: bm-gpu-b4-8-nccl-tests-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "nvidia.com/sriov-rdma-vf", "ephemeral-storage"]
+    flavors:
+    - name: bm-gpu-b4-8
+      resources:
+      - name: cpu
+        nominalQuota: "20000"
+      - name: memory
+        nominalQuota: "102400Gi"
+      - name: nvidia.com/gpu
+        nominalQuota: "1600"
+      - name: nvidia.com/sriov-rdma-vf
+        nominalQuota: "3200"
+      - name: ephemeral-storage
+        nominalQuota: "6400Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: bm-gpu-b4-8-nccl-tests
+spec:
+  clusterQueue: bm-gpu-b4-8-nccl-tests-queue
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test
+  labels:
+    kueue.x-k8s.io/queue-name: bm-gpu-b4-8-nccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: "Running"
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
       template:
         metadata:
+          labels:
+            nccl-test-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            command: ["bash", "-c"]
+            args:
+              - |
+                set -e -o pipefail; trap 'exit=1' SIGINT
+                NUM_GPUS=8
+                NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                NP=$(($NUM_HOSTS*$NUM_GPUS))
+                while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                  echo "Waiting for workers to be ready..."
+                  sleep 5
+                done
+                echo "All workers are ready!"
+                mpirun --allow-run-as-root \
+                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                  -mca coll_hcoll_enable 0 \
+                  -np $NP -npernode $NUM_GPUS --bind-to numa \
+                  -x NCCL_DEBUG=WARN \
+                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                  -x NCCL_IB_GID_INDEX=3 \
+                  -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
+                  -x NCCL_IB_TC=41 \
+                  -x NCCL_IB_SL=0 \
+                  -x NCCL_IB_TIMEOUT=22 \
+                  -x HCOLL_ENABLE_MCAST_ALL=0 \
+                  -x UCX_TLS=tcp \
+                  -x UCX_NET_DEVICES=eth0 \
+                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-worker
           annotations:
             k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
         spec:
-          containers:
-            - name: mpiworker
-              command:
-                - /bin/bash
-                - -c
-                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
-              image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
-              securityContext:
-                capabilities:
-                  add: ["IPC_LOCK"]
-              ports:
-                - containerPort: 22
-                  name: mpijob-port
-              workingDir: /workspace
-              resources:
-                requests:
-                  nvidia.com/gpu: 8
-                  nvidia.com/sriov-rdma-vf: 16
-                  ephemeral-storage: 1Gi
-                limits:
-                  nvidia.com/gpu: 8
-                  nvidia.com/sriov-rdma-vf: 16
-                  ephemeral-storage: 1Gi
-              volumeMounts:
-              - mountPath: /dev/shm
-                name: shm
-          restartPolicy: OnFailure
-          terminationGracePeriodSeconds: 15
-          tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           volumes:
-          - name: root
-            hostPath:
-              path: /
-              type: Directory
-          - name: shm
-            emptyDir:
-              medium: Memory
-              sizeLimit: 8Gi
+          - { name: devinf, hostPath: { path: /dev/infiniband }}
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
+          containers:
+          - name: mpi-worker
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            volumeMounts:
+            - { mountPath: /dev/infiniband, name: devinf }
+            - { mountPath: /dev/shm, name: shm }
+            securityContext:
+              privileged: true
+              capabilities:
+                add: ["IPC_LOCK"]
+            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            command:
+              - /bin/bash
+              - -c
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+            resources:
+              limits:
+                nvidia.com/gpu: 8
+                nvidia.com/sriov-rdma-vf: 16
 EOF
 ```
 
-```
-kubectl apply -f nccl-tests-nv-ipam-ippool.yaml
+Apply the manifest:
+
+```bash
+kubectl apply -f nccl-tests.yaml
 ```
 
-The initial pull of the container will take long. Once the master pod `nccl-allreduce-job0-mpimaster-0` starts running, you can check it logs for the NCCL test result.
+### 15. Monitor NCCL Test Results
 
-```sh
-Defaulted container "mpimaster" out of: mpimaster, wait-for-workers (init)
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-0.nccl-allreduce-job0' (ED25519) to the list of known hosts.
-Warning: Permanently added 'nccl-allreduce-job0-mpiworker-1.nccl-allreduce-job0' (ED25519) to the list of known hosts.
+Wait for the container image to pull (this may take several minutes on first run). Once the launcher pod starts, check the logs:
+
+```bash
+# Wait for pods to be ready
+kubectl get pods -l nccl-test-replica
+
+# View launcher logs
+kubectl logs -f nccl-test-launcher-<pod-id>
+```
+
+Expected output excerpt:
+
+```
 # nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
 #  Rank  0 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-0 device  0 [0x0f] NVIDIA A100-SXM4-40GB
 #  Rank  1 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-0 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank  2 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-0 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank  3 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-0 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank  4 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-0 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank  5 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-0 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank  6 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-0 device  6 [0xd6] NVIDIA A100-SXM4-40GB
-#  Rank  7 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-0 device  7 [0xda] NVIDIA A100-SXM4-40GB
-#  Rank  8 Group  0 Pid     43 on nccl-allreduce-job0-mpiworker-1 device  0 [0x0f] NVIDIA A100-SXM4-40GB
-#  Rank  9 Group  0 Pid     44 on nccl-allreduce-job0-mpiworker-1 device  1 [0x15] NVIDIA A100-SXM4-40GB
-#  Rank 10 Group  0 Pid     45 on nccl-allreduce-job0-mpiworker-1 device  2 [0x51] NVIDIA A100-SXM4-40GB
-#  Rank 11 Group  0 Pid     46 on nccl-allreduce-job0-mpiworker-1 device  3 [0x54] NVIDIA A100-SXM4-40GB
-#  Rank 12 Group  0 Pid     47 on nccl-allreduce-job0-mpiworker-1 device  4 [0x8d] NVIDIA A100-SXM4-40GB
-#  Rank 13 Group  0 Pid     48 on nccl-allreduce-job0-mpiworker-1 device  5 [0x92] NVIDIA A100-SXM4-40GB
-#  Rank 14 Group  0 Pid     49 on nccl-allreduce-job0-mpiworker-1 device  6 [0xd6] NVIDIA A100-SXM4-40GB
+#  ...
 #  Rank 15 Group  0 Pid     50 on nccl-allreduce-job0-mpiworker-1 device  7 [0xda] NVIDIA A100-SXM4-40GB
 #
 #                                                              out-of-place                       in-place
 #       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong
 #        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)
-           8             2     float     sum      -1    36.47    0.00    0.00      0    34.74    0.00    0.00      0
-          16             4     float     sum      -1    38.86    0.00    0.00      0    35.65    0.00    0.00      0
-          32             8     float     sum      -1    38.53    0.00    0.00      0    35.41    0.00    0.00      0
-          64            16     float     sum      -1    39.25    0.00    0.00      0    37.05    0.00    0.00      0
-         128            32     float     sum      -1    38.85    0.00    0.01      0    37.21    0.00    0.01      0
-         256            64     float     sum      -1    40.68    0.01    0.01      0    38.52    0.01    0.01      0
-         512           128     float     sum      -1    39.27    0.01    0.02      0    39.35    0.01    0.02      0
-        1024           256     float     sum      -1    41.97    0.02    0.05      0    40.56    0.03    0.05      0
-        2048           512     float     sum      -1    43.36    0.05    0.09      0    41.29    0.05    0.09      0
-        4096          1024     float     sum      -1    44.54    0.09    0.17      0    43.36    0.09    0.18      0
-        8192          2048     float     sum      -1    48.16    0.17    0.32      0    46.51    0.18    0.33      0
-       16384          4096     float     sum      -1    49.40    0.33    0.62      0    48.00    0.34    0.64      0
-       32768          8192     float     sum      -1    49.66    0.66    1.24      0    49.17    0.67    1.25      0
-       65536         16384     float     sum      -1    51.69    1.27    2.38      0    50.09    1.31    2.45      0
-      131072         32768     float     sum      -1    54.86    2.39    4.48      0    53.31    2.46    4.61      0
-      262144         65536     float     sum      -1    67.95    3.86    7.23      0    65.81    3.98    7.47      0
-      524288        131072     float     sum      -1    73.94    7.09   13.29      0    72.87    7.20   13.49      0
-     1048576        262144     float     sum      -1    85.58   12.25   22.97      0    84.50   12.41   23.27      0
-     2097152        524288     float     sum      -1    99.19   21.14   39.64      0    100.1   20.94   39.27      0
-     4194304       1048576     float     sum      -1    127.0   33.03   61.93      0    127.8   32.81   61.52      0
-     8388608       2097152     float     sum      -1    174.3   48.13   90.25      0    168.4   49.80   93.38      0
-    16777216       4194304     float     sum      -1    282.7   59.35  111.29      0    265.9   63.11  118.32      0
-    33554432       8388608     float     sum      -1    452.3   74.18  139.08      0    452.0   74.24  139.19      0
-    67108864      16777216     float     sum      -1    821.7   81.67  153.13      0    812.7   82.57  154.83      0
-   134217728      33554432     float     sum      -1   1542.0   87.04  163.20      0   1546.1   86.81  162.76      0
-   268435456      67108864     float     sum      -1   3042.7   88.22  165.42      0   3065.9   87.55  164.16      0
-   536870912     134217728     float     sum      -1   6436.0   83.42  156.41      0   6070.5   88.44  165.82      0
-  1073741824     268435456     float     sum      -1   9187.8  116.87  219.12      0   9073.4  118.34  221.89      0
-  2147483648     536870912     float     sum      -1    18289  117.42  220.16      0    17557  122.31  229.34      0
-  4294967296    1073741824     float     sum      -1    34176  125.67  235.63      0    34417  124.79  233.98      0
+  ...
   8589934592    2147483648     float     sum      -1    67689  126.90  237.94      0    67811  126.68  237.52      0
 # Out of bounds values : 0 OK
 # Avg bus bandwidth    : 66.4834
 #
 ```
+
+> [!TIP]
+> The "Avg bus bandwidth" metric indicates the overall RDMA performance. Higher values indicate better network throughput.
+
+## Troubleshooting
+
+### Common Issues
+
+**Workload Not Starting**
+- Verify the ClusterQueue includes `nvidia.com/sriov-rdma-vf` in `coveredResources`
+- Check VF quota is sufficient: `kubectl describe clusterqueue`
+- Review workload conditions: `kubectl describe workload <workload-name>`
+
+**Nodes Not Rebooting**
+- Check SR-IOV operator logs: `kubectl logs -n nvidia-network-operator -l app=sriov-network-operator`
+- Verify node selector matches your nodes: `kubectl get nodes --show-labels | grep instance-type`
+- Check SR-IOV network node states: `kubectl get sriovnetworknodestates -n nvidia-network-operator`
+
+**VFs Not Appearing**
+- Ensure nodes have completed reboot and are in `Ready` state
+- Check SR-IOV device plugin pods: `kubectl get pods -n nvidia-network-operator | grep device-plugin`
+- Verify node capacity: `kubectl get node <node-name> -o json | jq '.status.capacity'`
+- Check SR-IOV policy is applied: `kubectl get sriovnetworknodepolicy -n nvidia-network-operator`
+
+### Useful Commands
+
+```bash
+# Check Kueue workload status
+kubectl get workload -A
+
+# Describe workload for detailed status
+kubectl describe workload <workload-name> -n <namespace>
+
+# Check SR-IOV network node states
+kubectl get sriovnetworknodestates -n nvidia-network-operator
+
+# View all SR-IOV policies
+kubectl get sriovnetworknodepolicy -n nvidia-network-operator
+
+# Check GPU and VF capacity on nodes
+kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, gpus: .status.capacity."nvidia.com/gpu", vfs: .status.capacity."nvidia.com/sriov-rdma-vf"}'
+
+# View MPI Operator logs
+kubectl logs -n mpi-operator -l app=mpi-operator
+
+# Check Network Operator status
+kubectl get pods -n nvidia-network-operator
+```
+
+## Additional Resources
+
+- [NVIDIA GPU Operator Documentation](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
+- [NVIDIA Network Operator Documentation](https://docs.nvidia.com/networking/software/cloud-orchestration/index.html)
+- [Kueue Documentation](https://kueue.sigs.k8s.io/)
+- [MPI Operator Documentation](https://github.com/kubeflow/mpi-operator)
+- [SR-IOV Network Device Plugin](https://github.com/k8snetworkplumbingwg/sriov-network-device-plugin)
+- [NCCL Tests Repository](https://github.com/NVIDIA/nccl-tests)
+
+## Shape-Specific SR-IOV Policies
+
+Pre-configured SR-IOV policies for common Oracle GPU shapes are available in the [`manifests/sriov-network-node-policy/`](manifests/sriov-network-node-policy/) directory:
+
+- [`bm-gpu-b200-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-b200-8.yaml) - BM.GPU.B200.8
+- [`bm-gpu-gb200-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-gb200-4.yaml) - BM.GPU.GB200.4
+- [`bm-gpu-gm4-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-gm4-8.yaml) - BM.GPU.GM4.8
+- [`bm-gpu-h100t-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-h100t-8.yaml) - BM.GPU.H100T.8
+- [`bm-gpu-l40s-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-l40s-4.yaml) - BM.GPU.L40S.4
+- [`bm-gpu-l40s-nc-4.yaml`](manifests/sriov-network-node-policy/bm-gpu-l40s-nc-4.yaml) - BM.GPU.L40S-NC.4
+- [`bm-gpu-mi300x-8.yaml`](manifests/sriov-network-node-policy/bm-gpu-mi300x-8.yaml) - BM.GPU.MI300X.8
+
+## License
+
+This guide is provided as-is for experimental purposes. Always consult Oracle Cloud Infrastructure documentation for officially supported configurations.
