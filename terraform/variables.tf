@@ -302,6 +302,11 @@ variable "preferred_kubernetes_services" {
   default     = "public"
   description = "The type of preferred Kubernetes services. Accepted options are public or internal."
 }
+variable "setup_credential_provider_for_ocir" {
+  type        = bool
+  default     = false
+  description = "Setup the OKE credential provider for OCIR."
+}
 
 # OKE Cluster Setup - Advanced Options
 variable "override_hostnames" {
