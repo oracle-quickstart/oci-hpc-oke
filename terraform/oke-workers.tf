@@ -16,8 +16,8 @@ locals {
   worker_rdma_image_id   = var.worker_rdma_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_rdma_image_custom_uri, {}), "id", null) : coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
 
   runcmd_bootstrap = local.create_workers ? format(
-    "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
-    var.kubernetes_version, var.override_hostnames,
+    "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
+    var.kubernetes_version, var.setup_credential_provider_for_ocir, var.override_hostnames
   ) : ""
 
   runcmd_nvme_raid = var.nvme_raid_enabled ? format(

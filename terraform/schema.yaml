@@ -106,6 +106,7 @@ variableGroups:
       - max_pods_per_node
       - disable_gpu_device_plugin
       - preferred_kubernetes_services
+      - setup_credential_provider_for_ocir
 
   - title: "Workers: System"
     variables:
@@ -1034,6 +1035,11 @@ variables:
     title: Preferred Load Balancer kind
     description: The kind of load balancers which should be provisioned by default for the services of type Load Balancer.
     required: true
+  setup_credential_provider_for_ocir:
+    title: Setup OKE credential-provider for OCIR
+    description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If `create_policies` is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
+    type: boolean
+    default: false
 
 # OKE Cluster Setup - Advanced Options
   override_hostnames:
