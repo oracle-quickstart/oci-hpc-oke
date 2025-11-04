@@ -59,4 +59,3 @@ resource "time_sleep" "wait_for_nginx_lb" {
 
   create_duration = "60s"
 }
-

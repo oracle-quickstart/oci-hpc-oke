@@ -73,12 +73,6 @@ grafana:
         disableDelete: false
         foldersFromFilesStructure: true
 
-%{ if preferred_kubernetes_services == "public" }
-  grafana.ini:
-    server:
-      root_url: "%(protocol)s://%(domain)s"
-%{ endif }
-
 kubelet:
   serviceMonitor:
     attachMetadata:
@@ -164,3 +158,4 @@ additionalPrometheusRulesMap:
               (
                 node_gpu_row_remap_error_check or node_up_check
               )
+

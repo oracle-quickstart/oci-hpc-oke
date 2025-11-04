@@ -152,8 +152,7 @@ locals {
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
   version = "5.3.3"
-  # source    = "github.com/oracle-terraform-modules/terraform-oci-oke.git?ref=ca3e66f"
-  
+
   providers = { oci.home = oci.home }
 
   region         = var.region
@@ -204,7 +203,7 @@ module "oke" {
         remove_addon_resources_on_delete = true
         override_existing                = true
       }
-    } : {},    
+    } : {},
     var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
     {
       "CertManager" = {

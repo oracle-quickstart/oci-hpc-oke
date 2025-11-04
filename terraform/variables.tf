@@ -230,17 +230,17 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "77.5.0"
+  default = "79.0.0"
   type    = string
 }
 
 variable "dcgm_exporter_chart_version" {
-  default = "4.5.2"
+  default = "4.6.0"
   type    = string
 }
 
 variable "amd_device_metrics_exporter_chart_version" {
-  default = "v1.3.1"
+  default = "v1.4.0"
   type    = string
 }
 
@@ -420,4 +420,3 @@ variable "deploy_to_oke_from_orm" {
   default     = false
   description = "Should be set to true when deploying the stack from Oracle Resource Manager."
 }
-

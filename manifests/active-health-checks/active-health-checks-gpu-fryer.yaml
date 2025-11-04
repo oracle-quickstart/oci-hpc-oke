@@ -2,8 +2,8 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: active-health-checks-low
-value: -1000
+  name: active-health-checks-gpu-fryer-low
+value: -100000
 globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Very low priority for active health check jobs to be preempted by others"
@@ -138,7 +138,7 @@ spec:
                     labels:
                       app: gpu-fryer-test
                   spec:
-                    priorityClassName: active-health-checks-low
+                    priorityClassName: active-health-checks-gpu-fryer-low
                     restartPolicy: Never
                     nodeSelector:
                       kubernetes.io/hostname: $test_node

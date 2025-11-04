@@ -17,7 +17,7 @@ image:
   pullPolicy: IfNotPresent
   # Image tag defaults to AppVersion, but you can use the tag key
   # for the image tag, e.g:
-  tag: 4.4.1-4.5.2-ubuntu22.04
+  tag: 4.4.1-4.6.0-ubuntu22.04
 
 # Change the following reference to "/etc/dcgm-exporter/default-counters.csv"
 # to stop profiling metrics from DCGM
@@ -48,6 +48,10 @@ fullnameOverride: ""
 
 # Overrides the deployment namespace
 namespaceOverride: ""
+
+# hostPID allows the DCGM-Exporter container to see processes on the host node
+# Default: false
+hostPID: false
 
 # Defines the runtime class that will be used by the pod
 runtimeClassName: ""
@@ -210,6 +214,16 @@ kubernetes:
   # When enabled, metrics will include the pod UID as an attribute for the pods that are using the GPUs
   # This requires cluster-level read permissions to pods
   enablePodUID: false
+
+  # Pod label filtering configuration
+  # Filter which pod labels are included in metrics using regex patterns
+  # Empty list means all labels are included (default behavior)
+  # Examples:
+  #   podLabelAllowlistRegex:
+  #     - "^app$"                         # Exact match for "app" label
+  #     - "^app\\.kubernetes\\.io/.*"     # All labels starting with app.kubernetes.io/
+  #     - "^(tier|environment|version)$"  # Match tier, environment, or version labels
+  podLabelAllowlistRegex: []
 
   # RBAC settings for Kubernetes integration
   rbac:
