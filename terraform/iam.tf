@@ -21,7 +21,7 @@ locals {
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
 
-  rule_templates = [
+  rule_templates = compact([
     "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
     "Allow dynamic-group %v to manage cluster-family in compartment id %v",
     "Allow dynamic-group %v to manage file-family in compartment id %v",
@@ -37,8 +37,9 @@ locals {
     "Allow dynamic-group %v to {CLUSTER_JOIN} in compartment id %v",
     "Allow dynamic-group %v to read metrics in compartment id %v",
     "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='gpu_infrastructure_health'",
-    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='rdma_infrastructure_health'"
-  ]
+    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='rdma_infrastructure_health'",
+    var.setup_credential_provider_for_ocir ? "Allow dynamic-group %v to read repos in compartment id %v" : ""
+  ])
 
   wris_template = [
     "request.principal.type = 'workload'",

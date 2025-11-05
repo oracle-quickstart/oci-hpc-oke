@@ -5,8 +5,14 @@ locals {
   invalid_desired_load_balancers = !var.create_public_subnets && var.preferred_kubernetes_services == "public"
   invalid_public_ep              = !var.create_public_subnets && var.control_plane_is_public
   invalid_bastion                = !var.create_public_subnets && (var.bastion_is_public && var.create_bastion)
-  invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", data.oci_core_image.worker_rdma[0].display_name))
+  invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
   invalid_gb200_shape            = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4"], var.worker_rdma_shape)
+  invalid_image_uri              = anytrue([
+    var.worker_ops_image_use_uri && !startswith(coalesce(var.worker_ops_image_custom_uri, "none"), "http"),
+    var.worker_cpu_image_use_uri && !startswith(coalesce(var.worker_cpu_image_custom_uri, "none"), "http"),
+    var.worker_gpu_image_use_uri && !startswith(coalesce(var.worker_gpu_image_custom_uri, "none"), "http"),
+    var.worker_rdma_image_use_uri && !startswith(coalesce(var.worker_rdma_image_custom_uri, "none"), "http"),
+  ])
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -59,14 +65,24 @@ resource "null_resource" "validate_cluster_endpoint" {
   }
 }
 
-
 resource "null_resource" "validate_worker_rdma_image" {
   count = coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none") != "none" ? 1 : 0
 
   lifecycle {
     precondition {
       condition     = !local.invalid_worker_rdma_image
-      error_message = "GPU & RDMA worker pools only support Ubuntu images. The selected image '${data.oci_core_image.worker_rdma[0].display_name}' is an Oracle Linux image. Please choose an Ubuntu-based custom image."
+      error_message = "GPU & RDMA worker pools only support Ubuntu images. The selected image '${one(data.oci_core_image.worker_rdma[*].display_name)}' is an Oracle Linux image. Please choose an Ubuntu-based custom image."
+    }
+  }
+}
+
+resource "null_resource" "validate_image_uri" {
+  count = anytrue([var.worker_ops_image_use_uri, var.worker_cpu_image_use_uri, var.worker_gpu_image_use_uri, var.worker_rdma_image_use_uri]) ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_image_uri
+      error_message = "Error: Invalid image URI detected. Please ensure the URI is correct and accessible."
     }
   }
 }

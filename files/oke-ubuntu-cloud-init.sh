@@ -30,6 +30,38 @@ EOF
     fi
 }
 
+# Install OKE credential provider for OCIR
+download_oke_credential_provider_for_ocir() {
+    ARCH=$(uname -m)
+
+    case "$ARCH" in
+    x86_64)
+        ARCH="amd64"
+        ;;
+    aarch64 | arm64)
+        ARCH="arm64"
+        ;;
+    *)
+        return 1
+        ;;
+    
+    esac
+    
+    wget --tries=5 --waitretry=3 --retry-connrefused -O /usr/local/bin/credential-provider-oke \
+        https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/oke-credential-provider-for-ocir-linux-$ARCH && \
+        chmod +x /usr/local/bin/credential-provider-oke || true
+    
+    mkdir -p /etc/kubernetes/
+    wget --tries=5 --waitretry=3 --retry-connrefused -P /etc/kubernetes/ \
+        https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/credential-provider-config.yaml || true
+    
+    if [[ -f /usr/local/bin/credential-provider-oke && -f /etc/kubernetes/credential-provider-config.yaml ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape 2>/dev/null) || true
 if [[ -z "$SHAPE" ]]; then
@@ -43,17 +75,28 @@ elif [[ "$SHAPE" == BM.GPU.GB200* ]] || [[ "$SHAPE" == BM.GPU.GB300* ]]; then
     fi
 fi
 
+kubernetes_version="${1-}"
+setup_credential_provider="${2:-false}"
+
+if [[ "$setup_credential_provider" == "true" ]]; then
+    credential_provider_done=$(download_oke_credential_provider_for_ocir)
+else
+    credential_provider_done=1
+fi
+
 case "$ID" in
     ubuntu)
         echo "Detected Ubuntu"
         if command -v oke >/dev/null 2>&1; then
             echo "[Ubuntu] oke binary already present, running bootstrap only"
-            kubernetes_version="${1-}"
             configure_crio_defaults "$kubernetes_version"
-            oke bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                oke bootstrap
+            fi
         else
             echo "[Ubuntu] oke binary not found, installing package"
-            kubernetes_version="${1-}"
             oke_package_version="${kubernetes_version:1}"
             oke_package_repo_version="${oke_package_version:0:4}"
             oke_package_name="oci-oke-node-all-$oke_package_version"
@@ -78,16 +121,24 @@ EOF
 
             echo "[Ubuntu] Running bootstrap"
             configure_crio_defaults "$kubernetes_version"
-            oke bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                oke bootstrap
+            fi
         fi
         ;;
     ol)
         echo "Detected Oracle Linux"
         if command -v oke >/dev/null 2>&1; then
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
-            kubernetes_version="${1-}"
+            
             configure_crio_defaults "$kubernetes_version"
-            oke bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                oke bootstrap
+            fi
         else
             echo "[Oracle Linux] oke binary not found, fetching init script"
             curl --fail -H "Authorization: Bearer Oracle" \
@@ -95,9 +146,13 @@ EOF
             | base64 --decode >/var/run/oke-init.sh
 
             echo "[Oracle Linux] Running init script"
-            kubernetes_version="${1-}"
             configure_crio_defaults "$kubernetes_version"
-            bash /var/run/oke-init.sh
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                bash /var/run/oke-init.sh --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                bash /var/run/oke-init.sh
+            fi
+            
         fi
         ;;
     *)
