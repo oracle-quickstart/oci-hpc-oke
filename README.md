@@ -40,16 +40,17 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 - [ROCm 6.3.2](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-AMD-ROCM-632-2025.07.23-0)
 
-### Deploy the Cluster Using the Oracle Cloud Resource Manager Template
-You can easily deploy the cluster using the **Deploy to Oracle Cloud** button below.
+
+### Deploy the Cluster
+You can easily deploy the cluster with the **Deploy to Oracle Cloud** button below, which uses OCI Resource Manager. If you prefer deploying with Terraform locally, you can use the templates in the [terraform directory](./terraform/).
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
 
-For the image ID, use the ID of the image that you imported in the previous step.
+### Access the Cluster
 
-The template will deploy a `bastion` instance and an `operator` instance by default. The `operator` instance will have access to the OKE cluster. You can connect to the `operator` instance via SSH with `ssh -J ubuntu@<bastion IP> ubuntu@<operator IP>`.
+You can [access the cluster locally](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengdownloadkubeconfigfile.htm) by downloading the `kubeconfig` file.
 
-You can also find this information under the **Application information** tab in the OCI Resource Manager stack.
+Alternatively, the template deploys an `operator` instance with the kubeconfig pre-configured and tools like Helm and k9s pre-installed. You can find the SSH command to access the operator node under the **Application information** tab in the OCI Resource Manager stack.
 
 ![Application Information Tab](./docs/images/rms-application-information.png)
 
@@ -72,7 +73,7 @@ NAME           STATUS     ROLES    AGE     VERSION
 
 For more information, see [Adding a Service Account Token](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm).
 
-```
+```sh
 kubectl -n kube-system create serviceaccount kubeconfig-sa
 
 kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
@@ -155,7 +156,7 @@ Kueue and MPI Operator are required for running the optional NCCL tests.
 ```sh
 kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
 
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.1" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.4" --create-namespace --namespace=kueue-system
 ```
 
 ### Run the NCCL/RCCL Tests
@@ -171,6 +172,11 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 #### BM.GPU.GB200.4
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200.4.yaml
+```
+
+#### BM.GPU.B200.8
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B200.8.yaml
 ```
 
 #### BM.GPU.H200
@@ -244,51 +250,21 @@ NCCL version 2.25.1+cuda12.8
 #
 ```
 
-## Frequently Asked Questions
+## Guides
 
-If you have a question that is not listed below, you can create an issue in the repo.
-
-- [Are there any features that are not supported when using self-managed nodes?](#are-there-any-features-that-are-not-supported-when-using-self-managed-nodes)
-- [I don't see my GPU nodes in the OKE page in the console under worker pools](#i-dont-see-my-gpu-nodes-in-the-oke-page-in-the-console-under-worker-pools)
-- [I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error](#im-getting-the-400-invalidparameter-shape--is-incompatible-with-image-error)
-- [How can I add more SSH keys to my nodes besides the one I chose during deployment?](#how-can-i-add-more-ssh-keys-to-my-nodes-besides-the-one-i-chose-during-deployment)
-- [I'm having an issue when running a PyTorch job using RDMA](#im-having-an-issue-when-running-a-pytorch-job-using-rdma)
-- [I have large container images. Can I import them from a shared location instead of downloading them?](#i-have-large-container-images-can-i-import-them-from-a-shared-location-instead-of-downloading-them)
-- [How can I run GPU & RDMA health checks in my nodes?](#how-can-i-run-gpu--rdma-health-checks-in-my-nodes)
-- [Can I autoscale my RDMA enabled nodes in a Cluster Network?](#can-i-autoscale-my-rdma-enabled-nodes-in-a-cluster-network)
-- [How do I use network locality information when running workloads on OKE?](#how-do-i-use-network-locality-information-when-running-workloads-on-oke)
-
-### Are there any features that are not supported when using self-managed nodes?
-Some features and capabilities are not available, or not yet available, when using self-managed nodes. Please see [this link](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengworkingwithselfmanagednodes.htm) for a list of features and capabilities that are not available for self-managed nodes.
-
-### I don't see my GPU nodes in the OKE page in the console under worker pools
-This is expected. Currently, only the worker pools with the `node-pool` mode are listed. Self-managed nodes (`cluster-network` and `instance-pool` modes in worker pools) are not listed in the console in the OKE page.
-
-### I'm getting the "400-InvalidParameter, Shape <GPU BM shape> is incompatible with image" error
-Please follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/configuringimagecapabilities.htm#configuringimagecapabilities_topic-using_the_console) to add the capability of the shape that you are getting the error to your imported image.
-
-### How can I add more SSH keys to my nodes besides the one I chose during deployment?
-You can follow the instructions [here](./docs/adding-ssh-keys-to-worker-nodes.md) to add more SSH keys to your nodes.
-
-### I'm having an issue when running a PyTorch job using RDMA
-Please see the instructions [here](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md) for the best practices on running PyTorch jobs.
-
-### I have large container images. Can I import them from a shared location instead of downloading them?
-Yes, you can use OCI's File Storage Service (FSS) with `skopeo` to accomplish that. You can find the instructions [here](./docs/importing-images-from-fss-skopeo.md).
-
-### How can I run GPU & RDMA health checks in my nodes?
-You can deploy the health check script with Node Problem Detector by following the instructions [here](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md).
-
-### Can I autoscale my RDMA enabled nodes in a Cluster Network?
-You can set up autoscaling for your nodes in a Cluster Network using the instructions [here](./docs/using-cluster-autoscaler-with-cluster-networks.md).
-
-### How do I use network locality information when running workloads on OKE?
-You can follow the instructions [here](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md).
+- [Adding SSH keys to worker nodes](./docs/adding-ssh-keys-to-worker-nodes.md)
+- [Deploying the Monitoring Stack manually](./docs/deploying-monitoring-stack-manually.md)
+- [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
+- [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
+- [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+- [Running PyTorch Jobs on OKE Using Host Network with RDMA](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md)
+- [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
+- [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
 
 ## Contributing
 
-This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
+This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md).
 
 ## Security
 
-Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process
+Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process.
