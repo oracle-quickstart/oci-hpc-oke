@@ -3,6 +3,7 @@
 
 locals {
   create_workers = true
+  fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
   ssh_authorized_keys = compact([
     trimspace(local.ssh_public_key),
   ])
@@ -25,6 +26,13 @@ locals {
     var.nvme_raid_level,
   ) : ""
 
+   #fss mounting on worker nodes
+
+  runcmd_fss_mount = var.create_fss ? format(
+    "curl -sL -o /var/run/oke-fss-mount.sh https://raw.githubusercontent.com/subburamoracle/oci-hpc-oke/refs/heads/fssmount_worker/files/oke-fss-mount.sh && (bash /var/run/oke-fss-mount.sh '%v' '%v' '%v' || echo 'Error initializing RAID' >&2)",
+    var.fss_export_path, var.fss_mount_path, local.fss_mount_ip
+  ) : ""
+
   write_files = [
     {
       content = local.cluster_apiserver,
@@ -43,6 +51,7 @@ locals {
     runcmd = compact([
       local.runcmd_nvme_raid,
       local.runcmd_bootstrap,
+      local.runcmd_fss_mount
     ])
     write_files = local.write_files
   }
