@@ -10,6 +10,11 @@ if command -v yum >/dev/null 2>&1; then
   yum install -y nfs-utils
   echo "Installed nfs-utils via yum"
 elif command -v apt-get >/dev/null 2>&1; then
+  # Wait for apt lock and install the package
+  while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
+    echo "Waiting for dpkg/apt lock"
+    sleep 1
+  done
   apt-get update
   apt-get install -y nfs-common
   echo "Installed nfs-common via apt-get"
