@@ -84,6 +84,12 @@ resource "null_resource" "helm_deployment_via_operator" {
 
   provisioner "remote-exec" {
     inline = compact(concat(
+      [
+        "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+        "echo 'Checking for helm installation...'",
+        "for i in $(seq 1 30); do if which helm >/dev/null 2>&1; then echo 'Helm found!'; break; else echo \"Waiting for helm... ($i/30)\"; sleep 10; fi; done",
+        "if ! which helm >/dev/null 2>&1; then echo 'ERROR: Helm not found after 5 minutes!'; exit 1; fi"
+      ],
       var.pre_deployment_commands,
       [
         "if [ -s \"${local.operator_helm_values_override_user_file_path}\" ]; then",
