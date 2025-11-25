@@ -197,13 +197,14 @@ module "oke" {
         ]
       }
     },
-    var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack ?
-    {
-      "KubernetesMetricsServer" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-      }
-    } : {},
+    # var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack ?
+    # {
+    #   "KubernetesMetricsServer" = {
+    #     remove_addon_resources_on_delete = true
+    #     override_existing                = true
+    #     skipAddonDependenciesCheck = true
+    #   }
+    # } : {},
     var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
     {
       "CertManager" = {
