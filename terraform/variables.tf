@@ -414,6 +414,41 @@ variable "worker_rdma_image_use_uri" {
 } 
 variable "worker_rdma_image_id" { default = "" }
 
+# Workers - GPU Memory Cluster (GB200)
+variable "worker_gpu_memory_cluster_enabled" { default = false }
+variable "worker_gpu_memory_cluster_ad" { default = "" }
+variable "worker_gpu_memory_cluster_pool_size" {
+  default     = 0
+  type        = number
+  description = "Number of instances in the GMC. Set to 0 to use GMF's available_host_count."
+}
+variable "worker_gpu_memory_cluster_shape" { default = "BM.GPU.GB200.4" }
+variable "worker_gpu_memory_cluster_boot_volume_size" { default = 512 }
+variable "worker_gpu_memory_cluster_boot_volume_vpus_per_gb" { default = 10 }
+variable "worker_gpu_memory_cluster_image_type" { default = "Custom" }
+variable "worker_gpu_memory_cluster_image_custom_id" {
+  default = null
+  type    = string
+}
+variable "worker_gpu_memory_cluster_image_custom_uri" {
+  default = null
+  type    = string
+}
+variable "worker_gpu_memory_cluster_image_use_uri" {
+  default = false
+  type    = bool
+}
+variable "worker_gpu_memory_cluster_gpu_memory_fabric_ids_input" {
+  default     = ""
+  type        = string
+  description = "Newline-separated list of GPU Memory Fabric OCIDs (for ORM multiline input)."
+}
+variable "worker_gpu_memory_cluster_gpu_memory_fabric_ids" {
+  default     = []
+  type        = list(string)
+  description = "Optional list of GPU Memory Fabric OCIDs. If not specified, all available healthy fabrics will be used."
+}
+
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {
   type        = bool

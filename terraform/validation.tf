@@ -12,6 +12,7 @@ locals {
     var.worker_cpu_image_use_uri && !startswith(coalesce(var.worker_cpu_image_custom_uri, "none"), "http"),
     var.worker_gpu_image_use_uri && !startswith(coalesce(var.worker_gpu_image_custom_uri, "none"), "http"),
     var.worker_rdma_image_use_uri && !startswith(coalesce(var.worker_rdma_image_custom_uri, "none"), "http"),
+    var.worker_gpu_memory_cluster_image_use_uri && !startswith(coalesce(var.worker_gpu_memory_cluster_image_custom_uri, "none"), "http"),
   ])
 }
 
@@ -77,7 +78,7 @@ resource "null_resource" "validate_worker_rdma_image" {
 }
 
 resource "null_resource" "validate_image_uri" {
-  count = anytrue([var.worker_ops_image_use_uri, var.worker_cpu_image_use_uri, var.worker_gpu_image_use_uri, var.worker_rdma_image_use_uri]) ? 1 : 0
+  count = anytrue([var.worker_ops_image_use_uri, var.worker_cpu_image_use_uri, var.worker_gpu_image_use_uri, var.worker_rdma_image_use_uri, var.worker_gpu_memory_cluster_image_use_uri]) ? 1 : 0
 
   lifecycle {
     precondition {
@@ -87,17 +88,17 @@ resource "null_resource" "validate_image_uri" {
   }
 }
 
-resource "null_resource" "validate_gb200_shape" {
-  count = local.invalid_gb200_shape ? 1 : 0
+# resource "null_resource" "validate_gb200_shape" {
+#   count = local.invalid_gb200_shape ? 1 : 0
 
-  provisioner "local-exec" {
-    command = "echo 'Error: GB200 shapes require a different deployment process' && exit 1"
-  }
+#   provisioner "local-exec" {
+#     command = "echo 'Error: GB200 shapes require a different deployment process' && exit 1"
+#   }
 
-  lifecycle {
-    precondition {
-      condition     = !local.invalid_gb200_shape
-      error_message = "GB200 shapes (BM.GPU.GB200.4, BM.GPU.GB200-v2.4) require a different deployment process. Please deploy the OKE cluster without the GPU & RDMA worker pool, then follow the GB200-specific instructions at: https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200"
-    }
-  }
-}
+#   lifecycle {
+#     precondition {
+#       condition     = !local.invalid_gb200_shape
+#       error_message = "GB200 shapes (BM.GPU.GB200.4, BM.GPU.GB200-v2.4) require a different deployment process. Please deploy the OKE cluster without the GPU & RDMA worker pool, then follow the GB200-specific instructions at: https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200"
+#     }
+#   }
+# }

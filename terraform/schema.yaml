@@ -43,6 +43,8 @@ variableGroups:
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
+      # GMC variables
+      - worker_gpu_memory_cluster_gmf_ids
 
   - title: "Identity"
     variables:
@@ -172,6 +174,21 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
+
+  - title: "Workers: GPU Memory Cluster (GMC)"
+    variables:
+      - worker_gpu_memory_cluster_enabled
+      - worker_gpu_memory_cluster_ad
+      - worker_gpu_memory_cluster_pool_size
+      - worker_gpu_memory_cluster_shape
+      - worker_gpu_memory_cluster_boot_volume_size
+      - worker_gpu_memory_cluster_boot_volume_vpus_per_gb
+      - worker_gpu_memory_cluster_image_type
+      - worker_gpu_memory_cluster_image_use_uri
+      - worker_gpu_memory_cluster_image_custom_uri
+      - worker_gpu_memory_cluster_image_compartment
+      - worker_gpu_memory_cluster_image_custom_id
+      - worker_gpu_memory_cluster_gpu_memory_fabric_ids_input
   
   - title: "SSH Access"
     variables:
@@ -1310,7 +1327,7 @@ variables:
     title: Shape
     type: oci:core:instanceshape:name
     required: true
-    pattern: "^(VM|BM)\\.GPU.*$"
+    pattern: "^(VM|BM)\\.GPU(?!.*GB[23]00).*$"
     visible: ${worker_gpu_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
@@ -1418,7 +1435,7 @@ variables:
   worker_rdma_shape:
     title: Shape
     type: oci:core:instanceshape:name
-    pattern: "^BM\\.(HPC|GPU|Optimized).*$"
+    pattern: "^BM\\.(HPC|GPU|Optimized)(?!.*GB[23]00).*$"
     required: true
     visible: ${worker_rdma_enabled}
     dependsOn:
@@ -1511,6 +1528,95 @@ variables:
         - ${worker_rdma_enabled}
         - not: [worker_rdma_image_use_uri]
 
+  # Workers - GPU Memory Cluster (GMC)
+  worker_gpu_memory_cluster_enabled:
+    title: Create GPU Memory Cluster (GMC) pool
+    type: boolean
+    description: Create a worker pool using GPU Memory Clusters for GB200/GB300 shapes.
+    default: false
+  worker_gpu_memory_cluster_ad:
+    title: Availability domain
+    type: oci:identity:availabilitydomain:name
+    required: true
+    default: worker_ops_ad
+    visible: ${worker_gpu_memory_cluster_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  worker_gpu_memory_cluster_pool_size:
+    title: Number of GMC worker nodes (per GMF)
+    description: Number of instances per GPU Memory Cluster. Set to 0 to use available_host_count from the GPU Memory Cluster.
+    type: number
+    default: 0
+    visible: ${worker_gpu_memory_cluster_enabled}
+  worker_gpu_memory_cluster_shape:
+    title: Shape
+    type: oci:core:instanceshape:name
+    pattern: "^BM\\.GPU\\.GB[23]00.*$"
+    default: BM.GPU.GB200.4
+    required: true
+    visible: ${worker_gpu_memory_cluster_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  worker_gpu_memory_cluster_boot_volume_size:
+    title: Boot volume size (GB)
+    type: number
+    default: 512
+    visible: ${worker_gpu_memory_cluster_enabled}
+  worker_gpu_memory_cluster_boot_volume_vpus_per_gb:
+    title: Boot volume performance (VPUs/GB)
+    type: number
+    default: 10
+    visible: false
+  worker_gpu_memory_cluster_image_type:
+    title: Image type
+    description: Whether to use an OKE, Platform, Custom, or imported image for GMC worker nodes.
+    type: enum
+    default: Custom
+    enum: [Custom]
+    required: true
+    visible: false
+  worker_gpu_memory_cluster_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    visible: ${worker_gpu_memory_cluster_enabled}
+  worker_gpu_memory_cluster_image_custom_uri:
+    title: Image URI
+    type: string
+    visible:
+      and:
+        - eq: [worker_gpu_memory_cluster_image_type, Custom]
+        - ${worker_gpu_memory_cluster_enabled}
+        - ${worker_gpu_memory_cluster_image_use_uri}
+  worker_gpu_memory_cluster_image_compartment:
+    title: "GMC worker pool image compartment"
+    type: oci:identity:compartment:id
+    required: true
+    default: ${compartment_ocid}
+    visible:
+      and:
+        - eq: [worker_gpu_memory_cluster_image_type, Custom]
+        - ${worker_gpu_memory_cluster_enabled}
+        - not: [worker_gpu_memory_cluster_image_use_uri]
+  worker_gpu_memory_cluster_image_custom_id:
+    title: Image
+    description: Only Ubuntu custom images are supported with GMC worker pools.
+    type: oci:core:image:id
+    required: true
+    dependsOn:
+      compartmentId: ${worker_gpu_memory_cluster_image_compartment}
+    visible:
+      and:
+        - eq: [worker_gpu_memory_cluster_image_type, Custom]
+        - ${worker_gpu_memory_cluster_enabled}
+        - not: [worker_gpu_memory_cluster_image_use_uri]
+  worker_gpu_memory_cluster_gpu_memory_fabric_ids_input:
+    title: GPU Memory Fabric (GMF) OCIDs
+    description: Enter GPU Memory Fabric OCIDs, one per line. If left empty, all available healthy fabrics will be used.
+    type: text
+    multiline: true
+    required: false
+    visible: ${worker_gpu_memory_cluster_enabled}
+
   # SSH access to the nodes
   ssh_public_key:
     title: SSH public key
@@ -1597,6 +1703,8 @@ outputGroups:
       - worker_gpu_image_id
       - worker_rdma_pool_id
       - worker_rdma_image_id
+      - worker_gpu_memory_cluster_pool_ids
+      - worker_gpu_memory_cluster_image_id
 
   - title: Monitoring
     outputs:
@@ -1755,6 +1863,14 @@ outputs:
     title: RDMA pool
     type: ocid
     visible: ${worker_rdma_enabled}
+  worker_gpu_memory_cluster_pool_ids:
+    title: GPU Memory Cluster pools
+    type: string
+    visible: ${worker_gpu_memory_cluster_enabled}
+  worker_gpu_memory_cluster_image_id:
+    title: GMC image
+    type: ocid
+    visible: ${worker_gpu_memory_cluster_enabled}
   
   # Pods
   pod_subnet_id:
