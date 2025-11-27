@@ -1616,6 +1616,14 @@ variables:
     multiline: true
     required: false
     visible: ${worker_gpu_memory_cluster_enabled}
+  worker_gpu_memory_cluster_gpu_memory_fabric_ids:
+    title: GPU Memory Fabric OCIDs (List)
+    description: Optional list of GPU Memory Fabric OCIDs. If not specified, all available healthy fabrics will be used.
+    type: array
+    items:
+      type: string
+    required: false
+    visible: false
 
   # SSH access to the nodes
   ssh_public_key:
