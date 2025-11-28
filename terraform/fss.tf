@@ -5,6 +5,11 @@ locals {
   fss_export_path = format("/oke-gpu-%v", local.state_id)
 }
 
+#export path picked from user input 
+#locals {
+#  fss_export_path = var.fss_export_path
+#}
+
 data "oci_file_storage_mount_targets" "fss" {
   count               = var.create_fss ? 1 : 0
   availability_domain = var.fss_ad
