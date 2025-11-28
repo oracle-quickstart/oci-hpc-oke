@@ -184,7 +184,6 @@ variableGroups:
     - create_bv_high
     - create_fss
     - fss_ad
-    - fss_export_path
     - fss_mount_path
     - create_lustre
     - lustre_ad
@@ -745,12 +744,6 @@ variables:
     visible: ${create_fss}
     dependsOn:
       compartmentId: ${compartment_ocid}
-  fss_export_path:
-    title: FSS export path
-    type: string
-    default: "/oke-hpc-export"
-    required: true
-    visible: ${create_fss}
   fss_mount_path:
     title: FSS mount point
     type: string

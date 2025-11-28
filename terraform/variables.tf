@@ -189,10 +189,6 @@ variable "create_lustre_pv" {
   type    = bool
 }
 # created variable for fss mounting
-variable "fss_export_path" {
-  default = "/oke-hpc-export"
-  type    = string
-}
 variable "fss_mount_path" {
   default = "/mnt/oci-fss"
   type    = string

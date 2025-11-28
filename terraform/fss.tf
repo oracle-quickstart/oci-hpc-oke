@@ -1,14 +1,14 @@
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
-#locals {
-#  fss_export_path = format("/oke-gpu-%v", local.state_id)
-#}
+locals {
+  fss_export_path = format("/oke-gpu-%v", local.state_id)
+}
 
 #export path picked from user input 
-locals {
-  fss_export_path = var.fss_export_path
-}
+#locals {
+#  fss_export_path = var.fss_export_path
+#}
 
 data "oci_file_storage_mount_targets" "fss" {
   count               = var.create_fss ? 1 : 0
