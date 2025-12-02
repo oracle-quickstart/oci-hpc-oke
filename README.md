@@ -276,7 +276,7 @@ helm repo update
 
 ```
 helm install gpu-operator nvidia/gpu-operator \
-    --version=v25.3.4 \
+    --version=v25.10.0 \
     --create-namespace \
     --namespace gpu-operator \
     --set cdi.enabled=true \
@@ -289,7 +289,7 @@ helm install gpu-operator nvidia/gpu-operator \
 
 ```
 helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
-    --version=25.3.2 \
+    --version=25.8.0 \
     --create-namespace \
     --namespace nvidia-dra-driver-gpu \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/gb200/manifests/dra/values.yaml
