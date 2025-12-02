@@ -55,7 +55,8 @@ Follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEn
 #cloud-config
 apt:
   sources:
-    oke-node: {source: 'deb [trusted=yes] https://objectstorage.us-sanjose-1.oraclecloud.com/p/45eOeErEDZqPGiymXZwpeebCNb5lnwzkcQIhtVf6iOF44eet_efdePaF7T8agNYq/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-jammy/kubernetes-1.32 stable main'}
+    oke-node: {source: 'deb [trusted=yes] https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ
+/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-jammy/kubernetes-1.32 stable main'}
 packages:
   - oci-oke-node-all-1.32.1
 write_files:
