@@ -123,7 +123,7 @@ oci --region "${REGION}" \
     "metadata": {
       "user_data": "${BASE64_ENCODED_CLOUD_INIT}",
       "oke-native-pod-networking": "true",
-      "oke-max-pods": "40",
+      "oke-max-pods": "60",
       "pod-subnets": "${POD_SUBNET_ID}",
       "pod-nsgids": "${POD_SUBNET_NSG_ID}"
     },
@@ -161,6 +161,11 @@ oci --region "${REGION}" \
     },
     "availabilityConfig": {
       "recoveryAction": "RESTORE_INSTANCE"
+    }
+  }
+}
+EOF
+)"
 
 ```
 
