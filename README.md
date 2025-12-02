@@ -123,7 +123,7 @@ oci --region "${REGION}" \
     "metadata": {
       "user_data": "${BASE64_ENCODED_CLOUD_INIT}",
       "oke-native-pod-networking": "true",
-      "oke-max-pods": "60",
+      "oke-max-pods": "40",
       "pod-subnets": "${POD_SUBNET_ID}",
       "pod-nsgids": "${POD_SUBNET_NSG_ID}"
     },
