@@ -143,7 +143,7 @@ oci --region "${REGION}" \
         { "name": "Oracle Autonomous Linux", "desiredState": "DISABLED" },
         { "name": "OS Management Service Agent", "desiredState": "DISABLED" },
         { "name": "OS Management Hub Agent", "desiredState": "DISABLED" },
-        { "name": "Management Agent", "desiredState": "ENABLED" },
+        { "name": "Management Agent", "desiredState": "DISABLED" },
         { "name": "Custom Logs Monitoring", "desiredState": "ENABLED" },
         { "name": "Compute RDMA GPU Monitoring", "desiredState": "ENABLED" },
         { "name": "Compute Instance Run Command", "desiredState": "ENABLED" },
