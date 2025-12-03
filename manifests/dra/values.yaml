@@ -183,6 +183,13 @@ controller:
       securityContext: {}
       env: []
       resources: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "node-role.kubernetes.io/node"
+            operator: "Exists"
   # Network policy settings
   networkPolicy:
     # If the network policy is enabled or not
