@@ -333,7 +333,7 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: ctr
-    image: ubuntu:22.04
+    image: docker.io/library/ubuntu:22.04
     command: ["bash", "-c"]
     args: ["ls -la /dev/nvidia-caps-imex-channels; trap 'exit 0' TERM; sleep 9999 & wait"]
     resources:
