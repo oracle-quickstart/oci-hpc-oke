@@ -293,6 +293,12 @@ NODE            CLIQUE
 10.140.63.103   61248eac-4785-4fbf-9cbd-231635e37e9d.20663
 ```
 
+### Install MPI Operator
+
+```
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
+```
+
 ### Run a simple test to validate IMEX daemons are started and IMEX channels are injected
 
 ```yaml
