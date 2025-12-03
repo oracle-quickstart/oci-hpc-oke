@@ -127,7 +127,6 @@ oci --region "${REGION}" \
       "pod-subnets": "${POD_SUBNET_ID}",
       "pod-nsgids": "${POD_SUBNET_NSG_ID}"
     },
-    "displayName": "gb200-instance",
     "shape": "BM.GPU.GB200.4",
     "sourceDetails": {
       "sourceType": "image",
