@@ -542,7 +542,7 @@ kind: ComputeDomain
 metadata:
   name: nccl-test-compute-domain
 spec:
-  numNodes: 2
+  numNodes: 0
   channel:
     resourceClaimTemplate:
       name: nccl-test-compute-domain-channel
@@ -558,7 +558,9 @@ spec:
   runPolicy:
     cleanPodPolicy: Running
   sshAuthMountPath: /root/.ssh
+
   mpiReplicaSpecs:
+
     Launcher:
       replicas: 1
       template:
@@ -568,29 +570,32 @@ spec:
         spec:
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:nccl-2.28.7-1-ib
+            imagePullPolicy: Always
             command: ["bash", "-c"]
             args:
               - |
                 NUM_GPUS=4
                 NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
                 NP=$(($NUM_HOSTS*$NUM_GPUS))
+
                 mpirun --allow-run-as-root \
-                --bind-to none \
-                --map-by ppr:4:node \
-                --mca coll ^hcoll \
-                -x NCCL_DEBUG=WARN \
-                -x NCCL_MNNVL_ENABLE=1 \
-                -x NCCL_CUMEM_ENABLE=1 \
-                -x NCCL_NET_PLUGIN=sys \
-                -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4 \
-                -x NCCL_NVLS_ENABLE=1 \
-                -x NCCL_IB_DISABLE=1 \
-                -x NCCL_SOCKET_IFNAME=eth0 \
-                -np $NP \
-                /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+                  --bind-to none \
+                  --map-by ppr:4:node \
+                  --mca coll ^hcoll \
+                  -x NCCL_DEBUG=WARN \
+                  -x NCCL_MNNVL_ENABLE=1 \
+                  -x NCCL_CUMEM_ENABLE=1 \
+                  -x NCCL_NET_PLUGIN=sys \
+                  -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4 \
+                  -x NCCL_NVLS_ENABLE=1 \
+                  -x NCCL_IB_DISABLE=1 \
+                  -x NCCL_SOCKET_IFNAME=eth0 \
+                  -np $NP \
+                  /opt/nccl_tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+
     Worker:
-      replicas: 2
+      replicas: 18
       template:
         metadata:
           labels:
@@ -606,18 +611,22 @@ spec:
                     values:
                     - mpi-worker
                 topologyKey: nvidia.com/gpu.clique
+
           containers:
           - name: mpi-worker
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:nccl-2.28.7-1-ib
+            imagePullPolicy: Always
             command:
               - /bin/bash
               - -c
               - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+
             resources:
               limits:
                 nvidia.com/gpu: 4
               claims:
               - name: compute-domain-channel
+
           resourceClaims:
           - name: compute-domain-channel
             resourceClaimTemplateName: nccl-test-compute-domain-channel
