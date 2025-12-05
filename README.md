@@ -707,15 +707,6 @@ spec:
           volumes:
           - { name: devinf, hostPath: { path: /dev/infiniband }}
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                - matchExpressions:
-                  - key: node.kubernetes.io/instance-type
-                    operator: In
-                    values:
-                    - BM.GPU.GB200.4
           containers:
           - name: mpi-worker
             ports:
