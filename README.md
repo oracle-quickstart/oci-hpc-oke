@@ -325,9 +325,7 @@ kubectl apply -f sriovnetwork.yaml
 After the nodes reboot and SR-IOV configuration completes, verify that Virtual Functions are correctly exposed:
 
 ```bash
-kubectl get nodes -l 'nvidia.com/gpu=true' \
-  --sort-by=.status.capacity.\"nvidia\\.com/gpu\" \
-  -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\\.com/gpu,RDMA-VFs:status.capacity.nvidia\\.com/sriov-rdma-vf'
+kubectl get nodes -l 'nvidia.com/gpu=true' --sort-by=.status.capacity."nvidia\.com/gpu" -o=custom-columns='NODE:metadata.name,GPUs:status.capacity.nvidia\.com/gpu,RDMA-VFs:status.capacity.nvidia\.com/sriov-rdma-vf'
 ```
 
 Expected output:
