@@ -1,0 +1,34 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-h100t-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    pfNames:
+    - eth4
+    - eth5
+    - eth6
+    - eth7
+    - eth8
+    - eth9
+    - eth10
+    - eth11
+    - eth12
+    - eth13
+    - eth14
+    - eth15
+    - eth16
+    - eth17
+    - eth18
+    - eth19
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.H100T.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+

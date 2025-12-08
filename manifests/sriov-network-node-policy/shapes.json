@@ -1,0 +1,2856 @@
+{
+    "version": "20251203-0.5.91",
+    "rdma-network": [
+      {
+          "default-settings":
+           {
+              "rdma_network": "192.168.0.0/16",
+              "overwrite_config_files": false,
+              "modify_subnet": false,
+              "modify_arp": false
+           },
+           "subnet-settings":
+           {
+              "netmask": "255.255.255.0",
+              "override_netconfig_netmask": "255.255.0.0"
+           },
+           "arp-settings":
+           {
+              "rp_filter": "2",
+              "arp_ignore": "2",
+              "arp_announce": "1"
+           }
+      }
+    ] ,
+    "rdma-settings" : [
+       {
+          "shapes": [ "BM.HPC2.36" ],
+          "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "18",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "108288",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "105",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "5",
+              "roce_accl": { },
+              "buffer": [ "32768", "229120", "0", "0", "0", "0", "0", "0" ],
+              "pfc" : [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2buffer": [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { },
+              "pcie": { }
+          }
+      },
+      {
+          "shapes": [ "BM.Optimized3.36", "BM.GPU.T1.2", "BM.GPU.GU1.2" ],
+          "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "18",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "108288",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "105",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "5",
+              "roce_accl": {
+                  "roce_adp_retrans_en": "0x1",
+                  "roce_tx_window_en": "0x0",
+                  "roce_slow_restart_en": "0x1",
+                  "roce_slow_restart_idle_en": "0x0"
+              },
+              "buffer": [ "32768", "229120", "0", "0", "0", "0", "0", "0" ],
+              "pfc" : [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2buffer": [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { },
+              "pcie": { }
+          }
+      },
+      {
+          "shapes": [ "BM.GPU4.8", "BM.GPU.B4.8", "BM.GPU.A100-v2.8", "BM.GPU.GM4.8" ],
+          "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "8",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "108288",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "41",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "0",
+              "roce_accl": {
+                  "roce_adp_retrans_en": "0x1",
+                  "roce_tx_window_en": "0x0",
+                  "roce_slow_restart_en": "0x1",
+                  "roce_slow_restart_idle_en": "0x0"
+              },
+              "buffer": [ "32768", "229120", "0", "0", "0", "0", "0", "0" ],
+              "pfc" : [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2buffer": [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { "ADVANCED_PCI_SETTINGS": "True(1)", "MAX_ACC_OUT_READ": "44" },
+              "pcie": { "MaxReadReq": "4096", "MaxReadReqSelector": "5" }
+          }
+      },
+      {
+          "shapes": [ "BM.GPU.H100.8", "BM.GPU.H100T.8", "BM.GPU.H200.8", "BM.GPU.H200-NC.8", "BM.GPU.B200.8", "BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8" ],
+          "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "8",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "0",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "41",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "0",
+              "roce_accl": {
+                  "roce_adp_retrans_en": "0x1",
+                  "roce_tx_window_en": "0x0",
+                  "roce_slow_restart_en": "0x1",
+                  "roce_slow_restart_idle_en": "0x0",
+                  "min_ack_timeout_limit_disabled": "0x0",
+                  "adaptive_routing_forced_en": "0x0",
+                  "selective_repeat_forced_en": "0x0"
+              },
+              "pfc" : [ "1", "0", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { "ADVANCED_PCI_SETTINGS": "True(1)",
+                             "MAX_ACC_OUT_READ": "128",
+                             "ROCE_RTT_RESP_DSCP_MODE_P1": "True(1)",
+                             "ROCE_RTT_RESP_DSCP_MODE_P2": "True(1)",
+                             "ROCE_RTT_RESP_DSCP_P1": "46",
+                             "ROCE_RTT_RESP_DSCP_P2": "46" },
+              "pcie": { "MaxReadReq": "4096", "MaxReadReqSelector": "5" },
+              "acs": false
+          }
+      },
+      {
+          "shapes": [ "BM.GPU.GB200.4" ],
+          "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+          "settings":
+          {
+              "mlxconfig": { "ADVANCED_PCI_SETTINGS": "True(1)", "MAX_ACC_OUT_READ": "128" },
+              "pcie": { "MaxReadReq": "4096", "MaxReadReqSelector": "5" }
+          }
+      },
+      {
+          "shapes": [ "BM.GPU.GB200-v2.4" ],
+          "model": "Mellanox Technologies MT43244 Family [ConnectX-7]",
+          "settings":
+          {
+              "mlxconfig": { "ADVANCED_PCI_SETTINGS": "True(1)", "MAX_ACC_OUT_READ": "128" },
+              "pcie": { "MaxReadReq": "4096", "MaxReadReqSelector": "5" }
+          }
+      },
+      {
+        "shapes": [ "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4" ],
+        "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+        "settings":
+        {
+          "ring": { "rx": "8192", "tx": "8192" },
+          "channels": "16",
+          "tx_queue_length": "40000",
+          "mtu": "9000",
+          "rate_to_set_on_first_cnp": "108288",
+          "dscp_ip": "00",
+          "dscp_rdma": "26",
+          "dscp_gpu": "10",
+          "dscp_cnp": "46",
+          "dscp_rdma_tos": "105",
+          "dscp_gpu_tos": "41",
+          "dscp_default_tos": "105",
+          "dscp_ip_tc": "1",
+          "dscp_rdma_tc": "5",
+          "dscp_gpu_tc": "0",
+          "dscp_cnp_tc": "6",
+          "dscp_default_tc": "5",
+          "roce_accl": {
+            "roce_adp_retrans_en": "0x0",
+            "roce_tx_window_en": "0x1",
+            "roce_slow_restart_en": "0x0",
+            "roce_slow_restart_idle_en": "0x0",
+            "min_ack_timeout_limit_disabled": "0x0",
+            "adaptive_routing_forced_en": "0x0",
+            "selective_repeat_forced_en": "0x0"
+          },
+          "pfc":    [ "1", "0", "0", "0", "0", "1", "0", "0" ],
+          "prio2buffer": [ "1", "1", "0", "0", "0", "1", "0", "0" ],
+          "prio2tc":      [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+          "sysctl": { "net.ipv4.tcp_ecn": "1" },
+          "pcie": {}
+        }
+      },
+      {
+          "shapes": [ "BM.GPU.L40S.4" ],
+          "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "8",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "0",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "41",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "0",
+              "roce_accl": {
+                  "roce_adp_retrans_en": "0x1",
+                  "roce_tx_window_en": "0x1",
+                  "roce_slow_restart_en": "0x1",
+                  "roce_slow_restart_idle_en": "0x0",
+                  "min_ack_timeout_limit_disabled": "0x0",
+                  "adaptive_routing_forced_en": "0x0",
+                  "selective_repeat_forced_en": "0x0"
+              },
+              "pfc" : [ "1", "0", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { "ADVANCED_PCI_SETTINGS": "True(1)",
+                             "MAX_ACC_OUT_READ": "128",
+                             "ROCE_RTT_RESP_DSCP_MODE_P1": "True(1)",
+                             "ROCE_RTT_RESP_DSCP_MODE_P2": "True(1)",
+                             "ROCE_RTT_RESP_DSCP_P1": "46",
+                             "ROCE_RTT_RESP_DSCP_P2": "46" },
+              "pcie": { "MaxReadReq": "4096", "MaxReadReqSelector": "5" },
+              "acs": false
+          }
+      },
+      {
+          "shapes": [ "BM.HPC.E5.128", "BM.HPC.E5.144", "BM.HPC.E5-RBR.144" ],
+          "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]",
+          "settings":
+          {
+              "ring": { "rx": "8192", "tx": "8192" },
+              "channels": "18",
+              "tx_queue_length": "20000",
+              "mtu": "4220",
+              "rate_to_set_on_first_cnp": "108288",
+              "dscp_ip": "00",
+              "dscp_rdma": "26",
+              "dscp_gpu": "10",
+              "dscp_cnp": "46",
+              "dscp_rdma_tos": "105",
+              "dscp_gpu_tos": "41",
+              "dscp_default_tos": "105",
+              "dscp_ip_tc": "1",
+              "dscp_rdma_tc": "5",
+              "dscp_gpu_tc": "0",
+              "dscp_cnp_tc": "6",
+              "dscp_default_tc": "5",
+              "roce_accl": {
+                  "roce_adp_retrans_en": "0x1",
+                  "roce_tx_window_en": "0x0",
+                  "roce_slow_restart_en": "0x1",
+                  "roce_slow_restart_idle_en": "0x0"
+              },
+              "buffer": [ "32768", "229120", "0", "0", "0", "0", "0", "0" ],
+              "pfc" : [ "1", "0", "0", "0", "0", "1", "0", "0" ],
+              "prio2buffer": [ "1", "0", "0", "0", "0", "1", "0", "0" ],
+              "prio2tc":  [ "0", "1", "2", "3", "4", "5", "6", "7" ],
+              "sysctl": { "net.ipv4.tcp_ecn": "1" },
+              "mlxconfig": { },
+              "pcie": { }
+          }
+      }
+    ] ,
+    "hpc-shapes": [
+      {
+        "shape": "BM.HPC2.36",
+        "gpu": false,
+        "vcn-nics": [
+          {
+            "pci": "0000:3b:00.0",
+            "interface": "eno2",
+            "device_name": "undefined",
+            "model": "Broadcom Inc. and subsidiaries BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:5e:00.0",
+            "interface": "enp94s0f0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]"
+          }
+        ],
+        "_doc_hops_link": "https://hops.svc.ad1.us-ashburn-1/ui/deviceview?serial=2002XL6079"
+      },
+      {
+        "shape": "BM.Optimized3.36",
+        "gpu": false,
+        "vcn-nics": [
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:98:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU4.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 0,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:15:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 1,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:51:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 2,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:54:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 3,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:8d:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 4,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:92:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 5,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:d6:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 6,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:da:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 7,
+            "module_id": 2
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:2d:00.0",
+            "interface": "enp45s0f0",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "enp12s0f0",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": 0
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "enp12s0f1",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": 0
+          },
+          {
+            "pci": "0000:16:00.0",
+            "interface": "enp22s0f0",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": 1
+          },
+          {
+            "pci": "0000:16:00.1",
+            "interface": "enp22s0f1",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": 1
+          },
+          {
+            "pci": "0000:48:00.0",
+            "interface": "enp72s0f0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:51:00.0",
+            "gpu_id": 2
+          },
+          {
+            "pci": "0000:48:00.1",
+            "interface": "enp72s0f1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:51:00.0",
+            "gpu_id": 2
+          },
+          {
+            "pci": "0000:4c:00.0",
+            "interface": "enp76s0f0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:54:00.0",
+            "gpu_id": 3
+          },
+          {
+            "pci": "0000:4c:00.1",
+            "interface": "enp76s0f1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:54:00.0",
+            "gpu_id": 3
+          },
+          {
+            "pci": "0000:8a:00.0",
+            "interface": "enp138s0f0",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8d:00.0",
+            "gpu_id": 4
+          },
+          {
+            "pci": "0000:8a:00.1",
+            "interface": "enp138s0f1",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8d:00.0",
+            "gpu_id": 4
+          },
+          {
+            "pci": "0000:94:00.0",
+            "interface": "enp148s0f0",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:92:00.0",
+            "gpu_id": 5
+          },
+          {
+            "pci": "0000:94:00.1",
+            "interface": "enp148s0f1",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:92:00.0",
+            "gpu_id": 5
+          },
+          {
+            "pci": "0000:c3:00.0",
+            "interface": "enp195s0f0",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": 6
+          },
+          {
+            "pci": "0000:c3:00.1",
+            "interface": "enp195s0f1",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": 6
+          },
+          {
+            "pci": "0000:d1:00.0",
+            "interface": "enp209s0f0",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": 7
+          },
+          {
+            "pci": "0000:d1:00.1",
+            "interface": "enp209s0f1",
+            "device_name": "mlx5_13",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": 7
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.B4.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 0,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:15:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 1,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:50:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 2,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:53:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 3,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:8c:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 4,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:91:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 5,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:d6:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 6,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:da:00.0",
+            "model": "NVIDIA A100-SXM4-40GB",
+            "id": 7,
+            "module_id": 2
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:6b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "enp12s0f0",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": 0
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "enp12s0f1",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": 0
+          },
+          {
+            "pci": "0000:16:00.0",
+            "interface": "enp22s0f0",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": 1
+          },
+          {
+            "pci": "0000:16:00.1",
+            "interface": "enp22s0f1",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": 1
+          },
+          {
+            "pci": "0000:47:00.0",
+            "interface": "enp71s0f0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": 2
+          },
+          {
+            "pci": "0000:47:00.1",
+            "interface": "enp71s0f1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": 2
+          },
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "enp75s0f0",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": 3
+          },
+          {
+            "pci": "0000:4b:00.1",
+            "interface": "enp75s0f1",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": 3
+          },
+          {
+            "pci": "0000:89:00.0",
+            "interface": "enp137s0f0",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": 4
+          },
+          {
+            "pci": "0000:89:00.1",
+            "interface": "enp137s0f1",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": 4
+          },
+          {
+            "pci": "0000:93:00.0",
+            "interface": "enp147s0f0",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": 5
+          },
+          {
+            "pci": "0000:93:00.1",
+            "interface": "enp147s0f1",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": 5
+          },
+          {
+            "pci": "0000:c3:00.0",
+            "interface": "enp195s0f0",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": 6
+          },
+          {
+            "pci": "0000:c3:00.1",
+            "interface": "enp195s0f1",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": 6
+          },
+          {
+            "pci": "0000:d1:00.0",
+            "interface": "enp209s0f0",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": 7
+          },
+          {
+            "pci": "0000:d1:00.1",
+            "interface": "enp209s0f1",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": 7
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.A100-v2.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 0,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:15:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 1,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:50:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 2,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:53:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 3,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:8c:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 4,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:91:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 5,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:d6:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 6,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:da:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 7,
+            "module_id": 2
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:6b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "enp12s0f0",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "enp12s0f1",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:16:00.0",
+            "interface": "enp22s0f0",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:16:00.1",
+            "interface": "enp22s0f1",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:47:00.0",
+            "interface": "enp71s0f0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:47:00.1",
+            "interface": "enp71s0f1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "enp75s0f0",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:4b:00.1",
+            "interface": "enp75s0f1",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:89:00.0",
+            "interface": "enp137s0f0",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:89:00.1",
+            "interface": "enp137s0f1",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:93:00.0",
+            "interface": "enp147s0f0",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:93:00.1",
+            "interface": "enp147s0f1",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:c3:00.0",
+            "interface": "enp195s0f0",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:c3:00.1",
+            "interface": "enp195s0f1",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d1:00.0",
+            "interface": "enp209s0f0",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": "7"
+          },
+          {
+            "pci": "0000:d1:00.1",
+            "interface": "enp209s0f1",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GM4.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 0
+          },
+          {
+            "pci": "0000:15:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 1
+          },
+          {
+            "pci": "0000:50:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 2
+          },
+          {
+            "pci": "0000:53:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 3
+          },
+          {
+            "pci": "0000:8c:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 4
+          },
+          {
+            "pci": "0000:91:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 5
+          },
+          {
+            "pci": "0000:d6:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 6
+          },
+          {
+            "pci": "0000:da:00.0",
+            "model": "NVIDIA A100-SXM4-80GB",
+            "id": 7
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:6b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "enp12s0f0",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "enp12s0f1",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:16:00.0",
+            "interface": "enp22s0f0",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:16:00.1",
+            "interface": "enp22s0f1",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:15:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:47:00.0",
+            "interface": "enp71s0f0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:47:00.1",
+            "interface": "enp71s0f1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:50:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "enp75s0f0",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:4b:00.1",
+            "interface": "enp75s0f1",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:53:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:89:00.0",
+            "interface": "enp137s0f0",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:89:00.1",
+            "interface": "enp137s0f1",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:8c:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:93:00.0",
+            "interface": "enp147s0f0",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:93:00.1",
+            "interface": "enp147s0f1",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:91:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:c3:00.0",
+            "interface": "enp195s0f0",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:c3:00.1",
+            "interface": "enp195s0f1",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:d6:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d1:00.0",
+            "interface": "enp209s0f0",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": "7"
+          },
+          {
+            "pci": "0000:d1:00.1",
+            "interface": "enp209s0f1",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT28800 Family [ConnectX-5 Ex]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.T1.2",
+        "gpu": [
+          {
+            "pci": "0000:17:00.0",
+            "model": "NVIDIA A10",
+            "id": 0
+          },
+          {
+            "pci": "0000:31:00.0",
+            "model": "NVIDIA A10",
+            "id": 1
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:50:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]",
+            "gpu_pci": "0000:17:00.0",
+            "gpu_id": "0"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GU1.2",
+        "gpu": [
+          {
+            "pci": "0000:17:00.0",
+            "model": "NVIDIA A10",
+            "id": 0
+          },
+          {
+            "pci": "0000:31:00.0",
+            "model": "NVIDIA A10",
+            "id": 1
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:4b:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:50:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]",
+            "gpu_pci": "0000:17:00.0",
+            "gpu_id": "0"
+          }
+        ]
+      },
+      {
+        "shape": "BM.HPC.E5.128",
+        "gpu": false,
+        "vcn-nics": [
+          {
+            "pci": "0000:61:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:e1:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ]
+      },
+      {
+        "shape": "BM.HPC.E5.144",
+        "gpu": false,
+        "vcn-nics": [
+          {
+            "pci": "0000:61:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:e1:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ]
+      },
+      {
+        "shape": "BM.HPC.E5-RBR.144",
+        "gpu": false,
+        "vcn-nics": [
+          {
+            "pci": "0000:61:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:e1:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.L40S.4",
+        "gpu": [
+          {
+            "pci": "0000:16:00.0",
+            "model": "NVIDIA L40S",
+            "id": 0
+          },
+          {
+            "pci": "0000:38:00.0",
+            "model": "NVIDIA L40S",
+            "id": 1
+          },
+          {
+            "pci": "0000:82:00.0",
+            "model": "NVIDIA L40S",
+            "id": 2
+          },
+          {
+            "pci": "0000:ac:00.0",
+            "model": "NVIDIA L40S",
+            "id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:5a:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:5a:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:d4:00.0",
+            "interface": "eth2",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:d4:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:27:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:16:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:97:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:38:00.0",
+            "gpu_id": "1"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.L40S-NC.4",
+        "gpu": [
+          {
+            "pci": "0000:16:00.0",
+            "model": "NVIDIA L40S",
+            "id": 0
+          },
+          {
+            "pci": "0000:38:00.0",
+            "model": "NVIDIA L40S",
+            "id": 1
+          },
+          {
+            "pci": "0000:82:00.0",
+            "model": "NVIDIA L40S",
+            "id": 2
+          },
+          {
+            "pci": "0000:ac:00.0",
+            "model": "NVIDIA L40S",
+            "id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:5a:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:5a:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:d4:00.0",
+            "interface": "eth2",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:d4:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:27:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:16:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:97:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:38:00.0",
+            "gpu_id": "1"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.H100.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:2d:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 1,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:44:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 2,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:5b:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 3,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:89:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 4,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:a8:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 5,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:c0:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 6,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:d8:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 7,
+            "module_id": 6
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:2a:00.1",
+            "interface": "rdma3",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:41:00.1",
+            "interface": "rdma5",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:58:00.1",
+            "interface": "rdma7",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "rdma8",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:86:00.1",
+            "interface": "rdma9",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "rdma10",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:a5:00.1",
+            "interface": "rdma11",
+            "device_name": "mlx5_13",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "rdma12",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:bd:00.1",
+            "interface": "rdma13",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "rdma14",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          },
+          {
+            "pci": "0000:d5:00.1",
+            "interface": "rdma15",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.H100T.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:2d:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 1,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:44:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 2,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:5b:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 3,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:89:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 4,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:a8:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 5,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:c0:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 6,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:d8:00.0",
+            "model": "NVIDIA H100 80GB HBM3",
+            "id": 7,
+            "module_id": 6
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:1f:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth2_pf",
+            "device_name": "mlx5_12",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_13",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "eth4",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:0c:00.1",
+            "interface": "eth5",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "eth6",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:2a:00.1",
+            "interface": "eth7",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "eth8",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:41:00.1",
+            "interface": "eth9",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "eth10",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:58:00.1",
+            "interface": "eth11",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "eth12",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:86:00.1",
+            "interface": "eth13",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "eth14",
+            "device_name": "mlx5_14",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:a5:00.1",
+            "interface": "eth15",
+            "device_name": "mlx5_15",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "eth16",
+            "device_name": "mlx5_16",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:bd:00.1",
+            "interface": "eth17",
+            "device_name": "mlx5_17",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "eth18",
+            "device_name": "mlx5_18",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          },
+          {
+            "pci": "0000:d5:00.1",
+            "interface": "eth19",
+            "device_name": "mlx5_19",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.MI300X.8",
+        "gpu": [
+          {
+            "pci": "0000:11:00.0",
+            "model": "MI300X-O",
+            "id": 0,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:2f:00.0",
+            "model": "MI300X-O",
+            "id": 1,
+            "module_id": 0
+          },
+          {
+            "pci": "0000:46:00.0",
+            "model": "MI300X-O",
+            "id": 2,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:5d:00.0",
+            "model": "MI300X-O",
+            "id": 3,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:8b:00.0",
+            "model": "MI300X-O",
+            "id": 4,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:aa:00.0",
+            "model": "MI300X-O",
+            "id": 5,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:c2:00.0",
+            "model": "MI300X-O",
+            "id": 6,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:da:00.0",
+            "model": "MI300X-O",
+            "id": 7,
+            "module_id": 5
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2892 Family [ConnectX-6 Dx]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "enp12s0np0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:11:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "enp42s0np0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2f:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "enp65s0np0",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:46:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "enp88s0np0",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5d:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "enp134s0np0",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:8b:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "enp165s0np0",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:aa:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "enp189s0np0",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c2:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "enp213s0np0",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:da:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.MI355X-v1.8",
+        "gpu": [
+          {
+            "pci": "0000:0a:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 0,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:23:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 1,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:5a:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 2,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:72:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 3,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:8b:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 4,
+            "module_id": 0
+          },
+          {
+            "pci": "0000:a4:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 5,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:d9:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 6,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:f1:00.0",
+            "model": "AMD Instinct MI355X",
+            "id": 7,
+            "module_id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:38:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:be:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:6d:00.0",
+            "interface": "rdam0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:72:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:05:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0a:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:55:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5a:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:1e:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:23:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:ec:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:f1:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "rdma5",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:8b:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:d4:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d9:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:9f:00.0",
+            "interface": "rdma7",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a4:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.H200.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA H200",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:2d:00.0",
+            "model": "NVIDIA H200",
+            "id": 1,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:44:00.0",
+            "model": "NVIDIA H200",
+            "id": 2,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:5b:00.0",
+            "model": "NVIDIA H200",
+            "id": 3,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:89:00.0",
+            "model": "NVIDIA H200",
+            "id": 4,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:a8:00.0",
+            "model": "NVIDIA H200",
+            "id": 5,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:c0:00.0",
+            "model": "NVIDIA H200",
+            "id": 6,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:d8:00.0",
+            "model": "NVIDIA H200",
+            "id": 7,
+            "module_id": 6
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:1f:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth2",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "rdma5",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "rdma7",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.H200-NC.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA H200",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0000:2d:00.0",
+            "model": "NVIDIA H200",
+            "id": 1,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:44:00.0",
+            "model": "NVIDIA H200",
+            "id": 2,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:5b:00.0",
+            "model": "NVIDIA H200",
+            "id": 3,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:89:00.0",
+            "model": "NVIDIA H200",
+            "id": 4,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:a8:00.0",
+            "model": "NVIDIA H200",
+            "id": 5,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:c0:00.0",
+            "model": "NVIDIA H200",
+            "id": 6,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:d8:00.0",
+            "model": "NVIDIA H200",
+            "id": 7,
+            "module_id": 6
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:1f:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth2",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": "4"
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "rdma5",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": "5"
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": "6"
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "rdma7",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": "7"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GB200.4",
+        "gpu": [
+          {
+            "pci": "0008:01:00.0",
+            "model": "HGX GB200",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0009:01:00.0",
+            "model": "HGX GB200",
+            "id": 1,
+            "module_id": 1
+          },
+          {
+            "pci": "0018:01:00.0",
+            "model": "HGX GB200",
+            "id": 2,
+            "module_id": 4
+          },
+          {
+            "pci": "0019:01:00.0",
+            "model": "HGX GB200",
+            "id": 3,
+            "module_id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0006:09:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0016:0b:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:03:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0008:01:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0002:03:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0009:01:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0010:03:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0018:01:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0012:03:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0019:01:00.0",
+            "gpu_id": "3"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GB200-v2.4",
+        "gpu": [
+          {
+            "pci": "0008:01:00.0",
+            "model": "HGX GB200",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0009:01:00.0",
+            "model": "HGX GB200",
+            "id": 1,
+            "module_id": 1
+          },
+          {
+            "pci": "0018:01:00.0",
+            "model": "HGX GB200",
+            "id": 2,
+            "module_id": 4
+          },
+          {
+            "pci": "0019:01:00.0",
+            "model": "HGX GB200",
+            "id": 3,
+            "module_id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0006:03:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT43244 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0006:03:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT43244 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:03:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0008:01:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0002:03:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0009:01:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0010:03:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0018:01:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0012:03:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0019:01:00.0",
+            "gpu_id": "3"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GB200-v3.4",
+        "gpu": [
+          {
+            "pci": "0008:06:00.0",
+            "model": "HGX GB200",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0009:06:00.0",
+            "model": "HGX GB200",
+            "id": 1,
+            "module_id": 1
+          },
+          {
+            "pci": "0018:06:00.0",
+            "model": "HGX GB200",
+            "id": 2,
+            "module_id": 4
+          },
+          {
+            "pci": "0019:06:00.0",
+            "model": "HGX GB200",
+            "id": 3,
+            "module_id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0006:09:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0016:0b:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:03:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0009:06:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:03:00.1",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0009:06:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0002:03:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0008:06:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0002:03:00.1",
+            "interface": "rdma3",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0008:06:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0010:03:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0019:06:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0010:03:00.1",
+            "interface": "rdma5",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0019:06:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0012:03:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0018:06:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0012:03:00.1",
+            "interface": "rdma7",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0018:06:00.0",
+            "gpu_id": "2"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.GB300.4",
+        "gpu": [
+          {
+            "pci": "0008:06:00.0",
+            "model": "NVIDIA Graphics Device",
+            "id": 0,
+            "module_id": 2
+          },
+          {
+            "pci": "0009:06:00.0",
+            "model": "NVIDIA Graphics Device",
+            "id": 1,
+            "module_id": 1
+          },
+          {
+            "pci": "0018:06:00.0",
+            "model": "NVIDIA Graphics Device",
+            "id": 2,
+            "module_id": 4
+          },
+          {
+            "pci": "0019:06:00.0",
+            "model": "NVIDIA Graphics Device",
+            "id": 3,
+            "module_id": 3
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0007:01:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_4",
+            "model": " Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0017:01:00.0",
+            "interface": "eth1",
+            "device_name": "mlx5_9",
+            "model": " Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:03:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0009:06:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0000:03:00.1",
+            "interface": "rdma1",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0009:06:00.0",
+            "gpu_id": "1"
+          },
+          {
+            "pci": "0002:03:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0008:06:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0002:03:00.1",
+            "interface": "rdma3",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0008:06:00.0",
+            "gpu_id": "0"
+          },
+          {
+            "pci": "0010:03:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0019:06:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0010:03:00.1",
+            "interface": "rdma5",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0019:06:00.0",
+            "gpu_id": "3"
+          },
+          {
+            "pci": "0012:03:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0018:06:00.0",
+            "gpu_id": "2"
+          },
+          {
+            "pci": "0012:03:00.1",
+            "interface": "rdma7",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies CX8 Family [ConnectX-8]",
+            "gpu_pci": "0018:06:00.0",
+            "gpu_id": "2"
+          }
+        ]
+      },
+      {
+        "shape": "BM.GPU.B200.8",
+        "gpu": [
+          {
+            "pci": "0000:0f:00.0",
+            "model": "NVIDIA B200",
+            "id": 0,
+            "module_id": 6
+          },
+          {
+            "pci": "0000:2d:00.0",
+            "model": "NVIDIA B200",
+            "id": 1,
+            "module_id": 8
+          },
+          {
+            "pci": "0000:44:00.0",
+            "model": "NVIDIA B200",
+            "id": 2,
+            "module_id": 7
+          },
+          {
+            "pci": "0000:5b:00.0",
+            "model": "NVIDIA B200",
+            "id": 3,
+            "module_id": 5
+          },
+          {
+            "pci": "0000:89:00.0",
+            "model": "NVIDIA B200",
+            "id": 4,
+            "module_id": 3
+          },
+          {
+            "pci": "0000:a8:00.0",
+            "model": "NVIDIA B200",
+            "id": 5,
+            "module_id": 1
+          },
+          {
+            "pci": "0000:c0:00.0",
+            "model": "NVIDIA B200",
+            "id": 6,
+            "module_id": 4
+          },
+          {
+            "pci": "0000:d8:00.0",
+            "model": "NVIDIA B200",
+            "id": 7,
+            "module_id": 2
+          }
+        ],
+        "vcn-nics": [
+          {
+            "pci": "0000:1f:00.0",
+            "interface": "eth0",
+            "device_name": "mlx5_1",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:1f:00.1",
+            "interface": "eth1",
+            "device_name": "mlx5_2",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.0",
+            "interface": "eth2",
+            "device_name": "mlx5_7",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          },
+          {
+            "pci": "0000:9a:00.1",
+            "interface": "eth3",
+            "device_name": "mlx5_8",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]"
+          }
+        ],
+        "rdma-nics": [
+          {
+            "pci": "0000:0c:00.0",
+            "interface": "rdma0",
+            "device_name": "mlx5_0",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:0f:00.0",
+            "gpu_id": 0
+          },
+          {
+            "pci": "0000:2a:00.0",
+            "interface": "rdma1",
+            "device_name": "mlx5_3",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:2d:00.0",
+            "gpu_id": 1
+          },
+          {
+            "pci": "0000:41:00.0",
+            "interface": "rdma2",
+            "device_name": "mlx5_4",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:44:00.0",
+            "gpu_id": 2
+          },
+          {
+            "pci": "0000:58:00.0",
+            "interface": "rdma3",
+            "device_name": "mlx5_5",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:5b:00.0",
+            "gpu_id": 3
+          },
+          {
+            "pci": "0000:86:00.0",
+            "interface": "rdma4",
+            "device_name": "mlx5_6",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:89:00.0",
+            "gpu_id": 4
+          },
+          {
+            "pci": "0000:a5:00.0",
+            "interface": "rdma5",
+            "device_name": "mlx5_9",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:a8:00.0",
+            "gpu_id": 5
+          },
+          {
+            "pci": "0000:bd:00.0",
+            "interface": "rdma6",
+            "device_name": "mlx5_10",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:c0:00.0",
+            "gpu_id": 6
+          },
+          {
+            "pci": "0000:d5:00.0",
+            "interface": "rdma7",
+            "device_name": "mlx5_11",
+            "model": "Mellanox Technologies MT2910 Family [ConnectX-7]",
+            "gpu_pci": "0000:d8:00.0",
+            "gpu_id": 7
+          }
+        ]
+      }
+    ]
+  }

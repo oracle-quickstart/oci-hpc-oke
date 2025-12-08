@@ -307,4 +307,171 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
-
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-l40s-nc-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:27:00.0
+    - 0000:97:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.L40S-NC.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-gb200-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:03:00.0
+    - 0002:03:00.0
+    - 0010:03:00.0
+    - 0012:03:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.GB200.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-gb200-v2-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:03:00.0
+    - 0002:03:00.0
+    - 0010:03:00.0
+    - 0012:03:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.GB200-v2.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-gb200-v3-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 9000
+  nicSelector:
+    rootDevices:
+    - 0000:03:00.0
+    - 0000:03:00.1
+    - 0002:03:00.0
+    - 0002:03:00.1
+    - 0010:03:00.0
+    - 0010:03:00.1
+    - 0012:03:00.0
+    - 0012:03:00.1
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.GB200-v3.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-gb300-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 9000
+  nicSelector:
+    rootDevices:
+    - 0000:03:00.0
+    - 0000:03:00.1
+    - 0002:03:00.0
+    - 0002:03:00.1
+    - 0010:03:00.0
+    - 0010:03:00.1
+    - 0012:03:00.0
+    - 0012:03:00.1
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.GB300.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-h200-nc-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:0c:00.0
+    - 0000:2a:00.0
+    - 0000:41:00.0
+    - 0000:58:00.0
+    - 0000:86:00.0
+    - 0000:a5:00.0
+    - 0000:bd:00.0
+    - 0000:d5:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.H200-NC.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-mi355x-v1-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:6d:00.0
+    - 0000:05:00.0
+    - 0000:55:00.0
+    - 0000:1e:00.0
+    - 0000:ec:00.0
+    - 0000:86:00.0
+    - 0000:d4:00.0
+    - 0000:9f:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.MI355X-v1.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf

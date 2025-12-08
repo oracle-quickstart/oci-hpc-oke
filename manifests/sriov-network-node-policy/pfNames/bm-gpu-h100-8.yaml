@@ -7,23 +7,23 @@ spec:
   deviceType: netdevice
   mtu: 4220
   nicSelector:
-    rootDevices:
-    - 0000:0c:00.0
-    - 0000:0c:00.1
-    - 0000:2a:00.0
-    - 0000:2a:00.1
-    - 0000:41:00.0
-    - 0000:41:00.1
-    - 0000:58:00.0
-    - 0000:58:00.1
-    - 0000:86:00.0
-    - 0000:86:00.1
-    - 0000:a5:00.0
-    - 0000:a5:00.1
-    - 0000:bd:00.0
-    - 0000:bd:00.1
-    - 0000:d5:00.0
-    - 0000:d5:00.1
+    pfNames:
+    - rdma0
+    - rdma1
+    - rdma2
+    - rdma3
+    - rdma4
+    - rdma5
+    - rdma6
+    - rdma7
+    - rdma8
+    - rdma9
+    - rdma10
+    - rdma11
+    - rdma12
+    - rdma13
+    - rdma14
+    - rdma15
     vendor: "15b3"
   nodeSelector:
     node.kubernetes.io/instance-type: "BM.GPU.H100.8"

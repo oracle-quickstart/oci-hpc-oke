@@ -1,0 +1,26 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-gb300-4
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 9000
+  nicSelector:
+    rootDevices:
+    - 0000:03:00.0
+    - 0000:03:00.1
+    - 0002:03:00.0
+    - 0002:03:00.1
+    - 0010:03:00.0
+    - 0010:03:00.1
+    - 0012:03:00.0
+    - 0012:03:00.1
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.GB300.4"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+

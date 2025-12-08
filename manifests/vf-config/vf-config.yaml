@@ -1,0 +1,769 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vf-config-go-source
+  namespace: kube-system
+data:
+  main.go: |
+    package main
+
+    import (
+        "context"
+        "flag"
+        "fmt"
+        "io"
+        "net/http"
+        "os"
+        "os/exec"
+        "os/signal"
+        "path/filepath"
+        "sort"
+        "strings"
+        "sync"
+        "syscall"
+        "time"
+    )
+
+    // Shape configurations from shapes.json
+    var shapeConfig = map[string]struct {
+        PCIAddresses []string
+        MTU          int
+    }{
+        // ConnectX-5 shapes (16 NICs, enp* naming, MTU 4220)
+        "BM.GPU4.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:16:00.0", "0000:16:00.1",
+                "0000:48:00.0", "0000:48:00.1", "0000:4c:00.0", "0000:4c:00.1",
+                "0000:8a:00.0", "0000:8a:00.1", "0000:94:00.0", "0000:94:00.1",
+                "0000:c3:00.0", "0000:c3:00.1", "0000:d1:00.0", "0000:d1:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.B4.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:16:00.0", "0000:16:00.1",
+                "0000:47:00.0", "0000:47:00.1", "0000:4b:00.0", "0000:4b:00.1",
+                "0000:89:00.0", "0000:89:00.1", "0000:93:00.0", "0000:93:00.1",
+                "0000:c3:00.0", "0000:c3:00.1", "0000:d1:00.0", "0000:d1:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.A100-v2.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:16:00.0", "0000:16:00.1",
+                "0000:47:00.0", "0000:47:00.1", "0000:4b:00.0", "0000:4b:00.1",
+                "0000:89:00.0", "0000:89:00.1", "0000:93:00.0", "0000:93:00.1",
+                "0000:c3:00.0", "0000:c3:00.1", "0000:d1:00.0", "0000:d1:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.GM4.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:16:00.0", "0000:16:00.1",
+                "0000:47:00.0", "0000:47:00.1", "0000:4b:00.0", "0000:4b:00.1",
+                "0000:89:00.0", "0000:89:00.1", "0000:93:00.0", "0000:93:00.1",
+                "0000:c3:00.0", "0000:c3:00.1", "0000:d1:00.0", "0000:d1:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.H100.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:2a:00.0", "0000:2a:00.1",
+                "0000:41:00.0", "0000:41:00.1", "0000:58:00.0", "0000:58:00.1",
+                "0000:86:00.0", "0000:86:00.1", "0000:a5:00.0", "0000:a5:00.1",
+                "0000:bd:00.0", "0000:bd:00.1", "0000:d5:00.0", "0000:d5:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.H100T.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:0c:00.1", "0000:2a:00.0", "0000:2a:00.1",
+                "0000:41:00.0", "0000:41:00.1", "0000:58:00.0", "0000:58:00.1",
+                "0000:86:00.0", "0000:86:00.1", "0000:a5:00.0", "0000:a5:00.1",
+                "0000:bd:00.0", "0000:bd:00.1", "0000:d5:00.0", "0000:d5:00.1",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.H200.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
+                "0000:86:00.0", "0000:a5:00.0", "0000:bd:00.0", "0000:d5:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.H200-NC.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
+                "0000:86:00.0", "0000:a5:00.0", "0000:bd:00.0", "0000:d5:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.B200.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
+                "0000:86:00.0", "0000:a5:00.0", "0000:bd:00.0", "0000:d5:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.L40S.4": {
+            PCIAddresses: []string{"0000:27:00.0", "0000:97:00.0"},
+            MTU:          4220,
+        },
+        "BM.GPU.L40S-NC.4": {
+            PCIAddresses: []string{"0000:27:00.0", "0000:97:00.0"},
+            MTU:          4220,
+        },
+        "BM.GPU.MI300X.8": {
+            PCIAddresses: []string{
+                "0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
+                "0000:86:00.0", "0000:a5:00.0", "0000:bd:00.0", "0000:d5:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.MI355X-v1.8": {
+            PCIAddresses: []string{
+                "0000:6d:00.0", "0000:05:00.0", "0000:55:00.0", "0000:1e:00.0",
+                "0000:ec:00.0", "0000:86:00.0", "0000:d4:00.0", "0000:9f:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.GB200.4": {
+            PCIAddresses: []string{
+                "0000:03:00.0", "0002:03:00.0", "0010:03:00.0", "0012:03:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.GB200-v2.4": {
+            PCIAddresses: []string{
+                "0000:03:00.0", "0002:03:00.0", "0010:03:00.0", "0012:03:00.0",
+            },
+            MTU: 4220,
+        },
+        "BM.GPU.GB200-v3.4": {
+            PCIAddresses: []string{
+                "0000:03:00.0", "0000:03:00.1", "0002:03:00.0", "0002:03:00.1",
+                "0010:03:00.0", "0010:03:00.1", "0012:03:00.0", "0012:03:00.1",
+            },
+            MTU: 9000,
+        },
+        "BM.GPU.GB300.4": {
+            PCIAddresses: []string{
+                "0000:03:00.0", "0000:03:00.1", "0002:03:00.0", "0002:03:00.1",
+                "0010:03:00.0", "0010:03:00.1", "0012:03:00.0", "0012:03:00.1",
+            },
+            MTU: 9000,
+        },
+    }
+
+    var hostRoot string
+
+    func log(format string, args ...interface{}) {
+        timestamp := time.Now().Format("2006-01-02 15:04:05")
+        fmt.Printf("[%s] %s\n", timestamp, fmt.Sprintf(format, args...))
+    }
+
+    func hostPath(path string) string {
+        return filepath.Join(hostRoot, path)
+    }
+
+    func fileExists(path string) bool {
+        _, err := os.Stat(path)
+        return err == nil
+    }
+
+    func readFile(path string) (string, error) {
+        data, err := os.ReadFile(path)
+        if err != nil {
+            return "", err
+        }
+        return strings.TrimSpace(string(data)), nil
+    }
+
+    func writeFile(path, content string) error {
+        return os.WriteFile(path, []byte(content), 0644)
+    }
+
+    func runOnHost(args ...string) error {
+        cmd := exec.Command("chroot", append([]string{hostRoot}, args...)...)
+        cmd.Stdout = os.Stdout
+        cmd.Stderr = os.Stderr
+        return cmd.Run()
+    }
+
+    func runOnHostSilent(args ...string) error {
+        cmd := exec.Command("chroot", append([]string{hostRoot}, args...)...)
+        return cmd.Run()
+    }
+
+    // =============================================================================
+    // OCA Management
+    // =============================================================================
+
+    func waitForOCA(maxWait, interval int) bool {
+        log("Waiting for OCA configuration to complete...")
+        ocaLog := hostPath("/var/log/oracle-cloud-agent/plugins/oci-hpc/oci-hpc-configure/oci-hpc-mlx-configure.log")
+
+        waited := 0
+        for waited < maxWait {
+            if content, err := readFile(ocaLog); err == nil {
+                if strings.Contains(content, "Fully Configured") {
+                    log("OCA configuration complete")
+                    return true
+                }
+            }
+            log("Waiting... (%d/%d seconds)", waited, maxWait)
+            time.Sleep(time.Duration(interval) * time.Second)
+            waited += interval
+        }
+        log("Warning: Timeout waiting for OCA, proceeding anyway")
+        return false
+    }
+
+    func stopOCA() {
+        log("Stopping OCA...")
+        if err := runOnHostSilent("snap", "stop", "oracle-cloud-agent"); err != nil {
+            runOnHostSilent("systemctl", "stop", "oracle-cloud-agent")
+        }
+    }
+
+    func startOCA() {
+        log("Starting OCA...")
+        if err := runOnHostSilent("snap", "start", "oracle-cloud-agent"); err != nil {
+            runOnHostSilent("systemctl", "start", "oracle-cloud-agent")
+        }
+    }
+
+    // =============================================================================
+    // VF Management
+    // =============================================================================
+
+    func resetAllVFs() {
+        log("Resetting all VFs to 0...")
+        netPath := hostPath("/sys/class/net")
+        entries, err := os.ReadDir(netPath)
+        if err != nil {
+            return
+        }
+        for _, entry := range entries {
+            numvfsPath := filepath.Join(netPath, entry.Name(), "device", "sriov_numvfs")
+            if fileExists(numvfsPath) {
+                writeFile(numvfsPath, "0")
+            }
+        }
+        time.Sleep(5 * time.Second)
+    }
+
+    func getInterfaceFromPCI(pciAddr string) string {
+        netPath := hostPath(fmt.Sprintf("/sys/bus/pci/devices/%s/net", pciAddr))
+        entries, err := os.ReadDir(netPath)
+        if err != nil || len(entries) == 0 {
+            return ""
+        }
+        return entries[0].Name()
+    }
+
+    func discoverRDMAInterfaces() []string {
+        var interfaces []string
+        netPath := hostPath("/sys/class/net")
+        entries, err := os.ReadDir(netPath)
+        if err != nil {
+            return interfaces
+        }
+        for _, entry := range entries {
+            name := entry.Name()
+            if strings.HasPrefix(name, "rdma") && !strings.Contains(name, "v") {
+                interfaces = append(interfaces, name)
+            }
+        }
+        sort.Strings(interfaces)
+        return interfaces
+    }
+
+    func getShapeWithRetry(maxTime, interval int) string {
+        startTime := time.Now()
+        client := &http.Client{Timeout: 10 * time.Second}
+
+        for {
+            req, _ := http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/shape", nil)
+            req.Header.Set("Authorization", "Bearer Oracle")
+            
+            if resp, err := client.Do(req); err == nil {
+                defer resp.Body.Close()
+                if body, err := io.ReadAll(resp.Body); err == nil {
+                    shape := strings.TrimSpace(string(body))
+                    if shape != "" {
+                        return shape
+                    }
+                }
+            }
+
+            elapsed := time.Since(startTime).Seconds()
+            if elapsed >= float64(maxTime) {
+                log("Warning: Unable to detect shape after %ds", maxTime)
+                return ""
+            }
+            log("Metadata service not responding, retrying in %ds...", interval)
+            time.Sleep(time.Duration(interval) * time.Second)
+        }
+    }
+
+    // =============================================================================
+    // VF Creation
+    // =============================================================================
+
+    func getNumVFsPath(iface string) string {
+        return hostPath(fmt.Sprintf("/sys/class/net/%s/device/sriov_numvfs", iface))
+    }
+
+    func getTotalVFs(iface string) int {
+        path := hostPath(fmt.Sprintf("/sys/class/net/%s/device/sriov_totalvfs", iface))
+        if content, err := readFile(path); err == nil {
+            var total int
+            fmt.Sscanf(content, "%d", &total)
+            return total
+        }
+        return 0
+    }
+
+    func getVFDevName(iface string, vfIdx int) string {
+        vfNetPath := hostPath(fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net", iface, vfIdx))
+        entries, err := os.ReadDir(vfNetPath)
+        if err != nil || len(entries) == 0 {
+            return ""
+        }
+        return entries[0].Name()
+    }
+
+    func getEffMacAddr(iface string, vfIdx int) string {
+        vfDevName := getVFDevName(iface, vfIdx)
+        if vfDevName == "" {
+            return ""
+        }
+        addrPath := hostPath(fmt.Sprintf("/sys/class/net/%s/device/virtfn%d/net/%s/address", iface, vfIdx, vfDevName))
+        if content, err := readFile(addrPath); err == nil {
+            return content
+        }
+        return ""
+    }
+
+    func getVFPCIAddr(iface string, vfIdx int) string {
+        vfDevName := getVFDevName(iface, vfIdx)
+        if vfDevName == "" {
+            return ""
+        }
+        ueventPath := hostPath(fmt.Sprintf("/sys/class/net/%s/device/uevent", vfDevName))
+        if content, err := readFile(ueventPath); err == nil {
+            for _, line := range strings.Split(content, "\n") {
+                if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
+                    return strings.TrimPrefix(line, "PCI_SLOT_NAME=")
+                }
+            }
+        }
+        return ""
+    }
+
+    func waitForVF(iface string, vfIdx, maxWait int) bool {
+        for i := 0; i < maxWait; i++ {
+            if getVFDevName(iface, vfIdx) != "" {
+                return true
+            }
+            time.Sleep(1 * time.Second)
+        }
+        return false
+    }
+
+    func bindDriver(pciAddr, driver string) bool {
+        bindPath := hostPath(fmt.Sprintf("/sys/bus/pci/drivers/%s/bind", driver))
+        return writeFile(bindPath, pciAddr) == nil
+    }
+
+    func unbindDriver(pciAddr, driver string) bool {
+        unbindPath := hostPath(fmt.Sprintf("/sys/bus/pci/drivers/%s/unbind", driver))
+        return writeFile(unbindPath, pciAddr) == nil
+    }
+
+    func createVFsForInterface(iface string, numVFs int) bool {
+        log("Creating %d VFs for %s", numVFs, iface)
+
+        ifacePath := hostPath(fmt.Sprintf("/sys/class/net/%s", iface))
+        if !fileExists(ifacePath) {
+            log("ERROR: Interface %s does not exist", iface)
+            return false
+        }
+
+        numvfsPath := getNumVFsPath(iface)
+        if !fileExists(numvfsPath) {
+            log("ERROR: SRIOV not supported for %s", iface)
+            return false
+        }
+
+        totalVFs := getTotalVFs(iface)
+        if numVFs > totalVFs {
+            log("ERROR: %s only supports %d VFs", iface, totalVFs)
+            return false
+        }
+
+        currentStr, _ := readFile(numvfsPath)
+        var current int
+        fmt.Sscanf(currentStr, "%d", &current)
+
+        if current != numVFs {
+            log("Creating VFs for %s (current: %d, target: %d)", iface, current, numVFs)
+            if current != 0 {
+                writeFile(numvfsPath, "0")
+                time.Sleep(2 * time.Second)
+            }
+            writeFile(numvfsPath, fmt.Sprintf("%d", numVFs))
+            time.Sleep(3 * time.Second)
+        } else {
+            log("%d VFs already exist for %s", numVFs, iface)
+        }
+
+        // Configure VFs
+        for i := 0; i < numVFs; i++ {
+            if !waitForVF(iface, i, 10) {
+                log("VF %d not found for %s", i, iface)
+                continue
+            }
+            mac := getEffMacAddr(iface, i)
+            if mac == "" {
+                continue
+            }
+            vfName := getVFDevName(iface, i)
+            log("Setting %s VF %d (%s) MAC to %s", iface, i, vfName, mac)
+            runOnHostSilent("ip", "link", "set", "dev", iface, "vf", fmt.Sprintf("%d", i), "mac", mac)
+            
+            pci := getVFPCIAddr(iface, i)
+            if pci != "" {
+                unbindDriver(pci, "mlx5_core")
+                time.Sleep(1 * time.Second)
+                bindDriver(pci, "mlx5_core")
+            }
+        }
+
+        log("Done: %s", iface)
+        return true
+    }
+
+    func setMTU(iface string, mtu int) bool {
+        return runOnHostSilent("ip", "link", "set", "dev", iface, "mtu", fmt.Sprintf("%d", mtu)) == nil
+    }
+
+    // =============================================================================
+    // Parallel Configuration
+    // =============================================================================
+
+    type configResult struct {
+        pciAddr string
+        iface   string
+        success bool
+    }
+
+    func configureInterface(pciAddr string, numVFs, mtu int) configResult {
+        iface := getInterfaceFromPCI(pciAddr)
+        if iface == "" {
+            log("Warning: No interface for PCI %s", pciAddr)
+            return configResult{pciAddr, "", false}
+        }
+
+        log("PCI %s -> %s", pciAddr, iface)
+        if createVFsForInterface(iface, numVFs) {
+            setMTU(iface, mtu)
+            return configResult{pciAddr, iface, true}
+        }
+        return configResult{pciAddr, iface, false}
+    }
+
+    func configureInterfacesParallel(pciAddresses []string, numVFs, mtu int) int {
+        total := len(pciAddresses)
+        log("Configuring %d interfaces in PARALLEL", total)
+
+        results := make(chan configResult, total)
+        var wg sync.WaitGroup
+
+        for _, pci := range pciAddresses {
+            wg.Add(1)
+            go func(pciAddr string) {
+                defer wg.Done()
+                results <- configureInterface(pciAddr, numVFs, mtu)
+            }(pci)
+        }
+
+        go func() {
+            wg.Wait()
+            close(results)
+        }()
+
+        configured := 0
+        for result := range results {
+            if result.success {
+                configured++
+                log("[OK] %s (%s) - %d/%d", result.pciAddr, result.iface, configured, total)
+            } else {
+                ifaceStr := result.iface
+                if ifaceStr == "" {
+                    ifaceStr = "not found"
+                }
+                log("[FAIL] %s (%s)", result.pciAddr, ifaceStr)
+            }
+        }
+
+        return configured
+    }
+
+    // =============================================================================
+    // SRIOV Device Plugin
+    // =============================================================================
+
+    func restartSRIOVDevicePlugin() {
+        log("Restarting sriov-device-plugin pod...")
+
+        // First, try to find the pod using crictl
+        cmd := exec.Command("chroot", hostRoot, "/bin/bash", "-c",
+            "crictl pods 2>/dev/null | grep sriov-device-plugin | awk '{print $1}' | tail -1")
+        output, err := cmd.Output()
+        if err != nil {
+            log("Warning: Could not list pods via crictl: %v", err)
+            return
+        }
+
+        podID := strings.TrimSpace(string(output))
+        if podID == "" {
+            log("Warning: No sriov-device-plugin pod found")
+            return
+        }
+
+        log("Found sriov-device-plugin pod: %s", podID)
+
+        // Remove the pod forcefully
+        rmCmd := exec.Command("chroot", hostRoot, "/bin/bash", "-c",
+            fmt.Sprintf("crictl rmp -f %s 2>&1", podID))
+        rmOutput, rmErr := rmCmd.CombinedOutput()
+        if rmErr != nil {
+            log("Warning: Could not restart pod %s: %v (output: %s)", podID, rmErr, string(rmOutput))
+            return
+        }
+
+        log("Restarted pod %s", podID)
+    }
+
+    // =============================================================================
+    // Main
+    // =============================================================================
+
+    func main() {
+        numVFs := flag.Int("num-vfs", 1, "Number of VFs per interface")
+        waitForOCAFlag := flag.Bool("wait-for-oca", false, "Wait for OCA to complete")
+        manageServices := flag.Bool("manage-services", false, "Stop/start OCA")
+        resetVFs := flag.Bool("reset-vfs", false, "Reset all VFs before config")
+        restartSRIOV := flag.Bool("restart-sriov", false, "Restart sriov-device-plugin")
+        sleepForever := flag.Bool("sleep", false, "Sleep forever after completion")
+        runOnce := flag.Bool("run-once", false, "Run once using marker file (for DaemonSet without --sleep)")
+        hostRootFlag := flag.String("host-root", "/host", "Host root mount point")
+        flag.Parse()
+
+        hostRoot = *hostRootFlag
+
+        // Handle graceful shutdown
+        ctx, cancel := context.WithCancel(context.Background())
+        sigChan := make(chan os.Signal, 1)
+        signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+        go func() {
+            <-sigChan
+            log("Received signal, exiting...")
+            cancel()
+            os.Exit(0)
+        }()
+        _ = ctx
+
+        // Check marker file for --run-once mode
+        markerFile := hostPath("/var/run/vf-config-done")
+        if *runOnce {
+            if fileExists(markerFile) {
+                log("VF configuration already done (marker exists)")
+                if *sleepForever {
+                    log("Sleeping forever...")
+                    for {
+                        time.Sleep(1 * time.Hour)
+                    }
+                }
+                return
+            }
+        }
+
+        log("=== VF Configuration Started ===")
+
+        // Step 1: Wait for OCA
+        if *waitForOCAFlag {
+            waitForOCA(600, 15)
+        }
+
+        // Step 2: Stop OCA
+        if *manageServices {
+            stopOCA()
+        }
+
+        // Step 3: Reset VFs
+        if *resetVFs {
+            resetAllVFs()
+        }
+
+        // Step 4: Show RDMA status
+        runOnHost("rdma", "system", "show")
+
+        // Step 5: Detect shape and configure VFs
+        shape := getShapeWithRetry(300, 15)
+        config, ok := shapeConfig[shape]
+
+        if !ok || shape == "" {
+            log("Unknown shape '%s', falling back to rdma* discovery", shape)
+            interfaces := discoverRDMAInterfaces()
+            for _, iface := range interfaces {
+                createVFsForInterface(iface, *numVFs)
+            }
+        } else {
+            log("Detected shape: %s", shape)
+            log("Configuring %d interfaces (MTU: %d)", len(config.PCIAddresses), config.MTU)
+
+            startTime := time.Now()
+            configured := configureInterfacesParallel(config.PCIAddresses, *numVFs, config.MTU)
+            elapsed := time.Since(startTime).Seconds()
+            log("Configured %d/%d interfaces in %.1fs", configured, len(config.PCIAddresses), elapsed)
+        }
+
+        // Step 6: Start OCA
+        if *manageServices {
+            startOCA()
+        }
+
+        // Step 7: Restart sriov-device-plugin
+        if *restartSRIOV {
+            restartSRIOVDevicePlugin()
+        }
+
+        log("=== VF Configuration Complete ===")
+
+        // Create marker file for --run-once mode
+        if *runOnce {
+            if err := writeFile(markerFile, time.Now().Format(time.RFC3339)); err != nil {
+                log("Warning: Could not create marker file: %v", err)
+            } else {
+                log("Created marker file: %s", markerFile)
+            }
+        }
+
+        // Step 8: Sleep forever (for DaemonSet)
+        if *sleepForever {
+            log("Sleeping forever (send SIGTERM to exit)...")
+            for {
+                time.Sleep(1 * time.Hour)
+            }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vf-config
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: vf-config
+  template:
+    metadata:
+      labels:
+        app: vf-config
+    spec:
+      priorityClassName: system-node-critical
+      hostNetwork: true
+      tolerations: [{ operator: "Exists" }]
+      terminationGracePeriodSeconds: 5
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - BM.GPU4.8
+                - BM.GPU.B4.8
+                - BM.GPU.A100-v2.8
+                - BM.GPU.GM4.8
+                - BM.GPU.H100.8
+                - BM.GPU.H100T.8
+                - BM.GPU.H200.8
+                - BM.GPU.H200-NC.8
+                - BM.GPU.B200.8
+                - BM.GPU.L40S.4
+                - BM.GPU.L40S-NC.4
+                - BM.GPU.MI300X.8
+                - BM.GPU.MI355X-v1.8
+                - BM.GPU.GB200.4
+                - BM.GPU.GB200-v2.4
+                - BM.GPU.GB200-v3.4
+                - BM.GPU.GB300.4
+      volumes:
+        - name: host-root
+          hostPath:
+            path: "/"
+        - name: go-source
+          configMap:
+            name: vf-config-go-source
+        - name: go-cache
+          emptyDir: {}
+      initContainers:
+        - name: compile
+          image: docker.io/library/golang:1.25-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              ARCH=$(go env GOARCH)
+              echo "Compiling vf-config for linux/${ARCH}..."
+              cd /src
+              CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags="-s -w" -o /cache/vf-config main.go
+              chmod +x /cache/vf-config
+              echo "Compilation complete: $(file /cache/vf-config)"
+          volumeMounts:
+            - name: go-source
+              mountPath: /src
+            - name: go-cache
+              mountPath: /cache
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      containers:
+        - name: vf-config
+          image: docker.io/library/alpine:3.19
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: go-cache
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          command:
+            - /app/vf-config
+            - --num-vfs=1
+            - --wait-for-oca
+            - --manage-services
+            - --reset-vfs
+            - --restart-sriov
+            - --run-once
+

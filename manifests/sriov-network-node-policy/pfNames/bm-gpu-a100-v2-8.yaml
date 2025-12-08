@@ -1,0 +1,34 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-a100-v2-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    pfNames:
+    - enp12s0f0
+    - enp12s0f1
+    - enp22s0f0
+    - enp22s0f1
+    - enp71s0f0
+    - enp71s0f1
+    - enp75s0f0
+    - enp75s0f1
+    - enp137s0f0
+    - enp137s0f1
+    - enp147s0f0
+    - enp147s0f1
+    - enp195s0f0
+    - enp195s0f1
+    - enp209s0f0
+    - enp209s0f1
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.A100-v2.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+

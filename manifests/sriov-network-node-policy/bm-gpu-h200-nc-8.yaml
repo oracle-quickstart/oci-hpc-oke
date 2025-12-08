@@ -1,7 +1,7 @@
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: bm-gpu-h100-8
+  name: bm-gpu-h200-nc-8
   namespace: nvidia-network-operator
 spec:
   deviceType: netdevice
@@ -9,24 +9,16 @@ spec:
   nicSelector:
     rootDevices:
     - 0000:0c:00.0
-    - 0000:0c:00.1
     - 0000:2a:00.0
-    - 0000:2a:00.1
     - 0000:41:00.0
-    - 0000:41:00.1
     - 0000:58:00.0
-    - 0000:58:00.1
     - 0000:86:00.0
-    - 0000:86:00.1
     - 0000:a5:00.0
-    - 0000:a5:00.1
     - 0000:bd:00.0
-    - 0000:bd:00.1
     - 0000:d5:00.0
-    - 0000:d5:00.1
     vendor: "15b3"
   nodeSelector:
-    node.kubernetes.io/instance-type: "BM.GPU.H100.8"
+    node.kubernetes.io/instance-type: "BM.GPU.H200-NC.8"
   isRdma: true
   numVfs: 1
   priority: 90

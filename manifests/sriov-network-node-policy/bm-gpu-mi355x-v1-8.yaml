@@ -1,0 +1,26 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-mi355x-v1-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    rootDevices:
+    - 0000:6d:00.0
+    - 0000:05:00.0
+    - 0000:55:00.0
+    - 0000:1e:00.0
+    - 0000:ec:00.0
+    - 0000:86:00.0
+    - 0000:d4:00.0
+    - 0000:9f:00.0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.MI355X-v1.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+

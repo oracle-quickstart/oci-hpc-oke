@@ -1,0 +1,26 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: bm-gpu-mi300x-8
+  namespace: nvidia-network-operator
+spec:
+  deviceType: netdevice
+  mtu: 4220
+  nicSelector:
+    pfNames:
+    - enp12s0np0
+    - enp42s0np0
+    - enp65s0np0
+    - enp88s0np0
+    - enp134s0np0
+    - enp165s0np0
+    - enp189s0np0
+    - enp213s0np0
+    vendor: "15b3"
+  nodeSelector:
+    node.kubernetes.io/instance-type: "BM.GPU.MI300X.8"
+  isRdma: true
+  numVfs: 1
+  priority: 90
+  resourceName: sriov-rdma-vf
+
