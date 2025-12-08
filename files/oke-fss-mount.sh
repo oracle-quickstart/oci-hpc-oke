@@ -28,7 +28,7 @@ mount -t nfs -o vers=3,nconnect=16 "$MOUNT_TARGET_IP:$EXPORT_PATH" "$MOUNT_POINT
 if [ $? -eq 0 ]; then
   echo "Successfully mounted $MOUNT_TARGET_IP:$EXPORT_PATH at $MOUNT_POINT"
 else
-  echo "Failed to mount $MOUNT_TARGET_IP:$EXPORT_PATH" >&2
+  echo 'Error initializing RAID' >&2
   exit 1
 fi
 
