@@ -727,7 +727,8 @@ spec:
               cd /src
               CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags="-s -w" -o /cache/vf-config main.go
               chmod +x /cache/vf-config
-              echo "Compilation complete: $(file /cache/vf-config)"
+              ls -lh /cache/vf-config
+              echo "Compilation complete for linux/${ARCH}"
           volumeMounts:
             - name: go-source
               mountPath: /src
