@@ -100,7 +100,7 @@ case "$ID" in
             oke_package_version="${kubernetes_version:1}"
             oke_package_repo_version="${oke_package_version:0:4}"
             oke_package_name="oci-oke-node-all-$oke_package_version"
-            oke_package_repo="https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+            oke_package_repo="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
 
             tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
 Enabled: yes
