@@ -505,6 +505,69 @@ func configureInterfacesParallel(pciAddresses []string, numVFs, mtu int) int {
 }
 
 // =============================================================================
+// RDMA Namespace Configuration
+// =============================================================================
+
+func getRDMANetnsMode() string {
+	cmd := exec.Command("chroot", hostRoot, "rdma", "system", "show")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	// Output looks like: "netns shared copy-on-fork on" or "netns exclusive copy-on-fork on"
+	outputStr := strings.TrimSpace(string(output))
+	if strings.Contains(outputStr, "netns exclusive") {
+		return "exclusive"
+	} else if strings.Contains(outputStr, "netns shared") {
+		return "shared"
+	}
+	return ""
+}
+
+func setRDMANetnsExclusive() {
+	log("Checking RDMA netns mode...")
+
+	// Check current mode
+	currentMode := getRDMANetnsMode()
+	if currentMode == "exclusive" {
+		log("RDMA netns already set to exclusive, skipping")
+		return
+	}
+	log("Current RDMA netns mode: %s, setting to exclusive...", currentMode)
+
+	// Set at runtime (immediate effect, no reboot needed)
+	if err := runOnHost("rdma", "system", "set", "netns", "exclusive"); err != nil {
+		log("Warning: Failed to set netns exclusive at runtime: %v", err)
+		log("This may fail if RDMA resources are already in use")
+	} else {
+		log("RDMA netns set to exclusive mode")
+	}
+
+	// Persist for future reboots via modprobe.d
+	modprobePath := hostPath("/etc/modprobe.d/ib_core.conf")
+	content := "options ib_core netns_mode=0\n"
+	if err := writeFile(modprobePath, content); err != nil {
+		log("Warning: Failed to persist netns config: %v", err)
+	} else {
+		log("Persisted netns config to %s", modprobePath)
+	}
+
+	// Regenerate initramfs so config takes effect on reboot
+	// Try Ubuntu/Debian first, then RHEL/Oracle Linux
+	log("Regenerating initramfs...")
+	if err := runOnHostSilent("update-initramfs", "-u"); err != nil {
+		// Not Ubuntu/Debian, try dracut (RHEL/Oracle Linux)
+		if err := runOnHostSilent("dracut", "-f"); err != nil {
+			log("Warning: Could not regenerate initramfs (may not be needed)")
+		} else {
+			log("Regenerated initramfs with dracut")
+		}
+	} else {
+		log("Regenerated initramfs with update-initramfs")
+	}
+}
+
+// =============================================================================
 // SRIOV Device Plugin
 // =============================================================================
 
@@ -550,6 +613,7 @@ func main() {
 	manageServices := flag.Bool("manage-services", false, "Stop/start OCA")
 	resetVFs := flag.Bool("reset-vfs", false, "Reset all VFs before config")
 	restartSRIOV := flag.Bool("restart-sriov", false, "Restart sriov-device-plugin")
+	setNetnsExclusive := flag.Bool("set-netns-exclusive", false, "Set RDMA netns to exclusive mode")
 	sleepForever := flag.Bool("sleep", false, "Sleep forever after completion")
 	runOnce := flag.Bool("run-once", false, "Run once using marker file (for DaemonSet without --sleep)")
 	hostRootFlag := flag.String("host-root", "/host", "Host root mount point")
@@ -604,7 +668,12 @@ func main() {
 	// Step 4: Show RDMA status
 	runOnHost("rdma", "system", "show")
 
-	// Step 5: Detect shape and configure VFs
+	// Step 5: Set RDMA netns to exclusive
+	if *setNetnsExclusive {
+		setRDMANetnsExclusive()
+	}
+
+	// Step 6: Detect shape and configure VFs
 	shape := getShapeWithRetry(300, 15)
 	config, ok := shapeConfig[shape]
 
@@ -624,12 +693,12 @@ func main() {
 		log("Configured %d/%d interfaces in %.1fs", configured, len(config.PCIAddresses), elapsed)
 	}
 
-	// Step 6: Start OCA
+	// Step 7: Start OCA
 	if *manageServices {
 		startOCA()
 	}
 
-	// Step 7: Restart sriov-device-plugin
+	// Step 8: Restart sriov-device-plugin
 	if *restartSRIOV {
 		restartSRIOVDevicePlugin()
 	}
@@ -645,7 +714,7 @@ func main() {
 		}
 	}
 
-	// Step 8: Sleep forever (for DaemonSet)
+	// Step 9: Sleep forever (for DaemonSet)
 	if *sleepForever {
 		log("Sleeping forever (send SIGTERM to exit)...")
 		for {

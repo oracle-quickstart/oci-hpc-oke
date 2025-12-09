@@ -55,7 +55,7 @@ spec:
             path: "/"
       containers:
         - name: vf-config
-          image: iad.ocir.io/idxzjcdglx2s/vf-config:v1
+          image: iad.ocir.io/idxzjcdglx2s/vf-config:v3
           imagePullPolicy: Always
           securityContext:
             privileged: true
@@ -76,5 +76,6 @@ spec:
             - --wait-for-oca
             - --manage-services
             - --reset-vfs
+            - --set-netns-exclusive
             - --restart-sriov
             - --run-once
