@@ -78,4 +78,5 @@ spec:
             - --wait-for-oca
             - --manage-services
             - --reset-vfs
+            - --restart-sriov
             - --run-once
