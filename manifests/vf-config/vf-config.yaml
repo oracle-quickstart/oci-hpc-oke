@@ -57,7 +57,7 @@ spec:
             path: "/"
       containers:
         - name: vf-config
-          image: ghcr.io/oracle-quickstart/vf-config:latest
+          image: iad.ocir.io/idxzjcdglx2s/vf-config:v1
           imagePullPolicy: Always
           securityContext:
             privileged: true
