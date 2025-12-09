@@ -188,6 +188,13 @@ variable "create_lustre_pv" {
   default = true
   type    = bool
 }
+# created variable for fss mounting
+variable "fss_mount_path" {
+  default = "/mnt/oci-fss"
+  type    = string
+}
+
+
 
 # MONITORING
 variable "install_monitoring" {
