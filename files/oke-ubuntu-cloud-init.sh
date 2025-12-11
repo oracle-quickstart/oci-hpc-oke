@@ -100,7 +100,16 @@ case "$ID" in
             oke_package_version="${kubernetes_version:1}"
             oke_package_repo_version="${oke_package_version:0:4}"
             oke_package_name="oci-oke-node-all-$oke_package_version"
-            oke_package_repo="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+
+            # Check for local repository first, fall back to remote
+            LOCAL_REPO_PATH="/opt/oke-node-client-packages/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+            if [[ -d "$LOCAL_REPO_PATH/dists" ]]; then
+                echo "[Ubuntu] Using local repository at $LOCAL_REPO_PATH"
+                oke_package_repo="file://$LOCAL_REPO_PATH"
+            else
+                echo "[Ubuntu] Local repo not found, using remote repository"
+                oke_package_repo="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+            fi
 
             tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
 Enabled: yes
@@ -108,6 +117,7 @@ Types: deb
 URIs: $oke_package_repo
 Suites: stable
 Components: main
+Signed-By:
 Trusted: yes
 EOF
             # Wait for apt lock and install the package
