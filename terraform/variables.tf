@@ -69,6 +69,10 @@ variable "workers_sn_id" { default = null }
 variable "pods_sn_id" { default = null }
 variable "fss_sn_id" { default = null }
 variable "lustre_sn_id" { default = null }
+variable "subnet_advanced_attrs" { 
+  default = {}
+  type    = any
+}
 variable "networking_advanced_options" {
   type    = bool
   default = false
