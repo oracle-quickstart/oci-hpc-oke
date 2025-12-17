@@ -16,6 +16,30 @@ version_ge() {
     [[ "$(printf '%s\n' "$v1" "$v2" | sort -V | tail -n1)" == "$v1" ]]
 }
 
+# Retry a command every 15 seconds for up to 5 minutes
+run_with_retry() {
+    local max_attempts=20
+    local interval=15
+    local attempt=1
+
+    while [[ $attempt -le $max_attempts ]]; do
+        echo "Attempt $attempt of $max_attempts..."
+        if "$@"; then
+            echo "oke bootstrap succeeded on attempt $attempt"
+            return 0
+        fi
+        
+        if [[ $attempt -lt $max_attempts ]]; then
+            echo "oke bootstrap failed, retrying in ${interval} seconds..."
+            sleep $interval
+        fi
+        ((attempt++))
+    done
+
+    echo "oke bootstrap failed after $max_attempts attempts"
+    return 1
+}
+
 # Fix for CRI-O short name mode not being disabled for Kubernetes versions >= 1.34
 configure_crio_defaults() {
     local version="$1"
@@ -62,6 +86,9 @@ download_oke_credential_provider_for_ocir() {
     fi
 }
 
+# Wait until the certificate for instance principal is available in IMDS
+until curl -fsSL -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/identity/cert.pem | grep -q "BEGIN CERTIFICATE"; do sleep 2; done
+
 # Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape 2>/dev/null) || true
 if [[ -z "$SHAPE" ]]; then
@@ -91,9 +118,9 @@ case "$ID" in
             echo "[Ubuntu] oke binary already present, running bootstrap only"
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
-                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
             else
-                oke bootstrap
+                run_with_retry oke bootstrap
             fi
         else
             echo "[Ubuntu] oke binary not found, installing package"
@@ -132,9 +159,9 @@ EOF
             echo "[Ubuntu] Running bootstrap"
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
-                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
             else
-                oke bootstrap
+                run_with_retry oke bootstrap
             fi
         fi
         ;;
@@ -145,9 +172,9 @@ EOF
             
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
-                oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
             else
-                oke bootstrap
+                run_with_retry oke bootstrap
             fi
         else
             echo "[Oracle Linux] oke binary not found, fetching init script"
@@ -158,9 +185,9 @@ EOF
             echo "[Oracle Linux] Running init script"
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
-                bash /var/run/oke-init.sh --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+                run_with_retry bash /var/run/oke-init.sh --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
             else
-                bash /var/run/oke-init.sh
+                run_with_retry bash /var/run/oke-init.sh
             fi
             
         fi
