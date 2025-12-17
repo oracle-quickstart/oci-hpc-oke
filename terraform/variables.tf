@@ -34,6 +34,9 @@ variable "ssh_public_key" {
   type    = string
 }
 
+# Create Cluster
+variable "create_cluster" { default = true }
+
 # Network
 variable "create_vcn" { default = true }
 

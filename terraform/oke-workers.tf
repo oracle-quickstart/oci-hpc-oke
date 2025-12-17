@@ -58,7 +58,7 @@ locals {
 
   worker_pools = {
     "oke-system" = {
-      create           = local.create_workers
+      create           = var.create_cluster && local.create_workers
       description      = "OKE-managed VM Node Pool for cluster operations and monitoring"
       placement_ads    = [substr(var.worker_ops_ad, -1, 0)]
       mode             = "node-pool"
@@ -72,7 +72,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
-      create           = local.create_workers && var.worker_cpu_enabled
+      create           = var.create_cluster && local.create_workers && var.worker_cpu_enabled 
       description      = "OKE-managed CPU Node Pool"
       placement_ads    = [substr(var.worker_cpu_ad, -1, 0)]
       mode             = "node-pool"
@@ -86,7 +86,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
-      create           = local.create_workers && var.worker_gpu_enabled
+      create           = var.create_cluster && local.create_workers && var.worker_gpu_enabled
       description      = "OKE-managed GPU Node Pool"
       placement_ads    = [substr(var.worker_gpu_ad, -1, 0)]
       mode             = "node-pool"
@@ -99,7 +99,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
-      create                  = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
+      create                  = var.create_cluster && local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
       description             = "OKE self-managed Cluster Network with RDMA"
       placement_ads           = [substr(var.worker_rdma_ad, -1, 0)]
       mode                    = "cluster-network"

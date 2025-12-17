@@ -97,6 +97,7 @@ variableGroups:
 
   - title: OKE Cluster
     variables:
+      - create_cluster
       - compartment_ocid
       - cluster_name
       - kubernetes_version
@@ -991,6 +992,11 @@ variables:
       default: true
 
   # OKE Cluster Setup
+  create_cluster:
+    title: Create a Kubernetes cluster
+    type: boolean
+    default: true
+    visible: true
   cluster_name:
     type: string
     title: Cluster name prefix

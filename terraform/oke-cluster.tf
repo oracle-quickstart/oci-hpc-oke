@@ -226,7 +226,7 @@ module "oke" {
   control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public            = var.control_plane_is_public
   create_bastion                     = var.create_bastion
-  create_cluster                     = true
+  create_cluster                     = var.create_cluster
   create_iam_defined_tags            = false
   create_iam_resources               = false
   create_iam_tag_namespace           = false
