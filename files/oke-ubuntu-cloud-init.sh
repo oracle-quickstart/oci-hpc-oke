@@ -25,18 +25,18 @@ run_with_retry() {
     while [[ $attempt -le $max_attempts ]]; do
         echo "Attempt $attempt of $max_attempts..."
         if "$@"; then
-            echo "Command succeeded on attempt $attempt"
+            echo "oke bootstrap succeeded on attempt $attempt"
             return 0
         fi
         
         if [[ $attempt -lt $max_attempts ]]; then
-            echo "Command failed, retrying in ${interval} seconds..."
+            echo "oke bootstrap failed, retrying in ${interval} seconds..."
             sleep $interval
         fi
         ((attempt++))
     done
 
-    echo "Command failed after $max_attempts attempts"
+    echo "oke bootstrap failed after $max_attempts attempts"
     return 1
 }
 
