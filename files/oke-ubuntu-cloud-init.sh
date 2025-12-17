@@ -86,6 +86,9 @@ download_oke_credential_provider_for_ocir() {
     fi
 }
 
+# Wait until the certificate for instance principals is available in IMDS
+until curl -fsSL -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/identity/cert.pem | grep -q "BEGIN CERTIFICATE"; do sleep 2; done
+
 # Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape 2>/dev/null) || true
 if [[ -z "$SHAPE" ]]; then
