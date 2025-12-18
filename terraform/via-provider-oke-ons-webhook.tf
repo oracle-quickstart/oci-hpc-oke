@@ -6,7 +6,7 @@ resource "helm_release" "oke-ons-webhook" {
   depends_on        = [helm_release.prometheus]
   namespace         = var.monitoring_namespace
   name              = "oke-ons-webhook"
-  chart             = "${path.root}/files/oke-ons-webhook"
+  chart             = "${path.module}/files/oke-ons-webhook"
   version           = var.oke_ons_webhook_chart_version
   set              = [
     {

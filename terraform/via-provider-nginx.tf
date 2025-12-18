@@ -15,7 +15,7 @@ resource "helm_release" "nginx" {
   version    = var.nginx_chart_version
   values = [
     templatefile(
-      "${path.root}/files/nginx-ingress/values.yaml.tpl",
+      "${path.module}/files/nginx-ingress/values.yaml.tpl",
       {
         min_bw    = 10,
         max_bw    = 100,
@@ -47,8 +47,8 @@ resource "kubectl_manifest" "cluster_issuer" {
   ]
 
   yaml_body = (var.use_lets_encrypt_prod_endpoint ?
-    file("${path.root}/files/cert-manager/cluster-issuer-prod.yaml") :
-    file("${path.root}/files/cert-manager/cluster-issuer-staging.yaml")
+    file("${path.module}/files/cert-manager/cluster-issuer-prod.yaml") :
+    file("${path.module}/files/cert-manager/cluster-issuer-staging.yaml")
   )
 }
 

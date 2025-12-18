@@ -24,8 +24,8 @@ module "nginx" {
   post_deployment_commands = flatten([
     "cat <<'EOF' | kubectl apply -f -",
     ( var.use_lets_encrypt_prod_endpoint == true ? 
-      split("\n", file("${path.root}/files/cert-manager/cluster-issuer-prod.yaml")) :
-      split("\n", file("${path.root}/files/cert-manager/cluster-issuer-staging.yaml"))
+      split("\n", file("${path.module}/files/cert-manager/cluster-issuer-prod.yaml")) :
+      split("\n", file("${path.module}/files/cert-manager/cluster-issuer-staging.yaml"))
     ),
     "EOF",
     "sleep 60" #wait for the LB to be provisioned
@@ -33,7 +33,7 @@ module "nginx" {
   deployment_extra_args = ["--wait"]
 
   helm_template_values_override = templatefile(
-    "${path.root}/files/nginx-ingress/values.yaml.tpl",
+    "${path.module}/files/nginx-ingress/values.yaml.tpl",
     {
       min_bw    = 10,
       max_bw    = 100,
@@ -98,7 +98,7 @@ module "kube_prometheus_stack" {
 
   post_deployment_commands = []
 
-  helm_template_values_override = templatefile("./files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services})
+  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services})
 
   helm_user_values_override = yamlencode(
     {
@@ -143,7 +143,7 @@ module "node_problem_detector" {
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
   post_deployment_commands = []
 
-  helm_template_values_override = file("${path.root}/files/node-problem-detector/values.yaml")
+  helm_template_values_override = file("${path.module}/files/node-problem-detector/values.yaml")
   helm_user_values_override     = ""
 
   depends_on = [module.kube_prometheus_stack]
@@ -162,7 +162,7 @@ module "nvidia_dcgm_exporter" {
 
   deployment_name    = "dcgm-exporter"
   namespace          = var.monitoring_namespace
-  helm_chart_path    = "${path.root}/files/nvidia-dcgm-exporter"
+  helm_chart_path    = "${path.module}/files/nvidia-dcgm-exporter"
   helm_chart_version = var.dcgm_exporter_chart_version
 
   pre_deployment_commands = [
@@ -172,7 +172,7 @@ module "nvidia_dcgm_exporter" {
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
   post_deployment_commands = []
 
-  helm_template_values_override = file("${path.root}/files/nvidia-dcgm-exporter/oke-values.yaml")
+  helm_template_values_override = file("${path.module}/files/nvidia-dcgm-exporter/oke-values.yaml")
   helm_user_values_override     = ""
 
   depends_on = [module.kube_prometheus_stack]
@@ -202,7 +202,7 @@ module "amd_device_metrics_exporter" {
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
   post_deployment_commands = []
 
-  helm_template_values_override = file("${path.root}/files/amd-device-metrics-exporter/values.yaml")
+  helm_template_values_override = file("${path.module}/files/amd-device-metrics-exporter/values.yaml")
   helm_user_values_override     = ""
 
   depends_on = [module.kube_prometheus_stack]
@@ -232,7 +232,7 @@ module "lustre_client" {
   post_deployment_commands = var.create_lustre_pv ? flatten([
     "cat <<'EOF' | kubectl apply -f -",
     split("\n", templatefile(
-      "${path.root}/files/lustre/lustre-pv.yaml.tpl",
+      "${path.module}/files/lustre/lustre-pv.yaml.tpl",
       {
         lustre_storage_size = floor(var.lustre_size_in_tb),
         lustre_ip           = one(oci_lustre_file_storage_lustre_file_system.lustre.*.management_service_address),
@@ -261,7 +261,7 @@ module "oke-ons-webhook" {
 
   deployment_name    = "oke-ons-webhook"
   namespace          = var.monitoring_namespace
-  helm_chart_path    = "${path.root}/files/oke-ons-webhook"
+  helm_chart_path    = "${path.module}/files/oke-ons-webhook"
   helm_chart_version = var.oke_ons_webhook_chart_version
 
   pre_deployment_commands = [

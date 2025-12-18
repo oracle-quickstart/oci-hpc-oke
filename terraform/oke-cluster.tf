@@ -36,7 +36,7 @@ locals {
       bastion  = var.create_bastion ? { create = "auto" } : { create = "never"}
       operator = var.create_operator ? { create = "auto" } : { create = "never"}
       int_lb   = { create = "auto" }
-      pub_lb   = alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : { create = "auto"}
+      pub_lb   = { create = "auto" }
       cp       = { create = "auto" }
       workers  = { create = "auto" }
       pods     = { create = "auto" }

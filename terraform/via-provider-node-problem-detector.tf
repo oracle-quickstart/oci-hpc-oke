@@ -9,7 +9,7 @@ resource "helm_release" "node-problem_detector" {
   chart             = "node-problem-detector"
   repository        = "oci://ghcr.io/deliveryhero/helm-charts"
   version           = var.node_problem_detector_chart_version
-  values            = ["${file("./files/node-problem-detector/values.yaml")}"]
+  values            = ["${file("${path.module}/files/node-problem-detector/values.yaml")}"]
   create_namespace  = true
   recreate_pods     = true
   force_update      = true

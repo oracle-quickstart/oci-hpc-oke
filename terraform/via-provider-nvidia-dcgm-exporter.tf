@@ -6,9 +6,9 @@ resource "helm_release" "nvidia_dcgm_exporter" {
   depends_on        = [helm_release.prometheus]
   namespace         = var.monitoring_namespace
   name              = "dcgm-exporter"
-  chart             = "${path.root}/files/nvidia-dcgm-exporter"
+  chart             = "${path.module}/files/nvidia-dcgm-exporter"
   version           = var.dcgm_exporter_chart_version
-  values            = ["${file("./files/nvidia-dcgm-exporter/oke-values.yaml")}"]
+  values            = ["${file("${path.module}/files/nvidia-dcgm-exporter/oke-values.yaml")}"]
   create_namespace  = false
   recreate_pods     = true
   force_update      = true

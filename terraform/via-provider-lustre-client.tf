@@ -31,7 +31,7 @@ resource "kubectl_manifest" "lustre_pv" {
   ]
 
   yaml_body = templatefile(
-    "${path.root}/files/lustre/lustre-pv.yaml.tpl",
+    "${path.module}/files/lustre/lustre-pv.yaml.tpl",
     {
       lustre_storage_size = floor(var.lustre_size_in_tb),
       lustre_ip           = one(oci_lustre_file_storage_lustre_file_system.lustre.*.management_service_address),
