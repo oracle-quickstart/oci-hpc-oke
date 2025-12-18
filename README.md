@@ -129,6 +129,8 @@ oci --region "${REGION}" \
     },
     "shape": "BM.GPU.GB200.4",
     "sourceDetails": {
+      "bootVolumeSizeInGBs": "512",
+      "bootVolumeVpusPerGB": "20",
       "sourceType": "image",
       "imageId": "${IMAGE_ID}"
     },
