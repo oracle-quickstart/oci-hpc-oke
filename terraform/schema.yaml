@@ -653,12 +653,16 @@ variables:
     description: Provision an OCI Compute instance configured with access to interact with the OKE Kubernetes endpoint.
     type: boolean
     required: false
+    visible: create_cluster
   operator_shape_config:
     title: Configure operator shape
     type: boolean
     default: false
     required: false
-    visible: ${create_operator}
+    visible: 
+      and:
+        - create_cluster
+        - ${create_operator}
   operator_shape_name:
     title: Shape
     type: oci:core:instanceshape:name
@@ -666,8 +670,9 @@ variables:
     required: true
     visible: 
       and:
-      - create_operator
-      - operator_shape_config
+        - create_cluster
+        - create_operator
+        - operator_shape_config
     dependsOn:
       compartmentId: ${compartment_ocid}
   operator_shape_ocpus:
@@ -677,19 +682,20 @@ variables:
     default: 1
     visible:
       and:
-      - create_operator
-      - operator_shape_config
-      - or:
-          - eq: [operator_shape_name, "VM.Standard3.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
+        - create_cluster
+        - create_operator
+        - operator_shape_config
+        - or:
+            - eq: [operator_shape_name, "VM.Standard3.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
   operator_shape_memory:
     title: Memory (GB)
     type: number
@@ -697,38 +703,40 @@ variables:
     default: 8
     visible:
       and:
-      - create_operator
-      - operator_shape_config
-      - or:
-          - eq: [operator_shape_name, "VM.Standard3.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
+        - create_cluster
+        - create_operator
+        - operator_shape_config
+        - or:
+            - eq: [operator_shape_name, "VM.Standard3.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
   operator_shape_boot:
     title: Boot volume size (GB)
     type: number
     required: true
     visible:
       and:
-      - create_operator
-      - operator_shape_config
-      - or:
-          - eq: [operator_shape_name, "VM.Standard3.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
+        - create_cluster
+        - create_operator
+        - operator_shape_config
+        - or:
+            - eq: [operator_shape_name, "VM.Standard3.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
+            - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
+            - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
  
   # Storage
   create_fss:
@@ -736,52 +744,67 @@ variables:
     description: Provision a shared File Storage Service (FSS) file system and create a Storage Class.
     type: boolean
     default: false
-    required: true
+    required: create_cluster
+    visible: create_cluster
   fss_ad:
     title: FSS availability domain
     type: oci:identity:availabilitydomain:name
-    required: true
+    required: create_cluster
     default: worker_ops_ad
-    visible: ${create_fss}
+    visible: 
+      and:
+        - create_cluster
+        - ${create_fss}
     dependsOn:
       compartmentId: ${compartment_ocid}
   fss_mount_path:
     title: FSS mount point
     type: string
     default: "/mnt/oci-fss"
-    required: true
-    visible: ${create_fss}
+    required: create_cluster
+    visible: 
+      and: 
+        - create_cluster
+        - ${create_fss}
   create_bv_high:
     title: Create a storage class backed by higher performance OCI block volumes
     description: "Create a storage class backed by higher performance OCI block volumes (VPU: 20)."
     type: boolean
-    required: true
+    required: create_cluster
     default: false
+    visible: create_cluster
   nvme_raid_enabled:
     type: boolean
     title: Create a RAID array using local NVMe drives 
     description: If the instance has local NVMe drives, create a RAID 10 or 0 array with bind mounts for container runtime (/var/lib/containers), Kubelet ephemeral storage (/var/lib/kubelet), and logs (/var/log/pods).
     default: true
+    visible: create_cluster
   nvme_raid_level:
     title: RAID Level
     type: enum
     default: "10"
     enum: ["0", "10"]
-    required: true
-    visible: nvme_raid_enabled
+    required: create_cluster
+    visible: 
+      and:
+        - create_cluster
+        - nvme_raid_enabled
   create_lustre:
     title: Create Lustre FS
     description: Provision a shared Lustre file system and a PV backed by the Lustre file system.
     type: boolean
     default: false
-    required: true
-    visible: true
+    required: create_cluster
+    visible: create_cluster
   lustre_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
     required: ${create_lustre}
     default: ${worker_ops_ad}
-    visible: ${create_lustre}
+    visible: 
+      and: 
+        - create_cluster
+        - ${create_lustre}
     dependsOn:
       compartmentId: ${compartment_ocid}
   lustre_size_in_tb:
@@ -792,7 +815,10 @@ variables:
     default: 31.2
     multipleOf: 10.4
     required: ${create_lustre}
-    visible: ${create_lustre}
+    visible: 
+      and: 
+        - create_cluster
+        - ${create_lustre}
   lustre_performance_tier:
     title: Lustre Performance Tier
     description: Specify the performance tier for the Lustre file system [MB/s/TB].
@@ -800,12 +826,18 @@ variables:
     enum: [125, 250, 500, 1000]
     default: 125
     required: ${create_lustre}
-    visible: ${create_lustre}
+    visible: 
+      and: 
+        - create_cluster
+        - ${create_lustre}
   install_lustre_client:
     type: boolean
     title: Install Lustre Client Helm Chart
     description: Install the Lustre client Helm chart to install the Lustre client on the worker nodes. 
-    visible: ${create_lustre}
+    visible: 
+      and: 
+        - create_cluster
+        - ${create_lustre}
   lustre_client_helm_chart_version:
     title: Lustre client helm chart version
     type: string
@@ -818,8 +850,9 @@ variables:
     default: true
     visible:
       and:
-      - create_lustre
-      - install_lustre_client
+        - create_cluster
+        - create_lustre
+        - install_lustre_client
 
   # Monitoring
   install_monitoring:
@@ -827,13 +860,13 @@ variables:
     title: Install Monitoring Stack
     description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector, and AMD device metrics exporter.
     default: true
-    visible: true
+    visible: create_cluster
   monitoring_advanced_options:  
     title: Advanced options
     type: boolean
     default: false
     required: false
-    visible: true
+    visible: create_cluster
   monitoring_namespace:
     title: Monitoring namespace
     description: The Kubernetes namespace where to deploy resources associated with the cluster monitoring.
@@ -843,8 +876,9 @@ variables:
     required: true
     visible: 
       and:
-      - install_monitoring
-      - monitoring_advanced_options
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
   install_node_problem_detector_kube_prometheus_stack:
     type: boolean
     title: Install Node Problem Detector & Kube Prometheus Stack
@@ -852,8 +886,9 @@ variables:
     default: true
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
   install_nvidia_dcgm_exporter:
     title: DCGM Exporter
     description: Install NVIDIA DCGM Exporter
@@ -862,8 +897,9 @@ variables:
     default: ${install_monitoring}
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
   dcgm_exporter_chart_version:
     title: DCGM Exporter chart version
     type: string
@@ -880,8 +916,9 @@ variables:
     default: ${install_monitoring}
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
   amd_device_metrics_exporter_chart_version:
     title: AMD Device Metrics Exporter chart version
     type: string
@@ -926,9 +963,10 @@ variables:
     default: ${install_monitoring}
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
-      - install_node_problem_detector_kube_prometheus_stack
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
+        - install_node_problem_detector_kube_prometheus_stack
   install_grafana_dashboards:
     title: Grafana dashboards
     description: Install Grafana dashboards
@@ -937,10 +975,11 @@ variables:
     default: ${install_monitoring}
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
-      - install_node_problem_detector_kube_prometheus_stack
-      - install_grafana
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
+        - install_node_problem_detector_kube_prometheus_stack
+        - install_grafana
   use_lets_encrypt_prod_endpoint:
     title: Use Let's Encrypt production endpoint
     description:  Use Let's Encrypt production endpoint instead of staging.
@@ -949,11 +988,12 @@ variables:
     required: false
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
-      - install_node_problem_detector_kube_prometheus_stack
-      - install_grafana
-      - create_public_subnets
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
+        - install_node_problem_detector_kube_prometheus_stack
+        - install_grafana
+        - create_public_subnets
   setup_alerting:
     title: Enable Grafana Alerting
     description: Configure Grafana to send notifications to an OCI Notification Topic
@@ -962,10 +1002,11 @@ variables:
     default: ${install_monitoring}
     visible:
       and:
-      - install_monitoring
-      - monitoring_advanced_options
-      - install_node_problem_detector_kube_prometheus_stack
-      - install_grafana
+        - create_cluster
+        - install_monitoring
+        - monitoring_advanced_options
+        - install_node_problem_detector_kube_prometheus_stack
+        - install_grafana
   avoid_waiting_for_delete_target:
     type: boolean
     title: Accelerate Oracle Notifications Service (ONS) topic deletion on stack destroy
@@ -973,6 +1014,7 @@ variables:
     default: true
     visible: 
       and:
+        - create_cluster
         - install_monitoring
         - install_node_problem_detector_kube_prometheus_stack
         - setup_alerting
@@ -981,12 +1023,13 @@ variables:
       description: It's <strong>necessary to enable</strong> this option for <strong>clusters without a public endpoint</strong>. More details about <a href='https://docs.oracle.com/en-us/iaas/Content/ResourceManager/Tasks/private-endpoints.htm'>private endpoints</a>.
       visible:
         and:
-        - or:
-          - orm_create_mode
-          - install_monitoring
-        - not:
-          - create_bastion
-          - create_operator 
+          - create_cluster
+          - or:
+            - orm_create_mode
+            - install_monitoring
+          - not:
+            - create_bastion
+            - create_operator 
       type: boolean
       required: true
       default: true
@@ -1002,6 +1045,7 @@ variables:
     title: Cluster name prefix
     description: The Container Engine for Kubernetes cluster name.
     required: true
+    visible: create_cluster
   kubernetes_version:
     type: oci:kubernetes:versions:id
     title: Kubernetes version
@@ -1010,6 +1054,7 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
       clusterOptionId: "all"
+    visible: create_cluster
   control_plane_allowed_cidrs:
     title: Kubernetes endpoint allowed CIDRs
     description: List of CIDR ranges for allowed Kubernetes endpoint communication.
@@ -1020,6 +1065,7 @@ variables:
       pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
     unique_items: true
     minItems: 0
+    visible: create_cluster
   cni_type:
     title: CNI to use for pod networking
     description: CNI plugin to be used for pod communication on worker nodes in clusters
@@ -1029,11 +1075,12 @@ variables:
     - VCN-Native Pod Networking
     - Flannel
     default: VCN-Native Pod Networking
+    visible: create_cluster
   control_plane_is_public:
     title: Create the Kubernetes control plane endpoint in a public subnet and assign it a public IP address
     type: boolean
     default: true
-    visible: true
+    visible: create_cluster
   max_pods_per_node:
     title: Maximum number of pods per node
     description: The default maximum number of pods to deploy per node when unspecified on a pool
@@ -1048,11 +1095,13 @@ variables:
     title: Preferred Load Balancer kind
     description: The kind of load balancers which should be provisioned by default for the services of type Load Balancer.
     required: true
+    visible: create_cluster
   setup_credential_provider_for_ocir:
     title: Setup OKE credential-provider for OCIR
     description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If "Create policies" box is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
     type: boolean
     default: false
+    visible: create_cluster
 
 # OKE Cluster Setup - Advanced Options
   override_hostnames:
@@ -1065,6 +1114,7 @@ variables:
     type: boolean
     description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
     default: false
+    visible: create_cluster
 
   # Workers - System pool
   worker_ops_ad:
@@ -1073,10 +1123,12 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
+    visible: create_cluster
   worker_ops_pool_size:
     title: Number of system worker nodes
     type: number
     required: true
+    visible: create_cluster
   worker_ops_shape:
     title: Shape
     type: oci:core:instanceshape:name
@@ -1084,41 +1136,47 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${compartment_ocid}
+    visible: create_cluster
   worker_ops_ocpus:
     title: OCPUs
     type: number
     required: true
     visible:
-      or:
-        - eq: [worker_ops_shape, "VM.Standard3.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.A1.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.A2.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E4.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E5.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E6.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.x86.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
+      and:
+        - create_cluster
+        - or:
+          - eq: [worker_ops_shape, "VM.Standard3.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.A1.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.A2.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E4.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E5.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E6.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.x86.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
   worker_ops_memory:
     title: Memory (GB)
     type: number
     required: true
     visible:
-      or:
-        - eq: [worker_ops_shape, "VM.Standard3.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.A1.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.A2.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E4.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E5.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.E6.Flex"]
-        - eq: [worker_ops_shape, "VM.Standard.x86.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
-        - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
+      and: 
+        - create_cluster
+        - or:
+          - eq: [worker_ops_shape, "VM.Standard3.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.A1.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.A2.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E4.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E5.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.E6.Flex"]
+          - eq: [worker_ops_shape, "VM.Standard.x86.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
+          - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
   worker_ops_boot_volume_size:
     title: Boot volume size (GB)
     type: number      
+    visible: create_cluster
   worker_ops_image_type:
     title: Image type
     default: Custom
@@ -1130,11 +1188,13 @@ variables:
   worker_ops_image_use_uri:
     title: Import custom image from URI
     type: boolean
+    visible: create_cluster
   worker_ops_image_custom_uri:
     title: Image URI
     type: string
     visible:
       and:
+        - create_cluster
         - eq: [worker_ops_image_type, Custom]
         - ${worker_ops_image_use_uri}
   worker_ops_image_compartment:
@@ -1144,6 +1204,7 @@ variables:
     default: ${compartment_ocid}
     visible:
       and:
+        - create_cluster
         - eq: [worker_ops_image_type, Custom]
         - not: [worker_ops_image_use_uri]
   worker_ops_image_custom_id:
@@ -1154,6 +1215,7 @@ variables:
       compartmentId: ${worker_ops_image_compartment}
     visible:
       and:
+        - create_cluster
         - eq: [worker_ops_image_type, Custom]
         - not: [worker_ops_image_use_uri]
 
@@ -1163,25 +1225,35 @@ variables:
     type: boolean
     description: Create an OKE-managed general purpose node pool
     default: false
+    visible: create_cluster
   worker_cpu_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
     required: true
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_cpu_enabled}
     default: worker_ops_ad
     dependsOn:
       compartmentId: ${compartment_ocid}  
   worker_cpu_pool_size:
     title: Number of worker nodes
     type: number
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_cpu_enabled}
   worker_cpu_shape:
     title: Shape
     type: oci:core:instanceshape:name
     pattern: "^(VM|BM)\\.(Standard|Dense).*$"
     default: "VM.Standard.E5.Flex"
     required: true
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_cpu_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
   worker_cpu_ocpus:
@@ -1190,6 +1262,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_cpu_enabled}
         - or:
           - eq: [worker_cpu_shape, "VM.Standard3.Flex"]
@@ -1208,6 +1281,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_cpu_enabled}
         - or:
           - eq: [worker_cpu_shape, "VM.Standard3.Flex"]
@@ -1223,7 +1297,10 @@ variables:
   worker_cpu_boot_volume_size:
     title: Boot volume size (GB)
     type: number
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and: 
+        - create_cluster
+        - ${worker_cpu_enabled}
   worker_cpu_image_type:
     title: Image type
     default: Custom
@@ -1235,12 +1312,16 @@ variables:
   worker_cpu_image_use_uri:
     title: Import custom image from URI
     type: boolean
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and: 
+        - create_cluster
+        - ${worker_cpu_enabled}
   worker_cpu_image_custom_uri:
     title: Image URI
     type: string
     visible:
       and:
+        - create_cluster
         - eq: [worker_cpu_image_type, Custom]
         - ${worker_cpu_enabled}
         - ${worker_cpu_image_use_uri}
@@ -1251,6 +1332,7 @@ variables:
     default: ${compartment_ocid}
     visible:
       and:
+        - create_cluster
         - eq: [worker_cpu_image_type, Custom]
         - ${worker_cpu_enabled}
         - not: [worker_cpu_image_use_uri]
@@ -1262,6 +1344,7 @@ variables:
       compartmentId: ${worker_cpu_image_compartment}
     visible:
       and:
+        - create_cluster
         - eq: [worker_cpu_image_type, Custom]
         - ${worker_cpu_enabled}
         - not: [worker_cpu_image_use_uri]
@@ -1273,6 +1356,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_cpu_enabled}
         - or:
           - eq: [worker_cpu_image_type, OKE]
@@ -1285,6 +1369,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_cpu_enabled}
         - or:
           - eq: [worker_cpu_image_type, OKE]
@@ -1299,6 +1384,7 @@ variables:
       operatingSystemVersion: ${worker_cpu_image_os_version}
     visible:
       and:
+        - create_cluster
         - ${worker_cpu_enabled}
         - eq: [worker_cpu_image_type, Platform]
 
@@ -1307,30 +1393,43 @@ variables:
     title: Create GPU pool
     type: boolean
     description: Create an OKE-managed node pool with GPU resources.
+    visible: create_cluster
   worker_gpu_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
     required: true
     default: worker_ops_ad
-    visible: ${worker_gpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_gpu_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
   worker_gpu_pool_size:
     title: Number of GPU worker nodes
     type: number
-    visible: ${worker_gpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_gpu_enabled}
   worker_gpu_shape:
     title: Shape
     type: oci:core:instanceshape:name
     required: true
     pattern: "^(VM|BM)\\.GPU.*$"
-    visible: ${worker_gpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_gpu_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
   worker_gpu_boot_volume_size:
     title: Boot volume size (GB)
     type: number
-    visible: ${worker_gpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_gpu_enabled}
   worker_gpu_image_type:
     title: Image type
     description: Whether to use an OKE, Platform, Custom, or imported image for worker nodes.
@@ -1342,12 +1441,16 @@ variables:
   worker_gpu_image_use_uri:
     title: Import custom image from URI
     type: boolean
-    visible: ${worker_gpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_gpu_enabled}
   worker_gpu_image_custom_uri:
     title: Image URI
     type: string
     visible:
       and:
+        - create_cluster
         - eq: [worker_gpu_image_type, Custom]
         - ${worker_gpu_enabled}
         - ${worker_gpu_image_use_uri}
@@ -1358,6 +1461,7 @@ variables:
     default: ${compartment_ocid}
     visible:
       and:
+        - create_cluster
         - eq: [worker_gpu_image_type, Custom]
         - ${worker_gpu_enabled}
         - not: [worker_gpu_image_use_uri]
@@ -1369,6 +1473,7 @@ variables:
       compartmentId: ${worker_gpu_image_compartment}
     visible:
       and:
+        - create_cluster
         - eq: [worker_gpu_image_type, Custom]
         - ${worker_gpu_enabled}
         - not: [worker_gpu_image_use_uri]
@@ -1380,6 +1485,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_gpu_enabled}
         - or:
           - eq: [worker_gpu_image_type, OKE]
@@ -1392,6 +1498,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_gpu_enabled}
         - or:
           - eq: [worker_gpu_image_type, OKE]
@@ -1407,6 +1514,7 @@ variables:
       shape: ${worker_shape_name}
     visible:
       and:
+        - create_cluster
         - ${worker_gpu_enabled}
         - eq: [worker_gpu_image_type, Platform]
 
@@ -1415,31 +1523,44 @@ variables:
     title: Create GPU + RDMA pool
     type: boolean
     description: Create a worker pool with Cluster Network placement for RDMA networking
+    visible: create_cluster
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
     required: true
     default: worker_ops_ad
-    visible: ${worker_rdma_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_rdma_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
   worker_rdma_pool_size:
     title: Number of RDMA worker nodes
     type: number
     required: true
-    visible: ${worker_rdma_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_rdma_enabled}
   worker_rdma_shape:
     title: Shape
     type: oci:core:instanceshape:name
     pattern: "^BM\\.(HPC|GPU|Optimized).*$"
     required: true
-    visible: ${worker_rdma_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_rdma_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
   worker_rdma_boot_volume_size:
     title: Boot volume size (GB)
     type: number
-    visible: ${worker_rdma_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_rdma_enabled}
   worker_rdma_boot_volume_vpus_per_gb:
     title: Boot volume performance (VPUs/GB)
     type: number
@@ -1460,6 +1581,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_rdma_enabled}
         - or:
           - eq: [worker_rdma_image_type, OKE]
@@ -1472,6 +1594,7 @@ variables:
     required: true
     visible:
       and:
+        - create_cluster
         - ${worker_rdma_enabled}
         - or:
           - eq: [worker_rdma_image_type, OKE]
@@ -1487,17 +1610,22 @@ variables:
       shape: ${worker_shape_name}
     visible:
       and:
+        - create_cluster
         - ${worker_rdma_enabled}
         - eq: [worker_rdma_image_type, Platform]
   worker_rdma_image_use_uri:
     title: Import custom image from URI
     type: boolean
-    visible: ${worker_rdma_enabled}
+    visible:
+      and:
+        - create_cluster
+        - ${worker_rdma_enabled}
   worker_rdma_image_custom_uri:
     title: Image URI
     type: string
     visible:
       and:
+        - create_cluster
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
         - ${worker_rdma_image_use_uri}
@@ -1508,6 +1636,7 @@ variables:
     default: ${compartment_ocid}
     visible:
       and:
+        - create_cluster
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
         - not: [worker_rdma_image_use_uri]
@@ -1520,6 +1649,7 @@ variables:
       compartmentId: ${worker_rdma_image_compartment}
     visible:
       and:
+        - create_cluster
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
         - not: [worker_rdma_image_use_uri]
@@ -1531,6 +1661,11 @@ variables:
     type: oci:core:ssh:publickey
     pattern: "((^(ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)(,((ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)*$"
     required: false
+    visible:
+      or:
+        - create_bastion
+        - create_cluster
+        - create_operator
 
 outputGroups:
   - title: Terraform
@@ -1746,28 +1881,41 @@ outputs:
   worker_subnet_id:
     title: Subnet
     type: ocid
+    visible: create_cluster
   worker_subnet_cidr:
     title: Subnet CIDR
     type: string
+    visible: create_cluster
   worker_nsg_id:
     title: Network security group
     type: ocid
+    visible: create_cluster
   worker_ops_pool_id:
   # Workers - System pool
     title: System pool
     type: ocid
+    visible: create_cluster
   worker_cpu_pool_id:
     title: CPU pool
     type: ocid
-    visible: ${worker_cpu_enabled}
+    visible: 
+      and:
+        - create_cluster
+        - ${worker_cpu_enabled}
   worker_gpu_pool_id:
     title: GPU pool
     type: ocid
-    visible: worker_gpu_enabled
+    visible: 
+      and:
+        - create_cluster
+        - worker_gpu_enabled
   worker_rdma_pool_id:
     title: RDMA pool
     type: ocid
-    visible: ${worker_rdma_enabled}
+    visible: 
+      and: 
+        - create_cluster
+        - ${worker_rdma_enabled}
   
   # Pods
   pod_subnet_id:
@@ -1789,32 +1937,37 @@ outputs:
       type: string
       visible:
         and:
-        - install_node_problem_detector_kube_prometheus_stack
+          - create_cluster
+          - install_node_problem_detector_kube_prometheus_stack
   grafana_fetch_endpoint_command:
       title: Command to get the Grafana endpoint
       type: string
       visible:
         and:
-        - install_node_problem_detector_kube_prometheus_stack
+          - create_cluster
+          - install_node_problem_detector_kube_prometheus_stack
   grafana_admin_password:
     title: Grafana admin password
     type: copyableString
     visible:
       and:
-      - install_node_problem_detector_kube_prometheus_stack
-      - install_grafana
+        - create_cluster
+        - install_node_problem_detector_kube_prometheus_stack
+        - install_grafana
   grafana_port_forward:
      title: Grafana port forward command
      visible:
        and:
-       - install_node_problem_detector_kube_prometheus_stack
-       - install_grafana
+        - create_cluster
+        - install_node_problem_detector_kube_prometheus_stack
+        - install_grafana
   prom_server_port_forward:
       title: Prometheus server port forward command
       type: string
       visible:
         and:
-        - install_node_problem_detector_kube_prometheus_stack
+          - create_cluster
+          - install_node_problem_detector_kube_prometheus_stack
   prometheus_stack_chart_version:
       title: Prometheus stack chart version
       type: string

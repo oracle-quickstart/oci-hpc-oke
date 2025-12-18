@@ -34,9 +34,6 @@ variable "ssh_public_key" {
   type    = string
 }
 
-# Create Cluster
-variable "create_cluster" { default = true }
-
 # Network
 variable "create_vcn" { default = true }
 
@@ -290,6 +287,7 @@ variable "monitoring_advanced_options" {
 }
 
 # OKE Cluster Setup
+variable "create_cluster" { default = true }
 variable "cluster_name" { default = "oke-gpu-quickstart" }
 variable "kubernetes_version" { default = "v1.34.1" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
