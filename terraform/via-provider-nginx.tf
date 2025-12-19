@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "helm_release" "nginx" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.create_cluster, var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
     time_sleep.wait_for_ingress_lb_termination,
@@ -34,12 +34,12 @@ resource "helm_release" "nginx" {
 }
 
 resource "time_sleep" "wait_for_ingress_lb_termination" {
-  count            = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count            = alltrue([var.create_cluster,var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   destroy_duration = "60s"
 }
 
 resource "kubectl_manifest" "cluster_issuer" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.create_cluster, var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   depends_on = [
     module.oke,
@@ -53,7 +53,7 @@ resource "kubectl_manifest" "cluster_issuer" {
 }
 
 resource "time_sleep" "wait_for_nginx_lb" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.create_cluster, var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   depends_on = [helm_release.nginx]
 

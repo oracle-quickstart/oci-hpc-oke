@@ -3,7 +3,7 @@
 
 
 resource "oci_resourcemanager_private_endpoint" "oke" {
-  count = local.deploy_from_orm ? 1 : 0
+  count = var.create_cluster && local.deploy_from_orm ? 1 : 0
 
   compartment_id = var.compartment_ocid
   display_name   = format("oke-private-endpoint-%v", local.state_id)
@@ -20,7 +20,7 @@ resource "oci_resourcemanager_private_endpoint" "oke" {
 }
 
 data "oci_resourcemanager_private_endpoint_reachable_ip" "oke" {
-  count = local.deploy_from_orm ? 1 : 0
+  count = var.create_cluster && local.deploy_from_orm ? 1 : 0
 
   private_endpoint_id = one(oci_resourcemanager_private_endpoint.oke.*.id)
   private_ip          = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")

@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 data "kubernetes_service" "nginx_lb" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.create_cluster,var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   depends_on = [time_sleep.wait_for_nginx_lb]
 
@@ -13,7 +13,7 @@ data "kubernetes_service" "nginx_lb" {
 }
 
 data "oci_load_balancer_load_balancers" "lbs" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_operator]) ? 1 : 0
+  count = alltrue([var.create_cluster,var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_operator]) ? 1 : 0
 
   compartment_id = var.compartment_ocid
 
@@ -31,7 +31,7 @@ data "oci_load_balancer_load_balancers" "lbs" {
 }
 
 data "oci_load_balancer_load_balancers" "internal_lbs" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "internal", local.deploy_from_operator]) ? 1 : 0
+  count = alltrue([var.create_cluster,var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "internal", local.deploy_from_operator]) ? 1 : 0
 
   compartment_id = var.compartment_ocid
 

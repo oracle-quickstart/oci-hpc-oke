@@ -3,7 +3,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 module "nginx" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
+  count  = alltrue([var.create_cluster, var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -48,7 +48,7 @@ module "nginx" {
 
 
 module "kube_prometheus_stack" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
+  count  = alltrue([var.create_cluster, var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -121,7 +121,7 @@ module "kube_prometheus_stack" {
 
 
 module "node_problem_detector" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
+  count  = alltrue([var.create_cluster,var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -151,7 +151,7 @@ module "node_problem_detector" {
 
 
 module "nvidia_dcgm_exporter" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_nvidia_dcgm_exporter]) ? 1 : 0
+  count  = alltrue([var.create_cluster, var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_nvidia_dcgm_exporter]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -180,7 +180,7 @@ module "nvidia_dcgm_exporter" {
 
 
 module "amd_device_metrics_exporter" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_amd_device_metrics_exporter && (var.worker_rdma_shape == "BM.GPU.MI300X.8" || var.worker_gpu_shape == "BM.GPU.MI300X.8")]) ? 1 : 0
+  count  = alltrue([var.create_cluster, var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_amd_device_metrics_exporter && (var.worker_rdma_shape == "BM.GPU.MI300X.8" || var.worker_gpu_shape == "BM.GPU.MI300X.8")]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -250,7 +250,7 @@ module "lustre_client" {
 
 
 module "oke-ons-webhook" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_alerting]) ? 1 : 0
+  count  = alltrue([var.create_cluster, var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_alerting]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip

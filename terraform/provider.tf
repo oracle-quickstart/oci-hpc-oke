@@ -36,7 +36,7 @@ provider "helm" {
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "oci"
-      args        = local.kube_exec_args
+      args        = var.create_cluster ? local.kube_exec_args : []
     }
   }
 }
@@ -48,7 +48,7 @@ provider "kubernetes" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"
-    args        = local.kube_exec_args
+    args        = var.create_cluster ? local.kube_exec_args : []
   }
 }
 
@@ -59,6 +59,6 @@ provider "kubectl" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"
-    args        = local.kube_exec_args
+    args        = var.create_cluster ? local.kube_exec_args : []
   }
 }

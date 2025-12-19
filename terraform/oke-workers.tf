@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  create_workers = true
+  create_workers = var.create_cluster
   fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
   ssh_authorized_keys = compact([
     trimspace(local.ssh_public_key),
@@ -15,7 +15,7 @@ locals {
   worker_gpu_image_id    = var.worker_gpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_gpu_image_use_uri, {}), "id", null) : coalesce(var.worker_gpu_image_custom_id, var.worker_gpu_image_platform_id, "none")
   worker_rdma_image_type = contains(["platform", "custom"], lower(var.worker_rdma_image_type)) ? "custom" : "oke"
   worker_rdma_image_id   = var.worker_rdma_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_rdma_image_custom_uri, {}), "id", null) : coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
-
+  
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
     var.kubernetes_version, var.setup_credential_provider_for_ocir, var.override_hostnames
@@ -28,12 +28,12 @@ locals {
 
    #fss mounting on worker nodes
 
-  runcmd_fss_mount = var.create_fss && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
+  runcmd_fss_mount = local.create_workers && var.create_fss && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
     "curl -sL -o /var/run/oke-fss-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-fss-mount.sh && (bash /var/run/oke-fss-mount.sh '%v' '%v' '%v' || echo 'Error initializing RAID' >&2)",
     local.fss_export_path, var.fss_mount_path, local.fss_mount_ip
   ) : ""
 
-  write_files = [
+  write_files =   [
     {
       content = local.cluster_apiserver,
       path    = "/etc/oke/oke-apiserver",
@@ -46,6 +46,7 @@ locals {
       permissions = "0644",
     }
   ]
+
   cloud_init = {
     ssh_authorized_keys = local.ssh_authorized_keys
     runcmd = compact([
@@ -58,7 +59,7 @@ locals {
 
   worker_pools = {
     "oke-system" = {
-      create           = var.create_cluster && local.create_workers
+      create           = local.create_workers
       description      = "OKE-managed VM Node Pool for cluster operations and monitoring"
       placement_ads    = [substr(var.worker_ops_ad, -1, 0)]
       mode             = "node-pool"
@@ -72,7 +73,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
-      create           = var.create_cluster && local.create_workers && var.worker_cpu_enabled 
+      create           = local.create_workers && var.worker_cpu_enabled 
       description      = "OKE-managed CPU Node Pool"
       placement_ads    = [substr(var.worker_cpu_ad, -1, 0)]
       mode             = "node-pool"
@@ -86,7 +87,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
-      create           = var.create_cluster && local.create_workers && var.worker_gpu_enabled
+      create           = local.create_workers && var.worker_gpu_enabled
       description      = "OKE-managed GPU Node Pool"
       placement_ads    = [substr(var.worker_gpu_ad, -1, 0)]
       mode             = "node-pool"
@@ -99,7 +100,7 @@ locals {
       cloud_init       = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
-      create                  = var.create_cluster && local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
+      create                  = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
       description             = "OKE self-managed Cluster Network with RDMA"
       placement_ads           = [substr(var.worker_rdma_ad, -1, 0)]
       mode                    = "cluster-network"
