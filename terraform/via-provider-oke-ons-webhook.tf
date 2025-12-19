@@ -15,7 +15,7 @@ resource "helm_release" "oke-ons-webhook" {
     },
     {
       name  = "deploy.env.GRAFANA_INITIAL_PASSWORD"
-      value = base64encode(random_password.grafana_admin_password.result)
+      value = base64encode(random_password.grafana_admin_password[0].result)
     },
     {
       name  = "deploy.env.GRAFANA_SERVICE_URL"

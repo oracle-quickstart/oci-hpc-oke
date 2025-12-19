@@ -74,7 +74,7 @@ output "grafana_url" {
 }
 
 output "grafana_admin_password" {
-  value = var.create_cluster ? nonsensitive(random_password.grafana_admin_password.result) : null
+  value = var.create_cluster ? nonsensitive(random_password.grafana_admin_password[0].result) : null
 }
 
 output "prom_server_port_forward" {
