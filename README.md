@@ -585,6 +585,7 @@ spec:
                   --bind-to none \
                   --map-by ppr:4:node \
                   --mca coll ^hcoll \
+                  -mca plm_rsh_args "-p 2222" \
                   -x NCCL_DEBUG=WARN \
                   -x NCCL_MNNVL_ENABLE=1 \
                   -x NCCL_CUMEM_ENABLE=1 \
