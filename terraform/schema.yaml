@@ -1665,7 +1665,9 @@ variables:
       or:
         - create_bastion
         - create_cluster
-        - create_operator
+        - and: 
+            - create_operator 
+            - create_cluster
 
 outputGroups:
   - title: Terraform
