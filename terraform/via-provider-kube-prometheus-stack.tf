@@ -14,7 +14,7 @@ resource "helm_release" "prometheus" {
   chart             = "kube-prometheus-stack"
   repository        = "https://prometheus-community.github.io/helm-charts"
   version           = var.prometheus_stack_chart_version
-  values            = ["${templatefile("./files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services})}"]
+  values            = ["${templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services})}"]
   create_namespace  = true
   recreate_pods     = false
   force_update      = true

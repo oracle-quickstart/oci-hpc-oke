@@ -36,7 +36,7 @@ locals {
       bastion  = var.create_bastion ? { create = "auto" } : { create = "never"}
       operator = var.create_operator ? { create = "auto" } : { create = "never"}
       int_lb   = { create = "auto" }
-      pub_lb   = alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : { create = "auto"}
+      pub_lb   = { create = "auto" }
       cp       = { create = "auto" }
       workers  = { create = "auto" }
       pods     = { create = "auto" }
@@ -50,89 +50,97 @@ locals {
     {
       bastion = merge(
         var.create_bastion ? { create = "auto" } : { create = "never" },
-        (var.create_vcn && var.bastion_sn_cidr == null) || (!var.create_vcn && var.bastion_sn_id == null) ?
+        (var.create_vcn && var.bastion_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 1 } : {},
         var.create_vcn && var.bastion_sn_cidr != null ?
         { cidr = var.bastion_sn_cidr } : {},
-        var.vcn_id != null && var.bastion_sn_id != null ?
-        { id = var.bastion_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.bastion_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "bastion", {})
       )
-      operator = var.create_operator ? merge(
+      operator = merge(
         var.create_operator ? { create = "auto" } : { create = "never" },
-        (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && var.operator_sn_id == null) ?
+        (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 2 } : {},
         var.create_vcn && var.operator_sn_cidr != null ?
         { cidr = var.operator_sn_cidr } : {},
-        var.vcn_id != null && var.operator_sn_id != null ?
-        { id = var.operator_sn_id } : {}
-      ) : { create = "never" }
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.operator_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "operator", {})
+      )
       int_lb = merge(
         { create = "auto" },
-        (var.create_vcn && var.int_lb_sn_cidr == null) || (!var.create_vcn && var.int_lb_sn_id == null) ?
+        (var.create_vcn && var.int_lb_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 1 } : {},
         var.create_vcn && var.int_lb_sn_cidr != null ?
         { cidr = var.int_lb_sn_cidr } : {},
-        var.vcn_id != null && var.int_lb_sn_id != null ?
-        { id = var.int_lb_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.int_lb_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "int_lb", {})
       )
       pub_lb = merge(
         { create = "auto" },
-        (var.create_vcn && var.pub_lb_sn_cidr == null) || (!var.create_vcn && var.pub_lb_sn_id == null) ?
+        (var.create_vcn && var.pub_lb_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 2 } : {},
         var.create_vcn && var.pub_lb_sn_cidr != null ?
         { cidr = var.pub_lb_sn_cidr } : {},
-        var.vcn_id != null && var.pub_lb_sn_id != null ?
-        { id = var.pub_lb_sn_id } : {},
-        alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.pub_lb_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "pub_lb", {})
       )
       cp = merge(
         { create = "auto" },
-        (var.create_vcn && var.cp_sn_cidr == null) || (!var.create_vcn && var.cp_sn_id == null) ?
+        (var.create_vcn && var.cp_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 0 } : {},
         var.create_vcn && var.cp_sn_cidr != null ?
         { cidr = var.cp_sn_cidr } : {},
-        var.vcn_id != null && var.cp_sn_id != null ?
-        { id = var.cp_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.cp_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "cp", {})
       )
       workers = merge(
         { create = "auto" },
-        (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && var.workers_sn_id == null) ?
+        (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 4, netnum = 2 } : {},
         var.create_vcn && var.workers_sn_cidr != null ?
         { cidr = var.workers_sn_cidr } : {},
-        var.vcn_id != null && var.workers_sn_id != null ?
-        { id = var.workers_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.workers_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "workers", {})
       )
       pods = merge(
         { create = "auto" },
-        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && var.pods_sn_id == null) ?
+        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 2, netnum = 2 } : {},
         var.create_vcn && var.pods_sn_cidr != null ?
         { cidr = var.pods_sn_cidr } : {},
-        var.vcn_id != null && var.pods_sn_id != null ?
-        { id = var.pods_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.pods_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "pods", {})
       )
     },
     var.create_fss ? {
       fss = merge(
         { create = "always" },
-        (var.create_vcn && var.fss_sn_cidr == null) || (!var.create_vcn && var.fss_sn_id == null) ?
+        (var.create_vcn && var.fss_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 3 } : {},
         var.create_vcn && var.fss_sn_cidr != null ?
         { cidr = var.fss_sn_cidr } : {},
-        var.vcn_id != null && var.fss_sn_id != null ?
-        { id = var.fss_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.fss_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "fss", {})
       )
     } : {},
     var.create_lustre ? {
       lustre = merge(
         { create = "always" },
-        (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && var.lustre_sn_id == null) ?
+        (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 7, netnum = 1 } : {},
         var.create_vcn && var.lustre_sn_cidr != null ?
         { cidr = var.lustre_sn_cidr } : {},
-        var.vcn_id != null && var.lustre_sn_id != null ?
-        { id = var.lustre_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.lustre_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "lustre", {})
       )
     } : {}
   )

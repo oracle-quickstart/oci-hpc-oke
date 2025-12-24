@@ -457,8 +457,12 @@ settings:
 
         cp ./config/*.py /host/tmp
 
-        chroot /host bash -c "chmod +x /tmp/check_gpu_setup.py"
-        chroot /host bash -c "/tmp/check_gpu_setup.py --slurm --$healthcheck_type > /tmp/oke-latest-${healthcheck_type}-healthcheck.log 2>&1"
+        if [ ! -e "/host/tmp/uv" ]; then
+            cp /usr/bin/uv /host/tmp/uv
+            chmod +x /host/tmp/uv
+        fi
+
+        EXIT_CODE=$(nsenter -n/host/proc/1/ns/net chroot /host bash -c "/tmp/uv run /tmp/check_gpu_setup.py --dry-run --$healthcheck_type > /tmp/oke-latest-${healthcheck_type}-healthcheck.log 2>&1")
 
         ERROR_MSG=$(cat "$healtcheck_log_file" | grep "Healthcheck::")
         UNKNOWN_MSG=$(cat "$healtcheck_log_file" | grep -o 'Skipping.*')
@@ -467,7 +471,7 @@ settings:
         then
             echo "${ERROR_MSG#* }"
             exit $NONOK
-        elif [ "$ERROR_MSG" == "" ] && [ "$UNKNOWN_MSG" != "" ]
+        elif [ ! "${EXIT_CODE}" ] && [ "$UNKNOWN_MSG" != "" ]
         then
             echo $UNKNOWN_MSG
             exit $UNKNOWN
@@ -521,7 +525,7 @@ logDir:
 
 image:
   repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-  tag: v1.34.0-1
+  tag: v1.34.0-2
   # image.digest -- the image digest. If given it takes precedence over a given tag.
   digest: ""
   pullPolicy: IfNotPresent

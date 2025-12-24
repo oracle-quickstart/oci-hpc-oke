@@ -43,6 +43,7 @@ variableGroups:
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
+      - subnet_advanced_attrs
 
   - title: "Identity"
     variables:
