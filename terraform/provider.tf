@@ -31,34 +31,34 @@ provider "oci" {
 provider "helm" {
   kubernetes = {
     host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
-    cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  cluster_ca_certificate = var.create_cluster ? base64decode(local.cluster_ca_cert) : null
     tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "oci"
-      args        = local.kube_exec_args
+      args        = var.create_cluster ? local.kube_exec_args : []
     }
   }
 }
 
 provider "kubernetes" {
   host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
-  cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  cluster_ca_certificate = var.create_cluster ? base64decode(local.cluster_ca_cert) : null
   tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"
-    args        = local.kube_exec_args
+    args        = var.create_cluster ? local.kube_exec_args : []
   }
 }
 
 provider "kubectl" {
   host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
-  cluster_ca_certificate = base64decode(local.cluster_ca_cert)
+  cluster_ca_certificate = var.create_cluster ? base64decode(local.cluster_ca_cert) : null
   tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"
-    args        = local.kube_exec_args
+    args        = var.create_cluster ? local.kube_exec_args : []
   }
 }

@@ -76,7 +76,7 @@ locals {
 }
 
 resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
+  count = alltrue([var.create_cluster, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
     manifest_md5    = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_amd_dashboard_files_path, local.grafana_nvidia_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
@@ -106,7 +106,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/amd",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/nvidia",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/alerts",
-    ]))
+    ])) 
   }
 
   provisioner "file" {

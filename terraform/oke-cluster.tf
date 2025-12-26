@@ -18,7 +18,7 @@ locals {
   cluster_private_endpoint = try(format("https://%s", lookup(local.cluster_endpoints, "private_endpoint", "not-defined")), "not-defined")
   cluster_orm_endpoint     = try(format("https://%s:6443", one(data.oci_resourcemanager_private_endpoint_reachable_ip.oke.*.ip_address)), "not-defined")
 
-  cluster_ca_cert = module.oke.cluster_ca_cert
+  cluster_ca_cert = module.oke.cluster_ca_cert 
 
   cluster_id        = module.oke.cluster_id
   cluster_apiserver = try(trimspace(module.oke.apiserver_private_host), "")
@@ -213,7 +213,7 @@ module "oke" {
     #     skipAddonDependenciesCheck = true
     #   }
     # } : {},
-    var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
+    var.create_cluster && var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
     {
       "CertManager" = {
         remove_addon_resources_on_delete = true
@@ -234,11 +234,11 @@ module "oke" {
   control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public            = var.control_plane_is_public
   create_bastion                     = var.create_bastion
-  create_cluster                     = true
+  create_cluster                     = var.create_cluster
   create_iam_defined_tags            = false
   create_iam_resources               = false
   create_iam_tag_namespace           = false
-  create_operator                    = var.create_operator
+  create_operator                    = var.create_cluster ? var.create_operator : false 
   create_vcn                         = var.create_vcn
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
@@ -249,11 +249,11 @@ module "oke" {
   operator_image_os_version          = var.operator_image_os_version
   operator_user                      = var.operator_user
   operator_await_cloudinit           = local.deploy_from_operator ? true : false
-  operator_install_kubectl_from_repo = true
-  operator_install_helm_from_repo    = true
-  operator_install_oci_cli_from_repo = true
-  operator_install_k9s               = true
-  operator_install_kubectx           = true
+  operator_install_kubectl_from_repo = var.create_operator
+  operator_install_helm_from_repo    = var.create_operator
+  operator_install_oci_cli_from_repo = var.create_operator
+  operator_install_k9s               = var.create_operator
+  operator_install_kubectx           = var.create_operator
   operator_shape = {
     shape            = var.operator_shape_name
     ocpus            = var.operator_shape_ocpus
@@ -287,7 +287,7 @@ module "oke" {
     }
   }
 
-  allow_rules_public_lb = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? {
+  allow_rules_public_lb = alltrue([var.create_cluster,var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? {
     "Allow TCP ingress from anywhere to HTTP port" = {
       protocol = "6", port = 80, source = "0.0.0.0/0", source_type = "CIDR_BLOCK",
     },
