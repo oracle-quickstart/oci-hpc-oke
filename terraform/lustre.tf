@@ -61,7 +61,7 @@ locals {
     fss      = module.oke.fss_nsg_id
   }
 
-  all_lustre_rules = { for x, y in merge(
+  all_lustre_rules = !var.create_lustre ? {} : { for x, y in merge(
       local.default_lustre_nsg_rules,
       var.allow_rules_lustre
     ) : x => merge(y, {
