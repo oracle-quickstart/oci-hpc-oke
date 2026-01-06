@@ -33,13 +33,12 @@ var validationTestCases = []validationTestCase{
 		expectedError: "public cluster endpoint requires public subnets",
 	},
 	{
-		name: "PublicBastionRequiresPublicSubnets",
+		name: "BastionRequiresPublicSubnets",
 		vars: map[string]interface{}{
 			"create_public_subnets": false,
 			"create_bastion":        true,
-			"bastion_is_public":     true,
 		},
-		expectedError: "public bastion requires public subnets",
+		expectedError: "Creating a bastion requires public subnets",
 	},
 	{
 		name: "InvalidImageURI",

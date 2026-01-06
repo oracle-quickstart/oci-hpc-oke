@@ -2,11 +2,13 @@ create_policies = false
 
 create_bastion  = false
 bastion_is_public = false
-create_operator = false
+create_operator = true
 
-control_plane_is_public = true
-preferred_kubernetes_services = "public"
-create_public_subnets = true
+control_plane_is_public = false
+preferred_kubernetes_services = "internal"
+create_public_subnets = false
+
+cni_type = "VCN-Native Pod Networking"
 
 create_bv_high = false
 create_fss     = false

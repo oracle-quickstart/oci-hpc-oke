@@ -286,3 +286,9 @@ func setIfNotEmpty(vars map[string]interface{}, key, value string) {
 		vars[key] = trimmed
 	}
 }
+
+// isValidOCID checks if a string matches the OCI OCID format.
+// Format: ocid1.<resource-type>.<realm>.[region][.future-use].<unique-id>
+func isValidOCID(s string) bool {
+	return strings.HasPrefix(s, "ocid1.") && strings.Count(s, ".") >= 4
+}

@@ -20,13 +20,7 @@ API key auth (default) also requires:
 - `OCI_USER_OCID`
 - `OCI_FINGERPRINT`
 
-Optional:
-- `OCI_PROFILE` (defaults to the OCI CLI `DEFAULT` profile)
-- `OCI_COMPARTMENT_OCID` (defaults to the provided compartment OCID)
-
-`TF_VAR_*` equivalents are also accepted for the required Terraform inputs.
-If `TFVARS_FILE` is set, required inputs can come from the var file instead of env.
-Missing required inputs will fail the test run.
+`TF_VAR_*` equivalents are also accepted for the required Terraform inputs. If `TFVARS_FILE` is set, required inputs can come from the var file instead of env. Missing required inputs will fail the test run.
 
 ## Run
 From the repo root:
@@ -36,67 +30,56 @@ cd test
 
 go mod tidy
 
-go test ./... -run TestValidation -timeout 30m
+go test -count=1 ./... -run TestValidation -timeout 30m
 
-go test ./... -run TestCoreProvisioning -timeout 2h
+go test -count=1 ./... -run TestPlanSmoke -timeout 10m
+
+go test -count=1 ./... -run TestCoreProvisioning -timeout 2h
 ```
 
 ## Using tfvars files
-Set `TFVARS_FILE` to a comma-separated list of var files (relative or absolute paths). Relative paths are resolved to absolute paths before invoking Terraform. When set, the test harness does not force the default feature flags, so include any desired toggles in your var file (for example, `create_policies=false` if you lack tenancy permissions).
+Set `TFVARS_FILE` to a comma-separated list of var files (relative or absolute paths). When set, the test harness does not force the default feature flags, so include any desired toggles in your var file (for example, `create_policies=false` if you lack tenancy permissions).
 
 ```sh
-TFVARS_FILE=./vars/core-provisioning.tfvars go test ./... -run TestCoreProvisioning -timeout 2h
+TFVARS_FILE=./tfvars/base/base.tfvars go test -count=1 ./... -run TestCoreProvisioning -timeout 2h
 ```
 
-Example with the provided templates (edit the placeholder values first):
+Copy the example tfvars and fill in your values:
 
 ```sh
-TFVARS_FILE=./tfvars/base.tfvars,./tfvars/core-provisioning.tfvars go test ./... -run TestCoreProvisioning -timeout 2h
+cp ./tfvars/base/base.tfvars.example ./tfvars/base/base.tfvars
+# Edit base.tfvars with your OCI credentials
+```
+
+Example with the provided templates:
+
+```sh
+TFVARS_FILE=./tfvars/base/base.tfvars,./tfvars/core/cluster-only.tfvars go test -count=1 ./... -run TestCoreProvisioning -timeout 2h
 ```
 
 Monitoring example:
 
 ```sh
-TFVARS_FILE=./tfvars/base.tfvars,./tfvars/core-provisioning.tfvars,./tfvars/monitoring.tfvars go test ./... -run TestMonitoring -timeout 3h
+TFVARS_FILE=./tfvars/base/base.tfvars,./tfvars/monitoring/monitoring.tfvars go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
 
 ## Optional suites
 Storage (FSS & Lustre):
 
 ```sh
-RUN_FSS_TESTS=1 FSS_AD=<ad-name> go test ./... -run TestStorageFSS -timeout 3h
-RUN_LUSTRE_TESTS=1 go test ./... -run TestStorageLustre -timeout 3h
+RUN_FSS_TESTS=1 go test -count=1 ./... -run TestStorageFSS -timeout 3h
+RUN_LUSTRE_TESTS=1 go test -count=1 ./... -run TestStorageLustre -timeout 3h
 ```
+
+Both FSS and Lustre default to `worker_ops_ad`. Override with `FSS_AD` or `LUSTRE_AD` if needed.
 
 Monitoring (provider path):
 
 ```sh
-RUN_MONITORING_TESTS=1 go test ./... -run TestMonitoring -timeout 3h
-```
-
-Operator path (manual only):
-
-```sh
-RUN_OPERATOR_TESTS=1 go test ./... -run TestOperator -timeout 4h
-```
-
-## Retry Configuration
-
-Configure retry behavior for flaky OCI API calls:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TERRATEST_MAX_RETRIES` | `3` | Maximum number of retries for retryable Terraform errors |
-| `TERRATEST_RETRY_SLEEP_SECONDS` | `15` | Seconds to wait between retries |
-
-Example with increased retries for unstable environments:
-
-```sh
-TERRATEST_MAX_RETRIES=5 TERRATEST_RETRY_SLEEP_SECONDS=30 go test ./... -run TestCoreProvisioning -timeout 2h
+RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
 
 ## Notes
 - The default suite (no `TFVARS_FILE`) sets `create_policies=false` to avoid tenancy-level policy creation. When using a var file, set this explicitly if needed.
-- For instance principal runs, set `OCI_CLI_AUTH=instance_principal` when using monitoring or operator tests so the `oci` CLI can authenticate.
-- Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`, `RUN_OPERATOR_TESTS`) are required to run those tests; missing flags now fail the test run.
-- Validation tests run in parallel to reduce total test time.
+- For instance principal runs, set `OCI_CLI_AUTH=instance_principal` when using monitoring tests so the `oci` CLI can authenticate.
+- Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`) are required to run those tests; missing flags will fail the test run.

@@ -4,7 +4,7 @@
 locals {
   invalid_desired_load_balancers = !var.create_public_subnets && var.preferred_kubernetes_services == "public"
   invalid_public_ep              = !var.create_public_subnets && var.control_plane_is_public
-  invalid_bastion                = !var.create_public_subnets && (var.bastion_is_public && var.create_bastion)
+  invalid_bastion                = !var.create_public_subnets && var.create_bastion
   invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
   invalid_gb200_shape            = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4"], var.worker_rdma_shape)
   invalid_image_uri              = anytrue([
@@ -24,13 +24,13 @@ resource "null_resource" "validate_bastion_networking" {
   count = local.invalid_bastion ? 1 : 0
 
   provisioner "local-exec" {
-    command = "echo 'Error: Public bastion requires public subnets to be created' && exit 1"
+    command = "echo 'Error: Bastion requires public subnets to be created' && exit 1"
   }
 
   lifecycle {
     precondition {
       condition     = !local.invalid_bastion
-      error_message = "A public bastion requires public subnets. Please set `create_public_subnets=true` or change `bastion_is_public=false`."
+      error_message = "Creating a bastion requires public subnets. Please set `create_public_subnets=true` or set `create_bastion=false`."
     }
   }
 }

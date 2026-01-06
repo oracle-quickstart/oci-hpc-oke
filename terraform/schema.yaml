@@ -83,7 +83,6 @@ variableGroups:
   - title: Bastion & Operator
     variables:
       - create_bastion
-      - bastion_is_public
       - bastion_allowed_cidrs
       - bastion_shape_config
       - bastion_shape_name
@@ -570,7 +569,8 @@ variables:
     title: Create bastion instance
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
-    visible: true
+    visible:
+      - create_public_subnets
   bastion_is_public:
     title: Create the bastion in a public subnet
     type: boolean
@@ -1609,6 +1609,7 @@ outputGroups:
   - title: Monitoring
     outputs:
       - grafana_url
+      - grafana_admin_username
       - grafana_admin_password
       - grafana_port_forward
       - grafana_fetch_endpoint_command
@@ -1791,6 +1792,14 @@ outputs:
       visible:
         and:
         - install_node_problem_detector_kube_prometheus_stack
+  grafana_admin_username:
+    title: Grafana admin username
+    type: copyableString
+    default: "admin"
+    visible:
+      and:
+      - install_node_problem_detector_kube_prometheus_stack
+      - install_grafana        
   grafana_admin_password:
     title: Grafana admin password
     type: copyableString

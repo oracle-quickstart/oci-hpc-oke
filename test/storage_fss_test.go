@@ -9,11 +9,14 @@ import (
 func TestStorageFSS(t *testing.T) {
 	skipUnlessEnv(t, "RUN_FSS_TESTS")
 
-	fssAD := requireAnyEnv(t, "FSS_AD", "OCI_FSS_AD", "TF_VAR_fss_ad")
-	options := newTerraformOptions(t, map[string]interface{}{
+	vars := map[string]interface{}{
 		"create_fss": true,
-		"fss_ad":     fssAD,
-	})
+	}
+	// Optional: override AD if FSS_AD is set, otherwise falls back to worker_ops_ad
+	if fssAD := envOrDefault([]string{"FSS_AD", "OCI_FSS_AD", "TF_VAR_fss_ad"}, ""); fssAD != "" {
+		vars["fss_ad"] = fssAD
+	}
+	options := newTerraformOptions(t, vars)
 
 	defer terraform.Destroy(t, options)
 	terraform.InitAndApply(t, options)
