@@ -89,6 +89,10 @@ variable "public_subnet_route_table" {
   type    = string
   default = null
 }
+variable "allow_rules_lustre" {
+  default = {}
+  type    = any
+}
 
 
 # Bastion

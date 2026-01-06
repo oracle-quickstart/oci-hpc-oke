@@ -45,6 +45,8 @@ output "pub_lb_nsg_id" { value = module.oke.pub_lb_nsg_id }
 output "pod_subnet_id" { value = module.oke.pod_subnet_id }
 output "pod_subnet_cidr" { value = module.oke.pod_subnet_cidr }
 output "pod_nsg_id" { value = module.oke.pod_nsg_id }
+output "lustre_subnet_id" { value = one(oci_core_subnet.lustre_subnet[*].id) }
+output "lustre_nsg_id" { value = one(oci_core_network_security_group.lustre_nsg[*].id) }
 
 # Workers
 output "worker_subnet_id" { value = module.oke.worker_subnet_id }
