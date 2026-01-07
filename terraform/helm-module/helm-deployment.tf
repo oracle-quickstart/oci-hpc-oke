@@ -86,6 +86,9 @@ resource "null_resource" "helm_deployment_via_operator" {
     inline = compact(concat(
       [
         "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+        "echo 'Checking for kubeconfig...'",
+        "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
+        "if ! kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
         "echo 'Checking for helm installation...'",
         "for i in $(seq 1 30); do if which helm >/dev/null 2>&1; then echo 'Helm found!'; break; else echo \"Waiting for helm... ($i/30)\"; sleep 10; fi; done",
         "if ! which helm >/dev/null 2>&1; then echo 'ERROR: Helm not found after 5 minutes!'; exit 1; fi"
