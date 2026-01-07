@@ -28,11 +28,11 @@ output "operator_subnet_cidr" { value = module.oke.operator_subnet_cidr }
 output "operator_nsg_id" { value = module.oke.operator_nsg_id }
 
 # Cluster
-output "cluster_id" { value = module.oke.cluster_id }
+output "cluster_id" { value = var.create_cluster ? module.oke.cluster_id : "" }
 output "cluster_name" { value = local.cluster_name }
-output "cluster_public_endpoint" { value = var.control_plane_is_public ? local.cluster_public_endpoint : "" }
-output "cluster_private_endpoint" { value = local.cluster_private_endpoint }
-output "cluster_ca_cert" { value = base64decode(module.oke.cluster_ca_cert) }
+output "cluster_public_endpoint" { value = var.create_cluster && var.control_plane_is_public ? local.cluster_public_endpoint : "" }
+output "cluster_private_endpoint" { value = var.create_cluster ? local.cluster_private_endpoint : "" }
+output "cluster_ca_cert" { value = var.create_cluster ? base64decode(module.oke.cluster_ca_cert) : "" }
 output "control_plane_subnet_id" { value = module.oke.control_plane_subnet_id }
 output "control_plane_subnet_cidr" { value = module.oke.control_plane_subnet_cidr }
 output "control_plane_nsg_id" { value = module.oke.control_plane_nsg_id }
@@ -52,10 +52,10 @@ output "lustre_nsg_id" { value = one(oci_core_network_security_group.lustre_nsg[
 output "worker_subnet_id" { value = module.oke.worker_subnet_id }
 output "worker_nsg_id" { value = module.oke.worker_nsg_id }
 output "worker_subnet_cidr" { value = module.oke.worker_subnet_cidr }
-output "worker_ops_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-system", null) }
-output "worker_cpu_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-cpu", null) }
-output "worker_gpu_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-gpu", null) }
-output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-rdma", null) }
+output "worker_ops_pool_id" { value = var.create_cluster ? lookup(module.oke.worker_pool_ids, "oke-system", null) : null }
+output "worker_cpu_pool_id" { value = var.create_cluster ? lookup(module.oke.worker_pool_ids, "oke-cpu", null) : null }
+output "worker_gpu_pool_id" { value = var.create_cluster ? lookup(module.oke.worker_pool_ids, "oke-gpu", null) : null }
+output "worker_rdma_pool_id" { value = var.create_cluster ? lookup(module.oke.worker_pool_ids, "oke-rdma", null) : null }
 
 # Monitoring
 
@@ -84,11 +84,11 @@ output "grafana_port_forward" {
 }
 
 output "access_k8s_public_endpoint" {
-  value = var.control_plane_is_public ? format("oci ce cluster create-kubeconfig --cluster-id %v --file $HOME/.kube/config --region %v --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT", module.oke.cluster_id, var.region) : "N/A"
+  value = var.create_cluster && var.control_plane_is_public ? format("oci ce cluster create-kubeconfig --cluster-id %v --file $HOME/.kube/config --region %v --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT", module.oke.cluster_id, var.region) : "N/A"
 }
 
 output "access_k8s_private_endpoint" {
-  value = format("oci ce cluster create-kubeconfig --cluster-id %v --file $HOME/.kube/config --region %v --token-version 2.0.0 --kube-endpoint PRIVATE_ENDPOINT", module.oke.cluster_id, var.region)
+  value = var.create_cluster ? format("oci ce cluster create-kubeconfig --cluster-id %v --file $HOME/.kube/config --region %v --token-version 2.0.0 --kube-endpoint PRIVATE_ENDPOINT", module.oke.cluster_id, var.region) : "N/A"
 }
 
 # output "cluster_orm_endpoint" {

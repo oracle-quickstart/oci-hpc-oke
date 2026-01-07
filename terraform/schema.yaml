@@ -14,6 +14,7 @@ variableGroups:
     variables:
       # Provider auth
       - api_fingerprint
+      - compartment_ocid
       - oci_auth
       - oci_profile
       # ORM Variables
@@ -82,7 +83,22 @@ variableGroups:
       - private_subnet_route_table
       - public_subnet_route_table
 
+  - title: OKE Cluster
+    variables:
+      - create_cluster
+      - cluster_compartment_ocid
+      - cluster_name
+      - kubernetes_version
+      - cni_type
+      - control_plane_is_public
+      - control_plane_allowed_cidrs
+      - max_pods_per_node
+      - disable_gpu_device_plugin
+      - preferred_kubernetes_services
+      - setup_credential_provider_for_ocir
+
   - title: Bastion & Operator
+    visible: ${create_cluster}
     variables:
       - create_bastion
       - bastion_is_public
@@ -98,20 +114,8 @@ variableGroups:
       - operator_shape_memory
       - operator_shape_boot
 
-  - title: OKE Cluster
-    variables:
-      - compartment_ocid
-      - cluster_name
-      - kubernetes_version
-      - cni_type
-      - control_plane_is_public
-      - control_plane_allowed_cidrs
-      - max_pods_per_node
-      - disable_gpu_device_plugin
-      - preferred_kubernetes_services
-      - setup_credential_provider_for_ocir
-
   - title: "Workers: System"
+    visible: ${create_cluster}
     variables:
       - worker_ops_ad
       - worker_ops_pool_size
@@ -124,8 +128,9 @@ variableGroups:
       - worker_ops_image_custom_uri
       - worker_ops_image_compartment
       - worker_ops_image_custom_id
-      
+
   - title: "Workers: CPU"
+    visible: ${create_cluster}
     variables:
       - worker_cpu_enabled
       - worker_cpu_ad
@@ -144,6 +149,7 @@ variableGroups:
       - worker_cpu_image_custom_id
       
   - title: "Workers: GPU"
+    visible: ${create_cluster}
     variables:
       - worker_gpu_enabled
       - worker_gpu_ad
@@ -160,6 +166,7 @@ variableGroups:
       - worker_gpu_image_custom_id
 
   - title: "Workers: GPU + RDMA"
+    visible: ${create_cluster}
     variables:
       - worker_rdma_enabled
       - worker_rdma_ad
@@ -177,10 +184,12 @@ variableGroups:
       - worker_rdma_image_custom_id
   
   - title: "SSH Access"
+    visible: ${create_cluster}
     variables:
     - ssh_public_key
 
   - title: "Storage"
+    visible: ${create_cluster}
     variables:
     - nvme_raid_enabled
     - nvme_raid_level
@@ -197,6 +206,7 @@ variableGroups:
     - create_lustre_pv
 
   - title: "Monitoring & Observability"
+    visible: ${create_cluster}
     variables:
     - install_monitoring
     - monitoring_advanced_options
@@ -204,8 +214,8 @@ variableGroups:
     - install_node_problem_detector_kube_prometheus_stack
     - install_nvidia_dcgm_exporter
     - dcgm_exporter_chart_version
-    - install_amd_device_metrics_exporter     
-    - amd_device_metrics_exporter_chart_version 
+    - install_amd_device_metrics_exporter
+    - amd_device_metrics_exporter_chart_version
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
     - nginx_chart_version
@@ -215,6 +225,7 @@ variableGroups:
     - setup_alerting
 
   - title: "Stack Configuration"
+    visible: ${create_cluster}
     variables:
       - deploy_to_oke_from_orm
       - avoid_waiting_for_delete_target
@@ -572,7 +583,7 @@ variables:
     title: Create bastion instance
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
-    visible: true
+    visible: ${create_cluster}
   bastion_is_public:
     title: Create the bastion in a public subnet
     type: boolean
@@ -655,6 +666,7 @@ variables:
     description: Provision an OCI Compute instance configured with access to interact with the OKE Kubernetes endpoint.
     type: boolean
     required: false
+    visible: ${create_cluster}
   operator_shape_config:
     title: Configure operator shape
     type: boolean
@@ -994,16 +1006,31 @@ variables:
       default: true
 
   # OKE Cluster Setup
+  create_cluster:
+    title: Create OKE cluster
+    description: Create the OKE cluster. Uncheck to deploy only the network/VCN resources.
+    type: boolean
+    default: true
+  cluster_compartment_ocid:
+    title: Cluster Compartment
+    type: oci:identity:compartment:id
+    required: true
+    default: ${compartment_ocid}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+    visible: ${create_cluster}
   cluster_name:
     type: string
     title: Cluster name prefix
     description: The Container Engine for Kubernetes cluster name.
     required: true
+    visible: ${create_cluster}
   kubernetes_version:
     type: oci:kubernetes:versions:id
     title: Kubernetes version
     description: The Kubernetes version for the created OKE cluster and managed nodes.
     required: true
+    visible: ${create_cluster}
     dependsOn:
       compartmentId: ${compartment_ocid}
       clusterOptionId: "all"
@@ -1017,6 +1044,7 @@ variables:
       pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
     unique_items: true
     minItems: 0
+    visible: ${create_cluster}
   cni_type:
     title: CNI to use for pod networking
     description: CNI plugin to be used for pod communication on worker nodes in clusters
@@ -1026,11 +1054,12 @@ variables:
     - VCN-Native Pod Networking
     - Flannel
     default: VCN-Native Pod Networking
+    visible: ${create_cluster}
   control_plane_is_public:
     title: Create the Kubernetes control plane endpoint in a public subnet and assign it a public IP address
     type: boolean
     default: true
-    visible: true
+    visible: ${create_cluster}
   max_pods_per_node:
     title: Maximum number of pods per node
     description: The default maximum number of pods to deploy per node when unspecified on a pool
@@ -1045,11 +1074,13 @@ variables:
     title: Preferred Load Balancer kind
     description: The kind of load balancers which should be provisioned by default for the services of type Load Balancer.
     required: true
+    visible: ${create_cluster}
   setup_credential_provider_for_ocir:
     title: Setup OKE credential-provider for OCIR
     description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If "Create policies" box is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
     type: boolean
     default: false
+    visible: ${create_cluster}
 
 # OKE Cluster Setup - Advanced Options
   override_hostnames:
@@ -1062,6 +1093,7 @@ variables:
     type: boolean
     description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
     default: false
+    visible: ${create_cluster}
 
   # Workers - System pool
   worker_ops_ad:

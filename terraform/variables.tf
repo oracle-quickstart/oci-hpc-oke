@@ -41,6 +41,10 @@ variable "vcn_compartment_ocid" {
   default = null
   type    = string
 }
+variable "cluster_compartment_ocid" {
+  default = null
+  type    = string
+}
 variable "vcn_id" {
   default = null
   type    = string
@@ -295,6 +299,11 @@ variable "monitoring_advanced_options" {
 }
 
 # OKE Cluster Setup
+variable "create_cluster" {
+  type        = bool
+  default     = true
+  description = "Create the OKE cluster. Set to false to deploy only the network/VCN resources."
+}
 variable "cluster_name" { default = "oke-gpu-quickstart" }
 variable "kubernetes_version" { default = "v1.34.1" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }

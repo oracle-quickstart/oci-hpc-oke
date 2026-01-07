@@ -2,34 +2,34 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 data "oci_containerengine_clusters" "oke" {
-  compartment_id = var.compartment_ocid
+  compartment_id = coalesce(var.cluster_compartment_ocid, var.compartment_ocid)
 }
 
 locals {
 
-  deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
-  deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
-  deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])
+  deploy_from_operator = alltrue([var.create_cluster, var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
+  deploy_from_local    = alltrue([var.create_cluster, !local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
+  deploy_from_orm      = alltrue([var.create_cluster, var.current_user_ocid != null, var.deploy_to_oke_from_orm])
 
   vcn_name = format("%v-%v", var.vcn_name, local.state_id)
 
-  cluster_endpoints        = module.oke.cluster_endpoints
+  cluster_endpoints        = var.create_cluster ? module.oke.cluster_endpoints : {}
   cluster_public_endpoint  = try(format("https://%s", lookup(local.cluster_endpoints, "public_endpoint", "not-defined")), "not-defined")
   cluster_private_endpoint = try(format("https://%s", lookup(local.cluster_endpoints, "private_endpoint", "not-defined")), "not-defined")
   cluster_orm_endpoint     = try(format("https://%s:6443", one(data.oci_resourcemanager_private_endpoint_reachable_ip.oke.*.ip_address)), "not-defined")
 
-  cluster_ca_cert = module.oke.cluster_ca_cert
+  cluster_ca_cert = var.create_cluster ? module.oke.cluster_ca_cert : ""
 
-  cluster_id        = module.oke.cluster_id
-  cluster_apiserver = try(trimspace(module.oke.apiserver_private_host), "")
+  cluster_id        = var.create_cluster ? module.oke.cluster_id : ""
+  cluster_apiserver = var.create_cluster ? try(trimspace(module.oke.apiserver_private_host), "") : ""
   cluster_name      = format("%v-%v", var.cluster_name, local.state_id)
 
-  kube_exec_args = concat(
+  kube_exec_args = var.create_cluster ? concat(
     ["--region", var.region],
     var.oci_profile != null ? ["--profile", var.oci_profile] : [],
     ["ce", "cluster", "generate-token"],
     ["--cluster-id", module.oke.cluster_id],
-  )
+  ) : ["--version"]
 
   anywhere          = "0.0.0.0/0"
   anywhere_ipv6     = "::/0"
@@ -177,7 +177,7 @@ module "oke" {
 
   region         = var.region
   tenancy_id     = var.tenancy_ocid
-  compartment_id = var.compartment_ocid
+  compartment_id = coalesce(var.cluster_compartment_ocid, var.compartment_ocid)
   state_id       = local.state_id
 
   assign_public_ip_to_control_plane = var.create_public_subnets ? var.control_plane_is_public : false
@@ -245,12 +245,12 @@ module "oke" {
   cni_type                           = local.cni_type
   control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public            = var.control_plane_is_public
-  create_bastion                     = var.create_bastion
-  create_cluster                     = true
+  create_bastion                     = var.create_cluster && var.create_bastion
+  create_cluster                     = var.create_cluster
   create_iam_defined_tags            = false
   create_iam_resources               = false
   create_iam_tag_namespace           = false
-  create_operator                    = var.create_operator
+  create_operator                    = var.create_cluster && var.create_operator
   create_vcn                         = var.create_vcn
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"

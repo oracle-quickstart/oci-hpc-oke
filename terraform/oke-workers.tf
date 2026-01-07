@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  create_workers = true
+  create_workers = var.create_cluster
   fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
   ssh_authorized_keys = compact([
     trimspace(local.ssh_public_key),

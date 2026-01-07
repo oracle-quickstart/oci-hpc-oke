@@ -94,13 +94,13 @@ data "oci_core_vcn" "oke_vcn" {
 }
 
 data "oci_core_subnet" "lustre" {
-  count = var.create_lustre && var.custom_subnet_ids ? 1 : 0
+  count = alltrue([var.create_cluster, var.create_lustre, var.custom_subnet_ids]) ? 1 : 0
 
   subnet_id = var.lustre_sn_id
 }
 
 resource "oci_core_network_security_group" "lustre_nsg" {
-  count = var.create_lustre ? 1 : 0
+  count = alltrue([var.create_cluster, var.create_lustre]) ? 1 : 0
 
   compartment_id = var.compartment_ocid
   vcn_id         = coalesce(var.vcn_id, module.oke.vcn_id)
@@ -113,7 +113,7 @@ resource "oci_core_network_security_group" "lustre_nsg" {
 
 
 resource "oci_core_network_security_group_security_rule" "lustre_rules" {
-  for_each                  = var.create_lustre ? local.all_lustre_rules : {}
+  for_each                  = alltrue([var.create_cluster, var.create_lustre]) ? local.all_lustre_rules : {}
 
   network_security_group_id = one(oci_core_network_security_group.lustre_nsg[*].id)
 
@@ -250,7 +250,7 @@ resource "oci_core_network_security_group_security_rule" "lustre_rules" {
 }
 
 resource "oci_core_subnet" "lustre_subnet" {
-  count = var.create_lustre && !var.custom_subnet_ids ? 1 : 0
+  count = alltrue([var.create_cluster, var.create_lustre, !var.custom_subnet_ids]) ? 1 : 0
 
   cidr_block                 = local.lustre_subnet_cidr
   compartment_id             = var.compartment_ocid
@@ -265,7 +265,7 @@ resource "oci_core_subnet" "lustre_subnet" {
 }
 
 resource "oci_lustre_file_storage_lustre_file_system" "lustre" {
-  count = var.create_lustre ? 1 : 0
+  count = alltrue([var.create_cluster, var.create_lustre]) ? 1 : 0
 
   availability_domain = coalesce(var.lustre_ad, var.worker_ops_ad)
   capacity_in_gbs     = var.lustre_size_in_tb * 1000
