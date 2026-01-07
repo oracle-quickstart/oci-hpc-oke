@@ -73,6 +73,10 @@ output "grafana_admin_password" {
   value = nonsensitive(random_password.grafana_admin_password.result)
 }
 
+output "grafana_admin_username" {
+  value = "admin"
+}
+
 output "prom_server_port_forward" {
   value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
 }
