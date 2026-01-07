@@ -20,6 +20,8 @@ API key auth (default) also requires:
 - `OCI_USER_OCID`
 - `OCI_FINGERPRINT`
 
+More info about configuring the OCI Terraform provider: https://docs.oracle.com/en-us/iaas/Content/dev/terraform/configuring.htm
+
 `TF_VAR_*` equivalents are also accepted for the required Terraform inputs. If `TFVARS_FILE` is set, required inputs can come from the var file instead of env. Missing required inputs will fail the test run.
 
 ## Run
