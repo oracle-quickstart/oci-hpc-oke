@@ -9,7 +9,7 @@ resource "helm_release" "amd_device_metrics_exporter" {
   chart             = "device-metrics-exporter-charts"
   repository        = "https://rocm.github.io/device-metrics-exporter"
   version           = var.amd_device_metrics_exporter_chart_version
-  values            = ["${file("./files/amd-device-metrics-exporter/values.yaml")}"]
+  values            = ["${file("${path.module}/files/amd-device-metrics-exporter/values.yaml")}"]
   create_namespace  = false
   recreate_pods     = true
   force_update      = true

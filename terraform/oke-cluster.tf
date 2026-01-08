@@ -31,12 +31,24 @@ locals {
     ["--cluster-id", module.oke.cluster_id],
   )
 
+  anywhere          = "0.0.0.0/0"
+  anywhere_ipv6     = "::/0"
+  all_ports         = -1
+  all_protocols     = "all"
+  icmp_protocol     = 1
+  icmpv6_protocol   = 58
+  tcp_protocol      = 6
+  udp_protocol      = 17
+  rule_type_nsg     = "NETWORK_SECURITY_GROUP"
+  rule_type_cidr    = "CIDR_BLOCK"
+  rule_type_service = "SERVICE_CIDR_BLOCK"
+
   nsgs = merge(
     {
       bastion  = var.create_bastion ? { create = "auto" } : { create = "never"}
       operator = var.create_operator ? { create = "auto" } : { create = "never"}
       int_lb   = { create = "auto" }
-      pub_lb   = alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : { create = "auto"}
+      pub_lb   = { create = "auto" }
       cp       = { create = "auto" }
       workers  = { create = "auto" }
       pods     = { create = "auto" }
@@ -50,89 +62,97 @@ locals {
     {
       bastion = merge(
         var.create_bastion ? { create = "auto" } : { create = "never" },
-        (var.create_vcn && var.bastion_sn_cidr == null) || (!var.create_vcn && var.bastion_sn_id == null) ?
+        (var.create_vcn && var.bastion_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 1 } : {},
         var.create_vcn && var.bastion_sn_cidr != null ?
         { cidr = var.bastion_sn_cidr } : {},
-        var.vcn_id != null && var.bastion_sn_id != null ?
-        { id = var.bastion_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.bastion_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "bastion", {})
       )
-      operator = var.create_operator ? merge(
+      operator = merge(
         var.create_operator ? { create = "auto" } : { create = "never" },
-        (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && var.operator_sn_id == null) ?
+        (var.create_vcn && var.operator_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 2 } : {},
         var.create_vcn && var.operator_sn_cidr != null ?
         { cidr = var.operator_sn_cidr } : {},
-        var.vcn_id != null && var.operator_sn_id != null ?
-        { id = var.operator_sn_id } : {}
-      ) : { create = "never" }
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.operator_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "operator", {})
+      )
       int_lb = merge(
         { create = "auto" },
-        (var.create_vcn && var.int_lb_sn_cidr == null) || (!var.create_vcn && var.int_lb_sn_id == null) ?
+        (var.create_vcn && var.int_lb_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 1 } : {},
         var.create_vcn && var.int_lb_sn_cidr != null ?
         { cidr = var.int_lb_sn_cidr } : {},
-        var.vcn_id != null && var.int_lb_sn_id != null ?
-        { id = var.int_lb_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.int_lb_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "int_lb", {})
       )
       pub_lb = merge(
         { create = "auto" },
-        (var.create_vcn && var.pub_lb_sn_cidr == null) || (!var.create_vcn && var.pub_lb_sn_id == null) ?
+        (var.create_vcn && var.pub_lb_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 2 } : {},
         var.create_vcn && var.pub_lb_sn_cidr != null ?
         { cidr = var.pub_lb_sn_cidr } : {},
-        var.vcn_id != null && var.pub_lb_sn_id != null ?
-        { id = var.pub_lb_sn_id } : {},
-        alltrue([!var.create_vcn, var.pub_lb_sn_id == null, var.pub_lb_sn_cidr == null]) ? { create = "never" } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.pub_lb_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "pub_lb", {})
       )
       cp = merge(
         { create = "auto" },
-        (var.create_vcn && var.cp_sn_cidr == null) || (!var.create_vcn && var.cp_sn_id == null) ?
+        (var.create_vcn && var.cp_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 13, netnum = 0 } : {},
         var.create_vcn && var.cp_sn_cidr != null ?
         { cidr = var.cp_sn_cidr } : {},
-        var.vcn_id != null && var.cp_sn_id != null ?
-        { id = var.cp_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.cp_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "cp", {})
       )
       workers = merge(
         { create = "auto" },
-        (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && var.workers_sn_id == null) ?
+        (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 4, netnum = 2 } : {},
         var.create_vcn && var.workers_sn_cidr != null ?
         { cidr = var.workers_sn_cidr } : {},
-        var.vcn_id != null && var.workers_sn_id != null ?
-        { id = var.workers_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.workers_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "workers", {})
       )
       pods = merge(
         { create = "auto" },
-        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && var.pods_sn_id == null) ?
+        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 2, netnum = 2 } : {},
         var.create_vcn && var.pods_sn_cidr != null ?
         { cidr = var.pods_sn_cidr } : {},
-        var.vcn_id != null && var.pods_sn_id != null ?
-        { id = var.pods_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.pods_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "pods", {})
       )
     },
     var.create_fss ? {
       fss = merge(
         { create = "always" },
-        (var.create_vcn && var.fss_sn_cidr == null) || (!var.create_vcn && var.fss_sn_id == null) ?
+        (var.create_vcn && var.fss_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 3 } : {},
         var.create_vcn && var.fss_sn_cidr != null ?
         { cidr = var.fss_sn_cidr } : {},
-        var.vcn_id != null && var.fss_sn_id != null ?
-        { id = var.fss_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.fss_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "fss", {})
       )
     } : {},
     var.create_lustre ? {
       lustre = merge(
         { create = "always" },
-        (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && var.lustre_sn_id == null) ?
+        (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 7, netnum = 1 } : {},
         var.create_vcn && var.lustre_sn_cidr != null ?
         { cidr = var.lustre_sn_cidr } : {},
-        var.vcn_id != null && var.lustre_sn_id != null ?
-        { id = var.lustre_sn_id } : {}
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.lustre_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "lustre", {})
       )
     } : {}
   )
@@ -275,25 +295,25 @@ module "oke" {
 
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
-      protocol = "all", port = -1, source = local.vcn_cidr, source_type = "CIDR_BLOCK",
+      protocol = local.all_protocols, port = local.all_ports, source = local.vcn_cidr, source_type = local.rule_type_cidr,
     }
   }
 
   allow_rules_public_lb = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? {
     "Allow TCP ingress from anywhere to HTTP port" = {
-      protocol = "6", port = 80, source = "0.0.0.0/0", source_type = "CIDR_BLOCK",
+      protocol = local.tcp_protocol, port = 80, source = local.anywhere, source_type = local.rule_type_cidr,
     },
     "Allow TCP ingress from anywhere to HTTPS port" = {
-      protocol = "6", port = 443, source = "0.0.0.0/0", source_type = "CIDR_BLOCK",
+      protocol = local.tcp_protocol, port = 443, source = local.anywhere, source_type = local.rule_type_cidr,
     }
   } : {}
 
   allow_rules_workers = var.create_lustre ? {
-    "Allow ingress for Lustre SVC from lustre subnet" = {
-      protocol = "6", source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, source = local.lustre_subnet_cidr, source_type = "CIDR_BLOCK",
+    "Allow ingress from Lustre to OKE Workers" = {
+      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, source = one(oci_core_network_security_group.lustre_nsg[*].id), source_type = local.rule_type_nsg,
     }
-    "Allow egress for Lustre SVC to lustre subnet" = {
-      protocol = "6", source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, destination = local.lustre_subnet_cidr, destination_type = "CIDR_BLOCK",
+    "Allow egress from Workers to Lustre" = {
+      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, destination = one(oci_core_network_security_group.lustre_nsg[*].id), destination_type = local.rule_type_nsg,
     }
   } : {}
 

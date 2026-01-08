@@ -43,6 +43,9 @@ variableGroups:
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
+      # Networking
+      - subnet_advanced_attrs
+      - allow_rules_lustre
 
   - title: "Identity"
     variables:
