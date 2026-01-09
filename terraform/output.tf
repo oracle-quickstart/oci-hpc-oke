@@ -28,6 +28,7 @@ output "operator_subnet_cidr" { value = module.oke.operator_subnet_cidr }
 output "operator_nsg_id" { value = module.oke.operator_nsg_id }
 
 # Cluster
+output "cni_type" { value = var.cni_type }
 output "cluster_id" { value = module.oke.cluster_id }
 output "cluster_name" { value = local.cluster_name }
 output "cluster_public_endpoint" { value = var.control_plane_is_public ? local.cluster_public_endpoint : "" }
@@ -56,7 +57,6 @@ output "worker_gpu_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-gp
 output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-rdma", null) }
 
 # Monitoring
-
 output "grafana_fetch_endpoint_command" {
   value = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? format("kubectl get ingress -n %v -l app.kubernetes.io/instance=kube-prometheus-stack -o jsonpath='{.items[0].spec.rules[0].host}'", var.monitoring_namespace) : format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'", var.monitoring_namespace)
 }
