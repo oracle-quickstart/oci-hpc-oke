@@ -458,7 +458,7 @@ settings:
         cp ./config/*.py /host/tmp
 
         if [ ! -e "/host/tmp/uv" ]; then
-            cp /usr/bin/uv /host/tmp/uv
+            cp /root/.local/bin/uv /host/tmp/uv
             chmod +x /host/tmp/uv
         fi
 
@@ -479,7 +479,7 @@ settings:
             echo "No errors found"
             exit $OK
         fi
-        
+
 
   log_monitors:
     - /config/kernel-monitor.json
@@ -525,7 +525,7 @@ logDir:
 
 image:
   repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-  tag: v1.34.0-2
+  tag: v1.34.0-4
   # image.digest -- the image digest. If given it takes precedence over a given tag.
   digest: ""
   pullPolicy: IfNotPresent
@@ -597,6 +597,7 @@ affinity:
               - BM.GPU.B200.8
               - BM.GPU.GB200.4
               - BM.GPU.GB200-v2.4
+              - BM.GPU.GB200-v3.4
 
 nodeSelector: {}
 
