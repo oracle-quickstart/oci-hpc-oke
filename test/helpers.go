@@ -19,8 +19,6 @@ const (
 	defaultTimeBetweenRetries = 15 * time.Second
 )
 
-const defaultCompartmentOCID = "ocid1.compartment.oc1..aaaaaaaa3p3kstuy3pkr4kj4ehgadfcnw3ivqz53xzd6i7r3hkkkddzd7u3a"
-
 type baseVarsOptions struct {
 	includeDefaults      bool
 	allowMissingRequired bool
@@ -33,10 +31,7 @@ func terraformDir() string {
 func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	t.Helper()
 
-	auth := strings.ToLower(envOrDefault([]string{"OCI_AUTH", "TF_VAR_oci_auth"}, ""))
-	if auth == "" && opts.includeDefaults {
-		auth = "api_key"
-	}
+	auth := strings.ToLower(envOrDefault([]string{"OCI_AUTH", "TF_VAR_oci_auth"}, "api_key"))
 
 	required := func(keys ...string) string {
 		if opts.allowMissingRequired {
@@ -47,29 +42,20 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 
 	tenancyOCID := required("OCI_TENANCY_OCID", "TF_VAR_tenancy_ocid")
 	region := required("OCI_REGION", "TF_VAR_region")
-	compartmentFallback := ""
-	if opts.includeDefaults {
-		compartmentFallback = defaultCompartmentOCID
-	}
-	compartmentOCID := envOrDefault([]string{"OCI_COMPARTMENT_OCID", "TF_VAR_compartment_ocid"}, compartmentFallback)
+	compartmentOCID := required("OCI_COMPARTMENT_OCID", "TF_VAR_compartment_ocid")
 	workerOpsAD := required("WORKER_OPS_AD", "OCI_WORKER_OPS_AD", "TF_VAR_worker_ops_ad")
 	workerOpsImageID := required("WORKER_OPS_IMAGE_ID", "WORKER_OPS_IMAGE_CUSTOM_ID", "OCI_WORKER_OPS_IMAGE_ID", "TF_VAR_worker_ops_image_custom_id")
-	sshPublicKey := loadSSHPublicKey(t, !opts.allowMissingRequired)
+	sshPublicKey := loadSSHPublicKey(t, !opts.includeDefaults)
 
-	var userOCID string
-	var fingerprint string
+	// var userOCID string
+	var profile string
 	switch auth {
-	case "api_key", "security_token":
-		if opts.allowMissingRequired {
-			userOCID = envOrDefault([]string{"OCI_USER_OCID", "TF_VAR_current_user_ocid"}, "")
-			fingerprint = envOrDefault([]string{"OCI_FINGERPRINT", "TF_VAR_api_fingerprint"}, "")
-		} else {
-			userOCID = requireAnyEnv(t, "OCI_USER_OCID", "TF_VAR_current_user_ocid")
-			fingerprint = requireAnyEnv(t, "OCI_FINGERPRINT", "TF_VAR_api_fingerprint")
-		}
+	case "api_key":
+		profile = envOrDefault([]string{"OCI_CONFIG_FILE_PROFILE", "OCI_CLI_PROFILE", "TF_VAR_oci_profile"}, "DEFAULT")
+	case "security_token":
+		profile = requireAnyEnv(t, "OCI_CONFIG_FILE_PROFILE", "OCI_CLI_PROFILE", "TF_VAR_oci_profile")
 	default:
-		userOCID = envOrDefault([]string{"OCI_USER_OCID", "TF_VAR_current_user_ocid"}, "")
-		fingerprint = envOrDefault([]string{"OCI_FINGERPRINT", "TF_VAR_api_fingerprint"}, "")
+		profile = envOrDefault([]string{"OCI_CONFIG_FILE_PROFILE", "OCI_CLI_PROFILE", "TF_VAR_oci_profile"}, "")
 	}
 
 	vars := map[string]interface{}{}
@@ -77,8 +63,8 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	setIfNotEmpty(vars, "tenancy_ocid", tenancyOCID)
 	setIfNotEmpty(vars, "region", region)
 	setIfNotEmpty(vars, "compartment_ocid", compartmentOCID)
-	setIfNotEmpty(vars, "current_user_ocid", userOCID)
-	setIfNotEmpty(vars, "api_fingerprint", fingerprint)
+	// setIfNotEmpty(vars, "current_user_ocid", userOCID)
+	setIfNotEmpty(vars, "oci_profile", profile)
 	setIfNotEmpty(vars, "ssh_public_key", sshPublicKey)
 	setIfNotEmpty(vars, "worker_ops_ad", workerOpsAD)
 	setIfNotEmpty(vars, "worker_ops_image_custom_id", workerOpsImageID)
@@ -102,10 +88,6 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 		vars["worker_gpu_enabled"] = false
 		vars["worker_ops_pool_size"] = 1
 		vars["worker_rdma_enabled"] = false
-	}
-
-	if profile := envOrDefault([]string{"OCI_PROFILE", "TF_VAR_oci_profile"}, ""); profile != "" {
-		vars["oci_profile"] = profile
 	}
 
 	return vars
@@ -191,12 +173,12 @@ func requireAnyEnv(t *testing.T, keys ...string) string {
 func loadSSHPublicKey(t *testing.T, required bool) string {
 	t.Helper()
 
-	if value, ok := os.LookupEnv("SSH_PUBLIC_KEY"); ok && strings.TrimSpace(value) != "" {
-		return strings.TrimSpace(value)
+	if key := envOrDefault([]string{"SSH_PUBLIC_KEY", "TF_VAR_ssh_public_key"}, ""); key != "" {
+		return key
 	}
 
-	if path, ok := os.LookupEnv("SSH_PUBLIC_KEY_PATH"); ok && strings.TrimSpace(path) != "" {
-		content, err := os.ReadFile(strings.TrimSpace(path))
+	if path := envOrDefault([]string{"SSH_PUBLIC_KEY_PATH", "TF_VAR_ssh_public_key_path"}, ""); path != "" {
+		content, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("failed to read SSH public key file: %v", err)
 		}
@@ -204,7 +186,7 @@ func loadSSHPublicKey(t *testing.T, required bool) string {
 	}
 
 	if required {
-		t.Fatalf("missing SSH public key; set SSH_PUBLIC_KEY or SSH_PUBLIC_KEY_PATH")
+		t.Fatalf("missing SSH public key; set SSH_PUBLIC_KEY, SSH_PUBLIC_KEY_PATH, TF_VAR_ssh_public_key or TF_VAR_ssh_public_key_path")
 	}
 	return ""
 }
