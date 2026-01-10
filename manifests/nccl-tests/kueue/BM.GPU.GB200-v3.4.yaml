@@ -48,10 +48,8 @@ spec:
                         --mca coll ^hcoll \
                         -x NCCL_DEBUG=WARN \
                         -x NCCL_MNNVL_ENABLE=1 \
-                        -x NCCL_NET_PLUGIN=none \
                         -x UCX_NET_DEVICES=eth0 \
                         -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_5,mlx5_6,mlx5_7,mlx5_8 \
-                        -x NCCL_NVLS_ENABLE=1 \
                         -x NCCL_SOCKET_IFNAME=eth0 \
                         -x NCCL_NET_GDR_C2C=1 \
                         -x NCCL_IB_GID_INDEX=3 \
@@ -62,17 +60,16 @@ spec:
                         -x IB_RX_QUEUE_LEN=8192 \
                         -x HCOLL_ENABLE_MCAST_ALL=0 \
                         -x coll_hcoll_enable=0 \
-                  -x NCCL_BUFFSIZE=16777216 \
-                  -x NCCL_IB_QPS_PER_CONNECTION=4 \
-                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                  -x NCCL_NVLS_ENABLE=0 \
-                  -x NCCL_MNNVLS_ENABLE=0 \
-                  -x NCCL_DMABUF_ENABLE=1 \
-                  -x NCCL_NET_PLUGIN=sys \
-                -np $NP \
-                /opt/nccl_tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+                        -x NCCL_BUFFSIZE=16777216 \
+                        -x NCCL_IB_QPS_PER_CONNECTION=4 \
+                        -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                        -x NCCL_NVLS_ENABLE=0 \
+                        -x NCCL_DMABUF_ENABLE=1 \
+                        -x NCCL_NET_PLUGIN=sys \
+                        -np $NP \
+                        /opt/nccl_tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
-      replicas: 8
+      replicas: 2
       template:
         metadata:
           labels:
