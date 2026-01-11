@@ -3,6 +3,7 @@
 
 locals {
   fss_export_path = format("/oke-gpu-%v", local.state_id)
+  fss_ad          = coalesce(var.fss_ad, var.worker_ops_ad)
 }
 
 #export path picked from user input 
@@ -12,7 +13,7 @@ locals {
 
 data "oci_file_storage_mount_targets" "fss" {
   count               = var.create_fss ? 1 : 0
-  availability_domain = var.fss_ad
+  availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   id                  = oci_file_storage_mount_target.fss_mt.0.id
 }
@@ -30,14 +31,14 @@ data "oci_core_private_ip" "fss_mt_ip" {
 
 resource "oci_file_storage_file_system" "fss" {
   count               = var.create_fss ? 1 : 0
-  availability_domain = var.fss_ad
+  availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   display_name        = "${local.cluster_name}-fss"
 }
 
 resource "oci_file_storage_mount_target" "fss_mt" {
   count               = var.create_fss ? 1 : 0
-  availability_domain = var.fss_ad
+  availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   subnet_id           = module.oke.fss_subnet_id
   display_name        = "${local.cluster_name}-mt"

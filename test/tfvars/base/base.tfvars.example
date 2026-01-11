@@ -1,0 +1,24 @@
+# Required inputs for core provisioning (API key auth).
+# Copy this file to base.tfvars and replace placeholder values.
+
+region         = "<REGION>"           # e.g., "us-ashburn-1"
+tenancy_ocid   = "<TENANCY_OCID>"     # ocid1.tenancy.oc1..aaaa...
+compartment_ocid = "<COMPARTMENT_OCID>" # ocid1.compartment.oc1..aaaa...
+ssh_public_key = "<SSH_PUBLIC_KEY>"   # ssh-rsa AAAA... or path via SSH_PUBLIC_KEY_PATH env
+
+# Cluster
+kubernetes_version = "v1.32.1"
+
+# Operational pool
+worker_ops_ad              = "<AD_NAME>"        # e.g., "jLaG:US-ASHBURN-AD-1"
+worker_ops_image_custom_id = "<IMAGE_OCID>"     # ocid1.image.oc1...
+
+# Optional: pool size (defaults to 1)
+# worker_ops_pool_size = 1
+
+# Optional: GPU pool
+# worker_gpu_enabled         = true
+# worker_gpu_ad              = "<AD_NAME>"
+# worker_gpu_shape           = "VM.GPU.A10.1"
+# worker_gpu_pool_size       = 1
+# worker_gpu_image_custom_id = "<IMAGE_OCID>"
