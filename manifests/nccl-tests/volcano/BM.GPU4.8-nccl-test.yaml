@@ -47,7 +47,7 @@ spec:
               /workspace/nccl-tests/build/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
           ports:
           - { name: mpijob-port, containerPort: 2222, protocol: TCP }
-          image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+          image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
           name: mpimaster
           resources:
             limits:
@@ -84,7 +84,7 @@ spec:
           - /bin/bash
           - -c
           - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222 || sleep 999999999;
-          image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-24.11-nccl-2.23.4-1
+          image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
           name: mpiworker
           ports:
           - { name: mpijob-port, containerPort: 2222, protocol: TCP }
