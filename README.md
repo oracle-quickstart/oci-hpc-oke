@@ -154,15 +154,20 @@ Kueue and MPI Operator are required for running the optional NCCL tests.
 
 ### Deploy MPI Operator and Kueue
 ```sh
-kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.7.0/deploy/v2beta1/mpi-operator.yaml
 
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.4" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.15.2" --create-namespace --namespace=kueue-system
 ```
 
 ### Run the NCCL/RCCL Tests
 
 > [!IMPORTANT]  
 > The NCCL/RCCL parameters differ between GPU shapes. Ensure that you use the correct manifest for your specific bare metal GPU shape.
+
+#### BM.GPU.GB200-v3.4
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.GB200-v3.4.yaml
+```
 
 #### BM.GPU.GB200-v2.4
 ```sh

@@ -57,7 +57,7 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             command: ["bash", "-c"]
@@ -114,7 +114,7 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
             command:
               - /bin/bash
               - -c
