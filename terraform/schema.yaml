@@ -572,14 +572,12 @@ variables:
     title: Create bastion instance
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
-    visible: true
+    default: true
+    visible: ${create_public_subnets}
   bastion_is_public:
     title: Create the bastion in a public subnet
     type: boolean
-    visible: 
-      and:
-      - create_bastion
-      - create_public_subnets
+    visible: false
   bastion_allowed_cidrs:
     title: Bastion allowed CIDRs
     description: List of CIDR ranges for allowed SSH communication to bastion instance.
@@ -590,13 +588,19 @@ variables:
       pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
     unique_items: true
     minItems: 0
-    visible: ${create_bastion}
+    visible:
+      and:
+      - create_bastion
+      - create_public_subnets
   bastion_shape_config:
     title: Configure the bastion shape
     type: boolean
     default: false
     required: false
-    visible: ${create_bastion}
+    visible:
+      and:
+      - create_bastion
+      - create_public_subnets
   bastion_shape_name:
     title: Bastion instance shape
     type: oci:core:instanceshape:name
@@ -1611,6 +1615,7 @@ outputGroups:
   - title: Monitoring
     outputs:
       - grafana_url
+      - grafana_admin_username
       - grafana_admin_password
       - grafana_port_forward
       - grafana_fetch_endpoint_command
@@ -1793,6 +1798,14 @@ outputs:
       visible:
         and:
         - install_node_problem_detector_kube_prometheus_stack
+  grafana_admin_username:
+    title: Grafana admin username
+    type: copyableString
+    default: "admin"
+    visible:
+      and:
+      - install_node_problem_detector_kube_prometheus_stack
+      - install_grafana        
   grafana_admin_password:
     title: Grafana admin password
     type: copyableString
