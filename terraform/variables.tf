@@ -27,6 +27,10 @@ variable "region" { type = string }
 
 # Identity
 variable "create_policies" { default = true }
+variable "dynamic_groups" { 
+  type    = string
+  default = null
+  }
 
 # General Variables
 variable "ssh_public_key" {
