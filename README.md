@@ -92,6 +92,7 @@ WORKER_SUBNET_NSG_ID=""
 POD_SUBNET_ID=""
 POD_SUBNET_NSG_ID=""
 IMAGE_ID=""
+SHAPE=""
 
 # -----------------------------
 # Encode cloud-init
@@ -127,7 +128,7 @@ oci --region "${REGION}" \
       "pod-subnets": "${POD_SUBNET_ID}",
       "pod-nsgids": "${POD_SUBNET_NSG_ID}"
     },
-    "shape": "BM.GPU.GB200.4",
+    "shape": "${SHAPE}",
     "sourceDetails": {
       "bootVolumeSizeInGBs": "512",
       "bootVolumeVpusPerGB": "20",
