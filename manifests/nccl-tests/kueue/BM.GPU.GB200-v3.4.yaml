@@ -3,7 +3,7 @@ kind: ComputeDomain
 metadata:
   name: bm-gpu-gb200-v3.4-nccl-tests-compute-domain
 spec:
-  numNodes: 2
+  numNodes: 0
   channel:
     resourceClaimTemplate:
       name: bm-gpu-gb200-v3.4-nccl-tests-compute-domain-channel
@@ -67,7 +67,7 @@ spec:
                         -x NCCL_DMABUF_ENABLE=1 \
                         -x NCCL_NET_PLUGIN=sys \
                         -np $NP \
-                        /opt/nccl_tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
+                        /workspace/nccl-tests/build/all_reduce_perf -b 8 -e 32G -f 2 -g 1
     Worker:
       replicas: 2
       template:
