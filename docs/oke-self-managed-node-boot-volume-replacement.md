@@ -13,14 +13,15 @@ The [OKE Native BVR](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/re
 
 ### Prerequisites
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
+1. You can find the Boot Volume Replacement script [here.](https://github.com/oracle-quickstart/oci-hpc-oke/blob/main/docs/files/bvr-script.py)
+
+2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 For MacOS/Linux:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-
 ### Script parameters
 
 
