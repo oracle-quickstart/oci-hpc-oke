@@ -3,7 +3,7 @@ kind: ComputeDomain
 metadata:
   name: bm-gpu-gb200-v3.4-nccl-tests-compute-domain
 spec:
-  numNodes: 2
+  numNodes: 0
   channel:
     resourceClaimTemplate:
       name: bm-gpu-gb200-v3.4-nccl-tests-compute-domain-channel
