@@ -447,13 +447,9 @@ spec:
           labels:
             nccl-test-replica: mpi-launcher
         spec:
-          hostNetwork: true
-          dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
-            ports:
-            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
             command: ["bash", "-c"]
             args:
               - |
@@ -461,20 +457,20 @@ spec:
                 NUM_GPUS=8
                 NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
                 NP=$(($NUM_HOSTS*$NUM_GPUS))
-                while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1; done); do
+                while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no  $host exit 2>/dev/null || exit 1; done); do
                   echo "Waiting for workers to be ready..."
                   sleep 5
                 done
                 echo "All workers are ready!"
                 mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                  -mca coll ^hcoll \
                   -mca coll_hcoll_enable 0 \
                   -np $NP -npernode $NUM_GPUS --bind-to numa \
                   -x NCCL_DEBUG=WARN \
                   -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
                   -x NCCL_IB_QPS_PER_CONNECTION=4 \
                   -x NCCL_IB_GID_INDEX=3 \
-                  -x NCCL_IB_HCA==mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12 \
+                  -x NCCL_IB_HCA=mlx5 \
                   -x NCCL_IB_TC=41 \
                   -x NCCL_IB_SL=0 \
                   -x NCCL_IB_TIMEOUT=22 \
@@ -491,15 +487,11 @@ spec:
           annotations:
             k8s.v1.cni.cncf.io/networks: sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf,sriov-rdma-vf
         spec:
-          hostNetwork: true
-          dnsPolicy: ClusterFirstWithHostNet
           volumes:
           - { name: devinf, hostPath: { path: /dev/infiniband }}
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}
           containers:
           - name: mpi-worker
-            ports:
-            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             volumeMounts:
             - { mountPath: /dev/infiniband, name: devinf }
             - { mountPath: /dev/shm, name: shm }
@@ -507,11 +499,11 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/hpc_limited_availability/nccl-tests:pytorch-25.03-nccl-2.26.6-1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
             command:
               - /bin/bash
               - -c
-              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222;
+              - mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
             resources:
               limits:
                 nvidia.com/gpu: 8

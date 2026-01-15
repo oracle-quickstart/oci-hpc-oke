@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +15,10 @@ import (
 	"syscall"
 	"time"
 )
+
+var logMutex sync.Mutex
+
+const defaultMTU = 4220
 
 // Shape configurations from shapes.json
 var shapeConfig = map[string]struct {
@@ -84,13 +87,6 @@ var shapeConfig = map[string]struct {
 		},
 		MTU: 4220,
 	},
-	"BM.GPU.H200-NC.8": {
-		PCIAddresses: []string{
-			"0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
-			"0000:86:00.0", "0000:a5:00.0", "0000:bd:00.0", "0000:d5:00.0",
-		},
-		MTU: 4220,
-	},
 	"BM.GPU.B200.8": {
 		PCIAddresses: []string{
 			"0000:0c:00.0", "0000:2a:00.0", "0000:41:00.0", "0000:58:00.0",
@@ -99,10 +95,6 @@ var shapeConfig = map[string]struct {
 		MTU: 4220,
 	},
 	"BM.GPU.L40S.4": {
-		PCIAddresses: []string{"0000:27:00.0", "0000:97:00.0"},
-		MTU:          4220,
-	},
-	"BM.GPU.L40S-NC.4": {
 		PCIAddresses: []string{"0000:27:00.0", "0000:97:00.0"},
 		MTU:          4220,
 	},
@@ -151,6 +143,8 @@ var shapeConfig = map[string]struct {
 var hostRoot string
 
 func log(format string, args ...interface{}) {
+	logMutex.Lock()
+	defer logMutex.Unlock()
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	fmt.Printf("[%s] %s\n", timestamp, fmt.Sprintf(format, args...))
 }
@@ -235,12 +229,15 @@ func resetAllVFs() {
 	netPath := hostPath("/sys/class/net")
 	entries, err := os.ReadDir(netPath)
 	if err != nil {
+		log("Warning: Failed to read net path: %v", err)
 		return
 	}
 	for _, entry := range entries {
 		numvfsPath := filepath.Join(netPath, entry.Name(), "device", "sriov_numvfs")
 		if fileExists(numvfsPath) {
-			writeFile(numvfsPath, "0")
+			if err := writeFile(numvfsPath, "0"); err != nil {
+				log("Warning: Failed to reset VFs for %s: %v", entry.Name(), err)
+			}
 		}
 	}
 	time.Sleep(5 * time.Second)
@@ -277,15 +274,20 @@ func getShapeWithRetry(maxTime, interval int) string {
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for {
-		req, _ := http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/shape", nil)
-		req.Header.Set("Authorization", "Bearer Oracle")
+		req, err := http.NewRequest("GET", "http://169.254.169.254/opc/v2/instance/shape", nil)
+		if err != nil {
+			log("Warning: Failed to create request: %v", err)
+		} else {
+			req.Header.Set("Authorization", "Bearer Oracle")
 
-		if resp, err := client.Do(req); err == nil {
-			defer resp.Body.Close()
-			if body, err := io.ReadAll(resp.Body); err == nil {
-				shape := strings.TrimSpace(string(body))
-				if shape != "" {
-					return shape
+			if resp, err := client.Do(req); err == nil {
+				body, readErr := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if readErr == nil {
+					shape := strings.TrimSpace(string(body))
+					if shape != "" {
+						return shape
+					}
 				}
 			}
 		}
@@ -403,10 +405,16 @@ func createVFsForInterface(iface string, numVFs int) bool {
 	if current != numVFs {
 		log("Creating VFs for %s (current: %d, target: %d)", iface, current, numVFs)
 		if current != 0 {
-			writeFile(numvfsPath, "0")
+			if err := writeFile(numvfsPath, "0"); err != nil {
+				log("ERROR: Failed to reset VFs for %s: %v", iface, err)
+				return false
+			}
 			time.Sleep(2 * time.Second)
 		}
-		writeFile(numvfsPath, fmt.Sprintf("%d", numVFs))
+		if err := writeFile(numvfsPath, fmt.Sprintf("%d", numVFs)); err != nil {
+			log("ERROR: Failed to create VFs for %s: %v", iface, err)
+			return false
+		}
 		time.Sleep(3 * time.Second)
 	} else {
 		log("%d VFs already exist for %s", numVFs, iface)
@@ -614,37 +622,29 @@ func main() {
 	resetVFs := flag.Bool("reset-vfs", false, "Reset all VFs before config")
 	restartSRIOV := flag.Bool("restart-sriov", false, "Restart sriov-device-plugin")
 	setNetnsExclusive := flag.Bool("set-netns-exclusive", false, "Set RDMA netns to exclusive mode")
-	sleepForever := flag.Bool("sleep", false, "Sleep forever after completion")
-	runOnce := flag.Bool("run-once", false, "Run once using marker file (for DaemonSet without --sleep)")
+	runOnce := flag.Bool("run-once", false, "Run once using marker file, then sleep forever (for DaemonSet)")
 	hostRootFlag := flag.String("host-root", "/host", "Host root mount point")
 	flag.Parse()
 
 	hostRoot = *hostRootFlag
 
 	// Handle graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-sigChan
 		log("Received signal, exiting...")
-		cancel()
 		os.Exit(0)
 	}()
-	_ = ctx
 
 	// Check marker file for --run-once mode
 	markerFile := hostPath("/var/run/vf-config-done")
 	if *runOnce {
 		if fileExists(markerFile) {
-			log("VF configuration already done (marker exists)")
-			if *sleepForever {
-				log("Sleeping forever...")
-				for {
-					time.Sleep(1 * time.Hour)
-				}
+			log("VF configuration already done (marker exists), sleeping forever...")
+			for {
+				time.Sleep(1 * time.Hour)
 			}
-			return
 		}
 	}
 
@@ -678,10 +678,12 @@ func main() {
 	config, ok := shapeConfig[shape]
 
 	if !ok || shape == "" {
-		log("Unknown shape '%s', falling back to rdma* discovery", shape)
+		log("Unknown shape '%s', falling back to rdma* discovery (MTU: %d)", shape, defaultMTU)
 		interfaces := discoverRDMAInterfaces()
 		for _, iface := range interfaces {
-			createVFsForInterface(iface, *numVFs)
+			if createVFsForInterface(iface, *numVFs) {
+				setMTU(iface, defaultMTU)
+			}
 		}
 	} else {
 		log("Detected shape: %s", shape)
@@ -715,7 +717,7 @@ func main() {
 	}
 
 	// Step 9: Sleep forever (for DaemonSet)
-	if *sleepForever {
+	if *runOnce {
 		log("Sleeping forever (send SIGTERM to exit)...")
 		for {
 			time.Sleep(1 * time.Hour)
