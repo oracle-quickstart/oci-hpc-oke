@@ -5,6 +5,10 @@ data "oci_identity_availability_domains" "all" {
   compartment_id = var.tenancy_ocid
 }
 
+data "oci_identity_dynamic_groups" "all" {
+  compartment_id = var.tenancy_ocid
+}
+
 resource "random_string" "state_id" {
   length  = 6
   lower   = true
@@ -13,10 +17,14 @@ resource "random_string" "state_id" {
   upper   = false
 }
 
+
 locals {
+  dynamic_groups_list = data.oci_identity_dynamic_groups.all.dynamic_groups
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
-  group_name           = format("oke-gpu-%v", local.state_id)
+  
+  group_name = var.dynamic_groups == null ? format("oke-gpu-%v", local.state_id) : local.dynamic_groups_list[index(local.dynamic_groups_list[*].id, var.dynamic_groups)]["name"]
+ 
   storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
@@ -68,7 +76,7 @@ locals {
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.create_policies ? 1 : 0
+  count          = var.dynamic_groups == null ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
   name           = local.group_name
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
@@ -82,7 +90,7 @@ resource "oci_identity_policy" "oke_quickstart_all" {
   provider       = oci.home
   count          = var.create_policies ? 1 : 0
   compartment_id = var.compartment_ocid
-  name           = local.group_name
+  name           = format("oke-gpu-%v-policy", local.state_id)
   description    = format("Policies for OKE Terraform state %v", local.state_id)
   statements     = local.policy_statements
   lifecycle {
