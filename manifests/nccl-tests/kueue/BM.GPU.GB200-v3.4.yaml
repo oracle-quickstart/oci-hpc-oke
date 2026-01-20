@@ -1,3 +1,39 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: bm-gpu-gb200-v3.4
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: BM.GPU.GB200-v3.4
+    nvidia.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: bm-gpu-gb200-v3.4-nccl-tests-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "ephemeral-storage"]
+    flavors:
+    - name: bm-gpu-gb200-v3.4
+      resources:
+      - name: cpu
+        nominalQuota: "20000"
+      - name: memory
+        nominalQuota: "102400Gi"
+      - name: nvidia.com/gpu
+        nominalQuota: "1600"
+      - name: ephemeral-storage
+        nominalQuota: "6400Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: bm-gpu-gb200-v3.4-nccl-tests
+spec:
+  clusterQueue: bm-gpu-gb200-v3.4-nccl-tests-queue
+---
 apiVersion: resource.nvidia.com/v1beta1
 kind: ComputeDomain
 metadata:
@@ -12,6 +48,8 @@ apiVersion: kubeflow.org/v2beta1
 kind: MPIJob
 metadata:
   name: nccl-test
+  labels:
+    kueue.x-k8s.io/queue-name: bm-gpu-gb200-v3.4-nccl-tests
 spec:
   slotsPerWorker: 4
   runPolicy:
@@ -29,7 +67,7 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-011826.1
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             command: ["bash", "-c"]
@@ -91,7 +129,7 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-011826.1
             command:
               - /bin/bash
               - -c
