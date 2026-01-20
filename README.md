@@ -3,7 +3,7 @@
 ### Prerequisites
 - Your k8s version of the cluster must be at least v1.32.
 - If you're planning to use DRA, do not use k8s versions v1.34.0 and v1.34.1 as there's a bug that affects DRA.
-- If you are deploying in OCI's Dallas (DFW) region, make sure you use Flannel as your pod networking option. VCN Native CNI has a bug that affects the RDMA interface configuration of the nodes.
+- There's a known issue with using the OKE VCN Native CNI for pod networking. With Grace Blackwell clusters, use Flannel for pod networking.
 
 - Once it's enabled, you will need to start kubelet with `--feature-gates=DynamicResourceAllocation=true`. You can find an example [below](https://github.com/oracle-quickstart/oci-hpc-oke/tree/gb200?tab=readme-ov-file#create-cloud-init).
 
