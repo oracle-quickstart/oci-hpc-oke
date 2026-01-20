@@ -1,4 +1,4 @@
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
 metadata:
   name: bm-gpu-h200-8
@@ -7,7 +7,7 @@ spec:
     node.kubernetes.io/instance-type: BM.GPU.H200.8
     nvidia.com/gpu: "true"
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: bm-gpu-h200-8-nccl-tests-queue
@@ -27,7 +27,7 @@ spec:
       - name: ephemeral-storage
         nominalQuota: "6400Gi"
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: bm-gpu-h200-8-nccl-tests
@@ -57,7 +57,7 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-011826.1
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             command: ["bash", "-c"]
@@ -114,7 +114,7 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-26.1.0
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-011826.1
             command:
               - /bin/bash
               - -c

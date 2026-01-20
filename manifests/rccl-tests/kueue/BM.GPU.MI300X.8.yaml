@@ -59,7 +59,7 @@ spec:
           terminationGracePeriodSeconds: 2
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.0.2-rccl-2.26.6-ubuntu22.04-102025.1
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
             imagePullPolicy: Always
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
@@ -136,7 +136,7 @@ spec:
           terminationGracePeriodSeconds: 2
           containers:
           - name: mpi-worker
-            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.0.2-rccl-2.26.6-ubuntu22.04-102025.1
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
             imagePullPolicy: Always
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
