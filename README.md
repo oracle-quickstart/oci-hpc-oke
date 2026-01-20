@@ -34,9 +34,12 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### Images compatible with BM.GPU.GB200.4
 
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/jRqTH2aQhttWHCBG5RvAaK2dZzBmp6xRGx8LzGxlW4Hp2rVjdZ84i0MeihXLFixZ/n/imagegen/b/trroger/o/Canonical-Ubuntu-22.04-aarch64-2025.10.31-0-OCA-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-64K-2025.11.20-0)
+
 - [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.05.20-0-DOCA-OFED-3.0.0-GPU-570-OPEN-CUDA-12.8-2025.07.24-0)
 
 #### Images compatible with BM.GPU.GB200-v3.4, BM.GPU.GB300.4
+
 - [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.10.31-0-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-CX8-2025.12.20-0)
 
 #### Images for AMD Shapes
