@@ -124,7 +124,7 @@ data:
                 args:
                   - |
                     set -e -o pipefail
-                    trap 'exit=1' SIGINT
+                    trap 'exit 1' SIGINT
                     NUM_GPUS=4
                     HOSTFILE=/etc/mpi/hostfile
                     until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do
@@ -299,7 +299,7 @@ data:
                 args:
                   - |
                     set -e -o pipefail
-                    trap 'exit=1' SIGINT
+                    trap 'exit 1' SIGINT
                     NUM_GPUS=8
                     HOSTFILE=/etc/mpi/hostfile
                     until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do
@@ -604,7 +604,7 @@ data:
                 command: ["bash", "-c"]
                 args:
                   - |
-                    set -e -o pipefail; trap 'exit=1' SIGINT
+                    set -e -o pipefail; trap 'exit 1' SIGINT
                     NUM_GPUS=8
                     NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
                     NP=$(($NUM_HOSTS*$NUM_GPUS))
@@ -873,7 +873,7 @@ data:
                 command: ["bash", "-c"]
                 args:
                   - |
-                    set -e -o pipefail; trap 'exit=1' SIGINT
+                    set -e -o pipefail; trap 'exit 1' SIGINT
                     NUM_GPUS=8
                     NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
                     NP=$(($NUM_HOSTS*$NUM_GPUS))

@@ -100,6 +100,8 @@ spec:
         spec:
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
+          nodeSelector:
+            node.kubernetes.io/instance-type: BM.GPU.H100.8
           volumes:
           - { name: devinf, hostPath: { path: /dev/infiniband }}
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi }}

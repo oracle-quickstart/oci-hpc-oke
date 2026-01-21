@@ -127,7 +127,7 @@ data:
                 args:
                 - |
                   set -e -o pipefail
-                  trap 'exit=1' SIGINT
+                  trap 'exit 1' SIGINT
                   NUM_GPUS=8
                   HOSTFILE=/etc/mpi/hostfile
                   until [ -s "$HOSTFILE" ] && [ "$(sed -n '$=' "$HOSTFILE")" -ge 2 ]; do

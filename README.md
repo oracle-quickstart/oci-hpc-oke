@@ -42,6 +42,10 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 - [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.10.31-0-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-CX8-2025.12.20-0)
 
+#### BM.GPU.MI355X-v1.8
+
+- [ROCm 7.1.1](https://objectstorage.us-ashburn-1.oraclecloud.com/p/WvusvolB6r0XyzgKfOgJ5e7P3Sue0TKsF5FBGk1JndUfuQSRb0-UEEaEMl9dkgQs/n/imagegen/b/trroger/o/Canonical-Ubuntu-22.04-2025.10.31-0-OCA-DOCA-OFED-3.1.0-AMD-ROCM-711-2026.01.21-0)
+
 #### BM.GPU.MI300X.8
 
 - [ROCm 7.1.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/Rrur5toJd81BG-0nmLpi701FRs_PMLb4NhtfBwBlIgP-j2NE_5Dw5JfhR5v-Il_3/n/hpctraininglab/b/bucket-20251028-1826/o/Canonical-Ubuntu-24.04-2025.09.22-0-OCA-DOCA-OFED-3.1.0-AMD-ROCM-710-2025.10.31)
@@ -183,7 +187,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.15.2" -
 #### RCCL Tests
 | Image Tag                                                                 | ROCM   |
 |---------------------------------------------------------------------------|--------|
-| iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1 | 7.1.1 |
+| iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1 | 7.1.1 |
 | iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-6.4.4-ubuntu22.04-rccl-2.22.3-011826.1 | 6.4.4 |
 
 #### BM.GPU.GB200-v3.4
@@ -231,6 +235,10 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B4.8.yaml
 ```
 
+#### BM.GPU.MI355X-v1.8
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI355X-v1.8.yaml
+```
 #### BM.GPU.MI300X.8
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI300X.8.yaml
