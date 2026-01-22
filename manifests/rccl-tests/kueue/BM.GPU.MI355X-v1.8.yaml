@@ -119,7 +119,7 @@ spec:
           volumes:
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
     Worker:
-      replicas: 4
+      replicas: 2
       template:
         metadata:
           labels:
