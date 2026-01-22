@@ -18,6 +18,11 @@ metadata:
 data:
   applier.py: |
     #!/usr/bin/env python3
+    # /// script
+    # dependencies = [
+    #   "kubernetes"
+    # ]
+    # ///
     """
     GPU Fryer Active Health Check Applier
 
@@ -28,20 +33,21 @@ data:
     4. Labels the node with test results
     """
 
+    import os
     import time
     import sys
     from datetime import datetime, timezone
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
 
-    # Constants
-    NAMESPACE = "monitoring"
-    PRIORITY_CLASS = "active-health-checks-gpu-fryer-low"
-    GPU_FRYER_IMAGE = "ghcr.io/huggingface/gpu-fryer:1.1.0"
-    TEST_DURATION_SECONDS = 300  # 5 minutes
-    JOB_TTL_SECONDS = 300
-    MAX_WAIT_ITERATIONS = 180  # 30 minutes at 10s intervals
-    LABEL_PREFIX = "oke.oraclecloud.com"
+    # Constants (configurable via environment variables)
+    NAMESPACE = os.environ.get("NAMESPACE", "monitoring")
+    PRIORITY_CLASS = os.environ.get("PRIORITY_CLASS", "active-health-checks-gpu-fryer-low")
+    GPU_FRYER_IMAGE = os.environ.get("GPU_FRYER_IMAGE", "ghcr.io/huggingface/gpu-fryer:1.1.0")
+    TEST_DURATION_SECONDS = int(os.environ.get("TEST_DURATION_SECONDS", "300"))
+    JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "300"))
+    MAX_WAIT_ITERATIONS = int(os.environ.get("MAX_WAIT_ITERATIONS", "180"))
+    LABEL_PREFIX = os.environ.get("LABEL_PREFIX", "oke.oraclecloud.com")
     RESULT_LABEL = f"{LABEL_PREFIX}/active-health-checks-gpu-fryer"
     LAST_RUN_LABEL = f"{LABEL_PREFIX}/active-health-checks-gpu-fryer-last-run"
 
@@ -304,7 +310,7 @@ spec:
           containers:
           - name: applier
             image: ghcr.io/astral-sh/uv:python3.12-alpine
-            command: ["uv", "run", "--with", "kubernetes", "/scripts/applier.py"]
+            command: ["uv", "run", "/scripts/applier.py"]
             volumeMounts:
             - name: script
               mountPath: /scripts
