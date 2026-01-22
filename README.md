@@ -137,27 +137,7 @@ Apply the policy:
 kubectl apply -f nic-cluster-policy.yaml
 ```
 
-### 7. Enable additional configuration for SRIOV Network Operator (Recommended)
-
-Enable parallel NIC configuration for faster deployment:
-
-```bash
-kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io \
-  -n nvidia-network-operator default \
-  --patch '{"spec": {"featureGates": {"parallelNicConfig": true}}}' \
-  --type='merge'
-```
-
-Change configuration mode to `systemd` for better reliability:
-
-```bash
-kubectl patch sriovoperatorconfigs.sriovnetwork.openshift.io \
-  -n nvidia-network-operator default \
-  --patch '{"spec": {"configurationMode": "systemd"}}' \
-  --type='merge'
-```
-
-### 8. Create IP Pool for NVIDIA IPAM
+### 7. Create IP Pool for NVIDIA IPAM
 
 Configure the IP address pool for SR-IOV network interfaces:
 
@@ -183,7 +163,7 @@ kubectl apply -f nv-ipam-ip-pool.yaml
 
 ## SR-IOV Configuration
 
-### 9. Create Virtual Functions
+### 8. Create Virtual Functions
 
 This step creates Virtual Functions (VFs) on your GPU nodes.
 
@@ -191,7 +171,7 @@ This step creates Virtual Functions (VFs) on your GPU nodes.
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/vf/manifests/vf-config/vf-config.yaml
 ```
 
-### 10. Create SR-IOV Network Node Policy
+### 9. Create SR-IOV Network Node Policy
 
 The example below is for the `BM.GPU.B4.8` (A100) shape. For other GPU shapes, see:
 - [All GPU shapes combined policy](./manifests/sriov-network-node-policy.yaml)
@@ -244,38 +224,7 @@ Apply the policy:
 kubectl apply -f BM.GPU.B4.8-policy.yaml
 ```
 
-### 11. Configure Node Reboot Behavior
-
-Control the percentage of nodes that can reboot concurrently during VF configuration. The example below allows 100% of `BM.GPU.B4.8` nodes to reboot simultaneously.
-
-> [!TIP]
-> For production environments, consider using a lower percentage (e.g., `25%` or `50%`) to maintain cluster availability during VF configuration.
-
-```yaml
-cat <<'EOF' > sriov-network-pool-config-percentage.yaml
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovNetworkPoolConfig
-metadata:
-  name: bm-gpu-b4-8
-  namespace: nvidia-network-operator
-spec:
-  maxUnavailable: "100%"
-  nodeSelector:
-    matchExpressions:
-      - key: node.kubernetes.io/instance-type
-        operator: In
-        values:
-          - BM.GPU.B4.8
-EOF
-```
-
-Apply the configuration:
-
-```bash
-kubectl apply -f sriov-network-pool-config-percentage.yaml
-```
-
-### 12. Create SR-IOV Network Resource
+### 10. Create SR-IOV Network Resource
 
 Define the SR-IOV network that pods can attach to:
 
@@ -324,7 +273,7 @@ kubectl apply -f sriovnetwork.yaml
 
 ## Verification
 
-### 13. Verify VF Allocation
+### 11. Verify VF Allocation
 
 After the nodes reboot and SR-IOV configuration completes, verify that Virtual Functions are correctly exposed:
 
@@ -369,7 +318,7 @@ spec:
 
 ## Running the NCCL tests (Optional)
 
-### 14. Deploy Kueue & MPI Operator
+### 12. Deploy Kueue & MPI Operator
 
 To validate RDMA connectivity and GPU performance, install Kueue for job queueing and the MPI Operator for multi-node workloads:
 
@@ -384,7 +333,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
   --namespace=kueue-system
 ```
 
-### 15. Run NCCL tests
+### 13. Run NCCL tests
 
 The NCCL test validates RDMA performance between GPU nodes. Deploy the test with the following manifest:
 
@@ -517,7 +466,7 @@ Apply the manifest:
 kubectl apply -f nccl-tests.yaml
 ```
 
-### 16. Monitor NCCL tests Results
+### 14. Monitor NCCL tests Results
 
 Wait for the container image to pull (this may take several minutes on first run). Once the launcher pod starts, check the logs:
 
