@@ -1,0 +1,59 @@
+---
+# Shared RBAC resources for all active health check jobs
+# This manifest should be applied before any individual health check manifests
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: active-health-checks-runner
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: active-health-checks-runner-role
+rules:
+  # Required by: dcgm-diag, gpu-fryer, rvs (batch jobs)
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # Required by: nccl-tests, rccl-tests (MPI jobs)
+  - apiGroups: ["kubeflow.org"]
+    resources: ["mpijobs"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # Required by: nccl-tests, rccl-tests (Kueue scheduling)
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["resourceflavors", "clusterqueues", "localqueues"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # Required by: all health checks (pod monitoring)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Required by: dcgm-diag, gpu-fryer, rvs (reading test output)
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Required by: all health checks (node labeling)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  # Required by: rvs (event reporting)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create", "update"]
+  # Required by: rvs (test configuration)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: active-health-checks-runner-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: active-health-checks-runner-role
+subjects:
+  - kind: ServiceAccount
+    name: active-health-checks-runner
+    namespace: monitoring
