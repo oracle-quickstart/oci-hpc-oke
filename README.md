@@ -29,7 +29,7 @@ echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
 - [Canonical Ubuntu 22.04 - OKE Optimized (2025.03.28)](https://objectstorage.us-chicago-1.oraclecloud.com/p/O1VP9Rx0p7uWKRQW6739ZzTbnUPK5F8cvlN0apUaiO_cF5x9R2ESYN6yskW0FUVq/n/hpc_limited_availability/b/oke-images-do-not-delete/o/Canonical-Ubuntu-22.04-2025.03.28-0-OKE)
 
 **GPU Nodes (NVIDIA Shapes)**
-- [Ubuntu 22.04 with GPU Driver 570, CUDA 12.8, OFED 24.10 (2025.03.26)](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_DA3uxLCkOCLniSkfce_xyS1AOyBsqxHyWpLHkjb3lNshklPur2VuX3jLkLPcbPZ/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2024.10.04-0-OCA-OFED-24.10-1.1.4.0-GPU-570-CUDA-12.8-2025.03.26-0-VF)
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_zoP3rlMMSw56qgjZcneB8Hvdfi358vzGXqmPVM28L_LGNcOF3zX99cOWxyF8q55/n/idxzjcdglx2s/b/oke-images/o/Canonical-Ubuntu-22.04-2025.10.31-0-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-2026.01.16-0)
 
 ## Deployment Steps
 
@@ -92,7 +92,7 @@ Install the Network Operator with SR-IOV support:
 helm install network-operator nvidia/network-operator \
   -n nvidia-network-operator \
   --create-namespace \
-  --version v25.7.0 \
+  --version v25.10.0 \
   --set nfd.enabled=false \
   --set sriovNetworkOperator.enabled=true
 ```
@@ -117,17 +117,17 @@ spec:
   nvIpam:
     image: nvidia-k8s-ipam
     repository: nvcr.io/nvidia/mellanox
-    version: network-operator-v25.7.0
+    version: network-operator-v25.10.0
     enableWebhook: false
   secondaryNetwork:
     cniPlugins:
       image: plugins
       repository: nvcr.io/nvidia/mellanox
-      version: network-operator-v25.7.0
+      version: network-operator-v25.10.0
     multus:
       image: multus-cni
       repository: nvcr.io/nvidia/mellanox
-      version: network-operator-v25.7.0
+      version: network-operator-v25.10.0
 EOF
 ```
 
@@ -375,7 +375,7 @@ To validate RDMA connectivity and GPU performance, install Kueue for job queuein
 
 ```bash
 # Install MPI Operator
-kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.7.0/deploy/v2beta1/mpi-operator.yaml
 
 # Install Kueue
 helm install kueue oci://registry.k8s.io/kueue/charts/kueue \

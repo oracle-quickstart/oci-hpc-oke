@@ -224,25 +224,6 @@ func startOCA() {
 // VF Management
 // =============================================================================
 
-func resetAllVFs() {
-	log("Resetting all VFs to 0...")
-	netPath := hostPath("/sys/class/net")
-	entries, err := os.ReadDir(netPath)
-	if err != nil {
-		log("Warning: Failed to read net path: %v", err)
-		return
-	}
-	for _, entry := range entries {
-		numvfsPath := filepath.Join(netPath, entry.Name(), "device", "sriov_numvfs")
-		if fileExists(numvfsPath) {
-			if err := writeFile(numvfsPath, "0"); err != nil {
-				log("Warning: Failed to reset VFs for %s: %v", entry.Name(), err)
-			}
-		}
-	}
-	time.Sleep(5 * time.Second)
-}
-
 func getInterfaceFromPCI(pciAddr string) string {
 	netPath := hostPath(fmt.Sprintf("/sys/bus/pci/devices/%s/net", pciAddr))
 	entries, err := os.ReadDir(netPath)
@@ -619,10 +600,9 @@ func main() {
 	numVFs := flag.Int("num-vfs", 1, "Number of VFs per interface")
 	waitForOCAFlag := flag.Bool("wait-for-oca", false, "Wait for OCA to complete")
 	manageServices := flag.Bool("manage-services", false, "Stop/start OCA")
-	resetVFs := flag.Bool("reset-vfs", false, "Reset all VFs before config")
 	restartSRIOV := flag.Bool("restart-sriov", false, "Restart sriov-device-plugin")
 	setNetnsExclusive := flag.Bool("set-netns-exclusive", false, "Set RDMA netns to exclusive mode")
-	runOnce := flag.Bool("run-once", false, "Run once using marker file, then sleep forever (for DaemonSet)")
+	runOnce := flag.Bool("run-once", false, "Run once then sleep forever (for DaemonSet)")
 	hostRootFlag := flag.String("host-root", "/host", "Host root mount point")
 	flag.Parse()
 
@@ -637,17 +617,6 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Check marker file for --run-once mode
-	markerFile := hostPath("/var/run/vf-config-done")
-	if *runOnce {
-		if fileExists(markerFile) {
-			log("VF configuration already done (marker exists), sleeping forever...")
-			for {
-				time.Sleep(1 * time.Hour)
-			}
-		}
-	}
-
 	log("=== VF Configuration Started ===")
 
 	// Step 1: Wait for OCA
@@ -660,20 +629,15 @@ func main() {
 		stopOCA()
 	}
 
-	// Step 3: Reset VFs
-	if *resetVFs {
-		resetAllVFs()
-	}
-
-	// Step 4: Show RDMA status
+	// Step 3: Show RDMA status
 	runOnHost("rdma", "system", "show")
 
-	// Step 5: Set RDMA netns to exclusive
+	// Step 4: Set RDMA netns to exclusive
 	if *setNetnsExclusive {
 		setRDMANetnsExclusive()
 	}
 
-	// Step 6: Detect shape and configure VFs
+	// Step 5: Detect shape and configure VFs
 	shape := getShapeWithRetry(300, 15)
 	config, ok := shapeConfig[shape]
 
@@ -695,28 +659,19 @@ func main() {
 		log("Configured %d/%d interfaces in %.1fs", configured, len(config.PCIAddresses), elapsed)
 	}
 
-	// Step 7: Start OCA
+	// Step 6: Start OCA
 	if *manageServices {
 		startOCA()
 	}
 
-	// Step 8: Restart sriov-device-plugin
+	// Step 7: Restart sriov-device-plugin
 	if *restartSRIOV {
 		restartSRIOVDevicePlugin()
 	}
 
 	log("=== VF Configuration Complete ===")
 
-	// Create marker file for --run-once mode
-	if *runOnce {
-		if err := writeFile(markerFile, time.Now().Format(time.RFC3339)); err != nil {
-			log("Warning: Could not create marker file: %v", err)
-		} else {
-			log("Created marker file: %s", markerFile)
-		}
-	}
-
-	// Step 9: Sleep forever (for DaemonSet)
+	// Sleep forever (for DaemonSet)
 	if *runOnce {
 		log("Sleeping forever (send SIGTERM to exit)...")
 		for {
