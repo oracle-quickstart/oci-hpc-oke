@@ -50,6 +50,7 @@ variableGroups:
   - title: "Identity"
     variables:
       - create_policies
+      - use_existing_dynamic_group
       - dynamic_groups
 
   - title: Network
@@ -247,19 +248,28 @@ variables:
 
   # Identity
   create_policies:
-    title: Create policies
-    description: "Provision a Dynamic Group with policies for Cluster Autoscaler, Self-managed nodes. This option assumes your user has the necessary permissions to create a dynamic group and policies in the root compartment of your tenancy."
+    title: Create Dynamic Group and Policies
+    description: "Create a Dynamic Group with policies for Cluster Autoscaler, Self-managed nodes. This option assumes your user has the necessary permissions to create a dynamic group and policies in the root compartment of your tenancy."
     type: boolean
     default: true
+  use_existing_dynamic_group:
+    title: Use existing Dynamic Group
+    description: "Select an existing dynamic group instead of creating a new one."
+    type: boolean
+    default: false
+    visible: create_policies
   dynamic_groups:
     title: Dynamic Group
-    description: "The dynamic group to use with the policy statements.If the values not selected then stack creates the new dynamic group"
+    description: "The dynamic group to use with the policy statements. If the value is not selected then stack creates the new dynamic group"
     type: oci:identity:dynamicgroups:id
     required: false
     default: ""
     dependsOn:
       compartmentId: tenancy_ocid
-    visible: create_policies
+    visible:
+      and:
+        - create_policies
+        - use_existing_dynamic_group
 
   # VCN
   create_vcn:
@@ -1839,4 +1849,3 @@ outputs:
       title: Prometheus stack chart version
       type: string
       visible: false
-  

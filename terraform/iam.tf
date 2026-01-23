@@ -76,7 +76,7 @@ locals {
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.dynamic_groups == null ? 1 : 0
+  count          = var.create_policies && var.dynamic_groups == null ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
   name           = local.group_name
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
