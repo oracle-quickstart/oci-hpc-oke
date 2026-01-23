@@ -8,42 +8,286 @@ globalDefault: false
 preemptionPolicy: PreemptLowerPriority
 description: "Very low priority for active health check jobs to be preempted by others"
 ---
+# NOTE: Requires active-health-checks-rbac.yaml to be applied first
+---
 apiVersion: v1
-kind: ServiceAccount
+kind: ConfigMap
 metadata:
-  name: active-health-checks-runner
+  name: active-health-checks-gpu-fryer-script
   namespace: monitoring
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: active-health-checks-runner-role
-rules:
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch", "patch", "update"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: active-health-checks-runner-role-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: active-health-checks-runner-role
-subjects:
-  - kind: ServiceAccount
-    name: active-health-checks-runner
-    namespace: monitoring
+data:
+  applier.py: |
+    #!/usr/bin/env python3
+    # /// script
+    # dependencies = [
+    #   "kubernetes"
+    # ]
+    # ///
+    """
+    GPU Fryer Active Health Check Applier
+
+    This script:
+    1. Finds idle GPU nodes that haven't been tested today
+    2. Creates a GPU Fryer test job on one node
+    3. Waits for completion and checks results
+    4. Labels the node with test results
+    """
+
+    import os
+    import time
+    import sys
+    from datetime import datetime, timezone
+    from kubernetes import client, config
+    from kubernetes.client.rest import ApiException
+
+    # Constants (configurable via environment variables)
+    NAMESPACE = os.environ.get("NAMESPACE", "monitoring")
+    PRIORITY_CLASS = os.environ.get("PRIORITY_CLASS", "active-health-checks-gpu-fryer-low")
+    GPU_FRYER_IMAGE = os.environ.get("GPU_FRYER_IMAGE", "ghcr.io/huggingface/gpu-fryer:1.1.0")
+    TEST_DURATION_SECONDS = int(os.environ.get("TEST_DURATION_SECONDS", "300"))
+    JOB_TTL_SECONDS = int(os.environ.get("JOB_TTL_SECONDS", "300"))
+    MAX_WAIT_ITERATIONS = int(os.environ.get("MAX_WAIT_ITERATIONS", "180"))
+    LABEL_PREFIX = os.environ.get("LABEL_PREFIX", "oke.oraclecloud.com")
+    RESULT_LABEL = f"{LABEL_PREFIX}/active-health-checks-gpu-fryer"
+    LAST_RUN_LABEL = f"{LABEL_PREFIX}/active-health-checks-gpu-fryer-last-run"
+
+
+    def log(message: str) -> None:
+        """Print a log message with prefix."""
+        print(f"[applier] {message}", flush=True)
+
+
+    def get_gpu_nodes(v1: client.CoreV1Api) -> list[str]:
+        """Get all nodes with nvidia.com/gpu=true label."""
+        nodes = v1.list_node(label_selector="nvidia.com/gpu=true")
+        return [node.metadata.name for node in nodes.items]
+
+
+    def get_node_gpu_usage(v1: client.CoreV1Api, node_name: str) -> int:
+        """Calculate total GPU requests for pods on a node."""
+        pods = v1.list_pod_for_all_namespaces(field_selector=f"spec.nodeName={node_name}")
+        total_gpus = 0
+        for pod in pods.items:
+            if pod.spec.containers:
+                for container in pod.spec.containers:
+                    if container.resources and container.resources.requests:
+                        gpu_request = container.resources.requests.get("nvidia.com/gpu")
+                        if gpu_request:
+                            total_gpus += int(gpu_request)
+        return total_gpus
+
+
+    def get_node_gpu_capacity(v1: client.CoreV1Api, node_name: str) -> int:
+        """Get the GPU capacity of a node."""
+        node = v1.read_node(node_name)
+        if node.status.capacity:
+            gpu_capacity = node.status.capacity.get("nvidia.com/gpu")
+            if gpu_capacity:
+                return int(gpu_capacity)
+        return 8  # Default fallback
+
+
+    def get_last_run_date(v1: client.CoreV1Api, node_name: str) -> str | None:
+        """Get the date portion of the last run label for a node."""
+        node = v1.read_node(node_name)
+        if node.metadata.labels:
+            last_run = node.metadata.labels.get(LAST_RUN_LABEL)
+            if last_run:
+                return last_run.split("T")[0]
+        return None
+
+
+    def find_available_nodes(v1: client.CoreV1Api) -> list[str]:
+        """Find idle GPU nodes that haven't been tested today."""
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        gpu_nodes = get_gpu_nodes(v1)
+        available_nodes = []
+
+        # First, find idle nodes
+        idle_candidates = []
+        for node in gpu_nodes:
+            gpu_usage = get_node_gpu_usage(v1, node)
+            if gpu_usage == 0:
+                log(f"Node {node} is idle (allocated GPU usage = 0)")
+                idle_candidates.append(node)
+            else:
+                log(f"Node {node} currently uses {gpu_usage} GPU(s) - skipping")
+
+        # Filter out nodes tested today
+        for node in idle_candidates:
+            last_run_date = get_last_run_date(v1, node)
+            if last_run_date == current_date:
+                log(f"Excluding node {node} from scheduling - tested today")
+            elif last_run_date:
+                log(f"Node {node} available for testing - last tested on {last_run_date}")
+                available_nodes.append(node)
+            else:
+                log(f"Node {node} available for testing - no previous test timestamp found")
+                available_nodes.append(node)
+
+        return available_nodes
+
+
+    def create_gpu_fryer_job(
+        batch_v1: client.BatchV1Api,
+        job_name: str,
+        node_name: str,
+        gpu_count: int,
+    ) -> None:
+        """Create a GPU Fryer test job."""
+        job = client.V1Job(
+            api_version="batch/v1",
+            kind="Job",
+            metadata=client.V1ObjectMeta(name=job_name, namespace=NAMESPACE),
+            spec=client.V1JobSpec(
+                backoff_limit=0,
+                ttl_seconds_after_finished=JOB_TTL_SECONDS,
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(labels={"app": "gpu-fryer-test"}),
+                    spec=client.V1PodSpec(
+                        priority_class_name=PRIORITY_CLASS,
+                        restart_policy="Never",
+                        node_selector={"kubernetes.io/hostname": node_name},
+                        containers=[
+                            client.V1Container(
+                                name="gpu-fryer",
+                                image=GPU_FRYER_IMAGE,
+                                command=["gpu-fryer", str(TEST_DURATION_SECONDS)],
+                                resources=client.V1ResourceRequirements(
+                                    limits={"nvidia.com/gpu": str(gpu_count)},
+                                    requests={"nvidia.com/gpu": str(gpu_count)},
+                                ),
+                                security_context=client.V1SecurityContext(
+                                    privileged=True,
+                                    capabilities=client.V1Capabilities(add=["IPC_LOCK"]),
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ),
+        )
+        batch_v1.create_namespaced_job(namespace=NAMESPACE, body=job)
+        log(f"Created GPU Fryer job: {job_name}")
+
+
+    def wait_for_job_completion(
+        batch_v1: client.BatchV1Api,
+        v1: client.CoreV1Api,
+        job_name: str,
+    ) -> str:
+        """Wait for job completion and check results. Returns 'pass' or 'fail'."""
+        log(f"Waiting for Job {job_name} to complete...")
+
+        for _ in range(MAX_WAIT_ITERATIONS):
+            try:
+                job = batch_v1.read_namespaced_job(name=job_name, namespace=NAMESPACE)
+
+                # Check for completion
+                if job.status.conditions:
+                    for condition in job.status.conditions:
+                        if condition.type == "Complete" and condition.status == "True":
+                            log("Job completed successfully")
+                            return check_job_logs(v1, job_name)
+                        if condition.type == "Failed" and condition.status == "True":
+                            log("Job failed")
+                            return "fail"
+
+            except ApiException as e:
+                log(f"Error checking job status: {e}")
+
+            time.sleep(10)
+
+        log("Timeout waiting for job completion")
+        return "fail"
+
+
+    def check_job_logs(v1: client.CoreV1Api, job_name: str) -> str:
+        """Check job pod logs for success message."""
+        try:
+            pods = v1.list_namespaced_pod(
+                namespace=NAMESPACE,
+                label_selector=f"job-name={job_name}",
+            )
+
+            if not pods.items:
+                log("Could not find pod for job")
+                return "fail"
+
+            pod_name = pods.items[0].metadata.name
+            log(f"Checking logs from pod {pod_name}")
+
+            logs = v1.read_namespaced_pod_log(name=pod_name, namespace=NAMESPACE)
+
+            if "All GPUs seem healthy" in logs:
+                log("GPU Fryer test PASSED - All GPUs seem healthy")
+                return "pass"
+            else:
+                log("GPU Fryer test FAILED - 'All GPUs seem healthy' not found in logs")
+                return "fail"
+
+        except ApiException as e:
+            log(f"Error reading pod logs: {e}")
+            return "fail"
+
+
+    def label_node(v1: client.CoreV1Api, node_name: str, result: str) -> None:
+        """Label the node with test results."""
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+
+        body = {"metadata": {"labels": {RESULT_LABEL: result, LAST_RUN_LABEL: timestamp}}}
+
+        log(f"Labeling node {node_name} with {RESULT_LABEL}={result}")
+        log(f"Labeling node {node_name} with {LAST_RUN_LABEL}={timestamp}")
+
+        v1.patch_node(name=node_name, body=body)
+
+
+    def main() -> None:
+        """Main entry point."""
+        # Load in-cluster config
+        config.load_incluster_config()
+
+        v1 = client.CoreV1Api()
+        batch_v1 = client.BatchV1Api()
+
+        # Generate job name
+        job_name = f"active-health-checks-gpu-fryer-{int(time.time())}"
+        log(f"Creating GPU Fryer Job: {job_name}")
+
+        # Find available nodes
+        available_nodes = find_available_nodes(v1)
+        log(f"Found {len(available_nodes)} available nodes for testing")
+
+        if not available_nodes:
+            log("No idle nodes available; skipping job creation")
+            sys.exit(0)
+
+        # Select first available node
+        test_node = available_nodes[0]
+        log(f"Selected node {test_node} for GPU Fryer test")
+
+        # Get GPU count
+        gpu_count = get_node_gpu_capacity(v1, test_node)
+        log(f"Node {test_node} has {gpu_count} GPUs")
+
+        # Create and run the test job
+        create_gpu_fryer_job(batch_v1, job_name, test_node, gpu_count)
+
+        # Wait for completion and get result
+        result = wait_for_job_completion(batch_v1, v1, job_name)
+
+        log(f"Result for {job_name}: {result}")
+        log(f"Test node: {test_node}")
+
+        # Label the node
+        label_node(v1, test_node, result)
+
+        log(f"GPU Fryer test completed with result: {result}")
+
+
+    if __name__ == "__main__":
+        main()
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -51,7 +295,7 @@ metadata:
   name: active-health-checks-gpu-fryer-applier
   namespace: monitoring
 spec:
-  schedule: "0 * * * *"
+  schedule: "*/2 * * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 300
   successfulJobsHistoryLimit: 0
@@ -65,149 +309,13 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: applier
-            image: iad.ocir.io/idxzjcdglx2s/kubectl:latest
-            command: ["/bin/sh", "-c"]
-            args:
-            - |
-              set -euo pipefail
-              JOB_NAME="active-health-checks-gpu-fryer-$(date +%s)"
-              echo "[applier] Creating GPU Fryer Job: $JOB_NAME"
-              
-              # Check which nodes were tested recently and should be excluded
-              current_date=$(date -u +%Y-%m-%d)
-              excluded_nodes=""
-              available_nodes=""
-              idle_candidates=""
-              gpu_nodes=$(kubectl get nodes -l nvidia.com/gpu=true -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' | tr ' ' '\n' | grep -v '^$')
-              
-              for node in $gpu_nodes; do
-                gpu_usage=$(kubectl get pods -A --field-selector spec.nodeName=$node -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.resources.requests.nvidia\\.com/gpu}{"\n"}{end}{end}' 2>/dev/null | awk 'NF{sum+=$1+0} END{print sum+0}')
-                if [ "$gpu_usage" -eq 0 ] 2>/dev/null; then
-                  echo "[applier] Node $node is idle (allocated GPU usage = 0)"
-                  idle_candidates="$idle_candidates $node"
-                else
-                  echo "[applier] Node $node currently uses $gpu_usage GPU(s) - skipping"
-                fi
-              done
-              
-              for node in $idle_candidates; do
-                last_run_label=$(kubectl get node "$node" -o jsonpath='{.metadata.labels.oke\.oraclecloud\.com/active-health-checks-gpu-fryer-last-run}' 2>/dev/null || echo "")
-                if [ -n "$last_run_label" ]; then
-                  last_run_date=$(echo "$last_run_label" | cut -d'T' -f1)
-                  if [ "$last_run_date" = "$current_date" ]; then
-                    echo "[applier] Excluding node $node from scheduling - tested today"
-                    excluded_nodes="$excluded_nodes $node"
-                  else
-                    echo "[applier] Node $node available for testing - last tested on $last_run_date"
-                    available_nodes="$available_nodes $node"
-                  fi
-                else
-                  echo "[applier] Node $node available for testing - no previous test timestamp found"
-                  available_nodes="$available_nodes $node"
-                fi
-              done
-              
-              # Count available nodes
-              available_count=$(echo "$available_nodes" | tr ' ' '\n' | grep -v '^$' | wc -l)
-              echo "[applier] Found $available_count available nodes for testing"
-              if [ $available_count -eq 0 ]; then
-                echo "[applier] No idle nodes available; skipping job creation"
-                exit 0
-              fi
-              
-              # For GPU Fryer, we test one node at a time
-              test_node=$(echo "$available_nodes" | tr ' ' '\n' | grep -v '^$' | head -n1)
-              echo "[applier] Selected node $test_node for GPU Fryer test"
-              
-              # Get GPU count for the node
-              gpu_count=$(kubectl get node "$test_node" -o jsonpath='{.status.capacity.nvidia\.com/gpu}' 2>/dev/null || echo "8")
-              echo "[applier] Node $test_node has $gpu_count GPUs"
-              
-              # Create Kubernetes Job for GPU Fryer
-              cat <<EOF | kubectl apply -f -
-              apiVersion: batch/v1
-              kind: Job
-              metadata:
-                name: $JOB_NAME
-                namespace: monitoring
-              spec:
-                backoffLimit: 0
-                ttlSecondsAfterFinished: 300
-                template:
-                  metadata:
-                    labels:
-                      app: gpu-fryer-test
-                  spec:
-                    priorityClassName: active-health-checks-gpu-fryer-low
-                    restartPolicy: Never
-                    nodeSelector:
-                      kubernetes.io/hostname: $test_node
-                    containers:
-                    - name: gpu-fryer
-                      image: ghcr.io/huggingface/gpu-fryer:1.1.0
-                      command: ["gpu-fryer", "60"]
-                      resources:
-                        limits:
-                          nvidia.com/gpu: $gpu_count
-                        requests:
-                          nvidia.com/gpu: $gpu_count
-                      securityContext:
-                        privileged: true
-                        capabilities:
-                          add:
-                          - IPC_LOCK
-              EOF
-              
-              echo "[applier] Waiting for Job $JOB_NAME to complete..."
-              
-              # Wait for job to complete
-              result="fail"
-              for i in $(seq 1 180); do # up to 30 minutes (60s test + overhead)
-                job_status=$(kubectl get job -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "")
-                job_failed=$(kubectl get job -n monitoring "$JOB_NAME" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "")
-                
-                if [ "$job_status" = "True" ]; then
-                  echo "[applier] Job completed successfully"
-                  # Get the pod logs to check for "All GPUs seem healthy"
-                  pod_name=$(kubectl get pods -n monitoring -l job-name="$JOB_NAME" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                  if [ -n "$pod_name" ]; then
-                    echo "[applier] Checking logs from pod $pod_name"
-                    logs=$(kubectl logs -n monitoring "$pod_name" 2>/dev/null || echo "")
-                    if echo "$logs" | grep -q "All GPUs seem healthy"; then
-                      echo "[applier] GPU Fryer test PASSED - All GPUs seem healthy"
-                      result="pass"
-                    else
-                      echo "[applier] GPU Fryer test FAILED - 'All GPUs seem healthy' not found in logs"
-                      result="fail"
-                    fi
-                  else
-                    echo "[applier] Could not find pod for job"
-                    result="fail"
-                  fi
-                  break
-                elif [ "$job_failed" = "True" ]; then
-                  echo "[applier] Job failed"
-                  result="fail"
-                  break
-                fi
-                
-                sleep 10
-              done
-              
-              echo "[applier] Result for $JOB_NAME: $result"
-              echo "[applier] Test node: $test_node"
-              
-              # Label the node with test results
-              timestamp=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-              echo "[applier] Labeling node $test_node with oke.oraclecloud.com/active-health-checks-gpu-fryer=$result"
-              kubectl label node "$test_node" "oke.oraclecloud.com/active-health-checks-gpu-fryer=$result" --overwrite
-              echo "[applier] Labeling node $test_node with oke.oraclecloud.com/active-health-checks-gpu-fryer-last-run=$timestamp"
-              kubectl label node "$test_node" "oke.oraclecloud.com/active-health-checks-gpu-fryer-last-run=$timestamp" --overwrite
-              
-              if [ "$result" = "fail" ]; then
-                echo "[applier] GPU Fryer test failed but node has been labeled"
-                exit 0
-              fi
-              
-              echo "[applier] GPU Fryer test completed successfully"
-
+            image: ghcr.io/astral-sh/uv:python3.12-alpine
+            command: ["uv", "run", "/scripts/applier.py"]
+            volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+          volumes:
+          - name: script
+            configMap:
+              name: active-health-checks-gpu-fryer-script

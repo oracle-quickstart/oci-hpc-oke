@@ -1,22 +1,22 @@
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ResourceFlavor
 metadata:
-  name: bm-gpu-mi300x-8
+  name: bm-gpu-mi355x-v1.8
 spec:
   nodeLabels:
-    node.kubernetes.io/instance-type: BM.GPU.MI300X.8
+    node.kubernetes.io/instance-type: BM.GPU.MI355X-v1.8
     amd.com/gpu: "true"
 ---
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
 metadata:
-  name: bm-gpu-mi300x-8-rccl-tests-queue
+  name: bm-gpu-mi355x-v1.8-rccl-tests-queue
 spec:
   namespaceSelector: {}
   resourceGroups:
   - coveredResources: ["cpu", "memory", "amd.com/gpu", "ephemeral-storage"]
     flavors:
-    - name: bm-gpu-mi300x-8
+    - name: bm-gpu-mi355x-v1.8
       resources:
       - name: cpu
         nominalQuota: "5000"
@@ -30,16 +30,16 @@ spec:
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
 metadata:
-  name: bm-gpu-mi300x-8-rccl-tests
+  name: bm-gpu-mi355x-v1.8-rccl-tests
 spec:
-  clusterQueue: bm-gpu-mi300x-8-rccl-tests-queue
+  clusterQueue: bm-gpu-mi355x-v1.8-rccl-tests-queue
 ---
 apiVersion: kubeflow.org/v2beta1
 kind: MPIJob
 metadata:
   name: rccl-tests
   labels:
-    kueue.x-k8s.io/queue-name: bm-gpu-mi300x-8-rccl-tests
+    kueue.x-k8s.io/queue-name: bm-gpu-mi355x-v1.8-rccl-tests
 spec:
   slotsPerWorker: 8
   runPolicy:
@@ -59,7 +59,7 @@ spec:
           terminationGracePeriodSeconds: 2
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
             imagePullPolicy: Always
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
@@ -81,32 +81,25 @@ spec:
               echo "All workers are ready!"
               
               mpirun \
-                -mca coll ^hcoll \
+                --allow-run-as-root \
+                --bind-to numa \
+                -mca plm_rsh_args '-p 2222' \
                 -mca pml ucx \
                 -mca btl ^openib \
-                -mca plm_rsh_args '-p 2222' \
-                --allow-run-as-root \
-                -np $NP \
-                -npernode $NUM_GPUS \
-                --bind-to numa \
+                -x UCX_NET_DEVICES=eth0 \
                 -x RX_QUEUE_LEN=8192 \
                 -x IB_RX_QUEUE_LEN=8192 \
-                -x UCX_NET_DEVICES=mlx5_0:1 \
-                -x HCOLL_ENABLE_MCAST_ALL=0 \
                 -x coll_hcoll_enable=0 \
-                -x NCCL_CUMEM_ENABLE=0 \
-                -x NCCL_IB_TIMEOUT=22 \
-                -x NCCL_IB_SL=0 \
-                -x NCCL_IB_TC=41 \
-                -x NCCL_IB_GID_INDEX=3 \
-                -x NCCL_DEBUG=WARN \
+                -x HCOLL_ENABLE_MCAST_ALL=0 \
+                -x NCCL_MIN_CHANNEL=32 \
                 -x NCCL_IB_QPS_PER_CONNECTION=1 \
-                -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-                -x NCCL_IB_HCA='=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9' \
-                -x NCCL_PXN_DISABLE=0 \
-                -x NCCL_NET_PLUGIN=none \
-                -x LD_LIBRARY_PATH \
-                /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1 -n 50
+                -x NCCL_SOCKET_IFNAME=eth0 \
+                -x NCCL_IB_SL=0 \
+                -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                -x NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7" \
+                -N $NUM_GPUS \
+                -np $NP \
+                /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 4
             resources:
               limits:
                 ephemeral-storage: 32Gi
@@ -135,10 +128,10 @@ spec:
           restartPolicy: OnFailure
           terminationGracePeriodSeconds: 2
           nodeSelector:
-            node.kubernetes.io/instance-type: BM.GPU.MI300X.8
+            node.kubernetes.io/instance-type: BM.GPU.MI355X-v1.8
           containers:
           - name: mpi-worker
-            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
             imagePullPolicy: Always
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
