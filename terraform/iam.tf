@@ -23,7 +23,7 @@ locals {
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
   
-  group_name = var.dynamic_groups == null ? format("oke-gpu-%v", local.state_id) : local.dynamic_groups_list[index(local.dynamic_groups_list[*].id, var.dynamic_groups)]["name"]
+  group_name = var.dynamic_group_id == null ? format("oke-gpu-%v", local.state_id) : local.dynamic_groups_list[index(local.dynamic_groups_list[*].id, var.dynamic_group_id)]["name"]
  
   storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
@@ -76,7 +76,7 @@ locals {
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.create_policies && var.dynamic_groups == null ? 1 : 0
+  count          = var.create_policies && var.dynamic_group_id == null ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
   name           = local.group_name
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
