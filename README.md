@@ -224,7 +224,38 @@ Apply the policy:
 kubectl apply -f BM.GPU.B4.8-policy.yaml
 ```
 
-### 10. Create SR-IOV Network Resource
+### 10. Configure Node Drain/Reboot Behavior
+
+Control the percentage of nodes that can be drained or rebooted concurrently during VF configuration. The example below allows 100% of `BM.GPU.B4.8` nodes to be drained simultaneously.
+
+> [!TIP]
+> For production environments, consider using a lower percentage (e.g., `25%` or `50%`) to maintain cluster availability during VF configuration.
+
+```yaml
+cat <<'EOF' > sriov-network-pool-config-percentage.yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkPoolConfig
+metadata:
+  name: bm-gpu-b4-8
+  namespace: nvidia-network-operator
+spec:
+  maxUnavailable: "100%"
+  nodeSelector:
+    matchExpressions:
+      - key: node.kubernetes.io/instance-type
+        operator: In
+        values:
+          - BM.GPU.B4.8
+EOF
+```
+
+Apply the configuration:
+
+```bash
+kubectl apply -f sriov-network-pool-config-percentage.yaml
+```
+
+### 11. Create SR-IOV Network Resource
 
 Define the SR-IOV network that pods can attach to:
 
@@ -273,7 +304,7 @@ kubectl apply -f sriovnetwork.yaml
 
 ## Verification
 
-### 11. Verify VF Allocation
+### 12. Verify VF Allocation
 
 After the nodes reboot and SR-IOV configuration completes, verify that Virtual Functions are correctly exposed:
 
@@ -318,7 +349,7 @@ spec:
 
 ## Running the NCCL tests (Optional)
 
-### 12. Deploy Kueue & MPI Operator
+### 13. Deploy Kueue & MPI Operator
 
 To validate RDMA connectivity and GPU performance, install Kueue for job queueing and the MPI Operator for multi-node workloads:
 
@@ -333,7 +364,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue \
   --namespace=kueue-system
 ```
 
-### 13. Run NCCL tests
+### 14. Run NCCL tests
 
 The NCCL test validates RDMA performance between GPU nodes. Deploy the test with the following manifest:
 
@@ -466,7 +497,7 @@ Apply the manifest:
 kubectl apply -f nccl-tests.yaml
 ```
 
-### 14. Monitor NCCL tests Results
+### 15. Monitor NCCL tests Results
 
 Wait for the container image to pull (this may take several minutes on first run). Once the launcher pod starts, check the logs:
 
