@@ -71,7 +71,7 @@ spec:
               NUM_GPUS=8
               NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
               NP=$(($NUM_HOSTS*$NUM_GPUS))
-              
+
               while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do
                 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1
               done); do
@@ -79,7 +79,7 @@ spec:
                 sleep 5
               done
               echo "All workers are ready!"
-              
+
               mpirun \
                 --allow-run-as-root \
                 --bind-to numa \
@@ -95,6 +95,8 @@ spec:
                 -x NCCL_IB_QPS_PER_CONNECTION=1 \
                 -x NCCL_SOCKET_IFNAME=eth0 \
                 -x NCCL_IB_SL=0 \
+                -x NCCL_IB_GID_INDEX=3 \
+                -x NCCL_IB_TC=41 \
                 -x NCCL_IGNORE_CPU_AFFINITY=1 \
                 -x NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7" \
                 -N $NUM_GPUS \
@@ -159,4 +161,3 @@ spec:
           - { key: amd.com/gpu, operator: Exists }
           volumes:
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
-
