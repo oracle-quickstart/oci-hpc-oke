@@ -167,6 +167,8 @@ locals {
   ])
 
   pods_per_node = local.cni_type == "flannel" ? var.max_pods_per_node : min(local.nodes_supported_pods...)
+  operator_shape_ocpus = var.operator_shape_name == "VM.DenseIO.E4.Flex" ? var.operator_shape_ocpus_denseIO_e4_flex : var.operator_shape_name == "VM.DenseIO.E5.Flex" ? var.operator_shape_ocpus_denseIO_e5_flex : var.operator_shape_ocpus
+  operator_shape_memory = var.operator_shape_name == "VM.DenseIO.E4.Flex" ? 16 * local.operator_shape_ocpus : var.operator_shape_name == "VM.DenseIO.E5.Flex" ? 12 * local.operator_shape_ocpus : var.operator_shape_memory
 }
 
 module "oke" {
@@ -268,8 +270,8 @@ module "oke" {
   operator_install_kubectx           = true
   operator_shape = {
     shape            = var.operator_shape_name
-    ocpus            = var.operator_shape_ocpus
-    memory           = var.operator_shape_memory
+    ocpus            = local.operator_shape_ocpus
+    memory           = local.operator_shape_memory
     boot_volume_size = var.operator_shape_boot
   }
   output_detail = true
