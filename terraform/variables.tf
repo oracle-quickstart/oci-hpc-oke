@@ -332,18 +332,28 @@ variable "disable_gpu_device_plugin" { default = false }
 
 # Workers - System pool
 variable "worker_ops_ad" { default = "" }
-variable "worker_ops_pool_size" { default = 2 }
+variable "worker_ops_pool_size" { default = 3 }
 variable "worker_ops_shape" { default = "VM.Standard.E5.Flex" }
-variable "worker_ops_ocpus" { default = 8 }
-variable "worker_ops_memory" { default = 32 }
+variable "worker_ops_ocpus" { default = 4 }
+variable "worker_ops_memory" { default = 16 }
 variable "worker_ops_boot_volume_size" { default = 128 }
 variable "worker_ops_image_type" { default = "Custom" }
 variable "worker_ops_image_custom_id" { default = "" }
 variable "worker_ops_image_custom_uri" { default = "" }
-variable "worker_ops_image_use_uri" { 
-  default = false 
+variable "worker_ops_image_use_uri" {
+  default = false
   type    = bool
-} 
+}
+variable "worker_ops_max_pods_per_node" {
+  default     = 31
+  description = "Maximum number of pods per node for the system worker pool. Max is 110."
+  type        = number
+}
+variable "worker_ops_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the system worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
 
 # Workers - CPU pool
 variable "worker_cpu_enabled" { default = false }
@@ -373,6 +383,16 @@ variable "worker_cpu_image_platform_id" {
   default = null
   type    = string
 }
+variable "worker_cpu_max_pods_per_node" {
+  default     = 31
+  description = "Maximum number of pods per node for the CPU worker pool. Max is 110."
+  type        = number
+}
+variable "worker_cpu_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the CPU worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
 
 # Workers - GPU node-pool
 variable "worker_gpu_enabled" { default = false }
@@ -400,6 +420,16 @@ variable "worker_gpu_image_platform_id" {
   type    = string
 }
 variable "worker_gpu_image_id" { default = "" }
+variable "worker_gpu_max_pods_per_node" {
+  default     = 64
+  description = "Maximum number of pods per node for the GPU worker pool. Max is 110."
+  type        = number
+}
+variable "worker_gpu_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the GPU worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
 
 # Workers - GPU Cluster-network
 variable "worker_rdma_enabled" { default = false }
@@ -428,6 +458,16 @@ variable "worker_rdma_image_use_uri" {
   type    = bool
 } 
 variable "worker_rdma_image_id" { default = "" }
+variable "worker_rdma_max_pods_per_node" {
+  default     = 64
+  description = "Maximum number of pods per node for the RDMA worker pool. Max is 110."
+  type        = number
+}
+variable "worker_rdma_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the RDMA worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
 
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {

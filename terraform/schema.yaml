@@ -39,6 +39,11 @@ variableGroups:
       - worker_cpu_image_id
       - worker_gpu_image_id
       - worker_rdma_image_id
+      # Max pods per node (per pool)
+      - worker_ops_max_pods_per_node
+      - worker_cpu_max_pods_per_node
+      - worker_gpu_max_pods_per_node
+      - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
       # Monitoring
       - wildcard_dns_domain
@@ -119,6 +124,7 @@ variableGroups:
       - worker_ops_ocpus
       - worker_ops_memory
       - worker_ops_boot_volume_size
+      - worker_ops_kubernetes_version
       - worker_ops_image_type
       - worker_ops_image_use_uri
       - worker_ops_image_custom_uri
@@ -134,6 +140,7 @@ variableGroups:
       - worker_cpu_ocpus
       - worker_cpu_memory
       - worker_cpu_boot_volume_size
+      - worker_cpu_kubernetes_version
       - worker_cpu_image_type
       - worker_cpu_image_os
       - worker_cpu_image_os_version
@@ -150,6 +157,7 @@ variableGroups:
       - worker_gpu_pool_size
       - worker_gpu_shape
       - worker_gpu_boot_volume_size
+      - worker_gpu_kubernetes_version
       - worker_gpu_image_type
       - worker_gpu_image_os
       - worker_gpu_image_os_version
@@ -167,6 +175,7 @@ variableGroups:
       - worker_rdma_shape
       - worker_rdma_boot_volume_size
       - worker_rdma_boot_volume_vpus_per_gb
+      - worker_rdma_kubernetes_version
       - worker_rdma_image_os
       - worker_rdma_image_os_version
       - worker_rdma_image_type
@@ -1157,6 +1166,15 @@ variables:
       and:
         - eq: [worker_ops_image_type, Custom]
         - not: [worker_ops_image_use_uri]
+  worker_ops_kubernetes_version:
+    title: Kubernetes version
+    description: Kubernetes version for the system worker pool. Defaults to the cluster version.
+    type: oci:kubernetes:versions:id
+    required: false
+    default: ${kubernetes_version}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
 
   # Workers - CPU pool
   worker_cpu_enabled:
@@ -1302,6 +1320,16 @@ variables:
       and:
         - ${worker_cpu_enabled}
         - eq: [worker_cpu_image_type, Platform]
+  worker_cpu_kubernetes_version:
+    title: Kubernetes version
+    description: Kubernetes version for the CPU worker pool. Defaults to the cluster version.
+    type: oci:kubernetes:versions:id
+    required: false
+    default: ${kubernetes_version}
+    visible: ${worker_cpu_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
 
   # Workers - GPU node-pool
   worker_gpu_enabled:
@@ -1410,6 +1438,16 @@ variables:
       and:
         - ${worker_gpu_enabled}
         - eq: [worker_gpu_image_type, Platform]
+  worker_gpu_kubernetes_version:
+    title: Kubernetes version
+    description: Kubernetes version for the GPU worker pool. Defaults to the cluster version.
+    type: oci:kubernetes:versions:id
+    required: false
+    default: ${kubernetes_version}
+    visible: ${worker_gpu_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
 
   # Workers - GPU Cluster-network
   worker_rdma_enabled:
@@ -1524,6 +1562,16 @@ variables:
         - eq: [worker_rdma_image_type, Custom]
         - ${worker_rdma_enabled}
         - not: [worker_rdma_image_use_uri]
+  worker_rdma_kubernetes_version:
+    title: Kubernetes version
+    description: Kubernetes version for the GPU + RDMA worker pool. Defaults to the cluster version.
+    type: oci:kubernetes:versions:id
+    required: false
+    default: ${kubernetes_version}
+    visible: ${worker_rdma_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
 
   # SSH access to the nodes
   ssh_public_key:
