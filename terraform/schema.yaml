@@ -109,11 +109,12 @@ variableGroups:
       - cluster_name
       - kubernetes_version
       - cni_type
+      - services_cidr
       - control_plane_is_public
       - control_plane_allowed_cidrs
       - max_pods_per_node
-      - disable_gpu_device_plugin
       - preferred_kubernetes_services
+      - disable_gpu_device_plugin
       - setup_credential_provider_for_ocir
 
   - title: "Workers: System"
@@ -193,7 +194,6 @@ variableGroups:
     variables:
     - nvme_raid_enabled
     - nvme_raid_level
-    - create_bv_high
     - create_fss
     - fss_ad
     - fss_mount_path
@@ -766,12 +766,12 @@ variables:
     default: "/mnt/oci-fss"
     required: true
     visible: ${create_fss}
-  create_bv_high:
-    title: Create a storage class backed by higher performance OCI block volumes
-    description: "Create a storage class backed by higher performance OCI block volumes (VPU: 20)."
-    type: boolean
-    required: true
-    default: false
+  # create_bv_high:
+  #   title: Create a storage class backed by higher performance OCI block volumes
+  #   description: "Create a storage class backed by higher performance OCI block volumes (VPU: 20)."
+  #   type: boolean
+  #   required: true
+  #   default: false
   nvme_raid_enabled:
     type: boolean
     title: Create a RAID array using local NVMe drives 
@@ -1049,6 +1049,13 @@ variables:
     description: The default maximum number of pods to deploy per node when unspecified on a pool
     type: number
     visible: false
+  services_cidr:
+    title: Services CIDR
+    description: CIDR block for Kubernetes services.
+    type: string
+    default: "10.96.0.0/16"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    required: false
   preferred_kubernetes_services:
     type: enum
     enum:
@@ -1148,7 +1155,7 @@ variables:
         - eq: [worker_ops_image_type, Custom]
         - ${worker_ops_image_use_uri}
   worker_ops_image_compartment:
-    title: "Operational worker pool image compartment"
+    title: "System worker pool image compartment"
     type: oci:identity:compartment:id
     required: true
     default: ${compartment_ocid}
