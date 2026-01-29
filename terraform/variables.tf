@@ -359,6 +359,21 @@ variable "worker_ops_kubernetes_version" {
   description = "Kubernetes version for the system worker pool. Defaults to cluster version if not specified."
   type        = string
 }
+variable "worker_ops_node_cycling_enabled" {
+  default     = false
+  description = "Enable node cycling for the system worker pool."
+  type        = bool
+}
+variable "worker_ops_node_cycling_max_surge" {
+  default     = "25%"
+  description = "Maximum surge for node cycling in the system worker pool."
+  type        = string
+}
+variable "worker_ops_node_cycling_max_unavailable" {
+  default     = 0
+  description = "Maximum unavailable nodes during node cycling in the system worker pool."
+  type        = number
+}
 
 # Workers - CPU pool
 variable "worker_cpu_enabled" { default = false }
@@ -398,6 +413,21 @@ variable "worker_cpu_kubernetes_version" {
   description = "Kubernetes version for the CPU worker pool. Defaults to cluster version if not specified."
   type        = string
 }
+variable "worker_cpu_node_cycling_enabled" {
+  default     = false
+  description = "Enable node cycling for the CPU worker pool."
+  type        = bool
+}
+variable "worker_cpu_node_cycling_max_surge" {
+  default     = "25%"
+  description = "Maximum surge for node cycling in the CPU worker pool."
+  type        = string
+}
+variable "worker_cpu_node_cycling_max_unavailable" {
+  default     = 0
+  description = "Maximum unavailable nodes during node cycling in the CPU worker pool."
+  type        = number
+}
 
 # Workers - GPU node-pool
 variable "worker_gpu_enabled" { default = false }
@@ -434,6 +464,21 @@ variable "worker_gpu_kubernetes_version" {
   default     = null
   description = "Kubernetes version for the GPU worker pool. Defaults to cluster version if not specified."
   type        = string
+}
+variable "worker_gpu_node_cycling_enabled" {
+  default     = false
+  description = "Enable node cycling for the GPU worker pool."
+  type        = bool
+}
+variable "worker_gpu_node_cycling_max_surge" {
+  default     = "25%"
+  description = "Maximum surge for node cycling in the GPU worker pool."
+  type        = string
+}
+variable "worker_gpu_node_cycling_max_unavailable" {
+  default     = 0
+  description = "Maximum unavailable nodes during node cycling in the GPU worker pool."
+  type        = number
 }
 
 # Workers - GPU Cluster-network

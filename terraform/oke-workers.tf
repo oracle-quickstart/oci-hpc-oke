@@ -69,9 +69,9 @@ locals {
       image_id           = local.worker_ops_image_id
       max_pods_per_node  = var.worker_ops_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
-      node_cycling_enabled         = true
-      node_cycling_max_surge       = "25%"
-      node_cycling_max_unavailable = 0
+      node_cycling_enabled         = var.worker_ops_node_cycling_enabled
+      node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
+      node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
@@ -88,9 +88,9 @@ locals {
       image_id           = local.worker_cpu_image_id
       max_pods_per_node  = var.worker_cpu_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
-      node_cycling_enabled         = true
-      node_cycling_max_surge       = "25%"
-      node_cycling_max_unavailable = 0
+      node_cycling_enabled         = var.worker_cpu_node_cycling_enabled
+      node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
+      node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
@@ -106,9 +106,9 @@ locals {
       max_pods_per_node  = var.worker_gpu_max_pods_per_node
       kubernetes_version = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
       node_labels                  = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
-      node_cycling_enabled         = true
-      node_cycling_max_surge       = "25%"
-      node_cycling_max_unavailable = 0
+      node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
+      node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
+      node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
