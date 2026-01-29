@@ -48,6 +48,16 @@ variableGroups:
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
+      # Node cycling (per pool)
+      - worker_ops_node_cycling_enabled
+      - worker_ops_node_cycling_max_surge
+      - worker_ops_node_cycling_max_unavailable
+      - worker_cpu_node_cycling_enabled
+      - worker_cpu_node_cycling_max_surge
+      - worker_cpu_node_cycling_max_unavailable
+      - worker_gpu_node_cycling_enabled
+      - worker_gpu_node_cycling_max_surge
+      - worker_gpu_node_cycling_max_unavailable
       # Networking
       - subnet_advanced_attrs
       - allow_rules_lustre
