@@ -9,8 +9,14 @@ locals {
   ])
 
   worker_ops_image_id    = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, "none")
-  worker_cpu_ocpus = var.worker_cpu_shape == "VM.DenseIO.E4.Flex" ? var.worker_cpu_ocpus_denseIO_e4_flex : var.worker_cpu_shape == "VM.DenseIO.E5.Flex" ? var.worker_cpu_ocpus_denseIO_e5_flex : var.worker_cpu_ocpus
-  worker_cpu_memory = var.worker_cpu_shape == "VM.DenseIO.E4.Flex" ? 16 * local.worker_cpu_ocpus : var.worker_cpu_shape == "VM.DenseIO.E5.Flex" ? 12 * local.worker_cpu_ocpus : var.worker_cpu_memory
+  worker_cpu_denseio_ocpus = { 
+    "VM.DenseIO.E4.Flex" = var.worker_cpu_ocpus_denseIO_e4_flex, 
+    "VM.DenseIO.E5.Flex" = var.worker_cpu_ocpus_denseIO_e5_flex
+  }
+  worker_cpu_denseio_memory = { 
+    "VM.DenseIO.E4.Flex" = 16 * var.worker_cpu_ocpus_denseIO_e4_flex, 
+    "VM.DenseIO.E5.Flex" = 12 * var.worker_cpu_ocpus_denseIO_e5_flex
+  }
   worker_cpu_image_type  = contains(["platform", "custom"], lower(var.worker_cpu_image_type)) ? "custom" : "oke"
   worker_cpu_image_id    = var.worker_cpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_cpu_image_custom_uri, {}), "id", null) : coalesce(var.worker_cpu_image_custom_id, var.worker_cpu_image_platform_id, "none")
   worker_gpu_image_type  = contains(["platform", "custom"], lower(var.worker_gpu_image_type)) ? "custom" : "oke"
@@ -80,8 +86,8 @@ locals {
       mode             = "node-pool"
       size             = var.worker_cpu_pool_size
       shape            = var.worker_cpu_shape
-      ocpus            = local.worker_cpu_ocpus
-      memory           = local.worker_cpu_memory
+      ocpus            = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
+      memory           = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
       boot_volume_size = var.worker_cpu_boot_volume_size
       image_type       = "custom"
       image_id         = local.worker_cpu_image_id
