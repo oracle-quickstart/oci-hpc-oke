@@ -40,6 +40,7 @@ class BootVolumeReplacer:
                 kubeconfig="~/.kube/config",
                 oci_config_file="~/.oci/config",
                 oci_config_profile="DEFAULT",
+                ssh_authorized_keys="",
                 **kwargs
         ):
         
@@ -69,7 +70,7 @@ class BootVolumeReplacer:
         except Exception as e:
             logger.error(f"Failed to load OCI config:\n{traceback.format_exc()}")
             sys.exit(1)
-        
+
         try:
             if auth == "instance_principal":
                 logger.debug(f"Attempting to use instance_principal signer.")
@@ -98,34 +99,52 @@ class BootVolumeReplacer:
         self.node_metadata = node_metadata
         self.remove_previous_boot_volume = remove_previous_boot_volume
         self.timeout_seconds = timeout_seconds
-    
+        self.ssh_authorized_keys = ssh_authorized_keys
 
-    def get_k8s_node_details(self, kubernetes_node):
-        ##  Fetch the OCI instance details based on Kubernetes node name.
+    def _get_k8s_node_details(self, node):
         api_instance = kubernetes_client.CoreV1Api()
         try:
-            k8s_node_details = api_instance.read_node(name=kubernetes_node)
+            k8s_node_details = api_instance.read_node(name=node)
         except Exception as exc:
-            raise Exception(f"Failed to fetch Kubernetes node details for {kubernetes_node}:\n{traceback.format_exc()}")
-        
-        instance_display_name = k8s_node_details.metadata.labels.get('hostname', "")
-
-        core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
-        list_instances_response = core_client.list_instances(
-            compartment_id=self.compartment_id,
-            display_name=instance_display_name,
-            lifecycle_state="RUNNING")
-        
-        if len(list_instances_response.data) == 0:
-            logger.error(f"No running instance found with display name {instance_display_name} in compartment {self.compartment_id} corresponding to the Kubernetes node {kubernetes_node} in state 'Running'.")
+            # logger.error(f"Failed to fetch Kubernetes node details for {node}: {exc}")
             return None
-        else:
-            logger.info(f"Identified instance {list_instances_response.data[0].id} for the kubernetes node {kubernetes_node}.")
-            response = input(f"Continue BVR for node {kubernetes_node}? [y/n]: \n") if self.interactive else "y"
-            if response.lower() != "y":
-                return False
-            return list_instances_response.data[0]
+        return k8s_node_details
+
+    def get_node_details(self, node):
         
+        ##  Fetch the OCI instance details based on Kubernetes node name.
+        k8s_node_details = self._get_k8s_node_details(node)
+        
+        is_k8s_node = False
+        if k8s_node_details:
+            is_k8s_node = True
+            instance_display_name = k8s_node_details.metadata.labels.get('displayName', k8s_node_details.metadata.labels.get('hostname', ""))
+
+            core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+            list_instances_response = core_client.list_instances(
+                compartment_id=self.compartment_id,
+                display_name=instance_display_name,
+                lifecycle_state="RUNNING")
+            
+            if len(list_instances_response.data) == 0:
+                logger.error(f"No running instance found with display name {instance_display_name} in compartment {self.compartment_id} corresponding to the Kubernetes node {node} in state 'Running'.")
+                return None, is_k8s_node
+            else:
+                logger.info(f"Identified instance {list_instances_response.data[0].id} for the kubernetes node {node}.")
+                response = input(f"Continue BVR for node {node}? [y/n]: \n") if self.interactive else "y"
+                if response.lower() != "y":
+                    return False, is_k8s_node
+                return list_instances_response.data[0], is_k8s_node
+        else:
+            if node.startswith("ocid1.instance"):
+                core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+                get_instances_response = core_client.get_instance(
+                    instance_id=node)
+                return get_instances_response.data, is_k8s_node
+        logger.error(f"Failed to fetch instance details for {node}.")
+        return None, is_k8s_node
+
+
     def check_image_compatibility(self, image_id, shape_name):
         core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
         get_image_shape_compatibility_entries_response = core_client.list_image_shape_compatibility_entries(
@@ -135,6 +154,7 @@ class BootVolumeReplacer:
         if shape_name in supported_shapes:
             return True
         return False
+
 
     def get_existing_boot_volume_size(self, compartment_ocid, instance_id, ad):
         # Get the instance current boot volume size
@@ -189,6 +209,7 @@ class BootVolumeReplacer:
         except Exception as e:
             raise Exception(f"Failed to delete node {kubernetes_node}:\n{traceback.format_exc()}")
 
+
     def evict_pod(self, policy_v1, pod, kubernetes_node):
         eviction = kubernetes_client.V1Eviction(
             metadata=kubernetes_client.V1ObjectMeta(name=pod.metadata.name, namespace=pod.metadata.namespace),
@@ -205,33 +226,52 @@ class BootVolumeReplacer:
         except kubernetes_client.ApiException as e:
             raise Exception(f"Failed to remove pod {pod.metadata.name} in namespace {pod.metadata.namespace} from the node {kubernetes_node}:\n{traceback.format_exc()}")
 
-
-    def generate_new_cloud_init(self, k8s_node, instance_cloud_init, cloud_init_change_functions):
-        # Modifying the base64 gziped cloud-init. Generated from the OKE TF module.
+    def _check_if_base64_encoded(self, cloud_init):
         try:
-            is_base_64_encoded = base64.b64encode(base64.b64decode(instance_cloud_init)).decode('utf-8') == instance_cloud_init
+            return base64.b64encode(base64.b64decode(cloud_init)).decode('utf-8') == cloud_init
         except Exception:
-            is_base_64_encoded = False
+            return False
+
+    def _decode_cloud_init(self, cloud_init, k8s_node=""):
+        cloud_init_decoded = base64.standard_b64decode(cloud_init)
+        cloud_init_zip = None
+
+        try:    
+            cloud_init_fileobj = io.BytesIO(cloud_init_decoded)
+            cloud_init_zip = gzip.GzipFile(fileobj=cloud_init_fileobj)
+            decoded_cloud_init = cloud_init_zip.read()
+        except gzip.BadGzipFile:
+            if k8s_node:
+                logger.debug(f"Cloud-init for node {k8s_node} is not gzip compressed.")
+            decoded_cloud_init = cloud_init_decoded
+        finally:
+            if cloud_init_zip:
+                cloud_init_zip.close()
+
+        return decoded_cloud_init.decode('utf-8')
+
+
+    def _encode_cloud_init(self, cloud_init):
         
-        if is_base_64_encoded:
-            try:
-                existing_cloud_init_decoded = base64.standard_b64decode(instance_cloud_init)
-                existing_cloud_init_fileobj = io.BytesIO(existing_cloud_init_decoded)
-                existing_cloud_init_zip = gzip.GzipFile(fileobj=existing_cloud_init_fileobj)
-                cloud_init_data = existing_cloud_init_zip.read()
-            except gzip.BadGzipFile:
-                logger.debug("Cloud-init for node {k8s_node} is not gzip compressed.")
-                cloud_init_data = existing_cloud_init_decoded
-            finally:
-                existing_cloud_init_zip.close()
+        new_cloud_init_zip_fileobj = io.BytesIO()
+        new_cloud_init_zip = gzip.GzipFile(fileobj=new_cloud_init_zip_fileobj, mode='wb')
+        new_cloud_init_zip.write(cloud_init.encode('utf-8'))
+        new_cloud_init_zip.close()
+        new_cloud_init_zip_fileobj.seek(0)
+        new_cloud_init_encoded = base64.standard_b64encode(new_cloud_init_zip_fileobj.read())
+        new_cloud_init_zip_fileobj.close()
+        return new_cloud_init_encoded
 
-            cloud_init_data_string = cloud_init_data.decode('utf-8')
+    def generate_new_cloud_init(self, k8s_node, initial_cloud_init, cloud_init_change_functions):
+        # Modifying the base64 gziped cloud-init. Generated from the OKE TF module.
 
+        if self._check_if_base64_encoded(initial_cloud_init):
+            logger.debug(f"cloud-init for node {k8s_node} is base64 encoded.")
+            cloud_init_data_string = self._decode_cloud_init(initial_cloud_init, k8s_node)
         else:
-            logger.debug('cloud-init for node {k8s_node} is not base64 encoded.')
-            cloud_init_data_string = instance_cloud_init
+            logger.debug(f"cloud-init for node {k8s_node} is not base64 encoded.")
+            cloud_init_data_string = initial_cloud_init
         
-
         logger.debug(f"Cloud-init data for node {k8s_node} before changes:\n{cloud_init_data_string}")
         
         # Modify the cloud-init data using the functions provided by the user
@@ -245,14 +285,7 @@ class BootVolumeReplacer:
                 logger.info("BVR cancelled.")
                 return None
 
-        new_cloud_init_zip_fileobj = io.BytesIO()
-        new_cloud_init_zip = gzip.GzipFile(fileobj=new_cloud_init_zip_fileobj, mode='wb')
-        new_cloud_init_zip.write(cloud_init_data_string.encode('utf-8'))
-        new_cloud_init_zip.close()
-        new_cloud_init_zip_fileobj.seek(0)
-        new_cloud_init_encoded = base64.standard_b64encode(new_cloud_init_zip_fileobj.read())
-        new_cloud_init_zip_fileobj.close()
-        return new_cloud_init_encoded
+        return self._encode_cloud_init(cloud_init_data_string)
 
 
     def replace_bv(self, instance_ocid, image_ocid, new_metadata, bv_size_in_gbs, remove_bv):
@@ -282,6 +315,7 @@ class BootVolumeReplacer:
         oci.wait_until(core_client, get_instance_response, 'lifecycle_state', 'STOPPING', succeed_on_not_found=False)
         return True
     
+
     def wait_for_completion(self, k8s_node, timeout_seconds=600):
         # Method to wait for the completion of the boot volume replacement process
         # wait for the node to join the Kubernetes cluster.
@@ -294,11 +328,11 @@ class BootVolumeReplacer:
                 if node.metadata.name == k8s_node:
                     for condition in node.status.conditions:
                         if condition.type == 'Ready' and condition.status == 'True':
-                            logger.info(f"None {k8s_node} is ready.")
+                            logger.info(f"Node {k8s_node} is ready.")
                             w.stop()
                             return True
                         
-            logger.error("The node has not rejoined the cluster in {timeout_seconds} seconds.")
+            logger.error(f"The node has not rejoined the cluster in {timeout_seconds} seconds.")
             return False
         except Exception as e:
             raise Exception(f"Failed to wait for node {k8s_node}:\n{traceback.format_exc()}")
@@ -306,9 +340,8 @@ class BootVolumeReplacer:
 
     def upgrade_node(self, k8s_node):
         ## Method that brings together all the steps to replace the boot volume on a self managed instance.
-        
-        # Fetching the instance details associated with the kubernetes node
-        instance_details = self.get_k8s_node_details(k8s_node)
+        # Fetching the instance details
+        instance_details, is_k8s_node = self.get_node_details(k8s_node)
         if instance_details is None:
             raise Exception(f"Failed to identify the instance details for node {k8s_node}")
         if instance_details is False:
@@ -323,18 +356,18 @@ class BootVolumeReplacer:
         # Establish the cloud-init
         if self.cloud_init_file:
             try:
-                with open(self.cloud_init_file, 'rb') as file:
-                    new_cloud_init = file.read()
+                with open(self.cloud_init_file, 'r') as file:
+                    cloud_init_data = file.read()
+                    new_cloud_init = self._encode_cloud_init(cloud_init_data)
             except Exception as e:
                 raise Exception(f"Failed to read cloud-init file {self.cloud_init_file}: {traceback.format_exc()}")
-            
         elif len(self.cloud_init_change_functions):
             existing_cloud_init = instance_details.metadata['user_data']
             new_cloud_init = self.generate_new_cloud_init(k8s_node, existing_cloud_init, self.cloud_init_change_functions)
             if new_cloud_init is None:
                 return False, None
         else:
-            logger.debug(f'Cloud-init is not changed.')
+            logger.debug(f'Cloud-init was not changed.')
             new_cloud_init = instance_details.metadata['user_data']
         
         new_metadata = instance_details.metadata
@@ -346,13 +379,20 @@ class BootVolumeReplacer:
         else:
             new_metadata['user_data'] = new_cloud_init
 
-        cordon_and_drain_result = self.cordon_and_drain_node(k8s_node)
-        if cordon_and_drain_result:
-            logger.info(f"Successfuly drained the node {k8s_node}.")
+        if self.ssh_authorized_keys:
+            new_metadata['ssh_authorized_keys'] = self.ssh_authorized_keys
         
-        delete_node_result = self.delete_node(k8s_node)
-        if delete_node_result:
-            logger.info(f'Successfuly deleted the node {k8s_node} from the Kubernetes cluster.')
+        if is_k8s_node:
+            cordon_and_drain_result = self.cordon_and_drain_node(k8s_node)
+            if cordon_and_drain_result:
+                logger.info(f"Successfuly drained the node {k8s_node}.")
+            
+            delete_node_result = self.delete_node(k8s_node)
+            if delete_node_result:
+                logger.info(f'Successfuly deleted the node {k8s_node} from the Kubernetes cluster.')
+            else:
+                logger.error(f"Failed to delete the node {k8s_node} from the Kubernetes cluster.")
+                return None, False
         
         if self.bv_size:
             new_bv_size = self.bv_size
@@ -372,17 +412,22 @@ class BootVolumeReplacer:
             self.remove_previous_boot_volume)
         
         if bvr_result:
+            if self.ssh_authorized_keys:
+                logger.info(f"The SSH authorized keys have been updated for node {k8s_node}.")
             logger.info(f'The command to replace the boot volume on instance {instance_details.id} has been accepted.')
 
         logger.info(f"Waiting {self.timeout_seconds} seconds for node {k8s_node} to be ready...")
-        wait_for_completion_result = self.wait_for_completion(k8s_node, self.timeout_seconds)
-        if wait_for_completion_result:
-            logger.info(f'The boot volume replacement for instance {instance_details.id} has been completed successfully.')
-            result = True
+
+        if is_k8s_node:
+            wait_for_completion_result = self.wait_for_completion(k8s_node, self.timeout_seconds)
+            if wait_for_completion_result:
+                logger.info(f'The boot volume replacement for instance {instance_details.id} has been completed successfully.')
+                result = True
+            else:
+                logger.error(f'The boot volume replacement for instance {instance_details.id} failed.')
+                result = False
         else:
-            logger.error(f'The boot volume replacement for instance {instance_details.id} failed.')
-            result = False
-        
+            result = True
         return result, instance_details.metadata['user_data'] != new_cloud_init
         
 
@@ -423,6 +468,7 @@ def setup_logging(level):
     # logger.addHandler(file_handler)
     logger.addHandler(console_handler)
 
+
 if __name__ == "__main__": 
 
     ## Argument parsing
@@ -437,6 +483,7 @@ if __name__ == "__main__":
     parser.add_argument("--interactive", help="Enable interactive execution of the script.", action='store_true')
     parser.add_argument("--cloud-init-file", help="File with new node cloud-init. If not provided, the existing node cloud-init is used.", nargs="?", default="")
     parser.add_argument("--image-ocid", help="New image OCID to use for the BV. If not provided, the current node image is used.", nargs="?", default="")
+    parser.add_argument("--ssh_authorized_keys", help="New SSH public key(s) to be configured on the node.", nargs="?", default="")
     parser.add_argument("-p", "--parallelism", help="How many nodes to upgrade in parallel. Not recommended to enable at the same time with --interactive.", type=int, default=1)
     parser.add_argument("--bv-size", help="Size of the new boot volume in GB. If not set, the size of the existing boot volume will be used.", type=int, default=0)
     parser.add_argument("--remove-previous-boot-volume", help="Remove the existing boot volume after the upgrade. By default, the existing boot volume is preserved.", action='store_true')
@@ -449,7 +496,7 @@ if __name__ == "__main__":
     parser.add_argument("--region", help="The region to target. Required when using auth='instance_principal'", required=False)
     parser.add_argument("--auth", help="Change the OCI signer.", required=False, default="config_file", choices=['config_file', 'instance_principal'])
     parser.add_argument("nodes", help="Name of the Kubernetes node(s) for which to execute BVR.", nargs="+")
-    parser.add_argument("--debug", help="Enable debug logging", action='store_true')
+    parser.add_argument("--debug", help="Enable debug logging.", action='store_true')
     
     args = parser.parse_args()
 
