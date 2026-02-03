@@ -6,7 +6,7 @@ shopt -s nullglob
 level="${1:-0}"
 pattern="${2:-/dev/nvme*n1}"
 mount_primary="${3:-/mnt/nvme}"
-mount_extra=(/var/lib/{containers,kubelet,logs/pods})
+mount_extra=(/var{/lib/containers,/lib/kubelet,/log/pods})
 
 # Enumerate NVMe devices, exit if absent
 devices=($pattern)
