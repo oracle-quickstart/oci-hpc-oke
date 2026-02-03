@@ -212,7 +212,7 @@ variableGroups:
     - amd_device_metrics_exporter_chart_version 
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
-    - nginx_chart_version
+    - ingress_chart_version
     - install_grafana
     - install_grafana_dashboards
     - use_lets_encrypt_prod_endpoint
@@ -953,11 +953,11 @@ variables:
       # and:
       # - monitoring_advanced_options
       # - install_amd_device_metrics_exporter
-  nginx_chart_version:
-    title: Nginx stack chart version
+  ingress_chart_version:
+    title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "4.13.0"
+    default: "0.2.1"
     visible: false
       # and:
       # - monitoring_advanced_options

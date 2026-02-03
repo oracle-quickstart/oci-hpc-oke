@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
-module "nginx" {
+module "ingress" {
   count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
   source = "./helm-module"
 
@@ -12,10 +12,10 @@ module "nginx" {
   operator_user   = var.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
-  deployment_name     = "ingress-nginx"
-  helm_chart_name     = "ingress-nginx"
-  namespace           = "nginx"
-  helm_repository_url = "https://kubernetes.github.io/ingress-nginx"
+  deployment_name     = "contour"
+  helm_chart_name     = "contour"
+  namespace           = "projectcontour"
+  helm_repository_url = "https://projectcontour.github.io/helm-charts/"
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
@@ -33,7 +33,7 @@ module "nginx" {
   deployment_extra_args = ["--wait"]
 
   helm_template_values_override = templatefile(
-    "${path.module}/files/nginx-ingress/values.yaml.tpl",
+    "${path.module}/files/ingress/values.yaml.tpl",
     {
       min_bw    = 10,
       max_bw    = 100,
@@ -66,7 +66,7 @@ module "kube_prometheus_stack" {
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal",
-    "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=ingress-nginx  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
+    "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
   ]
 
   deployment_extra_args = flatten([
@@ -78,7 +78,7 @@ module "kube_prometheus_stack" {
     ],
     var.preferred_kubernetes_services == "public" ? [
       "--set grafana.ingress.enabled=true",
-      "--set grafana.ingress.ingressClassName=nginx",
+      "--set grafana.ingress.ingressClassName=contour",
       "--set grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
       "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
@@ -116,7 +116,7 @@ module "kube_prometheus_stack" {
         } : {})
       }
   )
-  depends_on = [module.nginx]
+  depends_on = [module.ingress]
 }
 
 

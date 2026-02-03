@@ -46,8 +46,8 @@ Before starting, ensure you have:
 5. **Namespace**: The monitoring namespace (default: `monitoring`)
 
 Optional:
-- NGINX Ingress Controller (for public access)
-- cert-manager (for TLS certificates)
+- Contour Ingress Controller (for public access)
+- Cert-Manager (for TLS certificates)
 - Load balancer capability (for external access)
 - OCI Notifications Service (ONS) Topic OCID (for alert notifications via OKE ONS Webhook)
 - Instance Principal authentication configured for OKE nodes (for OKE ONS Webhook)
@@ -519,16 +519,14 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
    Wait until the add-on status is `Ready`.
 
-2. Install the Nginx Ingress Controller
+2. Install the Contour Ingress Controller
    
    ```bash
-   helm upgrade --install ingress-nginx ingress-nginx \
-      --repo https://kubernetes.github.io/ingress-nginx \
-      --namespace ingress-nginx --create-namespace
+   helm upgrade --install contour contour --repo https://projectcontour.github.io/helm-charts/ --namespace projectcontour --create-namespace
    ```
 
    **Note**: 
-   - If you want to customize the Ingress Controller LoadBalancer attributes, please refer to the file `terraform/files/nginx-ingress/values.yaml.tpl`.
+   - If you want to customize the Ingress Controller LoadBalancer attributes, please refer to the file `terraform/files/ingress/values.yaml.tpl`.
 
    - All supported annotations can be found in [our documentation](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingloadbalancer_topic-Summaryofannotations.htm).
 
@@ -538,10 +536,10 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    kubectl apply -f terraform/files/cert-manager/cluster-issuer.yaml
    ```
 
-4. Get the public IP address of the LoadBalancer associated with the Nginx Ingress Controller.
+4. Get the public IP address of the LoadBalancer associated with the Contour Ingress Controller.
 
    ```bash
-   export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=ingress-nginx  -o json | jq -r '.items[] | select(.spec.type == "LoadBalancer") | .status.loadBalancer.ingress[].ip')
+   export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == "LoadBalancer") | .status.loadBalancer.ingress[].ip')
    ```
 
 5. Upgrade the Grafana Deployment to use Ingress.
@@ -551,7 +549,7 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    --namespace ${MONITORING_NAMESPACE} \
    --reuse-values \
    --set grafana.ingress.enabled=true \
-   --set grafana.ingress.ingressClassName=nginx \
+   --set grafana.ingress.ingressClassName=contour \
    --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
    --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.sslip.io \
    --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.sslip.io \
@@ -565,8 +563,8 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    kubectl get ingress -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/instance=kube-prometheus-stack
 
    # Sample output
-   # NAME                            CLASS   HOSTS                              ADDRESS           PORTS     AGE
-   # kube-prometheus-stack-grafana   nginx   grafana.${INGRESS_IP}.sslip.io     ${INGRESS_IP}     80, 443   5m28s
+   # NAME                            CLASS     HOSTS                              ADDRESS           PORTS     AGE
+   # kube-prometheus-stack-grafana   contour   grafana.${INGRESS_IP}.sslip.io     ${INGRESS_IP}     80, 443   5m28s
    ```
 
 7. Access Grafana at `https://grafana.${INGRESS_IP}.sslip.io`
@@ -809,8 +807,8 @@ helm uninstall oke-ons-webhook -n ${MONITORING_NAMESPACE}
 # Uninstall kube-prometheus-stack
 helm uninstall kube-prometheus-stack -n ${MONITORING_NAMESPACE}
 
-# Delete Nginx Ingress Controller (if deployed)
-helm uninstall ingress-nginx -n ingress-nginx
+# Delete contour Ingress Controller (if deployed)
+helm uninstall contour -n projectcontour
 
 # Delete the Cluster Issuer
 kubectl delete -f terraform/files/cert-manager/cluster-issuer.yaml
