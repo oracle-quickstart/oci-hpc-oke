@@ -16,6 +16,7 @@ module "ingress" {
   helm_chart_name     = "contour"
   namespace           = "projectcontour"
   helm_repository_url = "https://projectcontour.github.io/helm-charts/"
+  helm_chart_version  = var.ingress_chart_version
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
@@ -24,8 +25,8 @@ module "ingress" {
   post_deployment_commands = flatten([
     "cat <<'EOF' | kubectl apply -f -",
     ( var.use_lets_encrypt_prod_endpoint == true ? 
-      split("\n", file("${path.module}/files/cert-manager/cluster-issuer-prod.yaml")) :
-      split("\n", file("${path.module}/files/cert-manager/cluster-issuer-staging.yaml"))
+      split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-prod.yaml", { state = local.state_id })) :
+      split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-staging.yaml", { state = local.state_id }))
     ),
     "EOF",
     "sleep 60" #wait for the LB to be provisioned
@@ -79,7 +80,8 @@ module "kube_prometheus_stack" {
     var.preferred_kubernetes_services == "public" ? [
       "--set grafana.ingress.enabled=true",
       "--set grafana.ingress.ingressClassName=contour",
-      "--set grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
+      "--set-string grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
+      "--set-string grafana.ingress.annotations.'ingress\\.kubernetes\\.io/force-ssl-redirect'=true",
       "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"

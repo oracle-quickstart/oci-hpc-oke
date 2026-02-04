@@ -35,6 +35,11 @@ resource "helm_release" "prometheus" {
       value = "le-clusterissuer"
     },
     {
+      name  = "grafana.ingress.annotations.ingress\\.kubernetes\\.io/force-ssl-redirect",
+      type  = "string"
+      value = "true"
+    },
+    {
       name  = "grafana.ingress.hosts[0]",
       value = "grafana.${data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
@@ -46,7 +51,7 @@ resource "helm_release" "prometheus" {
       name  = "grafana.ingress.tls[0].secretName",
       value = "grafana-tls"
     }
-    ] : [
+  ] : [
     {
       name  = "grafana.service.type",
       value = "LoadBalancer"
