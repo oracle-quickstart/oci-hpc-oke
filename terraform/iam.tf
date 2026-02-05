@@ -6,6 +6,7 @@ data "oci_identity_availability_domains" "all" {
 }
 
 data "oci_identity_dynamic_groups" "all" {
+  count          = var.create_policies && var.dynamic_group_id != null ? 1 : 0
   compartment_id = var.tenancy_ocid
 }
 
@@ -19,16 +20,19 @@ resource "random_string" "state_id" {
 
 
 locals {
-  dynamic_groups_list = data.oci_identity_dynamic_groups.all.dynamic_groups
+  dynamic_groups_list = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
   
-  group_name = var.dynamic_group_id == null ? format("oke-gpu-%v", local.state_id) : local.dynamic_groups_list[index(local.dynamic_groups_list[*].id, var.dynamic_group_id)]["name"]
+  group_name = coalesce(
+    try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == var.dynamic_group_id]), null),
+    format("oke-gpu-%v", local.state_id)
+  )
  
   storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
-
+  
   rule_templates = compact([
     "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
     "Allow dynamic-group %v to manage cluster-family in compartment id %v",

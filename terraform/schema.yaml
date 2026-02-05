@@ -51,7 +51,7 @@ variableGroups:
     variables:
       - create_policies
       - use_existing_dynamic_group
-      - dynamic_groups
+      - dynamic_group_id
 
   - title: Network
     variables:
@@ -262,7 +262,7 @@ variables:
     type: boolean
     default: false
     visible: create_policies
-  dynamic_groups:
+  dynamic_group_id:
     title: Dynamic Group
     description: "The dynamic group to use with the policy statements. If the value is not selected then stack creates the new dynamic group"
     type: oci:identity:dynamicgroups:id
