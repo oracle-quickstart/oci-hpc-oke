@@ -267,8 +267,8 @@ variable "amd_device_metrics_exporter_chart_version" {
   type    = string
 }
 
-variable "nginx_chart_version" {
-  default = "4.13.2"
+variable "ingress_chart_version" {
+  default = "0.2.1"
   type    = string
 }
 

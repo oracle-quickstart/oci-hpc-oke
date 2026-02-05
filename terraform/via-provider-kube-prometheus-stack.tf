@@ -5,7 +5,7 @@ resource "helm_release" "prometheus" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
-    helm_release.nginx,
+    helm_release.ingress,
     time_sleep.wait_for_lb_termination,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
   ]
@@ -28,25 +28,30 @@ resource "helm_release" "prometheus" {
     },
     {
       name  = "grafana.ingress.ingressClassName",
-      value = "nginx"
+      value = "contour"
     },
     {
       name  = "grafana.ingress.annotations.cert-manager\\.io\\/cluster-issuer",
       value = "le-clusterissuer"
     },
     {
+      name  = "grafana.ingress.annotations.ingress\\.kubernetes\\.io/force-ssl-redirect",
+      type  = "string"
+      value = "true"
+    },
+    {
       name  = "grafana.ingress.hosts[0]",
-      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
+      value = "grafana.${data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].hosts[0]",
-      value = "grafana.${data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
+      value = "grafana.${data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].secretName",
       value = "grafana-tls"
     }
-    ] : [
+  ] : [
     {
       name  = "grafana.service.type",
       value = "LoadBalancer"

@@ -66,7 +66,7 @@ output "grafana_fetch_endpoint_command" {
 output "grafana_url" {
   value = var.install_node_problem_detector_kube_prometheus_stack ? (
     var.preferred_kubernetes_services == "public" ?
-    format("https://grafana.%s.%s", try(data.kubernetes_service.nginx_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain):
+    format("https://grafana.%s.%s", try(data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain):
     format("http://%s", try(data.kubernetes_service.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
   ) : "N/A"
 }
