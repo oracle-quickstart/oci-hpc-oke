@@ -32,6 +32,7 @@ variable "dynamic_group_id" {
   default = null
   }
 
+
 # General Variables
 variable "ssh_public_key" {
   default = null
