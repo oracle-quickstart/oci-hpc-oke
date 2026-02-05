@@ -97,6 +97,8 @@ variableGroups:
       - operator_shape_config
       - operator_shape_name
       - operator_shape_ocpus
+      - operator_shape_ocpus_denseIO_e4_flex
+      - operator_shape_ocpus_denseIO_e5_flex
       - operator_shape_memory
       - operator_shape_boot
 
@@ -134,6 +136,8 @@ variableGroups:
       - worker_cpu_pool_size
       - worker_cpu_shape
       - worker_cpu_ocpus
+      - worker_cpu_ocpus_denseIO_e4_flex
+      - worker_cpu_ocpus_denseIO_e5_flex
       - worker_cpu_memory
       - worker_cpu_boot_volume_size
       - worker_cpu_image_type
@@ -210,7 +214,7 @@ variableGroups:
     - amd_device_metrics_exporter_chart_version 
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
-    - nginx_chart_version
+    - ingress_chart_version
     - install_grafana
     - install_grafana_dashboards
     - use_lets_encrypt_prod_endpoint
@@ -634,9 +638,11 @@ variables:
       compartmentId: ${compartment_ocid}
   bastion_shape_ocpus:
     title: Bastion OCPUs
-    type: number
+    type: integer
     required: true
     default: 1
+    minimum: 1
+    maximum: 64
     visible:
       and:
       - create_bastion
@@ -654,7 +660,7 @@ variables:
           - eq: [bastion_shape_name, "VM.Standard.Intel.Generic"]
   bastion_shape_memory:
     title: Bastion Memory (GB)
-    type: number
+    type: integer
     required: true
     default: 8
     visible:
@@ -672,6 +678,7 @@ variables:
           - eq: [bastion_shape_name, "VM.Standard.AMD.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.Ampere.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.Intel.Generic"]
+          - eq: [bastion_shape_name, "VM.Standard.E3.Flex"]
 
   # Operator
   create_operator:
@@ -698,7 +705,7 @@ variables:
       compartmentId: ${compartment_ocid}
   operator_shape_ocpus:
     title: OCPUs
-    type: number
+    type: integer
     required: true
     default: 1
     visible:
@@ -716,9 +723,49 @@ variables:
           - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
           - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
           - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
+          - eq: [operator_shape_name, "VM.Standard.E3.Flex"]
+          - eq: [operator_shape_name, "VM.Optimized3.Flex"]
+
+  operator_shape_ocpus_denseIO_e4_flex:
+    title: OCPUs
+    type: enum
+    description: Number of OCPUs for Dense IO E4 Flex shape
+    required: true
+    enum:
+      - 8
+      - 16
+      - 32
+    default: 8
+    visible:
+      and:
+      - create_operator
+      - operator_shape_config
+      - or:
+          - eq: [operator_shape_name, "VM.DenseIO.E4.Flex"]
+
+  operator_shape_ocpus_denseIO_e5_flex:
+    title: OCPUs
+    type: enum
+    description: Number of OCPUs for Dense IO E5 Flex shape
+    required: true
+    enum:
+      - 8
+      - 16
+      - 24
+      - 32
+      - 40
+      - 48
+    default: 8
+    visible:
+      and:
+      - create_operator
+      - operator_shape_config
+      - or:
+          - eq: [operator_shape_name, "VM.DenseIO.E5.Flex"]
+
   operator_shape_memory:
     title: Memory (GB)
-    type: number
+    type: integer
     required: true
     default: 8
     visible:
@@ -736,25 +783,16 @@ variables:
           - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
           - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
           - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
+          - eq: [operator_shape_name, "VM.Standard.E3.Flex"]
+          - eq: [operator_shape_name, "VM.Optimized3.Flex"]
   operator_shape_boot:
     title: Boot volume size (GB)
-    type: number
+    type: integer
     required: true
     visible:
       and:
       - create_operator
       - operator_shape_config
-      - or:
-          - eq: [operator_shape_name, "VM.Standard3.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A1.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.A2.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E4.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E5.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.E6.Flex"]
-          - eq: [operator_shape_name, "VM.Standard.x86.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.AMD.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Ampere.Generic"]
-          - eq: [operator_shape_name, "VM.Standard.Intel.Generic"]
  
   # Storage
   create_fss:
@@ -935,11 +973,11 @@ variables:
       # and:
       # - monitoring_advanced_options
       # - install_amd_device_metrics_exporter
-  nginx_chart_version:
-    title: Nginx stack chart version
+  ingress_chart_version:
+    title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "4.13.0"
+    default: "0.2.1"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1058,7 +1096,7 @@ variables:
   max_pods_per_node:
     title: Maximum number of pods per node
     description: The default maximum number of pods to deploy per node when unspecified on a pool
-    type: number
+    type: integer
     visible: false
   preferred_kubernetes_services:
     type: enum
@@ -1096,7 +1134,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_ops_pool_size:
     title: Number of system worker nodes
-    type: number
+    type: integer
     required: true
   worker_ops_shape:
     title: Shape
@@ -1107,7 +1145,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_ops_ocpus:
     title: OCPUs
-    type: number
+    type: integer
     required: true
     visible:
       or:
@@ -1121,9 +1159,10 @@ variables:
         - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
         - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
         - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
+        - eq: [worker_ops_shape, "VM.Standard.E3.Flex"]
   worker_ops_memory:
     title: Memory (GB)
-    type: number
+    type: integer
     required: true
     visible:
       or:
@@ -1137,9 +1176,10 @@ variables:
         - eq: [worker_ops_shape, "VM.Standard.AMD.Generic"]
         - eq: [worker_ops_shape, "VM.Standard.Ampere.Generic"]
         - eq: [worker_ops_shape, "VM.Standard.Intel.Generic"]
+        - eq: [worker_ops_shape, "VM.Standard.E3.Flex"]
   worker_ops_boot_volume_size:
     title: Boot volume size (GB)
-    type: number      
+    type: integer      
   worker_ops_image_type:
     title: Image type
     default: Custom
@@ -1194,7 +1234,7 @@ variables:
       compartmentId: ${compartment_ocid}  
   worker_cpu_pool_size:
     title: Number of worker nodes
-    type: number
+    type: integer
     visible: ${worker_cpu_enabled}
   worker_cpu_shape:
     title: Shape
@@ -1207,7 +1247,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_cpu_ocpus:
     title: OCPUs
-    type: number
+    type: integer
     required: true
     visible:
       and:
@@ -1223,9 +1263,46 @@ variables:
           - eq: [worker_cpu_shape, "VM.Standard.AMD.Generic"]
           - eq: [worker_cpu_shape, "VM.Standard.Ampere.Generic"]
           - eq: [worker_cpu_shape, "VM.Standard.Intel.Generic"]
+          - eq: [worker_cpu_shape, "VM.Standard.E3.Flex"]
+
+  worker_cpu_ocpus_denseIO_e4_flex:
+    title: OCPUs
+    type: enum
+    description: Number of OCPUs for Dense IO E4 Flex shape
+    required: true
+    enum:
+      - 8
+      - 16
+      - 32
+    default: 8
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - or:
+          - eq: [worker_cpu_shape, "VM.DenseIO.E4.Flex"]
+
+  worker_cpu_ocpus_denseIO_e5_flex:
+    title: OCPUs
+    type: enum
+    description: Number of OCPUs for Dense IO E5 Flex shape
+    required: true
+    enum:
+      - 8
+      - 16
+      - 24
+      - 32
+      - 40
+      - 48
+    default: 8
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - or:
+          - eq: [worker_cpu_shape, "VM.DenseIO.E5.Flex"]
+
   worker_cpu_memory:
     title: Memory (GB)
-    type: number
+    type: integer
     required: true
     visible:
       and:
@@ -1241,9 +1318,10 @@ variables:
           - eq: [worker_cpu_shape, "VM.Standard.AMD.Generic"]
           - eq: [worker_cpu_shape, "VM.Standard.Ampere.Generic"]
           - eq: [worker_cpu_shape, "VM.Standard.Intel.Generic"]
+          - eq: [worker_cpu_shape, "VM.Standard.E3.Flex"]
   worker_cpu_boot_volume_size:
     title: Boot volume size (GB)
-    type: number
+    type: integer
     visible: ${worker_cpu_enabled}
   worker_cpu_image_type:
     title: Image type
@@ -1338,7 +1416,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_gpu_pool_size:
     title: Number of GPU worker nodes
-    type: number
+    type: integer
     visible: ${worker_gpu_enabled}
   worker_gpu_shape:
     title: Shape
@@ -1350,7 +1428,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_gpu_boot_volume_size:
     title: Boot volume size (GB)
-    type: number
+    type: integer
     visible: ${worker_gpu_enabled}
   worker_gpu_image_type:
     title: Image type
@@ -1446,7 +1524,7 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_rdma_pool_size:
     title: Number of RDMA worker nodes
-    type: number
+    type: integer
     required: true
     visible: ${worker_rdma_enabled}
   worker_rdma_shape:
@@ -1459,11 +1537,11 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_rdma_boot_volume_size:
     title: Boot volume size (GB)
-    type: number
+    type: integer
     visible: ${worker_rdma_enabled}
   worker_rdma_boot_volume_vpus_per_gb:
     title: Boot volume performance (VPUs/GB)
-    type: number
+    type: integer
     visible: false
   worker_rdma_image_type:
     title: Image type

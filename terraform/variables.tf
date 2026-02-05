@@ -142,6 +142,14 @@ variable "create_operator" { default = true }
 variable "operator_shape_config" { default = false }
 variable "operator_shape_name" { default = "VM.Standard.E5.Flex" }
 variable "operator_shape_ocpus" { default = 1 }
+variable "operator_shape_ocpus_denseIO_e4_flex" {
+  default = 8
+  type    = number
+}
+variable "operator_shape_ocpus_denseIO_e5_flex" {
+  default = 8
+  type    = number
+}
 variable "operator_shape_memory" { default = 8 }
 variable "operator_shape_boot" { default = 50 }
 variable "operator_image_id" {
@@ -263,8 +271,8 @@ variable "amd_device_metrics_exporter_chart_version" {
   type    = string
 }
 
-variable "nginx_chart_version" {
-  default = "4.13.2"
+variable "ingress_chart_version" {
+  default = "0.2.1"
   type    = string
 }
 
@@ -355,6 +363,14 @@ variable "worker_cpu_ad" { default = "" }
 variable "worker_cpu_pool_size" { default = 1 }
 variable "worker_cpu_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_cpu_ocpus" { default = 6 }
+variable "worker_cpu_ocpus_denseIO_e4_flex" {
+  default = 8
+  type    = number
+}
+variable "worker_cpu_ocpus_denseIO_e5_flex" {
+  default = 8
+  type    = number
+}
 variable "worker_cpu_memory" { default = 32 }
 variable "worker_cpu_boot_volume_size" { default = 256 }
 variable "worker_cpu_image_type" { default = "Custom" }

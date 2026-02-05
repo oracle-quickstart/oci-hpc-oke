@@ -26,7 +26,7 @@ resource "kubectl_manifest" "lustre_pv" {
 
   depends_on = [
     module.oke,
-    helm_release.nginx,
+    helm_release.ingress,
     helm_release.lustre_client
   ]
 
