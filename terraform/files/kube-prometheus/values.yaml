@@ -7,7 +7,8 @@ defaultRules:
 prometheus:
   prometheusSpec:
     enableAdminAPI: false
-    retention: 30d                         
+    retention: 30d
+    retentionSize: 450GB    
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
@@ -23,7 +24,7 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 100Gi
+              storage: 500Gi
 
 prometheus-node-exporter:
   prometheus:
