@@ -1,5 +1,8 @@
 envoy:
   service:
+    externalTrafficPolicy: Cluster
+    networkPolicy:
+      enabled: false
     annotations:
       oci.oraclecloud.com/load-balancer-type: "lb"
       service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
@@ -8,3 +11,14 @@ envoy:
       service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
       oci.oraclecloud.com/initial-freeform-tags-override: '{"state_id": "${state_id}", "application": "contour", "role": "contour_ingress_lb"}'
       oci.oraclecloud.com/oci-network-security-groups: "${lb_nsg_id}"
+contour:
+  resourcesPreset: "micro"
+  certgen:
+    networkPolicy:
+      enabled: false
+  networkPolicy:
+    enabled: false
+  ingressClass:
+    name: "contour"
+
+useCertManager: true
