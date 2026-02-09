@@ -272,7 +272,7 @@ helm install nvidia-dra-driver-gpu nvidia/nvidia-dra-driver-gpu \
     --version=25.8.1 \
     --create-namespace \
     --namespace nvidia-dra-driver-gpu \
-    -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/gb200/manifests/dra/values.yaml
+    -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/grace-blackwell/manifests/dra/values.yaml
 ```
 
 ### Validate that the DRA driver components are running and in a Ready state
