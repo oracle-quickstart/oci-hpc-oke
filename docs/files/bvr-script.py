@@ -6,7 +6,7 @@
 #   "oci==2.159.0"
 # ]
 # ///
-import argparse, base64, gzip, io, json, logging, re, sys, traceback
+import argparse, base64, gzip, io, json, logging, os, re, sys, traceback
 import concurrent.futures
 
 from kubernetes import client as kubernetes_client
@@ -43,16 +43,32 @@ class BootVolumeReplacer:
                 ssh_authorized_keys="",
                 **kwargs
         ):
-        
+        self.auth = auth
+
         try:
             logger.debug(f"Attempting to use {kubeconfig} kubeconfig file.")
             self.kubeconfig = kubernetes_config.load_kube_config(config_file=kubeconfig)
         except Exception as e:
             logger.error(f"Invalid kubeconfig file:\n{traceback.format_exc()}")
             sys.exit(1)
-        
+
         try:
-            if auth == "config_file":
+            if self.auth == "cloud_shell":
+                
+                logger.debug(f"Attempting to auth in cloud-shell env.")
+                self.oci_signer = oci.auth.signers.InstancePrincipalsDelegationTokenSigner(delegation_token=self._get_delegation_token())
+
+                self.oci_config = {
+                    'signer': self.oci_signer,
+                    'region': os.environ.get("OCI_REGION", region)
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to auth in cloud_shell:\n{traceback.format_exc()}")
+            sys.exit(1)
+
+        try:
+            if self.auth == "config_file":
                 logger.debug(f"Attempting to use {oci_config_file} OCI config file.")
                 self.oci_config = oci.config.from_file(file_location=oci_config_file, profile_name=oci_config_profile)
                 if region:
@@ -72,7 +88,7 @@ class BootVolumeReplacer:
             sys.exit(1)
 
         try:
-            if auth == "instance_principal":
+            if self.auth == "instance_principal":
                 logger.debug(f"Attempting to use instance_principal signer.")
                 self.oci_signer = InstancePrincipalsSecurityTokenSigner()
         
@@ -101,6 +117,15 @@ class BootVolumeReplacer:
         self.timeout_seconds = timeout_seconds
         self.ssh_authorized_keys = ssh_authorized_keys
 
+    def _get_delegation_token(self):
+        try:
+            with open('/etc/oci/delegation_token') as f:
+                dt = f.read()
+            return dt
+        except Exception as e:
+            logger.error(f"Failed to get delegation token:\n{traceback.format_exc()}")
+            return None
+
     def _get_k8s_node_details(self, node):
         api_instance = kubernetes_client.CoreV1Api()
         try:
@@ -119,8 +144,10 @@ class BootVolumeReplacer:
         if k8s_node_details:
             is_k8s_node = True
             instance_display_name = k8s_node_details.metadata.labels.get('displayName', k8s_node_details.metadata.labels.get('hostname', ""))
-
+            
             core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+            if self.auth == "cloud_shell":
+                core_client.base_client.signer.delegation_token = self._get_delegation_token()
             list_instances_response = core_client.list_instances(
                 compartment_id=self.compartment_id,
                 display_name=instance_display_name,
@@ -138,6 +165,8 @@ class BootVolumeReplacer:
         else:
             if node.startswith("ocid1.instance"):
                 core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+                if self.auth == "cloud_shell":
+                    core_client.base_client.signer.delegation_token = self._get_delegation_token()
                 get_instances_response = core_client.get_instance(
                     instance_id=node)
                 return get_instances_response.data, is_k8s_node
@@ -147,6 +176,8 @@ class BootVolumeReplacer:
 
     def check_image_compatibility(self, image_id, shape_name):
         core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+        if self.auth == "cloud_shell":
+            core_client.base_client.signer.delegation_token = self._get_delegation_token()
         get_image_shape_compatibility_entries_response = core_client.list_image_shape_compatibility_entries(
             image_id=image_id,
         )
@@ -159,6 +190,8 @@ class BootVolumeReplacer:
     def get_existing_boot_volume_size(self, compartment_ocid, instance_id, ad):
         # Get the instance current boot volume size
         core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+        if self.auth == "cloud_shell":
+            core_client.base_client.signer.delegation_token = self._get_delegation_token()
         list_boot_volume_attachments_response = core_client.list_boot_volume_attachments(
             availability_domain=ad,
             compartment_id=compartment_ocid,
@@ -166,7 +199,8 @@ class BootVolumeReplacer:
             )
         boot_volume_id = list_boot_volume_attachments_response.data[0].boot_volume_id
         core_client = BlockstorageClient(config = self.oci_config, signer = self.oci_signer)
-
+        if self.auth == "cloud_shell":
+            core_client.base_client.signer.delegation_token = self._get_delegation_token()
         get_boot_volume_response = core_client.get_boot_volume(
             boot_volume_id=boot_volume_id)
         logger.debug(f"Current boot volume size for instance with id {instance_id} is {get_boot_volume_response.data.size_in_gbs}.")
@@ -295,6 +329,8 @@ class BootVolumeReplacer:
         # - new metadata
         # - flag to preserve the current boot volume 
         core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
+        if self.auth == "cloud_shell":
+            core_client.base_client.signer.delegation_token = self._get_delegation_token()
         if bv_size_in_gbs < 50:
             bv_size_in_gbs = 50
         update_instance_response = core_client.update_instance(
@@ -483,7 +519,7 @@ if __name__ == "__main__":
     parser.add_argument("--interactive", help="Enable interactive execution of the script.", action='store_true')
     parser.add_argument("--cloud-init-file", help="File with new node cloud-init. If not provided, the existing node cloud-init is used.", nargs="?", default="")
     parser.add_argument("--image-ocid", help="New image OCID to use for the BV. If not provided, the current node image is used.", nargs="?", default="")
-    parser.add_argument("--ssh_authorized_keys", help="New SSH public key(s) to be configured on the node.", nargs="?", default="")
+    parser.add_argument("--ssh-authorized-keys", help="New SSH public key(s) to be configured on the node.", nargs="?", default="")
     parser.add_argument("-p", "--parallelism", help="How many nodes to upgrade in parallel. Not recommended to enable at the same time with --interactive.", type=int, default=1)
     parser.add_argument("--bv-size", help="Size of the new boot volume in GB. If not set, the size of the existing boot volume will be used.", type=int, default=0)
     parser.add_argument("--remove-previous-boot-volume", help="Remove the existing boot volume after the upgrade. By default, the existing boot volume is preserved.", action='store_true')
@@ -494,7 +530,7 @@ if __name__ == "__main__":
     parser.add_argument("--oci-config-file", help="Override the path to the oci_config file. Default is '~/.oci/config'", required=False, default="~/.oci/config")
     parser.add_argument("--oci-config-profile", help="oci config profile to use. Default is 'DEFAULT'", required=False, default="DEFAULT")
     parser.add_argument("--region", help="The region to target. Required when using auth='instance_principal'", required=False)
-    parser.add_argument("--auth", help="Change the OCI signer.", required=False, default="config_file", choices=['config_file', 'instance_principal'])
+    parser.add_argument("--auth", help="Change the OCI signer.", required=False, default="config_file", choices=['config_file', 'instance_principal', 'cloud_shell'])
     parser.add_argument("nodes", help="Name of the Kubernetes node(s) for which to execute BVR.", nargs="+")
     parser.add_argument("--debug", help="Enable debug logging.", action='store_true')
     

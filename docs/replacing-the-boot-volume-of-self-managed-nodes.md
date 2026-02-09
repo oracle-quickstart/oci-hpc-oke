@@ -43,7 +43,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 | --oci-config-file             | No       | "~/.oci/config"        | Override the path to the oci_config file. Default is '~/.oci/config'                                                             |
 | --oci-config-profile          | No       | "DEFAULT"              | OCI config profile to use. Default is 'DEFAULT'                                                                                  |
 | --region                      | No       |                        | The region to target. Required when using auth='instance_principal'                                                              |
-| --auth                        | No       |                        | Set OCI authentication method. Currently supported values: 'config_file','instance_principal'                                    |
+| --auth                        | No       |                        | Set OCI authentication method. Currently supported values: 'config_file','instance_principal', 'cloud_shell'                     |
 | --help                        | No       |                        | Show help message and exit                                                                                                       |
 | --debug                       | No       | False                  | Enable debug logging                                                                                                             |
 
