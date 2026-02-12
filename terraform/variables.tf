@@ -319,6 +319,11 @@ variable "max_pods_per_node" {
   description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Ignored when when cni_type != 'npn'."
   type        = number
 }
+variable "services_cidr" {
+  default     = "10.96.0.0/16"
+  description = "CIDR block for Kubernetes services."
+  type        = string
+}
 variable "preferred_kubernetes_services" {
   type        = string
   default     = "public"

@@ -106,6 +106,7 @@ variableGroups:
       - cluster_name
       - kubernetes_version
       - cni_type
+      - services_cidr
       - control_plane_is_public
       - control_plane_allowed_cidrs
       - max_pods_per_node
@@ -1069,8 +1070,15 @@ variables:
   max_pods_per_node:
     title: Maximum number of pods per node
     description: The default maximum number of pods to deploy per node when unspecified on a pool
-    type: integer
+    type: number
     visible: false
+  services_cidr:
+    title: Services CIDR
+    description: CIDR block for Kubernetes services.
+    type: string
+    default: "10.96.0.0/16"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    required: false
   preferred_kubernetes_services:
     type: enum
     enum:
