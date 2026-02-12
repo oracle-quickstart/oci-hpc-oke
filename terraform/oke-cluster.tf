@@ -282,7 +282,7 @@ module "oke" {
   }
   output_detail = true
   pods_cidr     = "10.240.0.0/12"
-  # services_cidr                     = "10.96.0.0/16"
+  services_cidr                     = var.services_cidr
   preferred_load_balancer           = var.preferred_kubernetes_services
   ssh_public_key                    = trimspace(local.ssh_public_key)
   ssh_private_key                   = local.deploy_from_operator ? tls_private_key.stack_key.private_key_openssh : null
