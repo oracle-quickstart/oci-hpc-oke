@@ -113,7 +113,7 @@ locals {
       workers = merge(
         { create = "auto" },
         (var.create_vcn && var.workers_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
-        { newbits = 4, netnum = 2 } : {},
+        { newbits = 3, netnum = 2 } : {},
         var.create_vcn && var.workers_sn_cidr != null ?
         { cidr = var.workers_sn_cidr } : {},
         !var.create_vcn && var.custom_subnet_ids ?
@@ -123,7 +123,7 @@ locals {
       pods = merge(
         { create = "auto" },
         (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
-        { newbits = 2, netnum = 2 } : {},
+        { newbits = 1, netnum = 1 } : {},
         var.create_vcn && var.pods_sn_cidr != null ?
         { cidr = var.pods_sn_cidr } : {},
         !var.create_vcn && var.custom_subnet_ids ?
@@ -179,7 +179,7 @@ locals {
 
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.3.3"
+  version = "5.4.0"
 
   providers = { oci.home = oci.home }
 
@@ -224,15 +224,26 @@ module "oke" {
           }
         ]
       }
+      "CoreDNS" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
+        configurations = [
+          {
+            key   = "minReplica"
+            value = "3"
+          },
+          {
+            key   = "nodesPerReplica"
+            value = "8"
+          },
+          {
+            key   = "coreDnsContainerResources"
+            value = jsonencode({ requests = { cpu = "200m", memory = "300Mi" }, limits = { memory = "1Gi" } })
+          }
+        ]
+      }
     },
-    # var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack ?
-    # {
-    #   "KubernetesMetricsServer" = {
-    #     remove_addon_resources_on_delete = true
-    #     override_existing                = true
-    #     skipAddonDependenciesCheck = true
-    #   }
-    # } : {},
+
     var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
     {
       "CertManager" = {
