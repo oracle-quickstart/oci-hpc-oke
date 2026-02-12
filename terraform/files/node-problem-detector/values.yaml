@@ -685,7 +685,7 @@ logDir:
 
 image:
   repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-  tag: v1.35.1-0
+  tag: v1.35.1-2
   # image.digest -- the image digest. If given it takes precedence over a given tag.
   digest: ""
   pullPolicy: IfNotPresent
