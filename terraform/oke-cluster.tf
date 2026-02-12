@@ -170,7 +170,8 @@ locals {
 }
 
 module "oke" {
-  source = "github.com/robo-cap/terraform-oci-oke?ref=38e9b396ef893bed3efcf11e3916c7adb4d41e71"
+  source  = "oracle-terraform-modules/oke/oci"
+  version = "5.4.0"
 
   providers = { oci.home = oci.home }
 
