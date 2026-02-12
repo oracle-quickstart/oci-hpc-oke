@@ -181,8 +181,8 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.15.2" -
 #### NCCL Tests
 | Image Tag                                                                 | CUDA   |
 |---------------------------------------------------------------------------|--------|
-| iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.0-ubuntu-24.04-nccl-2.29.2-011826.1 | 13.1.0 |
-| iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-12.9.1-ubuntu-24.04-nccl-2.29.2-011826.1 | 12.9.1 |
+| iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1 | 13.1.1 |
+| iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-12.9.1-ubuntu-24.04-nccl-2.29.3-020926.1 | 12.9.1 |
 
 #### RCCL Tests
 | Image Tag                                                                 | ROCM   |
