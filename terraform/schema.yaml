@@ -188,7 +188,6 @@ variableGroups:
     variables:
     - nvme_raid_enabled
     - nvme_raid_level
-    - create_bv_high
     - create_fss
     - fss_ad
     - fss_mount_path
@@ -795,12 +794,6 @@ variables:
     default: "/mnt/oci-fss"
     required: true
     visible: ${create_fss}
-  create_bv_high:
-    title: Create a storage class backed by higher performance OCI block volumes
-    description: "Create a storage class backed by higher performance OCI block volumes (VPU: 20)."
-    type: boolean
-    required: true
-    default: false
   nvme_raid_enabled:
     type: boolean
     title: Create a RAID array using local NVMe drives 
