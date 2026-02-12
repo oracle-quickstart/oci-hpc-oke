@@ -26,10 +26,15 @@ The following health checks are included. Note that depending on the node shape 
 | GpuPcie | Checks if PCIe has the expected bandwidth |
 | GpuFabricManager | Checks if Fabric Manager is running (NVIDIA multi-GPU systems) |
 | GpuBadPages | Checks if any AMD GPU has bad pages |
+| GpuXid | Checks for GPU Xid errors in dmesg |
+| NvlinkSpeed | Checks if NVLink speeds match expected values |
+| DcgmiHealth | Runs DCGMI health check (NVIDIA GPUs) |
+| Rocminfo | Runs rocminfo health check (AMD GPUs) |
 | RdmaLink | Checks if RDMA links are up |
 | RdmaLinkFlapping | Checks if any RDMA links are flapping |
 | RdmaWpaAuth | Checks if all RDMA interfaces are authenticated |
 | RdmaRttcc | Checks if RTTCC is disabled on the RDMA interfaces |
+| IpAddress | Checks if all RDMA interfaces have an IP address |
 | OcaVersion | Checks if the node has the correct Oracle Cloud Agent version |
 | CpuProfile | Checks if the CPU profile is set to performance |
 
@@ -42,7 +47,7 @@ By default, health checks run every 5 minutes. You can modify the frequency by e
 Deploy Node Problem Detector using the Helm chart with the OKE-specific health check configuration:
 
 ```bash
-helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.22 \
+helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.0 \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/terraform/files/node-problem-detector/values.yaml
 ```
 
