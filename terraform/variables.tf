@@ -252,17 +252,17 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "79.0.0"
+  default = "81.6.3"
   type    = string
 }
 
 variable "dcgm_exporter_chart_version" {
-  default = "4.6.0"
+  default = "4.8.1"
   type    = string
 }
 
 variable "amd_device_metrics_exporter_chart_version" {
-  default = "v1.4.0"
+  default = "v1.4.1"
   type    = string
 }
 
@@ -303,7 +303,7 @@ variable "monitoring_advanced_options" {
 
 # OKE Cluster Setup
 variable "cluster_name" { default = "oke-gpu-quickstart" }
-variable "kubernetes_version" { default = "v1.34.1" }
+variable "kubernetes_version" { default = "v1.34.2" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
 variable "cni_type" {
   default = "npn"
