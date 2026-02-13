@@ -62,6 +62,12 @@ locals {
     write_files = local.write_files
   }
 
+  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? ( var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31 ) : var.max_pods_per_node
+  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? ( var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31 ) : var.max_pods_per_node
+
+  worker_ops_max_pods_per_node = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
+  worker_cpu_max_pods_per_node = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
+
   worker_pools = {
     "oke-system" = {
       create             = local.create_workers
@@ -75,11 +81,12 @@ locals {
       boot_volume_size   = var.worker_ops_boot_volume_size
       image_type         = "custom"
       image_id           = local.worker_ops_image_id
-      max_pods_per_node  = var.worker_ops_max_pods_per_node
+      max_pods_per_node  = local.worker_ops_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
       node_cycling_enabled         = var.worker_ops_node_cycling_enabled
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
+      node_cycling_mode            = [var.worker_ops_node_cycling_mode]
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
@@ -94,11 +101,12 @@ locals {
       boot_volume_size   = var.worker_cpu_boot_volume_size
       image_type         = "custom"
       image_id           = local.worker_cpu_image_id
-      max_pods_per_node  = var.worker_cpu_max_pods_per_node
+      max_pods_per_node  = local.worker_cpu_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
       node_cycling_enabled         = var.worker_cpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
+      node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
@@ -117,6 +125,7 @@ locals {
       node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
+      node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {

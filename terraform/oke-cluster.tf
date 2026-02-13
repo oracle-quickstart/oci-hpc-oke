@@ -158,15 +158,7 @@ locals {
   )
 
   cni_type = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
-  nodes_supported_pods = flatten([
-    anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ?
-    [var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31] : [var.max_pods_per_node],
-    var.worker_cpu_enabled && anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]) ?
-    [var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31] : [var.max_pods_per_node],
-    [110]
-  ])
 
-  pods_per_node = local.cni_type == "flannel" ? var.max_pods_per_node : min(local.nodes_supported_pods...)
   operator_denseio_ocpus = { 
     "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex, 
     "VM.DenseIO.E5.Flex" = var.operator_shape_ocpus_denseIO_e5_flex
@@ -274,7 +266,7 @@ module "oke" {
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
-  max_pods_per_node                  = local.pods_per_node
+  max_pods_per_node                  = var.max_pods_per_node
   operator_image_type                = var.operator_image_type
   operator_image_os                  = var.operator_image_os # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = var.operator_image_os_version
@@ -294,6 +286,7 @@ module "oke" {
   output_detail = true
   pods_cidr     = "10.240.0.0/12"
   services_cidr                     = var.services_cidr
+  kubeproxy_mode                    = var.kubeproxy_mode
   preferred_load_balancer           = var.preferred_kubernetes_services
   ssh_public_key                    = trimspace(local.ssh_public_key)
   ssh_private_key                   = local.deploy_from_operator ? tls_private_key.stack_key.private_key_openssh : null
