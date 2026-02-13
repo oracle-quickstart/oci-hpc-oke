@@ -304,7 +304,8 @@ module "oke" {
   worker_pools                      = local.worker_pools
   subnets                           = local.subnets
   nsgs                              = local.nsgs
-
+  use_stateless_rules               = var.use_stateless_rules
+  
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
       protocol = local.all_protocols, port = local.all_ports, source = local.vcn_cidr, source_type = local.rule_type_cidr,

@@ -66,6 +66,7 @@ variableGroups:
       # Networking
       - subnet_advanced_attrs
       - allow_rules_lustre
+      - use_stateless_rules
 
   - title: "Identity"
     variables:

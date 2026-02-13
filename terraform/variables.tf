@@ -98,7 +98,10 @@ variable "allow_rules_lustre" {
   default = {}
   type    = any
 }
-
+variable "use_stateless_rules" {
+  type    = bool
+  default = false
+}
 
 # Bastion
 variable "create_bastion" { default = true }
