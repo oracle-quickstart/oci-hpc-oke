@@ -1,4 +1,19 @@
 envoy:
+  defaultInitContainers:
+    initConfig:
+      resourcesPreset: "micro"
+  shutdownManager:
+    resourcesPreset: "micro"
+  resourcesPreset: "none"
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+      ephemeral-storage: "50Mi"
+    limits:
+      cpu: "1.0"
+      memory: "2048Mi"
+      ephemeral-storage: "2Gi"
   service:
     externalTrafficPolicy: Cluster
     networkPolicy:
@@ -11,8 +26,18 @@ envoy:
       service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
       oci.oraclecloud.com/initial-freeform-tags-override: '{"state_id": "${state_id}", "application": "contour", "role": "contour_ingress_lb"}'
       oci.oraclecloud.com/oci-network-security-groups: "${lb_nsg_id}"
+
 contour:
-  resourcesPreset: "micro"
+  resourcesPreset: "none"
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+      ephemeral-storage: "50Mi"
+    limits:
+      cpu: "1.0"
+      memory: "2048Mi"
+      ephemeral-storage: "2Gi"
   certgen:
     networkPolicy:
       enabled: false
@@ -21,4 +46,4 @@ contour:
   ingressClass:
     name: "contour"
 
-useCertManager: true
+useCertManager: false

@@ -15,8 +15,8 @@ locals {
   ])
 
   # Pods subnet capacity validation
-  pods_required_ops  = var.worker_ops_pool_size * var.worker_ops_max_pods_per_node
-  pods_required_cpu  = var.worker_cpu_enabled ? var.worker_cpu_pool_size * var.worker_cpu_max_pods_per_node : 0
+  pods_required_ops  = var.worker_ops_pool_size * local.worker_ops_max_pods_per_node
+  pods_required_cpu  = var.worker_cpu_enabled ? var.worker_cpu_pool_size * local.worker_cpu_max_pods_per_node : 0
   pods_required_gpu  = var.worker_gpu_enabled ? var.worker_gpu_pool_size * var.worker_gpu_max_pods_per_node : 0
   pods_required_rdma = var.worker_rdma_enabled ? var.worker_rdma_pool_size * var.worker_rdma_max_pods_per_node : 0
   total_pods_required = (

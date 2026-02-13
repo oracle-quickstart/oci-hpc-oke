@@ -98,7 +98,10 @@ variable "allow_rules_lustre" {
   default = {}
   type    = any
 }
-
+variable "use_stateless_rules" {
+  type    = bool
+  default = false
+}
 
 # Bastion
 variable "create_bastion" { default = true }
@@ -346,6 +349,7 @@ variable "override_hostnames" {
   type    = bool
 }
 variable "disable_gpu_device_plugin" { default = false }
+variable "kubeproxy_mode" { default = "ipvs" }
 
 # Workers - System pool
 variable "worker_ops_ad" { default = "" }
@@ -362,7 +366,7 @@ variable "worker_ops_image_use_uri" {
   type    = bool
 }
 variable "worker_ops_max_pods_per_node" {
-  default     = 31
+  default     = 110
   description = "Maximum number of pods per node for the system worker pool. Max is 110."
   type        = number
 }
@@ -385,6 +389,11 @@ variable "worker_ops_node_cycling_max_unavailable" {
   default     = 0
   description = "Maximum unavailable nodes during node cycling in the system worker pool."
   type        = number
+}
+variable "worker_ops_node_cycling_mode" {
+  default     = "instance"
+  description = "What node cycling mode will be used for nodes in the system worker pool. Accepted options are 'instance' or 'boot_volume'."
+  type        = string
 }
 
 # Workers - CPU pool
@@ -424,7 +433,7 @@ variable "worker_cpu_image_platform_id" {
   type    = string
 }
 variable "worker_cpu_max_pods_per_node" {
-  default     = 31
+  default     = 110
   description = "Maximum number of pods per node for the CPU worker pool. Max is 110."
   type        = number
 }
@@ -447,6 +456,11 @@ variable "worker_cpu_node_cycling_max_unavailable" {
   default     = 0
   description = "Maximum unavailable nodes during node cycling in the CPU worker pool."
   type        = number
+}
+variable "worker_cpu_node_cycling_mode" {
+  default     = "instance"
+  description = "What node cycling mode will be used for nodes in the CPU worker pool. Accepted options are 'instance' or 'boot_volume'."
+  type        = string
 }
 
 # Workers - GPU node-pool
@@ -499,6 +513,11 @@ variable "worker_gpu_node_cycling_max_unavailable" {
   default     = 0
   description = "Maximum unavailable nodes during node cycling in the GPU worker pool."
   type        = number
+}
+variable "worker_gpu_node_cycling_mode" {
+  default     = "boot_volume"
+  description = "What node cycling mode will be used for nodes in the GPU worker pool. Accepted options are 'instance' or 'boot_volume'."
+  type        = string
 }
 
 # Workers - GPU Cluster-network
