@@ -5,6 +5,11 @@ data "oci_identity_availability_domains" "all" {
   compartment_id = var.tenancy_ocid
 }
 
+data "oci_identity_dynamic_groups" "all" {
+  count          = var.create_policies && var.dynamic_group_id != null ? 1 : 0
+  compartment_id = var.tenancy_ocid
+}
+
 resource "random_string" "state_id" {
   length  = 6
   lower   = true
@@ -13,14 +18,21 @@ resource "random_string" "state_id" {
   upper   = false
 }
 
+
 locals {
+  dynamic_groups_list = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
-  group_name           = format("oke-gpu-%v", local.state_id)
+  
+  group_name = coalesce(
+    try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == var.dynamic_group_id]), null),
+    format("oke-gpu-%v", local.state_id)
+  )
+ 
   storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
-
+  
   rule_templates = compact([
     "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
     "Allow dynamic-group %v to manage cluster-family in compartment id %v",
@@ -68,7 +80,7 @@ locals {
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.create_policies ? 1 : 0
+  count          = var.create_policies && var.dynamic_group_id == null ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
   name           = local.group_name
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
@@ -82,7 +94,7 @@ resource "oci_identity_policy" "oke_quickstart_all" {
   provider       = oci.home
   count          = var.create_policies ? 1 : 0
   compartment_id = var.compartment_ocid
-  name           = local.group_name
+  name           = format("oke-gpu-%v-policy", local.state_id)
   description    = format("Policies for OKE Terraform state %v", local.state_id)
   statements     = local.policy_statements
   lifecycle {
