@@ -231,6 +231,10 @@ module "oke" {
           {
             key   = "coreDnsContainerResources"
             value = jsonencode({ requests = { cpu = "200m", memory = "300Mi" }, limits = { memory = "1Gi" } })
+          },
+          {
+            key   = "tolerations"
+            value = jsonencode([{ key = "nvidia.com/gpu", operator = "Exists" }, { key = "amd.com/gpu", operator = "Exists" }])
           }
         ]
       }
