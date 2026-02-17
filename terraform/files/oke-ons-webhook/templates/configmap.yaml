@@ -188,6 +188,7 @@ data:
             sys.exit(1)
 
         notifications = []
+        seen_alert_ids = set()  # Track seen alerts in current batch to prevent duplicates
 
         while True:
 
@@ -195,34 +196,50 @@ data:
                 # Get all the notifications from the queue
                 try:
                     notification_from_queue = notification_queue.get(block=True, timeout=push_to_oci_topic_interval_seconds)
-                    
+
+                    # Skip if we've already seen this alert in the current batch
+                    alert_id = notification_from_queue.get("alert_id")
+                    if alert_id in seen_alert_ids:
+                        logging.debug(f"Skipping duplicate alert {alert_id} in current batch")
+                        continue
+
                     # Check if the aggregated notification text is larger than max_notification_size (ONS supports maximum 64 KB)
                     if utf8len("\n".join([template.render(**notification) for notification in (notifications + [notification_from_queue])])) > max_notification_size:
                         push_notifications_to_oci_topic(notification_client, notifications)
                         notifications = [notification_from_queue]
+                        seen_alert_ids = set()
                     else:
                         notifications.append(notification_from_queue)
-                        # wait three seconds before checking it the queue is empty (avoid accumulating too much delay sending notifications when aggregate_notifications is True
-                        sleep(3)
-                        
-                        if notification_queue.empty():
-                            push_notifications_to_oci_topic(notification_client, notifications)
-                            notifications = []
-                
+                    seen_alert_ids.add(alert_id)
+
+                    # wait five seconds before checking if the queue is empty (avoid accumulating too much delay sending notifications when aggregate_notifications is True)
+                    sleep(5)
+
+                    if notification_queue.empty():
+                        push_notifications_to_oci_topic(notification_client, notifications)
+                        notifications = []
+                        seen_alert_ids = set()
+
                 # When queue is empty and there are notifications to be sent, send them
                 except queue.Empty:
                     if notifications:
                         push_notifications_to_oci_topic(notification_client, notifications)
                     notifications = []
+                    seen_alert_ids = set()
             else:
                 try:
-                    notifications.append(notification_queue.get(block=True, timeout=push_to_oci_topic_interval_seconds))
+                    notification_from_queue = notification_queue.get(block=True, timeout=push_to_oci_topic_interval_seconds)
+                    alert_id = notification_from_queue.get("alert_id")
+                    if alert_id not in seen_alert_ids:
+                        notifications.append(notification_from_queue)
+                        seen_alert_ids.add(alert_id)
                 except queue.Empty:
                     pass
-                
+
                 if notifications:
                     push_notifications_to_oci_topic(notification_client, notifications)
                 notifications = []
+                seen_alert_ids = set()
 
 
     def alert_processing_daemon():
@@ -280,12 +297,15 @@ data:
                     # Add alert details into the database
                     
                     starts_at = str_to_date(alert_dict.get('startsAt'))
-                    # 
+
+                    # Generate alert_id - use fingerprint directly when available (it's already unique)
+                    # Fallback uses hash of alert_name + labels for consistent deduplication
                     fingerprint = alert_dict.get("fingerprint", "")
                     if fingerprint:
-                        alert_id = hashlib.sha256(f'{fingerprint}'.encode('utf-8')).hexdigest()
+                        alert_id = fingerprint
                     else:
-                        alert_id = hashlib.sha256(f'{alert_name}-{alert_dict.get("startsAt")}'.encode('utf-8')).hexdigest()
+                        labels_str = json.dumps(alert_labels, sort_keys=True)
+                        alert_id = hashlib.sha256(f'{alert_name}-{labels_str}'.encode('utf-8')).hexdigest()
                     ends_at = str_to_date(alert_dict.get('endsAt'))
                     current_status = alert_dict.get('status', "Status Unknown")
 
@@ -312,20 +332,19 @@ data:
                             ''', (date_to_str(current_time), alert, alert_id))
                             logging.info(f"Alert {alert_id}/{alert_name} still active. Incremented Fire Count.")
                     else:
-                        # If alert received for the first time and is already clear, just send notification
+                        # If alert received for the first time and is already clear, just send notification immediately
                         if ends_at > starts_at and current_status != "firing":
                             notification_dict = alert_to_notification_dict(alert_id, alert_dict, 1, alert_dict.get('startsAt'), alert_dict.get('endsAt'))
-                            logging.info(f"New Alert {alert_id}/{alert_name} seen for the first time with status resolved.")
+                            notification_queue.put(notification_dict)
+                            logging.info(f"New Alert {alert_id}/{alert_name} seen for the first time with status resolved. Notification sent.")
 
-                        # otherwise, load the alert into the database and send notification
+                        # otherwise, load the alert into the database but DEFER notification (10s debounce)
                         else:
-                            notification_dict = alert_to_notification_dict(alert_id, alert_dict, 1, alert_dict.get('startsAt'), alert_dict.get('endsAt'))
                             cur.execute('''
                                 INSERT INTO active_alerts (alert_id, first_seen_at, last_seen_at, last_notified_at, ended_at, fire_count, payload)
                                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                            ''', (alert_id, date_to_str(current_time), date_to_str(current_time), date_to_str(current_time), "0001-01-01T00:00:00Z", 1, alert))
-                            logging.info(f"New Alert {alert_id}/{alert_name} seen for the first. Added to the database.")
-                        notification_queue.put(notification_dict)
+                            ''', (alert_id, date_to_str(current_time), date_to_str(current_time), "0001-01-01T00:00:00Z", "0001-01-01T00:00:00Z", 1, alert))
+                            logging.info(f"New Alert {alert_id}/{alert_name} stored. Notification deferred for debounce.")
 
                     # Commit the changes to the database
                     conn.commit()
@@ -336,6 +355,35 @@ data:
                 pass
             except Exception:
                 logging.exception(f'Error processing alerts in the queue. {traceback.format_exc()}')
+
+            # Check for pending notifications (deferred alerts past 10-second debounce window)
+            try:
+                debounce_threshold = current_time - timedelta(seconds=10)
+                pending_alerts = cur.execute('''
+                    SELECT * FROM active_alerts
+                    WHERE last_notified_at = "0001-01-01T00:00:00Z"
+                ''').fetchall()
+
+                for alert_row in pending_alerts:
+                    alert_id = alert_row[0]
+                    first_seen_at = str_to_date(alert_row[1])
+
+                    # Only send notification if alert is older than debounce threshold
+                    if first_seen_at < debounce_threshold:
+                        alert_dict = json.loads(alert_row[6])
+                        fire_count = alert_row[5]
+                        last_seen_at = alert_row[2]
+
+                        notification_dict = alert_to_notification_dict(alert_id, alert_dict, fire_count, alert_row[1], last_seen_at)
+                        notification_queue.put(notification_dict)
+
+                        cur.execute('UPDATE active_alerts SET last_notified_at = ? WHERE alert_id = ?',
+                                    (date_to_str(current_time), alert_id))
+                        logging.info(f"Deferred notification sent for {alert_id} after debounce period.")
+
+                conn.commit()
+            except Exception:
+                logging.exception(f'Error processing pending notifications: {traceback.format_exc()}')
 
             try:
                 # Check if is necessary to send reminder or cleanup old alarms
