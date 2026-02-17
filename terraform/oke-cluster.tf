@@ -240,13 +240,13 @@ module "oke" {
       }
     },
 
-    var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
-    {
-      "CertManager" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-      }
-    } : {},
+    # var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
+    # {
+    #   "CertManager" = {
+    #     remove_addon_resources_on_delete = true
+    #     override_existing                = true
+    #   }
+    # } : {},
     anytrue([
       var.worker_rdma_shape == "BM.GPU.MI300X.8",
       var.worker_gpu_shape == "BM.GPU.MI300X.8"

@@ -204,7 +204,7 @@ variable "install_lustre_client" {
   type    = bool
 }
 variable "lustre_client_helm_chart_version" {
-  default = "0.1.1"
+  default = "0.1.2"
   type    = string
 }
 variable "create_lustre_pv" {
@@ -271,6 +271,11 @@ variable "dcgm_exporter_chart_version" {
 
 variable "amd_device_metrics_exporter_chart_version" {
   default = "v1.4.1"
+  type    = string
+}
+
+variable "cert_manager_chart_version" {
+  default = "v1.19.2"
   type    = string
 }
 

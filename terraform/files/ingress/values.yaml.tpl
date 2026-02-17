@@ -46,4 +46,4 @@ contour:
   ingressClass:
     name: "contour"
 
-useCertManager: false
+useCertManager: true

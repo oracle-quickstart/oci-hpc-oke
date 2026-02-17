@@ -4,10 +4,8 @@
 resource "helm_release" "prometheus" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
-    module.oke,
     helm_release.ingress,
-    time_sleep.wait_for_lb_termination,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    time_sleep.wait_for_ingress_lb
   ]
   namespace         = var.monitoring_namespace
   name              = "kube-prometheus-stack"
