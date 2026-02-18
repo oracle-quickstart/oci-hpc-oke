@@ -21,6 +21,12 @@ GPU nodes require a specialized image with pre-configured OFED drivers and RDMA 
 
 ```bash
 echo "options ib_core netns_mode=0" >> /etc/modprobe.d/ib_core.conf
+
+# Ubuntu
+update-initramfs -u
+
+# Oracle Linux
+dracut -f
 ```
 
 ### Available Images
