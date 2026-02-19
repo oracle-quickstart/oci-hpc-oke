@@ -248,8 +248,8 @@ module "oke" {
     #   }
     # } : {},
     anytrue([
-      var.worker_rdma_shape == "BM.GPU.MI300X.8",
-      var.worker_gpu_shape == "BM.GPU.MI300X.8"
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape),
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)
       ]) ? {
       "AmdGpuPlugin" = {
         remove_addon_resources_on_delete = true

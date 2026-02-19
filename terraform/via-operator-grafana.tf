@@ -22,8 +22,8 @@ locals {
           }
         }
       ],
-      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && var.worker_rdma_shape != "BM.GPU.MI300X.8") ||
-      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && var.worker_gpu_shape != "BM.GPU.MI300X.8") ?
+      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) ||
+      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)) ?
       [for cdk, cdv in local.grafana_nvidia_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
@@ -40,8 +40,8 @@ locals {
           }
         }
       ] : [],
-      var.worker_rdma_shape == "BM.GPU.MI300X.8" ||
-      var.worker_gpu_shape == "BM.GPU.MI300X.8" ?
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape) ||
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape) ?
       [for cdk, cdv in local.grafana_amd_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
