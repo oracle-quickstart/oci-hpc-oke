@@ -4,9 +4,7 @@
 resource "helm_release" "ingress" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
-    module.oke,
-    time_sleep.wait_for_ingress_lb_termination,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    time_sleep.wait_for_ingress_lb_termination
   ]
   namespace  = "projectcontour"
   name       = "contour"
@@ -35,15 +33,18 @@ resource "helm_release" "ingress" {
 
 resource "time_sleep" "wait_for_ingress_lb_termination" {
   count            = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
-  destroy_duration = "60s"
+  destroy_duration = "120s"
+
+  depends_on = [
+    helm_release.cert_manager
+  ]
 }
 
 resource "kubectl_manifest" "cluster_issuer" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   depends_on = [
-    module.oke,
-    helm_release.ingress
+    helm_release.ingress,
   ]
 
   yaml_body = (var.use_lets_encrypt_prod_endpoint ?

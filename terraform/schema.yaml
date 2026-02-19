@@ -48,19 +48,25 @@ variableGroups:
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
+      # Cluster setup
+      - kubeproxy_mode
       # Node cycling (per pool)
       - worker_ops_node_cycling_enabled
       - worker_ops_node_cycling_max_surge
       - worker_ops_node_cycling_max_unavailable
+      - worker_ops_node_cycling_mode
       - worker_cpu_node_cycling_enabled
       - worker_cpu_node_cycling_max_surge
       - worker_cpu_node_cycling_max_unavailable
+      - worker_cpu_node_cycling_mode
       - worker_gpu_node_cycling_enabled
       - worker_gpu_node_cycling_max_surge
       - worker_gpu_node_cycling_max_unavailable
+      - worker_gpu_node_cycling_mode
       # Networking
       - subnet_advanced_attrs
       - allow_rules_lustre
+      - use_stateless_rules
 
   - title: "Identity"
     variables:
@@ -886,7 +892,7 @@ variables:
   lustre_client_helm_chart_version:
     title: Lustre client helm chart version
     type: string
-    default: "0.1.1"
+    default: "0.1.2"
     visible: false
   create_lustre_pv:
     type: boolean

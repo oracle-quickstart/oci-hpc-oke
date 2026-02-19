@@ -158,15 +158,7 @@ locals {
   )
 
   cni_type = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
-  nodes_supported_pods = flatten([
-    anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ?
-    [var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31] : [var.max_pods_per_node],
-    var.worker_cpu_enabled && anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]) ?
-    [var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31] : [var.max_pods_per_node],
-    [110]
-  ])
 
-  pods_per_node = local.cni_type == "flannel" ? var.max_pods_per_node : min(local.nodes_supported_pods...)
   operator_denseio_ocpus = { 
     "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex, 
     "VM.DenseIO.E5.Flex" = var.operator_shape_ocpus_denseIO_e5_flex
@@ -179,7 +171,7 @@ locals {
 
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.4.0"
+  version = "5.4.1"
 
   providers = { oci.home = oci.home }
 
@@ -239,18 +231,22 @@ module "oke" {
           {
             key   = "coreDnsContainerResources"
             value = jsonencode({ requests = { cpu = "200m", memory = "300Mi" }, limits = { memory = "1Gi" } })
+          },
+          {
+            key   = "tolerations"
+            value = jsonencode([{ key = "nvidia.com/gpu", operator = "Exists" }, { key = "amd.com/gpu", operator = "Exists" }])
           }
         ]
       }
     },
 
-    var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
-    {
-      "CertManager" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-      }
-    } : {},
+    # var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
+    # {
+    #   "CertManager" = {
+    #     remove_addon_resources_on_delete = true
+    #     override_existing                = true
+    #   }
+    # } : {},
     anytrue([
       var.worker_rdma_shape == "BM.GPU.MI300X.8",
       var.worker_gpu_shape == "BM.GPU.MI300X.8"
@@ -274,7 +270,7 @@ module "oke" {
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
-  max_pods_per_node                  = local.pods_per_node
+  max_pods_per_node                  = var.max_pods_per_node
   operator_image_type                = var.operator_image_type
   operator_image_os                  = var.operator_image_os # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = var.operator_image_os_version
@@ -294,6 +290,7 @@ module "oke" {
   output_detail = true
   pods_cidr     = "10.240.0.0/12"
   services_cidr                     = var.services_cidr
+  kubeproxy_mode                    = var.kubeproxy_mode
   preferred_load_balancer           = var.preferred_kubernetes_services
   ssh_public_key                    = trimspace(local.ssh_public_key)
   ssh_private_key                   = local.deploy_from_operator ? tls_private_key.stack_key.private_key_openssh : null
@@ -311,7 +308,8 @@ module "oke" {
   worker_pools                      = local.worker_pools
   subnets                           = local.subnets
   nsgs                              = local.nsgs
-
+  use_stateless_rules               = var.use_stateless_rules
+  
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
       protocol = local.all_protocols, port = local.all_ports, source = local.vcn_cidr, source_type = local.rule_type_cidr,

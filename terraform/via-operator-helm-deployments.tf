@@ -1,6 +1,36 @@
 
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
+module "certmanager" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = var.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = var.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "cert-manager"
+  helm_chart_name     = "cert-manager"
+  namespace           = "cert-manager"
+  helm_repository_url = "oci://quay.io/jetstack/charts"
+  helm_chart_version  = var.cert_manager_chart_version
+
+  pre_deployment_commands = [
+    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal"
+  ]
+  
+  post_deployment_commands = []
+
+  deployment_extra_args = ["--force", "--dependency-update", "--history-max 1", "--wait"]
+
+  helm_template_values_override = file("${path.module}/files/cert-manager/values.yaml")
+  helm_user_values_override = ""
+
+  depends_on = [module.oke]
+}
 
 module "ingress" {
   count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
@@ -44,7 +74,7 @@ module "ingress" {
   )
   helm_user_values_override = ""
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.certmanager]
 }
 
 
