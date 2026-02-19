@@ -45,6 +45,7 @@ variableGroups:
       - worker_gpu_max_pods_per_node
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
+      - cert_manager_chart_version
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
