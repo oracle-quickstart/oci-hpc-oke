@@ -28,6 +28,14 @@ serviceMonitor:
 nodeSelector:
   nvidia.com/gpu: "true"
 
+resources:
+  limits:
+    cpu: 200m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
 tolerations:
   - effect: NoSchedule
     operator: Exists

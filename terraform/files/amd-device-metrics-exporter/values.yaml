@@ -1,8 +1,20 @@
 platform: k8s
 
 # -- Add node selector for the daemonset of metrics exporter
-nodeSelector:
-  node.kubernetes.io/instance-type: BM.GPU.MI300X.8
+nodeSelector: {}
+
+# -- Add node affinity for the daemonset of metrics exporter
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+                - BM.GPU.MI300X.8
+                - BM.GPU.MI355X-v1.8
+                - BM.GPU.MI355X.8
 
 # -- Add tolerations for deploying metrics exporter on tainted nodes
 tolerations:

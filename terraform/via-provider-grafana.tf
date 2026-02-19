@@ -21,8 +21,8 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
 resource "kubernetes_config_map_v1" "grafana_nvidia_dashboards" {
   for_each = (
     (
-      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && var.worker_rdma_shape != "BM.GPU.MI300X.8") ||
-      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && var.worker_gpu_shape != "BM.GPU.MI300X.8")
+      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) ||
+      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape))
     ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_nvidia_dashboards : {}
   )
 
@@ -47,8 +47,8 @@ resource "kubernetes_config_map_v1" "grafana_nvidia_dashboards" {
 resource "kubernetes_config_map_v1" "grafana_amd_dashboards" {
   for_each = (
     (
-      var.worker_rdma_shape == "BM.GPU.MI300X.8" ||
-      var.worker_gpu_shape == "BM.GPU.MI300X.8"
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape) ||
+      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)
     ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_amd_dashboards : {}
   )
 

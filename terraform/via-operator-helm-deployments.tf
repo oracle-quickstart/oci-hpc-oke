@@ -212,7 +212,7 @@ module "nvidia_dcgm_exporter" {
 
 
 module "amd_device_metrics_exporter" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_amd_device_metrics_exporter && (var.worker_rdma_shape == "BM.GPU.MI300X.8" || var.worker_gpu_shape == "BM.GPU.MI300X.8")]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_amd_device_metrics_exporter && (contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape) || contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape))]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
