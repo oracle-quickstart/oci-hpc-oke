@@ -50,6 +50,16 @@ locals {
       owner       = "root:root",
       path        = "/etc/kubernetes/ca.crt",
       permissions = "0644",
+    },
+    {
+      content     = <<-EOT
+      [Network]
+      ManageForeignRoutes=no
+      ManageForeignRoutingPolicyRules=no
+      EOT
+      owner       = "root:root",
+      path        = "/etc/systemd/networkd.conf",
+      permissions = "0644"
     }
   ]
   cloud_init = {
@@ -57,7 +67,8 @@ locals {
     runcmd = compact([
       local.runcmd_nvme_raid,
       local.runcmd_bootstrap,
-      local.runcmd_fss_mount
+      local.runcmd_fss_mount,
+      "if . /etc/os-release && [ \"$ID\" = \"ubuntu\" ]; then systemctl restart systemd-networkd && echo 'networkd patched' || echo 'networkd not patched'; fi",
     ])
     write_files = local.write_files
   }
