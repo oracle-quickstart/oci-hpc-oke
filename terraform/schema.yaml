@@ -72,8 +72,10 @@ variableGroups:
   - title: "Identity"
     variables:
       - create_policies
+      - identity_domain_id
       - use_existing_dynamic_group
       - dynamic_group_id
+      - dynamic_group_id_input
 
   - title: Network
     variables:
@@ -282,6 +284,14 @@ variables:
     description: "Create a Dynamic Group with policies for Cluster Autoscaler, Self-managed nodes. This option assumes your user has the necessary permissions to create a dynamic group and policies in the root compartment of your tenancy."
     type: boolean
     default: true
+  identity_domain_id:
+    title: Identity Domain
+    description: "Select an identity domain for creating the dynamic group. If not specified, the default domain of the tenancy will be used."
+    type: oci:identity:domains:id
+    required: false
+    dependsOn:
+      compartmentId: tenancy_ocid
+    visible: create_policies
   use_existing_dynamic_group:
     title: Use existing Dynamic Group
     description: "Select an existing dynamic group instead of creating a new one."
@@ -300,6 +310,18 @@ variables:
       and:
         - create_policies
         - use_existing_dynamic_group
+        - not: [identity_domain_id]
+  dynamic_group_id_input:
+    title: Dynamic Group OCID
+    description: "Paste the OCID of an existing dynamic group from the selected identity domain."
+    type: string
+    required: false
+    pattern: "^ocid1\\.dynamicgroup\\..*$"
+    visible:
+      and:
+        - create_policies
+        - use_existing_dynamic_group
+        - identity_domain_id
 
   # VCN
   create_vcn:

@@ -6,8 +6,13 @@ data "oci_identity_availability_domains" "all" {
 }
 
 data "oci_identity_dynamic_groups" "all" {
-  count          = var.create_policies && var.dynamic_group_id != null ? 1 : 0
+  count          = var.create_policies && local.existing_dg_id != null ? 1 : 0
   compartment_id = var.tenancy_ocid
+}
+
+data "oci_identity_domain" "selected" {
+  count     = var.create_policies && var.identity_domain_id != null ? 1 : 0
+  domain_id = var.identity_domain_id
 }
 
 resource "random_string" "state_id" {
@@ -20,19 +25,28 @@ resource "random_string" "state_id" {
 
 
 locals {
-  dynamic_groups_list = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
+  dynamic_groups_list  = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
-  
+  use_identity_domain  = var.identity_domain_id != null
+  idcs_endpoint        = one(data.oci_identity_domain.selected[*].url)
+  existing_dg_id      = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
+
+  domain_name = one(data.oci_identity_domain.selected[*].display_name)
+
   group_name = coalesce(
-    try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == var.dynamic_group_id]), null),
+    try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == local.existing_dg_id]), null),
+    local.use_identity_domain ? one(oci_identity_domains_dynamic_resource_group.oke_quickstart_all[*].display_name) : null,
     format("oke-gpu-%v", local.state_id)
   )
- 
-  storage_group_name   = format("oke-gpu-%v-storage", local.state_id)
-  compartment_matches  = format("instance.compartment.id = '%v'", var.compartment_ocid)
-  compartment_rule     = format("ANY {%v}", join(", ", [local.compartment_matches]))
-  
+
+  # For IAM policies, domain-scoped dynamic groups must be referenced as '<domain-name>'/'<group-name>'
+  policy_group_ref = local.use_identity_domain ? format("'%v'/'%v'", local.domain_name, local.group_name) : local.group_name
+
+  storage_group_name  = format("oke-gpu-%v-storage", local.state_id)
+  compartment_matches = format("instance.compartment.id = '%v'", var.compartment_ocid)
+  compartment_rule    = format("ANY {%v}", join(", ", [local.compartment_matches]))
+
   rule_templates = compact([
     "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
     "Allow dynamic-group %v to manage cluster-family in compartment id %v",
@@ -73,21 +87,30 @@ locals {
   var.compartment_ocid, local.wris_ca)
 
   policy_statements = compact(concat(
-    [for s in local.rule_templates : format(s, local.group_name, var.compartment_ocid)],
+    [for s in local.rule_templates : format(s, local.policy_group_ref, var.compartment_ocid)],
     [local.wris_statement, local.wris_ca_statement]
   ))
 }
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.create_policies && var.dynamic_group_id == null ? 1 : 0
+  count          = var.create_policies && local.existing_dg_id == null && !local.use_identity_domain ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
-  name           = local.group_name
+  name           = format("oke-gpu-%v", local.state_id)
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
   matching_rule  = local.compartment_rule
   lifecycle {
     ignore_changes = [defined_tags]
   }
+}
+
+resource "oci_identity_domains_dynamic_resource_group" "oke_quickstart_all" {
+  count         = var.create_policies && local.existing_dg_id == null && local.use_identity_domain ? 1 : 0
+  idcs_endpoint = local.idcs_endpoint
+  display_name  = format("oke-gpu-%v", local.state_id)
+  description   = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
+  matching_rule = local.compartment_rule
+  schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:DynamicResourceGroup"]
 }
 
 resource "oci_identity_policy" "oke_quickstart_all" {

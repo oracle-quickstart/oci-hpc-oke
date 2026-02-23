@@ -27,10 +27,18 @@ variable "region" { type = string }
 
 # Identity
 variable "create_policies" { default = true }
-variable "dynamic_group_id" { 
+variable "identity_domain_id" {
   type    = string
   default = null
-  }
+}
+variable "dynamic_group_id" {
+  type    = string
+  default = null
+}
+variable "dynamic_group_id_input" {
+  type    = string
+  default = null
+}
 
 
 # General Variables
@@ -74,7 +82,7 @@ variable "workers_sn_id" { default = null }
 variable "pods_sn_id" { default = null }
 variable "fss_sn_id" { default = null }
 variable "lustre_sn_id" { default = null }
-variable "subnet_advanced_attrs" { 
+variable "subnet_advanced_attrs" {
   default = {}
   type    = any
 }
@@ -426,10 +434,10 @@ variable "worker_cpu_image_custom_uri" {
   default = null
   type    = string
 }
-variable "worker_cpu_image_use_uri" { 
-  default = false 
+variable "worker_cpu_image_use_uri" {
+  default = false
   type    = bool
-} 
+}
 variable "worker_cpu_image_id" { default = "" }
 variable "worker_cpu_image_os" { default = "Oracle Linux" }
 variable "worker_cpu_image_os_version" { default = "8" }
@@ -483,10 +491,10 @@ variable "worker_gpu_image_custom_uri" {
   default = null
   type    = string
 }
-variable "worker_gpu_image_use_uri" { 
-  default = false 
+variable "worker_gpu_image_use_uri" {
+  default = false
   type    = bool
-} 
+}
 variable "worker_gpu_image_os" { default = "Oracle Linux" }
 variable "worker_gpu_image_os_version" { default = "8" }
 variable "worker_gpu_image_platform_id" {
@@ -547,10 +555,10 @@ variable "worker_rdma_image_custom_uri" {
   default = null
   type    = string
 }
-variable "worker_rdma_image_use_uri" { 
-  default = false 
+variable "worker_rdma_image_use_uri" {
+  default = false
   type    = bool
-} 
+}
 variable "worker_rdma_image_id" { default = "" }
 variable "worker_rdma_max_pods_per_node" {
   default     = 64
