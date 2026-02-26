@@ -356,6 +356,13 @@ variable "override_hostnames" {
 variable "disable_gpu_device_plugin" { default = false }
 variable "kubeproxy_mode" { default = "ipvs" }
 
+# Instance Metadata Service (IMDS)
+variable "legacy_imds_endpoints_disabled" {
+  type        = bool
+  default     = true
+  description = "Whether to disable legacy IMDS endpoints on nodepool instances (IMDSv1). When true, only IMDSv2 is available."
+}
+
 # Workers - System pool
 variable "worker_ops_ad" { default = "" }
 variable "worker_ops_pool_size" { default = 3 }

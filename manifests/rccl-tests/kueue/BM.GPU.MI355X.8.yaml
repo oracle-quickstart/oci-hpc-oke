@@ -1,0 +1,173 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: bm-gpu-mi355x-8
+spec:
+  nodeLabels:
+    node.kubernetes.io/instance-type: BM.GPU.MI355X.8
+    amd.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: bm-gpu-mi355x-8-rccl-tests-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "amd.com/gpu", "ephemeral-storage"]
+    flavors:
+    - name: bm-gpu-mi355x-8
+      resources:
+      - name: cpu
+        nominalQuota: "5000"
+      - name: memory
+        nominalQuota: "204800Gi"
+      - name: amd.com/gpu
+        nominalQuota: "1600"
+      - name: ephemeral-storage
+        nominalQuota: "12800Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: bm-gpu-mi355x-8-rccl-tests
+spec:
+  clusterQueue: bm-gpu-mi355x-8-rccl-tests-queue
+---
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: rccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: "Running"
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            rccl-tests-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 2
+          containers:
+            - name: mpi-launcher
+              image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.2.0-ubuntu22.04-rccl-2.27.7-anp-1.4.0-022526.2
+              imagePullPolicy: Always
+              ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+              command: ["bash", "-c"]
+              args:
+                - |
+                  set -e -o pipefail
+                  trap 'exit 1' SIGINT
+                  NUM_GPUS=8
+                  NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                  NP=$(($NUM_HOSTS*$NUM_GPUS))
+                  while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do
+                    ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1
+                  done); do
+                    echo "Waiting for workers to be ready..."
+                    sleep 5
+                  done
+                  echo "All workers are ready!"
+                  
+                  mpirun \
+                    --allow-run-as-root \
+                    --bind-to numa \
+                    -mca plm_rsh_args '-p 2222' \
+                    -mca btl ^vader,openib \
+                    -mca osc ^ucx \
+                    -mca pml ob1 \
+                    -mca btl_tcp_if_include ens9np0 \
+                    -x PATH \
+                    -x LD_LIBRARY_PATH \
+                    -x NCCL_IB_HCA==ionic_0,ionic_2,ionic_3,ionic_4,ionic_5,ionic_7,ionic_8,ionic_9 \
+                    -x NCCL_SOCKET_IFNAME=ens9np0 \
+                    -x NCCL_GDR_FLUSH_DISABLE=1 \
+                    -x RCCL_GDR_FLUSH_GPU_MEM_NO_RELAXED_ORDERING=0 \
+                    -x NCCL_IB_QPS_PER_CONNECTION=2 \
+                    -x NCCL_TOPO_DUMP_FILE=/tmp/system_run.txt \
+                    -x HSA_NO_SCRATCH_RECLAIM=1 \
+                    -x NCCL_BUFFSIZE=16777216 \
+                    -x NCCL_MAX_P2P_NCHANNELS=32 \
+                    -x NCCL_IB_TC=41 \
+                    -x NCCL_IB_FIFO_TC=185 \
+                    -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                    -x NCCL_PXN_DISABLE=0 \
+                    -x NCCL_DMABUF_ENABLE=0 \
+                    -x NCCL_DEBUG=WARN \
+                    -x NCCL_NET_OPTIONAL_RECV_COMPLETION=1 \
+                    -x RCCL_IB_ABORT_ON_ERROR=1 \
+                    -x NCCL_IB_USE_INLINE=1 \
+                    -x IONIC_LOCKFREE=all \
+                    -x NCCL_NET_PLUGIN=librccl-anp.so \
+                    -x RCCL_LL128_FORCE_ENABLE=1 \
+                    -x LD_PRELOAD=/workspace/rccl/install/lib/librccl.so \
+                    -N $NUM_GPUS \
+                    -np $NP \
+                    /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1 -n 2 -c 1 -w 10
+              resources:
+                limits:
+                  ephemeral-storage: 32Gi
+                requests:
+                  cpu: 2
+                  ephemeral-storage: 32Gi
+                  memory: 2Gi
+              securityContext:
+                privileged: true
+                capabilities:
+                  add: [IPC_LOCK, SYS_PTRACE]
+              volumeMounts:
+                - { mountPath: /dev/shm, name: shm }
+              workingDir: /workspace
+          volumes:
+            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            rccl-tests-replica: mpi-worker
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 2
+          nodeSelector:
+            node.kubernetes.io/instance-type: BM.GPU.MI355X.8
+          containers:
+            - name: mpi-worker
+              image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.2.0-ubuntu22.04-rccl-2.27.7-anp-1.4.0-022526.2
+              imagePullPolicy: Always
+              ports:
+                - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+              command:
+                - /bin/bash
+                - -c
+                - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+              resources:
+                limits:
+                  ephemeral-storage: 32Gi
+                  amd.com/gpu: 8
+                requests:
+                  cpu: 200
+                  ephemeral-storage: 32Gi
+                  memory: 1024Gi
+                  amd.com/gpu: 8
+              securityContext:
+                privileged: true
+                capabilities:
+                  add: [IPC_LOCK, SYS_PTRACE]
+              volumeMounts:
+                - { mountPath: /dev/shm, name: shm }
+              workingDir: /workspace
+          tolerations:
+            - { key: amd.com/gpu, operator: Exists }
+          volumes:
+            - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
