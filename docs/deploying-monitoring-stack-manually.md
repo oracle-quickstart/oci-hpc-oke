@@ -16,6 +16,7 @@ This guide provides step-by-step instructions to deploy the same Prometheus and 
 - [Step 7: Deploy OKE ONS Webhook (Optional)](#step-7-deploy-oke-ons-webhook-optional)
 - [Step 8: Access Grafana](#step-8-access-grafana)
 - [Step 9: Verify the Deployment](#step-9-verify-the-deployment)
+- [Updating an Existing Deployment](#updating-an-existing-deployment)
 - [Troubleshooting](#troubleshooting)
 - [Cleanup](#cleanup)
 
@@ -232,7 +233,7 @@ kubectl get servicemonitor -n ${MONITORING_NAMESPACE} device-metrics-exporter
 ### 4.1 Install Node Problem Detector
 
 ```bash
-helm upgrade --install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.22 \
+helm upgrade --install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.0 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --wait
@@ -615,6 +616,219 @@ kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometh
 # Query for node problem detector metrics
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'problem_gauge'
+```
+
+## Updating an Existing Deployment
+
+If the monitoring stack is already deployed (either via Terraform or a previous manual installation), you can update individual components by re-running the `helm upgrade` commands with updated values files or chart versions.
+
+### Important: Terraform-Managed Deployments
+
+If the stack was originally deployed via Terraform, be aware that manually upgrading Helm releases will cause **Terraform state drift**. On the next `terraform apply`, Terraform may attempt to revert your manual changes.
+
+You have two options:
+
+1. **Update via Terraform (recommended)**: Modify Terraform variables (e.g., `prometheus_stack_chart_version`, `dcgm_exporter_chart_version`) and re-run `terraform apply`.
+
+2. **Switch to manual management**: Remove the Helm releases from Terraform state before managing them manually:
+   ```bash
+   # Remove monitoring resources from Terraform state
+   terraform state rm 'helm_release.prometheus[0]'
+   terraform state rm 'helm_release.nvidia_dcgm_exporter[0]'
+   terraform state rm 'helm_release.amd_device_metrics_exporter[0]'
+   terraform state rm 'helm_release.node-problem_detector[0]'
+   terraform state rm 'helm_release.oke-ons-webhook[0]'
+
+   # Remove dashboard and alert ConfigMaps from state
+   terraform state rm 'kubernetes_config_map_v1.grafana_common_dashboards'
+   terraform state rm 'kubernetes_config_map_v1.grafana_nvidia_dashboards'
+   terraform state rm 'kubernetes_config_map_v1.grafana_amd_dashboards'
+   terraform state rm 'kubernetes_config_map_v1.grafana_alerts'
+   ```
+
+   **Note**: Only remove resources that exist in your state. Run `terraform state list | grep -E 'helm_release|grafana'` first to see what's managed.
+
+### Check Current State
+
+Before updating, inspect the currently deployed releases:
+
+```bash
+# List all monitoring Helm releases
+helm list -n monitoring
+
+# View the current values for a specific release
+helm get values kube-prometheus-stack -n monitoring
+
+# Compare with the values file in the repository
+diff <(helm get values kube-prometheus-stack -n monitoring) terraform/files/kube-prometheus/values.yaml
+```
+
+### Update kube-prometheus-stack
+
+Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingress configuration) while applying changes from the values file:
+
+```bash
+helm repo update
+
+helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/kube-prometheus/values.yaml \
+  --reuse-values \
+  --wait
+```
+
+To upgrade to a specific chart version, add `--version`:
+
+```bash
+helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/kube-prometheus/values.yaml \
+  --reuse-values \
+  --version 81.6.3 \
+  --wait
+```
+
+### Update NVIDIA DCGM Exporter
+
+```bash
+helm upgrade dcgm-exporter terraform/files/nvidia-dcgm-exporter \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/nvidia-dcgm-exporter/oke-values.yaml \
+  --wait
+```
+
+**Note on upgrade speed**: The DCGM exporter runs as a DaemonSet on every GPU node with `hostNetwork: true`. During a rolling update, each pod must fully terminate before its replacement can start (to release the host port), and each new pod waits 45 seconds before passing its readiness probe. By default, `oke-values.yaml` sets `rollingUpdate.maxUnavailable` to `25%` to update multiple nodes in parallel. On very large clusters, you can speed this up further:
+
+```bash
+# Update all pods simultaneously (brief gap in metrics collection)
+helm upgrade dcgm-exporter terraform/files/nvidia-dcgm-exporter \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/nvidia-dcgm-exporter/oke-values.yaml \
+  --set rollingUpdate.maxUnavailable="100%" \
+  --wait
+```
+
+### Update AMD Device Metrics Exporter
+
+```bash
+helm repo update
+
+helm upgrade amd-device-metrics-exporter amd-gpu-operator/device-metrics-exporter \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/amd-device-metrics-exporter/values.yaml \
+  --wait
+```
+
+### Update Node Problem Detector
+
+```bash
+helm upgrade gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.22 \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --wait
+```
+
+### Update OKE ONS Webhook
+
+```bash
+helm upgrade oke-ons-webhook terraform/files/oke-ons-webhook \
+  --namespace ${MONITORING_NAMESPACE} \
+  --reuse-values \
+  --wait
+```
+
+### Update Dashboards and Alerts
+
+Dashboards and alerts are deployed as ConfigMaps, not Helm releases. Re-running the `kubectl apply` loops will update them in place:
+
+```bash
+# Update common dashboards
+DASHBOARD_PATH="terraform/files/grafana/dashboards"
+
+for dashboard in ${DASHBOARD_PATH}/common/*.json; do
+  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
+    --from-file="$(basename $dashboard)=${dashboard}" \
+    --namespace ${MONITORING_NAMESPACE} \
+    --dry-run=client -o yaml | \
+  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
+  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="Kubernetes" | \
+  kubectl apply -f -
+done
+
+# Update NVIDIA GPU dashboards (if applicable)
+for dashboard in ${DASHBOARD_PATH}/nvidia/*.json; do
+  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
+    --from-file="$(basename $dashboard)=${dashboard}" \
+    --namespace ${MONITORING_NAMESPACE} \
+    --dry-run=client -o yaml | \
+  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
+  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
+  kubectl apply -f -
+done
+
+# Update AMD GPU dashboards (if applicable)
+for dashboard in ${DASHBOARD_PATH}/amd/*.json; do
+  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
+    --from-file="$(basename $dashboard)=${dashboard}" \
+    --namespace ${MONITORING_NAMESPACE} \
+    --dry-run=client -o yaml | \
+  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
+  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
+  kubectl apply -f -
+done
+
+# Update alert rules
+ALERTS_PATH="terraform/files/grafana/alerts"
+
+for alert in ${ALERTS_PATH}/*.yaml; do
+  kubectl create configmap "alert-$(basename $alert .yaml)" \
+    --from-file="$(basename $alert)=${alert}" \
+    --namespace ${MONITORING_NAMESPACE} \
+    --dry-run=client -o yaml | \
+  kubectl label -f - --dry-run=client -o yaml --local grafana_alert=1 | \
+  kubectl apply -f -
+done
+```
+
+The Grafana sidecar will automatically detect ConfigMap changes and reload the updated dashboards and alerts.
+
+### Rolling Back
+
+If an upgrade causes issues, roll back to the previous Helm release revision:
+
+```bash
+# View release history
+helm history kube-prometheus-stack -n monitoring
+
+# Roll back to the previous revision
+helm rollback kube-prometheus-stack -n monitoring
+
+# Or roll back to a specific revision number
+helm rollback kube-prometheus-stack 1 -n monitoring
+```
+
+The same `helm history` and `helm rollback` commands work for all Helm-managed components (`dcgm-exporter`, `gpu-rdma-node-problem-detector`, `oke-ons-webhook`, `amd-device-metrics-exporter`).
+
+### Verify the Update
+
+After updating, verify the deployment is healthy:
+
+```bash
+# Check all pods are running
+kubectl get pods -n ${MONITORING_NAMESPACE}
+
+# Check the updated release versions
+helm list -n monitoring
+
+# Verify Prometheus targets are UP (port-forward first)
+kubectl port-forward -n ${MONITORING_NAMESPACE} svc/kube-prometheus-stack-prometheus 9090:9090
+# Then open http://localhost:9090/targets
+
+# Verify dashboards are loaded in Grafana
+kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
+
+# Verify alert rules are loaded
+kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 ```
 
 ## Troubleshooting

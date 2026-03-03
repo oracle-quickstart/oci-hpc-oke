@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: problem_gauge{reason="PcieAerError",type="NodeHasPcieErrors"}
+                expr: problem_gauge{reason=~"PcieCorrectable|PcieFatal|PcieNonFatal",type="NodeHasPcieErrors"}
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
@@ -51,6 +51,7 @@ groups:
           noDataState: NoData
           execErrState: Error
           for: 5m
+          keep_firing_for: 30m
           annotations: {}
           labels: {}
           isPaused: false

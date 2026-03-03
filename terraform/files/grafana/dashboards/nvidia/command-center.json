@@ -73,7 +73,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "count(count by (nodename) (node_uname_info{cluster_name=~\"$cluster_name\"}))",
+          "expr": "count(count by (nodename) (node_uname_info))",
           "refId": "A"
         }
       ],
@@ -132,12 +132,12 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{worker_pool_name=~\"oke-system\"})",
+          "expr": "count(node_uname_info{instance_shape!~\"(BM|VM).GPU.*\"})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "System Nodes (oke-system)",
+      "title": "CPU Nodes",
       "type": "stat"
     },
     {
@@ -192,7 +192,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{worker_pool_name!~\"oke-system\",cluster_name=~\"$cluster_name\"})",
+          "expr": "count(node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
           "range": true,
           "refId": "A"
         }
@@ -252,7 +252,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count by (cluster_name, worker_pool_name) (node_health_status{worker_pool_name=~\"^(oke-gpu|oke-rdma)$\"})",
+          "expr": "count(node_health_status == 1 and on(hostname) node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
           "range": true,
           "refId": "A"
         }
@@ -311,7 +311,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "sum(max by (instance) (DCGM_FI_DEV_COUNT{cluster_name=~\"$cluster_name\"}))",
+          "expr": "sum(max by (instance) (DCGM_FI_DEV_COUNT))",
           "refId": "A"
         }
       ],
@@ -370,7 +370,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(\n  count by (UUID) (DCGM_EXP_GPU_HEALTH_STATUS == 0)\n  ==\n  count by (UUID) (DCGM_EXP_GPU_HEALTH_STATUS)\n)",
+          "expr": "sum(max by (hostname) (DCGM_FI_DEV_COUNT) * on(hostname) group_left() (node_health_status == 1))",
           "range": true,
           "refId": "A"
         }
@@ -445,7 +445,7 @@
         {
           "targetBlank": true,
           "title": "Cluster Metrics",
-          "url": "/d/cluster-level-metrics/cluster-level-metrics?var-hostname=${__field.labels.cluster_name}"
+          "url": "/d/cluster-level-metrics/cluster-level-metrics"
         },
         {
           "targetBlank": true,
@@ -478,7 +478,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status{worker_pool_name=~\"$worker_pool_name\", hostname!~\"oke-system\"}",
+          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
           "legendFormat": "{{ hostname }}",
           "range": true,
           "refId": "A"
@@ -572,7 +572,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status{worker_pool_name=~\"$worker_pool_name\"}",
+          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -594,7 +594,7 @@
       },
       "id": 9,
       "options": {
-        "alertInstanceLabelFilter": "{cluster_name=~\"$cluster_name\"}",
+        "alertInstanceLabelFilter": "",
         "alertName": "",
         "dashboardAlerts": false,
         "groupBy": [],
@@ -638,40 +638,19 @@
       {
         "current": {
           "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${PROMETHEUS_DS}"
-        },
-        "includeAll": true,
-        "label": "Cluster",
-        "multi": true,
-        "name": "cluster_name",
-        "options": [],
-        "query": "label_values(up, cluster_name)",
-        "refresh": 1,
-        "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": [
-            "All"
-          ],
           "value": [
             "$__all"
           ]
         },
-        "definition": "label_values(up,worker_pool_name)",
+        "definition": "label_values(node_uname_info,instance_shape)",
         "includeAll": true,
-        "label": "Worker Pool",
+        "label": "Instance Shape",
         "multi": true,
-        "name": "worker_pool_name",
+        "name": "instance_shape",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,worker_pool_name)",
+          "query": "label_values(node_uname_info,instance_shape)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

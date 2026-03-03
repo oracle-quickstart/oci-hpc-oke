@@ -32,16 +32,10 @@ prometheus-node-exporter:
       relabelings:
         - sourceLabels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
           targetLabel: instance_shape
-        - sourceLabels: [__meta_kubernetes_node_provider_id]
-          targetLabel: instance_id
         - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number]
           targetLabel: host_serial_number
-        - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_pool_name]
-          targetLabel: worker_pool_name
         - sourceLabels: [__meta_kubernetes_node_label_displayName]
           targetLabel: oci_name
-        - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_cluster_name]
-          targetLabel: cluster_name
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: hostname
           action: replace
@@ -95,47 +89,47 @@ additionalPrometheusRulesMap:
       - name: node_health
         rules:
           - record: node_disk_free_ok
-            expr: avg by (hostname, worker_pool_name) (node_filesystem_avail_bytes{mountpoint="/",device=~"/dev/sd.*"}) >= bool 50 * 1024 * 1024 * 1024
+            expr: avg by (hostname) (node_filesystem_avail_bytes{mountpoint="/",device=~"/dev/sd.*"}) >= bool 50 * 1024 * 1024 * 1024
           - record: node_memory_availability_ok
-            expr: avg by (hostname, worker_pool_name) (node_memory_MemAvailable_bytes) >= bool 50 * 1024 * 1024 * 1024
+            expr: avg by (hostname) (node_memory_MemAvailable_bytes) >= bool 50 * 1024 * 1024 * 1024
           - record: node_gpu_power_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)
           - record: node_gpu_board_limit_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)
           - record: node_gpu_thermal_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)
           - record: node_gpu_sync_boost_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)
           - record: node_gpu_reliability_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)
           - record: node_pcie_aer_correctable_errors_ok
-            expr: min by (hostname, worker_pool_name) (increase(pcie_aer_correctable_error_count[5m]) == bool 0)
+            expr: min by (hostname) (increase(pcie_aer_correctable_error_count[5m]) == bool 0)
           - record: node_pcie_aer_fatal_errors_ok
-            expr: min by (hostname, worker_pool_name) (increase(pcie_aer_fatal_error_count[5m]) == bool 0)
+            expr: min by (hostname) (increase(pcie_aer_fatal_error_count[5m]) == bool 0)
           - record: node_pcie_aer_nonfatal_errors_ok
-            expr: min by(hostname, worker_pool_name) (increase(pcie_aer_nonfatal_error_count[5m]) == bool 0)
+            expr: min by(hostname) (increase(pcie_aer_nonfatal_error_count[5m]) == bool 0)
           - record: node_pcie_bus_inaccessible_ok
-            expr: min by (hostname, worker_pool_name) (pcie_bus_inaccessible_status == bool 0)
+            expr: min by (hostname) (pcie_bus_inaccessible_status == bool 0)
           - record: node_pcie_bus_linkwidth_ok
-            expr: min by (hostname, worker_pool_name) (pcie_bus_linkwidth_status == bool 0)
+            expr: min by (hostname) (pcie_bus_linkwidth_status == bool 0)
           - record: node_rttcc_ok
-            expr: min by(hostname, worker_pool_name) (problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"} == bool 0)
+            expr: min by(hostname) (problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"} == bool 0)
           - record: node_oca_ver_ok
-            expr: min by(hostname, worker_pool_name) (problem_gauge{reason="OcaVersionHasIssues",type="OcaVersion"} == bool 0)
+            expr: min by(hostname) (problem_gauge{reason="OcaVersionHasIssues",type="OcaVersion"} == bool 0)
           - record: node_rdma_device_status_ok
-            expr: min by(hostname, worker_pool_name) (rdma_device_status)
+            expr: min by(hostname) (rdma_device_status)
           - record: node_check_bus_issue_count_ok
-            expr: (check_bus_issue_count == bool 0) * on (hostname, worker_pool_name) (check_bus_issue_count == bool 0)
+            expr: (check_bus_issue_count == bool 0) * on (hostname) (check_bus_issue_count == bool 0)
           - record: node_rdma_link_flapping_ok
-            expr: min by(hostname, worker_pool_name) (rdma_link_noflap)
+            expr: min by(hostname) (rdma_link_noflap)
           - record: node_ecc_error_check_ok
-            expr: (gpu_ecc_error_check) * on (hostname, worker_pool_name) (gpu_ecc_error_check)
+            expr: (gpu_ecc_error_check) * on (hostname) (gpu_ecc_error_check)
           - record: node_gpu_row_remap_error_check
-            expr: (gpu_row_remap_error_check== bool 0) * on (hostname, worker_pool_name) (gpu_row_remap_error_check== bool 0)
+            expr: (gpu_row_remap_error_check== bool 0) * on (hostname) (gpu_row_remap_error_check== bool 0)
           - record: node_xid_error_check
-            expr: (xid_error_check) * on (hostname, worker_pool_name) (xid_error_check)
+            expr: (xid_error_check) * on (hostname) (xid_error_check)
           - record: node_up_check
-            expr: (min by (hostname, worker_pool_name) (up{instance=~".*:9100$"}))
+            expr: (min by (hostname) (up{instance=~".*:9100$"}))
           - record: node_health_status
             expr: |
               (

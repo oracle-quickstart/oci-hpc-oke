@@ -84,7 +84,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "avg by (cluster_name) (100 * (1 - avg by (hostname) (irate(node_cpu_seconds_total{cluster_name=~\"$cluster_name\",mode=\"idle\"}[5m]))))",
+          "expr": "100 * (1 - avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])))",
           "refId": "A"
         }
       ],
@@ -154,7 +154,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg by (worker_pool_name) (DCGM_FI_DEV_GPU_UTIL{worker_pool_name=~\"$worker_pool_name\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_UTIL)",
           "range": true,
           "refId": "A"
         }
@@ -224,7 +224,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "avg by (cluster_name) ((1 - (node_memory_MemAvailable_bytes{cluster_name=~\"$cluster_name\"}/node_memory_MemTotal_bytes{cluster_name=~\"$cluster_name\"})) * 100)",
+          "expr": "avg((1 - (node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes)) * 100)",
           "refId": "A"
         }
       ],
@@ -293,7 +293,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "avg by (cluster_name) (rate(node_pressure_cpu_waiting_seconds_total{cluster_name=~\"$cluster_name\"}[5m]) * 100)",
+          "expr": "avg(rate(node_pressure_cpu_waiting_seconds_total[5m]) * 100)",
           "refId": "A"
         }
       ],
@@ -362,7 +362,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "avg by (cluster_name) (rate(node_pressure_memory_stalled_seconds_total{cluster_name=~\"$cluster_name\"}[5m]) * 100)",
+          "expr": "avg(rate(node_pressure_memory_stalled_seconds_total[5m]) * 100)",
           "refId": "A"
         }
       ],
@@ -431,7 +431,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "avg by (cluster_name) (rate(node_pressure_io_stalled_seconds_total{cluster_name=~\"$cluster_name\"}[5m]) * 100)",
+          "expr": "avg(rate(node_pressure_io_stalled_seconds_total[5m]) * 100)",
           "refId": "A"
         }
       ],
@@ -501,108 +501,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 4
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "p99"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$PROMETHEUS_DS"
-          },
-          "editorMode": "code",
-          "expr": "avg by (cluster_name, mode) (rate(node_cpu_seconds_total{cluster_name=~\"$cluster_name\", mode!~\"idle\"}[5m])) * 100",
-          "legendFormat": "{{ mode }}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Cluster CPU Utilization by Mode",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
         "y": 4
       },
       "id": 8,
@@ -629,8 +529,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg by (worker_pool_name) ((1 - (node_memory_MemAvailable_bytes{cluster_name=~\"$cluster_name\"}/node_memory_MemTotal_bytes{cluster_name=~\"$cluster_name\"})) * 100)",
-          "legendFormat": "{{ cluster_name }}",
+          "expr": "avg by (instance_shape) ((1 - (node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes)) * 100)",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -701,8 +601,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
+        "w": 12,
+        "x": 12,
         "y": 4
       },
       "id": 9,
@@ -729,8 +629,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg by (worker_pool_name) (DCGM_FI_DEV_GPU_UTIL{worker_pool_name=~\"$worker_pool_name\"})",
-          "legendFormat": "{{ worker_pool_name }}",
+          "expr": "avg by (instance_shape) (DCGM_FI_DEV_GPU_UTIL)",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -829,8 +729,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "max by (worker_pool_name) (DCGM_FI_DEV_GPU_TEMP{worker_pool_name=~\"$worker_pool_name\"})",
-          "legendFormat": "{{ worker_pool_name }}",
+          "expr": "max by (instance_shape) (DCGM_FI_DEV_GPU_TEMP)",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -929,8 +829,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (worker_pool_name) (DCGM_FI_DEV_POWER_USAGE{worker_pool_name=~\"$worker_pool_name\"})",
-          "legendFormat": "{{ worker_pool_name }}",
+          "expr": "sum by (instance_shape) (DCGM_FI_DEV_POWER_USAGE)",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -1029,8 +929,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (worker_pool_name) (rate(node_network_receive_bytes_total{cluster_name=~\"$cluster_name\",device!~\"lo|docker.*|rdma.*\"}[5m]))",
-          "legendFormat": "{{ cluster_name }}",
+          "expr": "sum by (instance_shape) (rate(node_network_receive_bytes_total{device!~\"lo|docker.*|rdma.*\"}[5m]))",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -1129,8 +1029,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (worker_pool_name) (rate(node_network_transmit_bytes_total{cluster_name=~\"$cluster_name\",device!~\"lo|docker.*|rdma.*\"}[5m]))",
-          "legendFormat": "{{ cluster_name }}",
+          "expr": "sum by (instance_shape) (rate(node_network_transmit_bytes_total{device!~\"lo|docker.*|rdma.*\"}[5m]))",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -1229,8 +1129,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (worker_pool_name) (irate(node_disk_read_bytes_total{cluster_name=~\"$cluster_name\"}[5m]))",
-          "legendFormat": "{{ cluster_name }}",
+          "expr": "sum by (instance_shape) (irate(node_disk_read_bytes_total[5m]))",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -1329,8 +1229,8 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (worker_pool_name) (irate(node_disk_written_bytes_total{cluster_name=~\"$cluster_name\"}[5m]))",
-          "legendFormat": "{{ cluster_name }}",
+          "expr": "sum by (instance_shape) (irate(node_disk_written_bytes_total[5m]))",
+          "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
         }
@@ -1358,41 +1258,21 @@
         "type": "datasource"
       },
       {
-        "allowCustomValue": false,
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "definition": "label_values(up,cluster_name)",
-        "includeAll": true,
-        "label": "Cluster Name",
-        "name": "cluster_name",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(up,cluster_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
         "current": {
           "text": "All",
           "value": [
             "$__all"
           ]
         },
-        "definition": "label_values(up,worker_pool_name)",
+        "definition": "label_values(node_uname_info,instance_shape)",
         "includeAll": true,
-        "label": "Worker Pool",
+        "label": "Instance Shape",
         "multi": true,
-        "name": "worker_pool_name",
+        "name": "instance_shape",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,worker_pool_name)",
+          "query": "label_values(node_uname_info,instance_shape)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

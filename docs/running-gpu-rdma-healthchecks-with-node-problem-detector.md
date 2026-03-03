@@ -24,12 +24,13 @@ The following health checks are included. Note that depending on the node shape 
 | GpuRowRemap | Checks for GPU row remapping errors |
 | GpuBus | Checks if any GPU has fallen off the bus |
 | GpuPcie | Checks if PCIe has the expected bandwidth |
-| GpuFabricManager | Checks if Fabric Manager is running (NVIDIA multi-GPU systems) |
+| GpuFabricMgr | Checks if Fabric Manager is running (NVIDIA multi-GPU systems) |
 | GpuBadPages | Checks if any AMD GPU has bad pages |
 | GpuXid | Checks for GPU Xid errors in dmesg |
 | NvlinkSpeed | Checks if NVLink speeds match expected values |
 | DcgmiHealth | Runs DCGMI health check (NVIDIA GPUs) |
 | Rocminfo | Runs rocminfo health check (AMD GPUs) |
+| NodeHasPcieErrors | Monitors kernel log for PCIe AER errors (correctable, non-fatal, fatal) |
 | RdmaLink | Checks if RDMA links are up |
 | RdmaLinkFlapping | Checks if any RDMA links are flapping |
 | RdmaWpaAuth | Checks if all RDMA interfaces are authenticated |
@@ -86,19 +87,27 @@ kubectl describe node <node-name>
 Look for the new condition types in the output. **Example output** (showing relevant sections):
 
 ```
-Conditions:     
-                                                                                                                                                                                                                  
-    Type                    Status    Reason                        Message   
-    ----                    ------    ------                        -------                  
-    RdmaLinkFlapping        False     RdmaLinkFlappingHasNoIssues   No flapping RDMA links                    
-    OcaVersion              False     OcaVersionHasNoIssues         OCA version is up to date   
+Conditions:
+
+    Type                    Status    Reason                        Message
+    ----                    ------    ------                        -------
+    GpuEcc                  False     GpuEccHasNoIssues             No ECC issues detected with GPUs
     GpuRowRemap             False     GpuRowRemapHasNoIssues        No Row Remapping issues detected with GPUs
-    RdmaWpaAuth             False     RdmaWpaAuthHasNoIssues        All RDMA links are authenticated          
-    RdmaRttcc               False     RdmaRttccHasNoIssues          RTCCC is disabled on all RDMA interfaces  
-    GpuEcc                  False     GpuEccHasNoIssues             No ECC issues detected with GPUs          
-    GpuBus                  False     GpuBusHasNoIssues             No GPU Bus issues detected with GPUs      
-    GpuCount                True      GpuCountHasIssues             Node has missing GPU(s)                   
-    RdmaLink                False     RdmaLinkHasNoIssues           All RDMA links are up                     
+    GpuBus                  False     GpuBusHasNoIssues             No GPU Bus issues detected with GPUs
+    GpuCount                True      GpuCountHasIssues             Node has missing GPU(s)
+    GpuPcie                 False     GpuPcieHasNoIssues            Node has the expected PCIE bandwidth
+    GpuFabricMgr            False     GpuFabricMgrHasNoIssues       Fabric Manager is running
+    GpuXid                  False     GpuXidHasNoIssues             No GPU Xid errors detected
+    NvlinkSpeed             False     NvlinkSpeedHasNoIssues        NVLink speeds are as expected
+    DcgmiHealth             False     DcgmiHealthHasNoIssues        DCGMI health check passed
+    NodeHasPcieErrors       False     PcieAerError                  Node has experienced PCIe AER errors
+    RdmaLink                False     RdmaLinkHasNoIssues           All RDMA links are up
+    RdmaLinkFlapping        False     RdmaLinkFlappingHasNoIssues   No flapping RDMA links
+    RdmaWpaAuth             False     RdmaWpaAuthHasNoIssues        All RDMA links are authenticated
+    RdmaRttcc               False     RdmaRttccHasNoIssues          RTCCC is disabled on all RDMA interfaces
+    IpAddress               False     IpAddressHasNoIssues          All interfaces have an IP address
+    OcaVersion              False     OcaVersionHasNoIssues         OCA version is up to date
+    CpuProfile              False     CpuProfileHasNoIssues         CPU profile is set to performance
 ```
 
 In this example, the node has one issue: `GpuCount` shows `Status: True` with `Reason: GpuCountHasIssues`, indicating the node is missing one or more GPUs. All other checks show `Status: False`, meaning they passed (no issues detected).
@@ -111,7 +120,7 @@ To get a summary of all GPU nodes with problems:
 kubectl get nodes -o json | jq -r '.items[]
 | select (.metadata.labels."nvidia.com/gpu" == "true" or .metadata.labels."amd.com/gpu" == "true")
 | { name: .metadata.name, ocid: .spec.providerID, serial: .metadata.labels["oci.oraclecloud.com/host.serial_number"], error: .status.conditions[]
-| select(.reason | test("^(Gpu|Rdma|Oca|Cpu).*HasIssues$")) | .message }
+| select(.reason | test("HasIssues$|^Pcie(Correctable|NonFatal|Fatal)$")) | .message }
 | "\(.name)\t\(.ocid)\t\(.serial)\t\(.error)"'
 ```
 

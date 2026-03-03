@@ -2693,14 +2693,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values({cluster_name=\"$g_cluster_name\"},job_id)",
+        "definition": "label_values({},job_id)",
         "includeAll": false,
         "label": "Job",
         "name": "g_job_id",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values({cluster_name=\"$g_cluster_name\"},job_id)",
+          "query": "label_values({},job_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -2718,14 +2718,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values({cluster_name=\"$g_cluster_name\"},pod)",
+        "definition": "label_values({},pod)",
         "includeAll": false,
         "label": "Pod",
         "name": "g_pod",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values({cluster_name=\"$g_cluster_name\"},pod)",
+          "query": "label_values({},pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

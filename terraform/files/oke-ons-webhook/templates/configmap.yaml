@@ -133,6 +133,8 @@ data:
                 if match:
                     ip_only = True
                 if not ip_only:
+                    if netloc == "localhost":
+                        return short_url
                     scheme = "https"
                     return parsed_short_url.geturl().replace(f'{parsed_short_url.scheme}://{parsed_url.netloc}/', f"{scheme}://{netloc}/")
                 return short_url
@@ -147,7 +149,19 @@ data:
         annotations = alert_dict.get("annotations", {})
         labels = alert_dict.get("labels", {})
         silence_url = annotations.get("silence_url", alert_dict.get("silenceURL", "N/A")).strip()
-        panel_url =  annotations.get("panel_url", alert_dict.get("panelURL", "N/A")).strip()
+        panel_url =  annotations.get("panel_url", alert_dict.get("panelURL", "")).strip()
+        dashboard_url = alert_dict.get("dashboardURL", "").strip()
+        if not panel_url and not dashboard_url and silence_url and silence_url != "N/A":
+            # Construct a panel URL from the silence URL's base and the alert's hostname
+            parsed_silence = urlparse(silence_url)
+            base_url = f"{parsed_silence.scheme}://{parsed_silence.netloc}"
+            hostname = labels.get("hostname", labels.get("Hostname", ""))
+            if hostname:
+                panel_url = f"{base_url}/d/gpu-health/gpu-health-status?var-hostname={hostname}"
+            else:
+                panel_url = f"{base_url}/d/command-center/command-center"
+        elif not panel_url and dashboard_url:
+            panel_url = dashboard_url
         if silence_url and silence_url != "N/A":
             shorten_silence_url = shorten_url(grafana_service_url, grafana_api_key, silence_url)
         else:
@@ -166,7 +180,7 @@ data:
             "hostname": labels.get("hostname", labels.get("Hostname", "N/A")),
             "node": labels.get("node", "N/A"),
             "oci_name": labels.get("oci_name", "N/A"),
-            "serial_number": labels.get("host_serial_number", labels.get("serial", "N/A")),
+            "serial_number": labels.get("host_serial_number", labels.get("serial", "N/A")).upper(),
             "interface": labels.get("interface", "N/A"),
             "rdma_device": labels.get("rdma_device", "N/A"),
             "gpu": labels.get("gpu", "N/A"),

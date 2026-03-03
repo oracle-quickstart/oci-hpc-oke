@@ -32,16 +32,10 @@ prometheus-node-exporter:
       relabelings:
         - sourceLabels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
           targetLabel: instance_shape
-        - sourceLabels: [__meta_kubernetes_node_provider_id]
-          targetLabel: instance_id
         - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number]
           targetLabel: host_serial_number
-        - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_pool_name]
-          targetLabel: worker_pool_name
         - sourceLabels: [__meta_kubernetes_node_label_displayName]
           targetLabel: oci_name
-        - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_cluster_name]
-          targetLabel: cluster_name
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: hostname
           action: replace
@@ -84,52 +78,213 @@ kube-state-metrics:
     create: true
 
 additionalPrometheusRulesMap:
+  kube-apiserver-availability-rules:
+    groups:
+      - name: kube-apiserver-availability.rules
+        interval: 3m
+        rules:
+          - record: code_verb:apiserver_request_total:increase1h
+            expr: sum by (cluster, code, verb) (increase(apiserver_request_total{job="apiserver",verb=~"LIST|GET|POST|PUT|PATCH|DELETE",code=~"2.."}[1h]))
+          - record: code_verb:apiserver_request_total:increase1h
+            expr: sum by (cluster, code, verb) (increase(apiserver_request_total{job="apiserver",verb=~"LIST|GET|POST|PUT|PATCH|DELETE",code=~"3.."}[1h]))
+          - record: code_verb:apiserver_request_total:increase1h
+            expr: sum by (cluster, code, verb) (increase(apiserver_request_total{job="apiserver",verb=~"LIST|GET|POST|PUT|PATCH|DELETE",code=~"4.."}[1h]))
+          - record: code_verb:apiserver_request_total:increase1h
+            expr: sum by (cluster, code, verb) (increase(apiserver_request_total{job="apiserver",verb=~"LIST|GET|POST|PUT|PATCH|DELETE",code=~"5.."}[1h]))
+          - record: code_verb:apiserver_request_total:increase30d
+            expr: avg_over_time(code_verb:apiserver_request_total:increase1h[30d]) * 24 * 30
+          - record: code:apiserver_request_total:increase30d
+            labels:
+              verb: read
+            expr: sum by (cluster, code) (code_verb:apiserver_request_total:increase30d{verb=~"LIST|GET"})
+          - record: code:apiserver_request_total:increase30d
+            labels:
+              verb: write
+            expr: sum by (cluster, code) (code_verb:apiserver_request_total:increase30d{verb=~"POST|PUT|PATCH|DELETE"})
+          - record: cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase1h
+            expr: sum by (cluster, verb, scope, le) (increase(apiserver_request_sli_duration_seconds_bucket[1h]))
+          - record: cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d
+            expr: sum by (cluster, verb, scope, le) (avg_over_time(cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase1h[30d]) * 24 * 30)
+          - record: cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase1h
+            expr: sum by (cluster, verb, scope) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase1h{le="+Inf"})
+          - record: cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d
+            expr: sum by (cluster, verb, scope) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{le="+Inf"})
+          - record: apiserver_request:availability30d
+            labels:
+              verb: all
+            expr: |
+              1 - (
+                (
+                  (
+                    sum by (cluster) (cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d{verb=~"POST|PUT|PATCH|DELETE"})
+                    -
+                    sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"POST|PUT|PATCH|DELETE",le=~"1(\\.0)?"} or vector(0))
+                  )
+                  +
+                  (
+                    sum by (cluster) (cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d{verb=~"LIST|GET"})
+                    -
+                    (
+                      sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope=~"resource|",le=~"1(\\.0)?"} or vector(0))
+                      +
+                      sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope="namespace",le=~"5(\\.0)?"} or vector(0))
+                      +
+                      sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope="cluster",le=~"30(\\.0)?"} or vector(0))
+                    )
+                  )
+                  +
+                  sum by (cluster) (code:apiserver_request_total:increase30d{code=~"5.."} or vector(0))
+                )
+                /
+                sum by (cluster) (code:apiserver_request_total:increase30d)
+              )
+          - record: apiserver_request:availability30d
+            labels:
+              verb: read
+            expr: |
+              1 - (
+                (
+                  sum by (cluster) (cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d{verb=~"LIST|GET"})
+                  -
+                  (
+                    sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope=~"resource|",le=~"1(\\.0)?"} or vector(0))
+                    +
+                    sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope="namespace",le=~"5(\\.0)?"} or vector(0))
+                    +
+                    sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"LIST|GET",scope="cluster",le=~"30(\\.0)?"} or vector(0))
+                  )
+                  +
+                  sum by (cluster) (code:apiserver_request_total:increase30d{verb="read",code=~"5.."} or vector(0))
+                )
+                /
+                sum by (cluster) (code:apiserver_request_total:increase30d{verb="read"})
+              )
+          - record: apiserver_request:availability30d
+            labels:
+              verb: write
+            expr: |
+              1 - (
+                (
+                  (
+                    sum by (cluster) (cluster_verb_scope:apiserver_request_sli_duration_seconds_count:increase30d{verb=~"POST|PUT|PATCH|DELETE"})
+                    -
+                    sum by (cluster) (cluster_verb_scope_le:apiserver_request_sli_duration_seconds_bucket:increase30d{verb=~"POST|PUT|PATCH|DELETE",le=~"1(\\.0)?"} or vector(0))
+                  )
+                  +
+                  sum by (cluster) (code:apiserver_request_total:increase30d{verb="write",code=~"5.."} or vector(0))
+                )
+                /
+                sum by (cluster) (code:apiserver_request_total:increase30d{verb="write"})
+              )
+          - record: code_resource:apiserver_request_total:rate5m
+            labels:
+              verb: read
+            expr: sum by (cluster,code,resource) (rate(apiserver_request_total{job="apiserver",verb=~"LIST|GET"}[5m]))
+          - record: code_resource:apiserver_request_total:rate5m
+            labels:
+              verb: write
+            expr: sum by (cluster,code,resource) (rate(apiserver_request_total{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[5m]))
+      - name: kube-apiserver-slos
+        rules:
+          - record: cluster_quantile:apiserver_request_sli_duration_seconds:histogram_quantile
+            labels:
+              quantile: "0.99"
+              verb: read
+            expr: histogram_quantile(0.99, sum by (cluster, le, resource) (rate(apiserver_request_sli_duration_seconds_bucket{job="apiserver",verb=~"LIST|GET",subresource!~"proxy|attach|log|exec|portforward"}[5m]))) > 0
+          - record: cluster_quantile:apiserver_request_sli_duration_seconds:histogram_quantile
+            labels:
+              quantile: "0.99"
+              verb: write
+            expr: histogram_quantile(0.99, sum by (cluster, le, resource) (rate(apiserver_request_sli_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",subresource!~"proxy|attach|log|exec|portforward"}[5m]))) > 0
+  k8s-container-resource-rules:
+    groups:
+      - name: k8s.rules.container_cpu_usage_seconds_total
+        rules:
+          - record: node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate
+            expr: |
+              sum by (cluster, namespace, pod, container) (
+                irate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}[5m])
+              ) * on (cluster, namespace, pod) group_left(node) topk by (cluster, namespace, pod) (
+                1, max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+              )
+      - name: k8s.rules.container_resource
+        rules:
+          - record: cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests
+            expr: |
+              kube_pod_container_resource_requests{resource="cpu",job="kube-state-metrics"} * on (namespace, pod, cluster)
+              group_left() max by (namespace, pod, cluster) (
+                (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+              )
+          - record: cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits
+            expr: |
+              kube_pod_container_resource_limits{resource="cpu",job="kube-state-metrics"} * on (namespace, pod, cluster)
+              group_left() max by (namespace, pod, cluster) (
+                (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+              )
+          - record: cluster:namespace:pod_memory:active:kube_pod_container_resource_requests
+            expr: |
+              kube_pod_container_resource_requests{resource="memory",job="kube-state-metrics"} * on (namespace, pod, cluster)
+              group_left() max by (namespace, pod, cluster) (
+                (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+              )
+          - record: cluster:namespace:pod_memory:active:kube_pod_container_resource_limits
+            expr: |
+              kube_pod_container_resource_limits{resource="memory",job="kube-state-metrics"} * on (namespace, pod, cluster)
+              group_left() max by (namespace, pod, cluster) (
+                (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+              )
   node-health-rules:
     groups:
       - name: node_health
         rules:
           - record: node_disk_free_ok
-            expr: avg by (hostname, worker_pool_name) (node_filesystem_avail_bytes{mountpoint="/",device=~"/dev/sd.*"}) >= bool 50 * 1024 * 1024 * 1024
+            expr: avg by (hostname) (node_filesystem_avail_bytes{mountpoint="/",device=~"/dev/sd.*"}) >= bool 50 * 1024 * 1024 * 1024
           - record: node_memory_availability_ok
-            expr: avg by (hostname, worker_pool_name) (node_memory_MemAvailable_bytes) >= bool 50 * 1024 * 1024 * 1024
+            expr: avg by (hostname) (node_memory_MemAvailable_bytes) >= bool 50 * 1024 * 1024 * 1024
           - record: node_gpu_power_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)
           - record: node_gpu_board_limit_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)
           - record: node_gpu_thermal_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)
           - record: node_gpu_sync_boost_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)
           - record: node_gpu_reliability_violation_ok
-            expr: min by (hostname, worker_pool_name) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)
+            expr: min by (hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)
           - record: node_pcie_aer_correctable_errors_ok
-            expr: min by (hostname, worker_pool_name) (increase(pcie_aer_correctable_error_count[5m]) == bool 0)
+            expr: min by (hostname) (increase(pcie_aer_correctable_error_count[5m]) == bool 0)
           - record: node_pcie_aer_fatal_errors_ok
-            expr: min by (hostname, worker_pool_name) (increase(pcie_aer_fatal_error_count[5m]) == bool 0)
+            expr: min by (hostname) (increase(pcie_aer_fatal_error_count[5m]) == bool 0)
           - record: node_pcie_aer_nonfatal_errors_ok
-            expr: min by(hostname, worker_pool_name) (increase(pcie_aer_nonfatal_error_count[5m]) == bool 0)
+            expr: min by(hostname) (increase(pcie_aer_nonfatal_error_count[5m]) == bool 0)
           - record: node_pcie_bus_inaccessible_ok
-            expr: min by (hostname, worker_pool_name) (pcie_bus_inaccessible_status == bool 0)
+            expr: min by (hostname) (pcie_bus_inaccessible_status == bool 0)
           - record: node_pcie_bus_linkwidth_ok
-            expr: min by (hostname, worker_pool_name) (pcie_bus_linkwidth_status == bool 0)
+            expr: min by (hostname) (pcie_bus_linkwidth_status == bool 0)
           - record: node_rttcc_ok
-            expr: min by(hostname, worker_pool_name) (problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"} == bool 0)
+            expr: min by(hostname) (problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"} == bool 0)
           - record: node_oca_ver_ok
-            expr: min by(hostname, worker_pool_name) (problem_gauge{reason="OcaVersionHasIssues",type="OcaVersion"} == bool 0)
+            expr: min by(hostname) (problem_gauge{reason="OcaVersionHasIssues",type="OcaVersion"} == bool 0)
           - record: node_rdma_device_status_ok
-            expr: min by(hostname, worker_pool_name) (rdma_device_status)
+            expr: min by(hostname) (rdma_device_status)
           - record: node_check_bus_issue_count_ok
-            expr: (check_bus_issue_count == bool 0) * on (hostname, worker_pool_name) (check_bus_issue_count == bool 0)
+            expr: (check_bus_issue_count == bool 0) * on (hostname) (check_bus_issue_count == bool 0)
           - record: node_rdma_link_flapping_ok
-            expr: min by(hostname, worker_pool_name) (rdma_link_noflap)
+            expr: min by(hostname) (rdma_link_noflap)
           - record: node_ecc_error_check_ok
-            expr: (gpu_ecc_error_check) * on (hostname, worker_pool_name) (gpu_ecc_error_check)
+            expr: (gpu_ecc_error_check) * on (hostname) (gpu_ecc_error_check)
           - record: node_gpu_row_remap_error_check
-            expr: (gpu_row_remap_error_check== bool 0) * on (hostname, worker_pool_name) (gpu_row_remap_error_check== bool 0)
+            expr: (gpu_row_remap_error_check== bool 0) * on (hostname) (gpu_row_remap_error_check== bool 0)
           - record: node_xid_error_check
-            expr: (xid_error_check) * on (hostname, worker_pool_name) (xid_error_check)
+            expr: (xid_error_check) * on (hostname) (xid_error_check)
+          - record: node_nvlink_speed_ok
+            expr: min by(hostname) (problem_gauge{reason="NvlinkSpeedHasIssues",type="NvlinkSpeed"} == bool 0)
+          - record: node_dcgm_health_ok
+            expr: min by(hostname) (problem_gauge{reason="DcgmiHealthHasIssues",type="DcgmiHealth"} == bool 0)
+          - record: node_gpu_xid_ok
+            expr: min by(hostname) (problem_gauge{reason="GpuXidHasIssues",type="GpuXid"} == bool 0)
           - record: node_up_check
-            expr: (min by (hostname, worker_pool_name) (up{instance=~".*:9100$"}))
+            expr: (min by (hostname) (up{instance=~".*:9100$"}))
           - record: node_health_status
             expr: |
               (
@@ -159,4 +314,17 @@ additionalPrometheusRulesMap:
               (
                 node_gpu_row_remap_error_check or node_up_check
               )
+              *
+              (
+                node_nvlink_speed_ok or node_up_check
+              )
+              *
+              (
+                node_dcgm_health_ok or node_up_check
+              )
+              *
+              (
+                node_gpu_xid_ok or node_up_check
+              )
+
 
