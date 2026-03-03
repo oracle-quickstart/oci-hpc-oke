@@ -1,5 +1,7 @@
 # Running GPU & RDMA Health Checks with Node Problem Detector
 
+> **Note:** If you deployed the monitoring stack using the Terraform stack, Node Problem Detector is already installed and configured. You do not need to follow the instructions below.
+
 Node Problem Detector is a Kubernetes add-on that monitors node health and reports problems as node conditions and events. This guide explains how to deploy Node Problem Detector with custom health checks designed specifically for OKE GPU and RDMA nodes.
 
 ## Overview
@@ -49,6 +51,7 @@ Deploy Node Problem Detector using the Helm chart with the OKE-specific health c
 
 ```bash
 helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.0 \
+    -n monitoring \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/terraform/files/node-problem-detector/values.yaml
 ```
 

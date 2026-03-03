@@ -327,6 +327,9 @@ The repository includes alert rules for:
 - GPU PCIe issues
 - GPU count mismatches
 - GPU fabric manager issues
+- GPU Xid errors
+- NVLink speed issues
+- DCGM health issues
 - RDMA link issues
 - RDMA link flapping
 - RDMA RTTCC issues
@@ -552,8 +555,8 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    --set grafana.ingress.enabled=true \
    --set grafana.ingress.ingressClassName=contour \
    --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
-   --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.sslip.io \
-   --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.sslip.io \
+   --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
+   --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
    --set grafana.ingress.tls[0].secretName=grafana-tls \
    --wait
    ```
@@ -565,10 +568,10 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
    # Sample output
    # NAME                            CLASS     HOSTS                              ADDRESS           PORTS     AGE
-   # kube-prometheus-stack-grafana   contour   grafana.${INGRESS_IP}.sslip.io     ${INGRESS_IP}     80, 443   5m28s
+   # kube-prometheus-stack-grafana   contour   grafana.${INGRESS_IP}.endpoint.oci-hpc.ai     ${INGRESS_IP}     80, 443   5m28s
    ```
 
-7. Access Grafana at `https://grafana.${INGRESS_IP}.sslip.io`
+7. Access Grafana at `https://grafana.${INGRESS_IP}.endpoint.oci-hpc.ai`
 
 ## Step 9: Verify the Deployment
 
