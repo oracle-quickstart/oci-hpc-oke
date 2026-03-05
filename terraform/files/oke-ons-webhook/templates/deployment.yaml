@@ -11,6 +11,8 @@ spec:
       {{- include "oke-ons-webhook.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         token_name: {{ include "oke-ons-webhook.fullname" . }}
         {{- include "oke-ons-webhook.selectorLabels" . | nindent 8 }}

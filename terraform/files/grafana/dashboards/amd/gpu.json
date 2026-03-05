@@ -1828,7 +1828,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values({cluster_name=\"$g_cluster_name\", hostname=\"$g_hostname\", gpu_id=\"$g_gpu_id\", gpu_partition_id=\"$g_gpu_partition_id\"},gpu_uuid)",
+        "definition": "label_values({hostname=\"$g_hostname\", gpu_id=\"$g_gpu_id\", gpu_partition_id=\"$g_gpu_partition_id\"},gpu_uuid)",
         "hide": 2,
         "includeAll": false,
         "label": "GPU UUID",
@@ -1836,7 +1836,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values({cluster_name=\"$g_cluster_name\", hostname=\"$g_hostname\", gpu_id=\"$g_gpu_id\", gpu_partition_id=\"$g_gpu_partition_id\"},gpu_uuid)",
+          "query": "label_values({hostname=\"$g_hostname\", gpu_id=\"$g_gpu_id\", gpu_partition_id=\"$g_gpu_partition_id\"},gpu_uuid)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

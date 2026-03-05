@@ -5,8 +5,8 @@ groups:
       folder: Alerts
       interval: 1m
       rules:
-        - uid: oke_npd_gpu_bus
-          title: GPU Bus
+        - uid: oke_npd_gpu_xid
+          title: GPU Xid
           condition: C
           data:
             - refId: A
@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: problem_gauge{reason="GpuBusHasIssues",type="GpuBus"}
+                expr: problem_gauge{reason="GpuXidHasIssues",type="GpuXid"}
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto

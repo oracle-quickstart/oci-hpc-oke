@@ -81,7 +81,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(100 * (avg by (hostname, oci_name) (irate(node_cpu_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",mode=\"idle\"}[5m]))))",
+          "expr": "ceil(100 * (avg by (hostname, oci_name) (irate(node_cpu_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",mode=\"idle\"}[5m]))))",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -149,7 +149,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil((node_memory_MemAvailable_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}/node_memory_MemTotal_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\"})*100)",
+          "expr": "ceil((node_memory_MemAvailable_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}/node_memory_MemTotal_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"})*100)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -217,7 +217,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil((node_filesystem_avail_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",mountpoint=~\"/\"} / node_filesystem_size_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",mountpoint=~\"/\"})*100)",
+          "expr": "ceil((node_filesystem_avail_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",mountpoint=~\"/\"} / node_filesystem_size_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",mountpoint=~\"/\"})*100)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -289,7 +289,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_cpu_waiting_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}[5m]) * 100))",
+          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_cpu_waiting_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}[5m]) * 100))",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -361,7 +361,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_memory_stalled_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}[5m]) * 100))",
+          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_memory_stalled_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}[5m]) * 100))",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -433,7 +433,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_io_stalled_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}[5m]) * 100))",
+          "expr": "ceil(avg by (hostname, oci_name) (rate(node_pressure_io_stalled_seconds_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}[5m]) * 100))",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -505,106 +505,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 4
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "p99"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$PROMETHEUS_DS"
-          },
-          "expr": "ceil(avg by (mode) (rate(node_cpu_seconds_total{hostname=~\"$hostname\", mode!~\"idle\"}[5m])) * 100)",
-          "legendFormat": "{{ hostname }}",
-          "refId": "A"
-        }
-      ],
-      "title": "CPU Utilization",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
         "y": 4
       },
       "id": 8,
@@ -630,7 +532,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "ceil((1 - (node_memory_MemAvailable_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}/node_memory_MemTotal_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}))*100)",
+          "expr": "ceil((1 - (node_memory_MemAvailable_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}/node_memory_MemTotal_bytes{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}))*100)",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
@@ -728,7 +630,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "irate(node_disk_read_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}[5m])",
+          "expr": "irate(node_disk_read_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -826,7 +728,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "irate(node_disk_written_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\"}[5m])",
+          "expr": "irate(node_disk_written_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -923,7 +825,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "rate(node_network_receive_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
+          "expr": "rate(node_network_receive_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -1020,7 +922,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "rate(node_network_transmit_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
+          "expr": "rate(node_network_transmit_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -1048,28 +950,28 @@
         "type": "datasource"
       },
       {
-        "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
         },
-        "definition": "label_values(up,worker_pool_name)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${PROMETHEUS_DS}"
+        },
+        "definition": "label_values(node_uname_info,instance_shape)",
         "includeAll": true,
-        "label": "Worker Pool",
+        "label": "Instance Shape",
         "multi": true,
-        "name": "worker_pool_name",
+        "name": "instance_shape",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,worker_pool_name)",
+          "query": "label_values(node_uname_info,instance_shape)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
         "type": "query"
       },
       {
@@ -1088,7 +990,7 @@
         "multi": true,
         "name": "hostname",
         "options": [],
-        "query": "label_values(up, hostname)",
+        "query": "label_values(up{instance_shape=~\"$instance_shape\"}, hostname)",
         "refresh": 1,
         "type": "query"
       },
@@ -1108,7 +1010,7 @@
         "multi": true,
         "name": "oci_name",
         "options": [],
-        "query": "label_values(up, oci_name)",
+        "query": "label_values(up{instance_shape=~\"$instance_shape\"}, oci_name)",
         "refresh": 1,
         "type": "query"
       },

@@ -714,7 +714,13 @@ priorityClassName: system-node-critical
 securityContext:
   privileged: true
 
-resources: {}
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 2Gi
 
 annotations: {}
 
@@ -757,6 +763,7 @@ affinity:
               - VM.GPU.A100.80G.1
               - BM.GPU.H200.8
               - BM.GPU.B200.8
+              - BM.GPU.B300.8
               - BM.GPU.GB200.4
               - BM.GPU.GB200-v2.4
               - BM.GPU.GB200-v3.4
@@ -776,9 +783,6 @@ metrics:
     additionalLabels:
       release: kube-prometheus-stack
     additionalRelabelings:
-      - sourceLabels: [__meta_kubernetes_node_provider_id]
-        targetLabel: instance_id
-        action: replace
       - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number]
         targetLabel: host_serial_number
         action: replace
@@ -787,12 +791,6 @@ metrics:
         action: replace
       - sourceLabels: [__meta_kubernetes_node_label_displayName]
         targetLabel: oci_name
-        action: replace
-      - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_pool_name]
-        targetLabel: worker_pool_name
-        action: replace
-      - sourceLabels: [__meta_kubernetes_node_label_oke_oraclecloud_com_cluster_name]
-        targetLabel: cluster_name
         action: replace
       - sourceLabels: [__meta_kubernetes_pod_node_name]
         targetLabel: hostname
@@ -821,4 +819,4 @@ extraContainers: []
 # updateStrategy -- Manage the daemonset update strategy
 updateStrategy: RollingUpdate
 # maxUnavailable -- The max pods unavailable during an update
-maxUnavailable: 1
+maxUnavailable: "25%"

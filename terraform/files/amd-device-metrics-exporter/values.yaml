@@ -71,15 +71,9 @@ serviceMonitor:
       targetLabel: hostname
       replacement: $1
       action: replace
-    - sourceLabels: [__meta_kubernetes_node_provider_id]
-      targetLabel: instance_id
-      action: replace
     - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number]
       targetLabel: host_serial_number
       action: replace
     - sourceLabels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
       targetLabel: instance_shape
-      action: replace
-    - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_rdma_cluster_id]
-      targetLabel: cluster_name
       action: replace

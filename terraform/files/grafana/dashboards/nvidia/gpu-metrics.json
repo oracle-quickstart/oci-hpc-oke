@@ -146,7 +146,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) / max by (Hostname) (DCGM_FI_DEV_SLOWDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) * 100)",
+          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}) / max by (Hostname) (DCGM_FI_DEV_SLOWDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}) * 100)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -218,7 +218,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) / max by (Hostname) (DCGM_FI_DEV_SHUTDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}) * 100)",
+          "expr": "ceil(max by (Hostname) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}) / max by (Hostname) (DCGM_FI_DEV_SHUTDOWN_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}) * 100)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -282,7 +282,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"})",
+          "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -352,7 +352,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_XID_ERRORS{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_XID_ERRORS{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "refId": "A"
         }
       ],
@@ -451,7 +451,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -551,7 +551,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -651,7 +651,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -751,7 +751,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_MEMORY_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_MEMORY_TEMP{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -851,7 +851,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_SM_CLOCK{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_SM_CLOCK{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -951,7 +951,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\"}",
+          "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}",
           "legendFormat": "{{ gpu }}",
           "refId": "A"
         }
@@ -1022,7 +1022,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 24,
         "x": 0,
         "y": 20
       },
@@ -1052,217 +1052,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
+          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\", instance_shape=~\"$instance_shape\"}[5m])) * 1024",
           "legendFormat": "{{ gpu }}",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "NVLink Rx + Tx Combined B/W",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 20
-      },
-      "id": 13,
-      "options": {
-        "legend": {
-          "calcs": [
-            "p99",
-            "p95",
-            "p90"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$PROMETHEUS_DS"
-          },
-          "editorMode": "code",
-          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_TX_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
-          "legendFormat": "{{ gpu }}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NVLink Tx B/W",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "datasource",
-        "uid": "-- Mixed --"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 20
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "calcs": [
-            "p99",
-            "p95",
-            "p90"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.1.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$PROMETHEUS_DS"
-          },
-          "editorMode": "code",
-          "expr": "sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_RX_BANDWIDTH_TOTAL{hostname=~\"$hostname\", oci_name=~\"$oci_name\"}[5m])) * 1024",
-          "legendFormat": "{{ gpu }}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "NVLink Rx B/W",
       "type": "timeseries"
     },
     {
@@ -1356,7 +1152,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "(\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n)\n+\n(\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m])\n  )\n  or\n  sum by (device) (\n    irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])\n  )\n)\n",
+          "expr": "(\nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_7|mlx5_8|mlx5_9\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v2.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v3.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB300.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X-v1.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7\"}[1m]))\nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X.8\", device=~\"ionic_0|ionic_2|ionic_3|ionic_4|ionic_5|ionic_7|ionic_8|ionic_9\"}[1m]))\nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B300.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m]))\n)\n+\n(\nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_7|mlx5_8|mlx5_9\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v2.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v3.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB300.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X-v1.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7\"}[1m]))\n\nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X.8\", device=~\"ionic_0|ionic_2|ionic_3|ionic_4|ionic_5|ionic_7|ionic_8|ionic_9\"}[1m]))\nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B300.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m]))\n)\n",
           "legendFormat": "{{ device }}",
           "range": true,
           "refId": "A"
@@ -1456,7 +1252,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m]))\nor\nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) ",
+          "expr": "sum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_7|mlx5_8|mlx5_9\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v2.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v3.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB300.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X-v1.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X.8\", device=~\"ionic_0|ionic_2|ionic_3|ionic_4|ionic_5|ionic_7|ionic_8|ionic_9\"}[1m]))\nor \nsum by (device) (irate(node_infiniband_port_data_transmitted_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B300.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m]))",
           "legendFormat": "{{ device }}",
           "range": true,
           "refId": "A"
@@ -1556,7 +1352,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9\"}[1m]))\nor\nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) ",
+          "expr": "sum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H100.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.H200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B4.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.A100-v2.8\", device=~\"mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU4.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_11|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI300X.8\", device=~\"mlx5_0|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_7|mlx5_8|mlx5_9\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B200.8\", device=~\"mlx5_0|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_9|mlx5_10|mlx5_11\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v2.4\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB200-v3.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.GB300.4\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_5|mlx5_6|mlx5_7|mlx5_8\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X-v1.8\", device=~\"mlx5_0|mlx5_1|mlx5_2|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7\"}[1m])) \nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.MI355X.8\", device=~\"ionic_0|ionic_2|ionic_3|ionic_4|ionic_5|ionic_7|ionic_8|ionic_9\"}[1m]))\nor \nsum by (device) (irate(node_infiniband_port_data_received_bytes_total{hostname=~\"$hostname\", instance_shape=\"BM.GPU.B300.8\", device=~\"mlx5_0|mlx5_1|mlx5_3|mlx5_4|mlx5_5|mlx5_6|mlx5_7|mlx5_8|mlx5_9|mlx5_10|mlx5_12|mlx5_13|mlx5_14|mlx5_15|mlx5_16|mlx5_17\"}[1m]))",
           "legendFormat": "{{ device }}",
           "range": true,
           "refId": "A"
@@ -1585,26 +1381,27 @@
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
         },
-        "definition": "label_values(up,worker_pool_name)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${PROMETHEUS_DS}"
+        },
+        "definition": "label_values(node_uname_info,instance_shape)",
         "includeAll": true,
-        "label": "Worker Pool",
+        "label": "Instance Shape",
         "multi": true,
-        "name": "worker_pool_name",
+        "name": "instance_shape",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,worker_pool_name)",
+          "query": "label_values(node_uname_info,instance_shape)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
-        "regex": "",
         "type": "query"
       },
       {
@@ -1620,7 +1417,7 @@
           "type": "prometheus",
           "uid": "${PROMETHEUS_DS}"
         },
-        "definition": "label_values(up,hostname)",
+        "definition": "label_values(up{instance_shape=~\"$instance_shape\"},hostname)",
         "includeAll": true,
         "label": "Node",
         "multi": true,
@@ -1628,7 +1425,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,hostname)",
+          "query": "label_values(up{instance_shape=~\"$instance_shape\"},hostname)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1650,7 +1447,7 @@
         "multi": true,
         "name": "oci_name",
         "options": [],
-        "query": "label_values(up, oci_name)",
+        "query": "label_values(up{instance_shape=~\"$instance_shape\"}, oci_name)",
         "refresh": 1,
         "type": "query"
       }
