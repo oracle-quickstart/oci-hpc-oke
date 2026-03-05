@@ -2,6 +2,8 @@
 
 This guide provides step-by-step instructions to deploy the same Prometheus and Grafana monitoring stack outside of Terraform, including custom dashboards and alerts for GPU/RDMA workloads on Kubernetes.
 
+> **Note:** If you deployed the monitoring stack using the Terraform stack, the monitoring stack is already installed and configured. You do not need to follow the instructions below.
+
 ## Table of Contents
 
 - [Overview](#overview)
