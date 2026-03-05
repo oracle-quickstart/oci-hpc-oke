@@ -10,9 +10,17 @@ data "oci_identity_dynamic_groups" "all" {
   compartment_id = var.tenancy_ocid
 }
 
+data "oci_identity_domains" "default" {
+  count          = var.create_policies && var.identity_domain_id == null ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  display_name   = "Default"
+  type           = "DEFAULT"
+  state          = "ACTIVE"
+}
+
 data "oci_identity_domain" "selected" {
-  count     = var.create_policies && var.identity_domain_id != null ? 1 : 0
-  domain_id = var.identity_domain_id
+  count     = var.create_policies ? 1 : 0
+  domain_id = coalesce(var.identity_domain_id, try(one(data.oci_identity_domains.default[0].domains[*].id), null))
 }
 
 resource "random_string" "state_id" {
@@ -28,9 +36,9 @@ locals {
   dynamic_groups_list  = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
-  use_identity_domain  = var.identity_domain_id != null
+  use_identity_domain  = var.create_policies
   idcs_endpoint        = one(data.oci_identity_domain.selected[*].url)
-  existing_dg_id      = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
+  existing_dg_id       = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
 
   domain_name = one(data.oci_identity_domain.selected[*].display_name)
 

@@ -27,6 +27,10 @@ variable "region" { type = string }
 
 # Identity
 variable "create_policies" { default = true }
+variable "identity_domain_compartment_id" {
+  type    = string
+  default = null
+}
 variable "identity_domain_id" {
   type    = string
   default = null
