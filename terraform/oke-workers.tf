@@ -98,6 +98,7 @@ locals {
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_ops_node_cycling_mode]
+      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
@@ -118,6 +119,7 @@ locals {
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
+      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
@@ -137,23 +139,25 @@ locals {
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
+      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
-      create                  = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
-      description             = "OKE self-managed Cluster Network with RDMA"
-      placement_ads           = [substr(var.worker_rdma_ad, -1, 0)]
-      mode                    = "cluster-network"
-      size                    = var.worker_rdma_pool_size
-      shape                   = var.worker_rdma_shape
-      boot_volume_size        = var.worker_rdma_boot_volume_size
-      boot_volume_vpus_per_gb = var.worker_rdma_boot_volume_vpus_per_gb
-      image_type              = "custom"
-      image_id                = local.worker_rdma_image_id
-      max_pods_per_node       = var.worker_rdma_max_pods_per_node
-      kubernetes_version      = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
-      cloud_init              = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_labels             = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      create                         = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
+      description                    = "OKE self-managed Cluster Network with RDMA"
+      placement_ads                  = [substr(var.worker_rdma_ad, -1, 0)]
+      mode                           = "cluster-network"
+      size                           = var.worker_rdma_pool_size
+      shape                          = var.worker_rdma_shape
+      boot_volume_size               = var.worker_rdma_boot_volume_size
+      boot_volume_vpus_per_gb        = var.worker_rdma_boot_volume_vpus_per_gb
+      image_type                     = "custom"
+      image_id                       = local.worker_rdma_image_id
+      max_pods_per_node              = var.worker_rdma_max_pods_per_node
+      kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
+      legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
+      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
       agent_config = {
         are_all_plugins_disabled = false
         is_management_disabled   = false
