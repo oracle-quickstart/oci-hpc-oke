@@ -75,8 +75,8 @@ locals {
 
   node_metadata = merge(
     var.oke_pre_bootstrap_script != "" ? { "pre_oke" : base64encode(var.oke_pre_bootstrap_script) } : {},
-    var.oke_kubelet_extra_args != "" ? { "kubelet-extra-args" : var.oke_kubelet_extra_args } : {},
-    var.oke_post_bootstrap_script != "" ? { "post_oke" : base64encode(var.oke_post_bootstrap_script) } : {},
+    var.oke_kubelet_extra_args != "" ? { "kube_args" : base64encode(var.oke_kubelet_extra_args) } : {},
+    var.oke_post_bootstrap_script != "" ? { "post_oke" : base64encode(var.oke_post_bootstrap_script) } : {}, 
   )
   
   supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? ( var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31 ) : var.max_pods_per_node
@@ -109,6 +109,7 @@ locals {
         local.node_metadata
       )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                = local.node_metadata
     }
     "oke-cpu" = {
       create             = local.create_workers && var.worker_cpu_enabled
@@ -133,6 +134,7 @@ locals {
         local.node_metadata
       )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                = local.node_metadata
     }
     "oke-gpu" = {
       create             = local.create_workers && var.worker_gpu_enabled
@@ -156,24 +158,24 @@ locals {
         local.node_metadata
       )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                = local.node_metadata
     }
     "oke-rdma" = {
-      create                         = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
-      description                    = "OKE self-managed Cluster Network with RDMA"
-      placement_ads                  = [substr(var.worker_rdma_ad, -1, 0)]
-      mode                           = "cluster-network"
-      size                           = var.worker_rdma_pool_size
-      shape                          = var.worker_rdma_shape
-      boot_volume_size               = var.worker_rdma_boot_volume_size
-      boot_volume_vpus_per_gb        = var.worker_rdma_boot_volume_vpus_per_gb
-      image_type                     = "custom"
-      image_id                       = local.worker_rdma_image_id
-      max_pods_per_node              = var.worker_rdma_max_pods_per_node
-      kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
-      legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
-      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata                  = local.node_metadata
-      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      create                  = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
+      description             = "OKE self-managed Cluster Network with RDMA"
+      placement_ads           = [substr(var.worker_rdma_ad, -1, 0)]
+      mode                    = "cluster-network"
+      size                    = var.worker_rdma_pool_size
+      shape                   = var.worker_rdma_shape
+      boot_volume_size        = var.worker_rdma_boot_volume_size
+      boot_volume_vpus_per_gb = var.worker_rdma_boot_volume_vpus_per_gb
+      image_type              = "custom"
+      image_id                = local.worker_rdma_image_id
+      max_pods_per_node       = var.worker_rdma_max_pods_per_node
+      kubernetes_version      = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
+      cloud_init              = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_labels             = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      node_metadata           = local.node_metadata
       agent_config = {
         are_all_plugins_disabled = false
         is_management_disabled   = false
