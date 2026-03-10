@@ -68,7 +68,6 @@ download_oke_credential_provider_for_ocir() {
     *)
         return 1
         ;;
-    
     esac
     
     wget --tries=5 --waitretry=3 --retry-connrefused -O /usr/local/bin/credential-provider-oke \
@@ -106,9 +105,21 @@ kubernetes_version="${1-}"
 setup_credential_provider="${2:-false}"
 
 if [[ "$setup_credential_provider" == "true" ]]; then
-    credential_provider_done=$(download_oke_credential_provider_for_ocir)
+    download_oke_credential_provider_for_ocir && credential_provider_done=0 || credential_provider_done=1
 else
     credential_provider_done=1
+fi
+
+# Fetch and execute the OKE pre-bootstrap script from metadata
+b64_pre_bootstrap_script=$(curl --silent --fail --max-time 30 -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/metadata/pre_oke 2>/dev/null) || true
+
+if [[ -n "$b64_pre_bootstrap_script" ]]; then
+    echo "Running pre-bootstrap script"
+    if pre_bootstrap_script=$(base64 --decode <<< "$b64_pre_bootstrap_script" 2>/dev/null); then
+        eval "$pre_bootstrap_script" || true
+    else
+        echo "Failed to decode pre-bootstrap script" >&2
+    fi
 fi
 
 case "$ID" in
@@ -199,3 +210,15 @@ EOF
 esac
 
 echo "OKE setup completed successfully."
+
+# Fetch and execute the OKE post-bootstrap script from metadata
+b64_post_bootstrap_script=$(curl --silent --fail --max-time 30 -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/metadata/post_oke 2>/dev/null) || true
+
+if [[ -n "$b64_post_bootstrap_script" ]]; then
+    echo "Running post-bootstrap script"
+    if post_bootstrap_script=$(base64 --decode <<< "$b64_post_bootstrap_script" 2>/dev/null); then
+        eval "$post_bootstrap_script" || true
+    else
+        echo "Failed to decode post-bootstrap script" >&2
+    fi
+fi

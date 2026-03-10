@@ -73,6 +73,12 @@ locals {
     write_files = local.write_files
   }
 
+  node_metadata = merge(
+    var.oke_pre_bootstrap_script != "" ? { "pre_oke" : base64encode(var.oke_pre_bootstrap_script) } : {},
+    var.oke_kubelet_extra_args != "" ? { "kubelet-extra-args" : var.oke_kubelet_extra_args } : {},
+    var.oke_post_bootstrap_script != "" ? { "post_oke" : base64encode(var.oke_post_bootstrap_script) } : {},
+  )
+  
   supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? ( var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31 ) : var.max_pods_per_node
   supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? ( var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31 ) : var.max_pods_per_node
 
@@ -98,7 +104,10 @@ locals {
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_ops_node_cycling_mode]
-      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
+      node_metadata                = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+        local.node_metadata
+      )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
@@ -119,7 +128,10 @@ locals {
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
-      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
+      node_metadata                = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+        local.node_metadata
+      )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
@@ -139,7 +151,10 @@ locals {
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
-      node_metadata                = { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }
+      node_metadata                = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+        local.node_metadata
+      )
       cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
@@ -157,6 +172,7 @@ locals {
       kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
       cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                  = local.node_metadata
       node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
       agent_config = {
         are_all_plugins_disabled = false
