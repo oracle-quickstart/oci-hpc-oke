@@ -51,6 +51,9 @@ variableGroups:
       - monitoring_advanced_options
       # Cluster setup
       - kubeproxy_mode
+      - oke_pre_bootstrap_script
+      - oke_post_bootstrap_script
+      - oke_kubelet_extra_args
       # Node cycling (per pool)
       - worker_ops_node_cycling_enabled
       - worker_ops_node_cycling_max_surge
@@ -68,6 +71,8 @@ variableGroups:
       - subnet_advanced_attrs
       - allow_rules_lustre
       - use_stateless_rules
+      # Workers
+      - legacy_imds_endpoints_disabled
 
   - title: "Identity"
     variables:
