@@ -11,7 +11,7 @@ data "oci_identity_dynamic_groups" "all" {
 }
 
 data "oci_identity_domains" "default" {
-  count          = var.create_policies && var.identity_domain_id == null ? 1 : 0
+  count          = local.lookup_identity_domain && var.identity_domain_id == null ? 1 : 0
   compartment_id = var.tenancy_ocid
   display_name   = "Default"
   type           = "DEFAULT"
@@ -19,7 +19,7 @@ data "oci_identity_domains" "default" {
 }
 
 data "oci_identity_domain" "selected" {
-  count     = var.create_policies ? 1 : 0
+  count     = local.lookup_identity_domain ? 1 : 0
   domain_id = coalesce(var.identity_domain_id, try(one(data.oci_identity_domains.default[0].domains[*].id), null))
 }
 
@@ -36,9 +36,11 @@ locals {
   dynamic_groups_list  = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id             = random_string.state_id.id
   service_account_name = format("oke-%s-svcacct", local.state_id)
-  use_identity_domain  = var.create_policies
-  idcs_endpoint        = one(data.oci_identity_domain.selected[*].url)
   existing_dg_id       = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
+  should_create_dg     = var.create_dynamic_group && !var.use_existing_dynamic_group && local.existing_dg_id == null
+  lookup_identity_domain = var.create_policies || local.should_create_dg
+  use_identity_domain  = local.lookup_identity_domain
+  idcs_endpoint        = one(data.oci_identity_domain.selected[*].url)
 
   domain_name = one(data.oci_identity_domain.selected[*].display_name)
 
@@ -102,7 +104,7 @@ locals {
 
 resource "oci_identity_dynamic_group" "oke_quickstart_all" {
   provider       = oci.home
-  count          = var.create_policies && local.existing_dg_id == null && !local.use_identity_domain ? 1 : 0
+  count          = local.should_create_dg && !local.use_identity_domain ? 1 : 0
   compartment_id = var.tenancy_ocid # dynamic groups exist in root compartment (tenancy)
   name           = format("oke-gpu-%v", local.state_id)
   description    = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)
@@ -113,7 +115,7 @@ resource "oci_identity_dynamic_group" "oke_quickstart_all" {
 }
 
 resource "oci_identity_domains_dynamic_resource_group" "oke_quickstart_all" {
-  count         = var.create_policies && local.existing_dg_id == null && local.use_identity_domain ? 1 : 0
+  count         = local.should_create_dg && local.use_identity_domain ? 1 : 0
   idcs_endpoint = local.idcs_endpoint
   display_name  = format("oke-gpu-%v", local.state_id)
   description   = format("Dynamic group of instances for OKE Terraform state %v", local.state_id)

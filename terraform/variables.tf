@@ -27,6 +27,15 @@ variable "region" { type = string }
 
 # Identity
 variable "create_policies" { default = true }
+variable "create_dynamic_group" { default = true }
+variable "use_existing_dynamic_group" {
+  type    = bool
+  default = false
+}
+variable "use_default_identity_domain" {
+  type    = bool
+  default = true
+}
 variable "identity_domain_compartment_id" {
   type    = string
   default = null
