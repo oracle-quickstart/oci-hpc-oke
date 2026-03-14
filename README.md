@@ -4,6 +4,7 @@ This guide provides instructions for deploying and managing GPU workloads with R
 
 ## Supported Operating Systems
 - Ubuntu 22.04
+- Ubuntu 24.04
 - Oracle Linux 8 (except for the GPU & RDMA worker pool)
 
 ## Required Policies
@@ -27,31 +28,47 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### VM.GPU.A10.1, VM.GPU.A10.2, BM.GPU.A10.4, BM.GPU4.8, BM.GPU.B4.8, BM.GPU.A100-v2.8, BM.GPU.L40S.4, BM.GPU.H100.8, BM.GPU.H200.8, BM.GPU.B200.8
 
-- [GPU driver 580 & CUDA 13.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/_zoP3rlMMSw56qgjZcneB8Hvdfi358vzGXqmPVM28L_LGNcOF3zX99cOWxyF8q55/n/idxzjcdglx2s/b/oke-images/o/Canonical-Ubuntu-22.04-2025.10.31-0-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-2026.01.16-0)
+##### Ubuntu 24.04
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.05.20-0-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.07.22-0)
+- [GPU driver 590 & CUDA 13.1](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-GPU-590-OPEN-CUDA-13.1-2026.03.13-0)
 
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-GPU-580-OPEN-CUDA-13.0-2026.03.13-0)
 
-#### BM.GPU.GB200.4
+##### Ubuntu 22.04
 
-- [GPU driver 580 & CUDA 13.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/jRqTH2aQhttWHCBG5RvAaK2dZzBmp6xRGx8LzGxlW4Hp2rVjdZ84i0MeihXLFixZ/n/imagegen/b/trroger/o/Canonical-Ubuntu-22.04-aarch64-2025.10.31-0-OCA-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-64K-2025.11.20-0)
+- [GPU driver 590 & CUDA 13.1](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-22.04-2026.02.28-0-DOCA-OFED-3.2.1-GPU-590-OPEN-CUDA-13.1-2026.03.13-0)
 
-- [GPU driver 570 & CUDA 12.8](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.05.20-0-DOCA-OFED-3.0.0-GPU-570-OPEN-CUDA-12.8-2025.07.24-0)
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-22.04-2026.02.28-0-DOCA-OFED-3.2.1-GPU-580-OPEN-CUDA-13.0-2026.03.13-0)
 
-#### BM.GPU.GB200-v3.4, BM.GPU.GB300.4
+#### BM.GPU.GB200.4, BM.GPU.GB200-v3.4, BM.GPU.GB300.4
 
-- [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-aarch64-2025.10.31-0-DOCA-OFED-3.1.0-GPU-580-OPEN-CUDA-13.0-CX8-2025.12.20-0)
+##### Ubuntu 24.04
 
-#### BM.GPU.MI355X-v1.8
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-6.8-DOCA-OFED-3.2.1-GPU-580-OPEN-CUDA-13.0-2026.03.13-0)
 
-- [ROCm 7.1.1](https://objectstorage.us-ashburn-1.oraclecloud.com/p/WvusvolB6r0XyzgKfOgJ5e7P3Sue0TKsF5FBGk1JndUfuQSRb0-UEEaEMl9dkgQs/n/imagegen/b/trroger/o/Canonical-Ubuntu-22.04-2025.10.31-0-OCA-DOCA-OFED-3.1.0-AMD-ROCM-711-2026.01.21-0)
+##### Ubuntu 22.04
 
-#### BM.GPU.MI300X.8
+- [GPU driver 580 & CUDA 13.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-22.04-aarch64-2026.02.28-0-DOCA-OFED-3.2.1-GPU-580-OPEN-CUDA-13.0-2026.03.13-0)
 
-- [ROCm 7.1.0](https://objectstorage.us-ashburn-1.oraclecloud.com/p/Rrur5toJd81BG-0nmLpi701FRs_PMLb4NhtfBwBlIgP-j2NE_5Dw5JfhR5v-Il_3/n/hpctraininglab/b/bucket-20251028-1826/o/Canonical-Ubuntu-24.04-2025.09.22-0-OCA-DOCA-OFED-3.1.0-AMD-ROCM-710-2025.10.31)
+#### BM.GPU.MI300X.8, BM.GPU.MI355X-v1.8
 
-- [ROCm 6.4.3](https://objectstorage.ca-montreal-1.oraclecloud.com/p/ts6fjAuj7hY4io5x_jfX3fyC70HRCG8-9gOFqAjuF0KE0s-6tgDZkbRRZIbMZmoN/n/hpc_limited_availability/b/images/o/Canonical-Ubuntu-22.04-2025.07.23-0-DOCA-OFED-3.1.0-AMD-ROCM-643-2025.09.25-0)
+##### Ubuntu 24.04
 
+- [ROCm 7.2.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-AMD-ROCM-72-2026.03.13-0)
+
+##### Ubuntu 22.04
+
+- [ROCm 7.2.0](https://objectstorage.ca-montreal-1.oraclecloud.com/p/AIo4CP0P_DlUelDlsWgGPWmY6FcBQzJWmmFyGKdY0epkh87a9Q3ndvFYycjIxTQ9/n/idxzjcdglx2s/b/images/o/Canonical-Ubuntu-22.04-2026.02.28-0-DOCA-OFED-3.2.1-AMD-ROCM-72-2026.03.13-0)
+
+#### BM.GPU.MI355X.8
+
+##### Ubuntu 24.04
+
+- [ROCm 7.2.0](https://objectstorage.ap-kulai-1.oraclecloud.com/p/r7NmOiphWU9Pm9G7yBSkGIYRT5EXCjSNL2BYqso7R-s2zYBoTPmdwn3uyJ-pCvGb/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-MOFED-2410_1140-AMD-ROCM-72-2026.03.13-0)
+
+##### Ubuntu 22.04
+
+- [ROCm 7.0.2](https://objectstorage.us-saltlake-2.oraclecloud.com/p/02QYYf_pFsZlBzMQi5-kp3jTYTJiX4RnkOfgpqTxlvwpO7pCie2bfYrRCr5KD_ll/n/hpctraininglab/b/Sudhir-test-bucket/o/Canonical-Ubuntu-22.04-Kernel-5.15-OFED-5.9-AMD-ROCM-702_POLLARA-OPENMPI-4.1.6)
 
 ### Deploy the Cluster
 You can easily deploy the cluster with the **Deploy to Oracle Cloud** button below, which uses OCI Resource Manager. If you prefer deploying with Terraform locally, you can use the templates in the [terraform directory](./terraform/).
@@ -166,9 +183,9 @@ Kueue and MPI Operator are required for running the optional NCCL tests.
 
 ### Deploy MPI Operator and Kueue
 ```sh
-kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.7.0/deploy/v2beta1/mpi-operator.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.8.0/deploy/v2beta1/mpi-operator.yaml
 
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.15.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
 ```
 
 ### Run the NCCL/RCCL Tests
