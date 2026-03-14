@@ -76,9 +76,14 @@ variableGroups:
 
   - title: "Identity"
     variables:
+      - use_default_identity_domain
+      - identity_domain_compartment_id
+      - identity_domain_id
       - create_policies
+      - create_dynamic_group
       - use_existing_dynamic_group
       - dynamic_group_id
+      - dynamic_group_id_input
 
   - title: Network
     variables:
@@ -283,28 +288,69 @@ variables:
 
   # Identity
   create_policies:
-    title: Create Dynamic Group and Policies
-    description: "Create a Dynamic Group with policies for Cluster Autoscaler, Self-managed nodes. This option assumes your user has the necessary permissions to create a dynamic group and policies in the root compartment of your tenancy."
+    title: Create Policies
+    description: "Create IAM policies for Cluster Autoscaler, Self-managed nodes, etc. This option assumes your user has the necessary permissions to create policies in the compartment."
     type: boolean
     default: true
+  create_dynamic_group:
+    title: Create Dynamic Group
+    description: "Create a new Dynamic Group for OKE resources. This option assumes your user has the necessary permissions to create a dynamic group."
+    type: boolean
+    default: true
+    visible:
+      not:
+        - use_existing_dynamic_group
   use_existing_dynamic_group:
     title: Use existing Dynamic Group
     description: "Select an existing dynamic group instead of creating a new one."
     type: boolean
     default: false
-    visible: create_policies
   dynamic_group_id:
     title: Dynamic Group
-    description: "The dynamic group to use with the policy statements. If the value is not selected then stack creates the new dynamic group"
+    description: "Select an existing dynamic group."
     type: oci:identity:dynamicgroups:id
-    required: false
+    required: true
     default: ""
     dependsOn:
       compartmentId: tenancy_ocid
     visible:
       and:
-        - create_policies
         - use_existing_dynamic_group
+        - use_default_identity_domain
+  use_default_identity_domain:
+    title: Use the Default Identity Domain
+    description: "Use the default identity domain of the tenancy. Disable to select a different identity domain."
+    type: boolean
+    default: true
+  identity_domain_compartment_id:
+    title: Identity Domain Compartment
+    description: "Select the compartment where your identity domain is located."
+    type: oci:identity:compartment:id
+    required: true
+    default: ${tenancy_ocid}
+    visible:
+      not:
+        - use_default_identity_domain
+  identity_domain_id:
+    title: Identity Domain
+    description: "Select an identity domain."
+    type: oci:identity:domains:id
+    required: true
+    dependsOn:
+      compartmentId: identity_domain_compartment_id
+    visible:
+      not:
+        - use_default_identity_domain
+  dynamic_group_id_input:
+    title: Dynamic Group OCID
+    description: "Paste the OCID of an existing dynamic group from the selected identity domain."
+    type: string
+    required: false
+    pattern: "^ocid1\\.dynamicgroup\\..*$"
+    visible:
+      and:
+        - use_existing_dynamic_group
+        - not: [use_default_identity_domain]
 
   # VCN
   create_vcn:
