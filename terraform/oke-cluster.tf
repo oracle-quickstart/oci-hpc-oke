@@ -7,6 +7,13 @@ data "oci_containerengine_clusters" "oke" {
 
 locals {
 
+  total_worker_nodes = sum([
+    var.worker_ops_pool_size,
+    var.worker_cpu_pool_size,
+    var.worker_gpu_pool_size,
+    var.worker_rdma_pool_size,
+  ])
+
   deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])
@@ -217,7 +224,7 @@ module "oke" {
         ]
       }
     },
-    (var.worker_ops_pool_size + var.worker_cpu_pool_size + var.worker_gpu_pool_size + var.worker_rdma_pool_size) > 50 ? {
+    local.total_worker_nodes > 50 ? {
       "CoreDNS" = {
         remove_addon_resources_on_delete = true
         override_existing                = true
