@@ -7,6 +7,13 @@ data "oci_containerengine_clusters" "oke" {
 
 locals {
 
+  total_worker_nodes = sum([
+    var.worker_ops_pool_size,
+    var.worker_cpu_pool_size,
+    var.worker_gpu_pool_size,
+    var.worker_rdma_pool_size,
+  ])
+
   deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])
@@ -45,8 +52,8 @@ locals {
 
   nsgs = merge(
     {
-      bastion  = var.create_bastion ? { create = "auto" } : { create = "never"}
-      operator = var.create_operator ? { create = "auto" } : { create = "never"}
+      bastion  = var.create_bastion ? { create = "auto" } : { create = "never" }
+      operator = var.create_operator ? { create = "auto" } : { create = "never" }
       int_lb   = { create = "auto" }
       pub_lb   = { create = "auto" }
       cp       = { create = "auto" }
@@ -159,12 +166,12 @@ locals {
 
   cni_type = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
 
-  operator_denseio_ocpus = { 
-    "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex, 
+  operator_denseio_ocpus = {
+    "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = var.operator_shape_ocpus_denseIO_e5_flex
   }
-  operator_denseio_memory = { 
-    "VM.DenseIO.E4.Flex" = 16 * var.operator_shape_ocpus_denseIO_e4_flex, 
+  operator_denseio_memory = {
+    "VM.DenseIO.E4.Flex" = 16 * var.operator_shape_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = 12 * var.operator_shape_ocpus_denseIO_e5_flex
   }
 }
@@ -216,13 +223,15 @@ module "oke" {
           }
         ]
       }
+    },
+    local.total_worker_nodes > 50 ? {
       "CoreDNS" = {
         remove_addon_resources_on_delete = true
         override_existing                = true
         configurations = [
           {
             key   = "minReplica"
-            value = "3"
+            value = tostring(min(3, max(1, var.worker_ops_pool_size)))
           },
           {
             key   = "nodesPerReplica"
@@ -238,15 +247,8 @@ module "oke" {
           }
         ]
       }
-    },
+    } : {},
 
-    # var.install_monitoring && var.install_node_problem_detector_kube_prometheus_stack && var.preferred_kubernetes_services == "public" ?
-    # {
-    #   "CertManager" = {
-    #     remove_addon_resources_on_delete = true
-    #     override_existing                = true
-    #   }
-    # } : {},
     anytrue([
       contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape),
       contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)
@@ -287,8 +289,8 @@ module "oke" {
     memory           = lookup(local.operator_denseio_memory, var.operator_shape_name, var.operator_shape_memory)
     boot_volume_size = var.operator_shape_boot
   }
-  output_detail = true
-  pods_cidr     = "10.240.0.0/12"
+  output_detail                     = true
+  pods_cidr                         = "10.240.0.0/12"
   services_cidr                     = var.services_cidr
   kubeproxy_mode                    = var.kubeproxy_mode
   preferred_load_balancer           = var.preferred_kubernetes_services
@@ -309,7 +311,7 @@ module "oke" {
   subnets                           = local.subnets
   nsgs                              = local.nsgs
   use_stateless_rules               = var.use_stateless_rules
-  
+
   allow_rules_internal_lb = {
     "Allow TCP ingress to internal load balancers from internal VCN/DRG" = {
       protocol = local.all_protocols, port = local.all_ports, source = local.vcn_cidr, source_type = local.rule_type_cidr,
