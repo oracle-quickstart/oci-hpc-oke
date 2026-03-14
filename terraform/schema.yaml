@@ -321,7 +321,7 @@ variables:
     title: Identity Domain Compartment
     description: "Select the compartment where your identity domain is located."
     type: oci:identity:compartment:id
-    required: false
+    required: true
     default: ${tenancy_ocid}
     visible:
       not:
@@ -330,7 +330,7 @@ variables:
     title: Identity Domain
     description: "Select an identity domain."
     type: oci:identity:domains:id
-    required: false
+    required: true
     dependsOn:
       compartmentId: identity_domain_compartment_id
     visible:
