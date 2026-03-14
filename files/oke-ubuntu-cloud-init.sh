@@ -116,41 +116,11 @@ b64_pre_bootstrap_script=$(curl --silent --fail --max-time 30 -H "Authorization:
 if [[ -n "$b64_pre_bootstrap_script" ]]; then
     echo "Running pre-bootstrap script"
     if pre_bootstrap_script=$(base64 --decode <<< "$b64_pre_bootstrap_script" 2>/dev/null); then
-        eval "$pre_bootstrap_script"
+        eval "$pre_bootstrap_script" || true
     else
         echo "Failed to decode pre-bootstrap script" >&2
     fi
 fi
-
-# Fetch the OKE custom kubelet extra args from metadata and build the final args
-b64_kubelet_extra_args=$(curl --silent --fail --max-time 30 -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/metadata/kube_args 2>/dev/null) || true
-
-kubelet_custom_args=""
-if [[ -n "$b64_kubelet_extra_args" ]]; then
-    kubelet_custom_args=$(base64 --decode <<< "$b64_kubelet_extra_args" 2>/dev/null) || kubelet_custom_args=""
-fi
-
-# Build final kubelet args
-kubelet_extra_args_array=()
-if [[ "$credential_provider_done" -eq 0 ]]; then
-    kubelet_extra_args_array+=("--image-credential-provider-bin-dir=/usr/local/bin/")
-    kubelet_extra_args_array+=("--image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml")
-fi
-
-if [[ -n "$kubelet_custom_args" ]]; then
-    kubelet_extra_args_array+=("$kubelet_custom_args")
-fi
-
-kubelet_extra_args_final="${kubelet_extra_args_array[*]}"
-
-# Helper to run oke bootstrap
-run_oke_bootstrap() {
-    if [[ -n "$kubelet_extra_args_final" ]]; then
-        run_with_retry oke bootstrap --kubelet-extra-args "$kubelet_extra_args_final"
-    else
-        run_with_retry oke bootstrap
-    fi
-}
 
 case "$ID" in
     ubuntu)
@@ -158,7 +128,11 @@ case "$ID" in
         if command -v oke >/dev/null 2>&1; then
             echo "[Ubuntu] oke binary already present, running bootstrap only"
             configure_crio_defaults "$kubernetes_version"
-            run_oke_bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                run_with_retry oke bootstrap
+            fi
         else
             echo "[Ubuntu] oke binary not found, installing package"
             oke_package_version="${kubernetes_version:1}"
@@ -195,7 +169,11 @@ EOF
 
             echo "[Ubuntu] Running bootstrap"
             configure_crio_defaults "$kubernetes_version"
-            run_oke_bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                run_with_retry oke bootstrap
+            fi
         fi
         ;;
     ol)
@@ -204,7 +182,11 @@ EOF
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
             
             configure_crio_defaults "$kubernetes_version"
-            run_oke_bootstrap
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            else
+                run_with_retry oke bootstrap
+            fi
         else
             echo "[Oracle Linux] oke binary not found, fetching init script"
             curl --fail -H "Authorization: Bearer Oracle" \
@@ -213,8 +195,8 @@ EOF
 
             echo "[Oracle Linux] Running init script"
             configure_crio_defaults "$kubernetes_version"
-            if [[ -n "$kubelet_extra_args_final" ]]; then
-                run_with_retry bash /var/run/oke-init.sh --kubelet-extra-args "$kubelet_extra_args_final"
+            if [[ "$credential_provider_done" -eq 0 ]]; then
+                run_with_retry bash /var/run/oke-init.sh --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
             else
                 run_with_retry bash /var/run/oke-init.sh
             fi
@@ -227,16 +209,16 @@ EOF
         ;;
 esac
 
+echo "OKE setup completed successfully."
+
 # Fetch and execute the OKE post-bootstrap script from metadata
 b64_post_bootstrap_script=$(curl --silent --fail --max-time 30 -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2/instance/metadata/post_oke 2>/dev/null) || true
 
 if [[ -n "$b64_post_bootstrap_script" ]]; then
     echo "Running post-bootstrap script"
     if post_bootstrap_script=$(base64 --decode <<< "$b64_post_bootstrap_script" 2>/dev/null); then
-        eval "$post_bootstrap_script"
+        eval "$post_bootstrap_script" || true
     else
         echo "Failed to decode post-bootstrap script" >&2
     fi
 fi
-echo "OKE setup completed successfully."
-

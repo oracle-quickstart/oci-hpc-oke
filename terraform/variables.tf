@@ -379,17 +379,24 @@ variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string
   default     = "" 
-  description = "Bash commands to be executed on all the worker nodes before the OKE Bootstrapping command."
+  description = "Bash commands to be executed on all of the worker nodes before the OKE Bootstrapping."
 }
 variable "oke_post_bootstrap_script" { 
   type        = string
   default     = "" 
-  description = "Bash commands to be executed on all the worker nodes after the OKE Bootstrapping command."
+  description = "Bash commands to be executed on all of the worker nodes after the OKE Bootstrapping."
 }
 variable "oke_kubelet_extra_args" { 
   type        = string
   default     = "" 
-  description = "kubelet-extra-args to be appended to the kubelet configuration. https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengusingcustomcloudinitscripts.htm"
+  description = "kubelet-extra-args to be used for the kubelet configuration. https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/"
+}
+
+# Instance Metadata Service (IMDS)
+variable "legacy_imds_endpoints_disabled" {
+  type        = bool
+  default     = true
+  description = "Whether to disable legacy IMDS endpoints on nodepool instances (IMDSv1). When true, only IMDSv2 is available."
 }
 
 # Workers - System pool
