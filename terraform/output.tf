@@ -87,6 +87,14 @@ output "grafana_port_forward" {
   value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-grafana 3000:80", var.monitoring_namespace)
 }
 
+output "cluster_healthchecks_bucket_name" {
+  value = local.cluster_healthchecks_results_bucket_name
+}
+
+output "cluster_healthchecks_namespace" {
+  value = local.cluster_healthchecks_results_namespace
+}
+
 output "access_k8s_public_endpoint" {
   value = var.control_plane_is_public ? format("oci ce cluster create-kubeconfig --cluster-id %v --file $HOME/.kube/config --region %v --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT", module.oke.cluster_id, var.region) : "N/A"
 }

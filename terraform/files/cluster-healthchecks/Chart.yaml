@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cluster-healthchecks
+description: Cluster health checks workload (daemonset)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

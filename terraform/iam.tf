@@ -64,6 +64,7 @@ locals {
     "Allow dynamic-group %v to manage compute-management-family in compartment id %v",
     "Allow dynamic-group %v to manage instance-family in compartment id %v",
     "Allow dynamic-group %v to manage volume-family in compartment id %v",
+    var.install_cluster_healthchecks ? "Allow dynamic-group %v to manage object-family in compartment id %v" : "",
     "Allow dynamic-group %v to use ons-topics in compartment id %v",
     "Allow dynamic-group %v to use subnets in compartment id %v",
     "Allow dynamic-group %v to use virtual-network-family in compartment id %v",

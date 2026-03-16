@@ -315,6 +315,41 @@ variable "setup_alerting" {
   type    = bool
 }
 
+variable "install_cluster_healthchecks" {
+  default = true
+  type    = bool
+}
+
+variable "cluster_healthchecks_namespace" {
+  default = "cluster-healthchecks"
+  type    = string
+}
+
+variable "cluster_healthchecks_image_repository" {
+  default = "iad.ocir.io/iduyx1qnmway/lens-metric-collector/oci-dr-hpc-v2"
+  type    = string
+}
+
+variable "cluster_healthchecks_image_tag" {
+  default = "cuda-12.6.0-1.0.103"
+  type    = string
+}
+
+variable "cluster_healthchecks_image_pull_policy" {
+  default = "IfNotPresent"
+  type    = string
+}
+
+variable "cluster_healthchecks_image_pull_secrets" {
+  default = []
+  type    = list(string)
+}
+
+variable "cluster_healthcheck_verbose" {
+  default = false
+  type    = bool
+}
+
 variable "avoid_waiting_for_delete_target" {
   default = false
   type    = bool

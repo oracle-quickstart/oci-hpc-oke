@@ -255,6 +255,11 @@ variableGroups:
     - install_grafana_dashboards
     - use_lets_encrypt_prod_endpoint
     - setup_alerting
+    - install_cluster_healthchecks
+    - cluster_healthchecks_namespace
+    - cluster_healthchecks_image_repository
+    - cluster_healthchecks_image_tag
+    - cluster_healthcheck_verbose
 
   - title: "Stack Configuration"
     variables:
@@ -1101,6 +1106,40 @@ variables:
       - monitoring_advanced_options
       - install_node_problem_detector_kube_prometheus_stack
       - install_grafana
+  install_cluster_healthchecks:
+    title: Install Cluster Healthchecks
+    description: Deploy the cluster-healthchecks daemonset.
+    type: boolean
+    default: true
+    visible: true
+  cluster_healthchecks_namespace:
+    title: Cluster Healthchecks namespace
+    description: Kubernetes namespace for cluster-healthchecks resources.
+    type: string
+    default: "cluster-healthchecks"
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+    required: ${install_cluster_healthchecks}
+    visible: ${install_cluster_healthchecks}
+  cluster_healthchecks_image_repository:
+    title: Cluster Healthchecks image repository
+    description: Image repository for the cluster-healthchecks workloads.
+    type: string
+    default: "iad.ocir.io/iduyx1qnmway/lens-metric-collector/oci-dr-hpc-v2"
+    required: ${install_cluster_healthchecks}
+    visible: ${install_cluster_healthchecks}
+  cluster_healthchecks_image_tag:
+    title: Cluster Healthchecks image tag
+    description: Image tag for the cluster-healthchecks workloads.
+    type: string
+    default: "cuda-12.6.0-1.0.103"
+    required: ${install_cluster_healthchecks}
+    visible: ${install_cluster_healthchecks}
+  cluster_healthcheck_verbose:
+    title: Cluster Healthchecks verbose
+    description: Enable verbose output for passive checks.
+    type: boolean
+    default: false
+    visible: ${install_cluster_healthchecks}
   avoid_waiting_for_delete_target:
     type: boolean
     title: Accelerate Oracle Notifications Service (ONS) topic deletion on stack destroy

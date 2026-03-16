@@ -181,6 +181,51 @@ module "node_problem_detector" {
   depends_on = [module.kube_prometheus_stack]
 }
 
+module "cluster_healthchecks" {
+  count  = alltrue([local.deploy_from_operator, var.install_cluster_healthchecks]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = var.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = var.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name = "cluster-healthchecks"
+  namespace       = var.cluster_healthchecks_namespace
+  helm_chart_path = "${path.module}/files/cluster-healthchecks"
+
+  pre_deployment_commands = [
+    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal"
+  ]
+  post_deployment_commands = []
+
+  deployment_extra_args = ["--wait"]
+
+  helm_template_values_override = yamlencode(
+    {
+      image = {
+        repository = var.cluster_healthchecks_image_repository
+        tag        = var.cluster_healthchecks_image_tag
+        pullPolicy = var.cluster_healthchecks_image_pull_policy
+        pullSecrets = [for s in var.cluster_healthchecks_image_pull_secrets : { name = s }]
+      }
+      passive = {
+        enabled  = true
+        verbose  = var.cluster_healthcheck_verbose
+      }
+      results = {
+        mountPath  = "/results"
+        bucketName = local.cluster_healthchecks_results_bucket_name
+        namespace  = local.cluster_healthchecks_results_namespace
+      }
+    }
+  )
+  helm_user_values_override = ""
+
+  depends_on = [module.oke]
+}
 
 module "nvidia_dcgm_exporter" {
   count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_nvidia_dcgm_exporter]) ? 1 : 0

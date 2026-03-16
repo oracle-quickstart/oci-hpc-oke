@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-healthchecks-results
+  labels:
+    app.kubernetes.io/name: {{ include "cluster-healthchecks.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  bucketName: {{ required "results.bucketName is required" .Values.results.bucketName | quote }}
+  namespace: {{ required "results.namespace is required" .Values.results.namespace | quote }}
+  mountPath: {{ .Values.results.mountPath | default "/results" | quote }}

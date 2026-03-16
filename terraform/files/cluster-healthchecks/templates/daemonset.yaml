@@ -1,0 +1,138 @@
+{{- if .Values.passive.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "cluster-healthchecks.fullname" . }}-passive
+  labels:
+    app.kubernetes.io/name: {{ include "cluster-healthchecks.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: cluster-healthchecks-passive
+    {{- with .Values.commonLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app: cluster-healthchecks-passive
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app: cluster-healthchecks-passive
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "1"
+      restartPolicy: Always
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.passive.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.passive.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.passive.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: results
+        hostPath:
+          path: {{ .Values.results.path | default "/tmp/cluster-healthcheck" | quote }}
+          type: DirectoryOrCreate
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
+      - name: host-run
+        hostPath:
+          path: /run
+          type: Directory
+      - name: host-dbus
+        hostPath:
+          path: /run/dbus/system_bus_socket
+          type: Socket
+      containers:
+      - name: passive
+        image: "{{ required \"image.repository is required\" .Values.image.repository }}:{{ required \"image.tag is required\" .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          privileged: true
+        env:
+        - name: RESULTS_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-healthchecks-results
+              key: bucketName
+        - name: RESULTS_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-healthchecks-results
+              key: namespace
+        - name: RESULTS_MOUNT_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-healthchecks-results
+              key: mountPath
+        command: ["/bin/bash","-lc"]
+        args:
+        - |-
+          set -euo pipefail
+
+          RESULTS_DIR="${RESULTS_MOUNT_PATH:-/results}"
+          BUCKET="${RESULTS_BUCKET}"
+          NAMESPACE="${RESULTS_NAMESPACE}"
+          if [ -z "${BUCKET}" ] || [ -z "${NAMESPACE}" ]; then
+            echo "ERROR: results.bucketName and results.namespace must be set"
+            exit 1
+          fi
+          mkdir -p "${RESULTS_DIR}"
+
+          echo "[passive] starting on $(hostname) at $(date -u +%Y%m%dT%H%M%SZ)"
+
+          while true; do
+            ts="$(date -u +%Y%m%dT%H%M%SZ)"
+
+            echo "[passive] tick ts=${ts}"
+
+            set +e
+            timeout -k 10 600 oci-dr-hpc-v2 health-checks --container \
+              -o json \
+              --output-dir "${RESULTS_DIR}" \
+              --all-recommendations \
+              {{- if .Values.passive.verbose }}--verbose{{ end }} \
+              --upload --bucket "${BUCKET}" --namespace "${NAMESPACE}"
+            rc=$?
+            set -e
+
+            sleep 300
+          done
+        volumeMounts:
+        - name: results
+          mountPath: {{ .Values.results.mountPath | default "/results" | quote }}
+        - name: host-root
+          mountPath: /host
+          readOnly: false
+        - name: host-run
+          mountPath: /host/run
+          readOnly: true
+        - name: host-dbus
+          mountPath: /run/dbus/system_bus_socket
+          readOnly: true
+{{- end }}

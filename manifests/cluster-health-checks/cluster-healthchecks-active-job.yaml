@@ -1,0 +1,227 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: gpu-nvidia
+  namespace: cluster-healthchecks
+spec:
+  nodeLabels:
+    nvidia.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: gpu-amd
+  namespace: cluster-healthchecks
+spec:
+  nodeLabels:
+    amd.com/gpu: "true"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: cluster-healthchecks-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "nvidia.com/gpu", "amd.com/gpu", "ephemeral-storage"]
+    flavors:
+    - name: gpu-nvidia
+      resources:
+      - name: cpu
+        nominalQuota: "100000"
+      - name: memory
+        nominalQuota: "100000Gi"
+      - name: nvidia.com/gpu
+        nominalQuota: "100000"
+      - name: ephemeral-storage
+        nominalQuota: "100000Gi"
+    - name: gpu-amd
+      resources:
+      - name: cpu
+        nominalQuota: "100000"
+      - name: memory
+        nominalQuota: "100000Gi"
+      - name: amd.com/gpu
+        nominalQuota: "100000"
+      - name: ephemeral-storage
+        nominalQuota: "100000Gi"
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: cluster-healthchecks-local
+  namespace: cluster-healthchecks
+spec:
+  clusterQueue: cluster-healthchecks-queue
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cluster-healthchecks-active
+  namespace: cluster-healthchecks
+  labels:
+    app.kubernetes.io/name: cluster-healthchecks
+    app.kubernetes.io/instance: cluster-healthchecks
+    app: cluster-healthchecks-active
+  annotations:
+    kueue.x-k8s.io/queue-name: "cluster-healthchecks-local"
+spec:
+  suspend: true
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: cluster-healthchecks-active
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      dnsConfig:
+        options:
+        - name: ndots
+          value: "1"
+      restartPolicy: Never
+
+      volumes:
+      - name: results
+        hostPath:
+          path: "/tmp/cluster-healthcheck"
+          type: DirectoryOrCreate
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
+      - name: host-dbus
+        hostPath:
+          path: /run/dbus/system_bus_socket
+          type: Socket
+      - name: host-run
+        hostPath:
+          path: /run
+          type: Directory
+
+      # imagePullSecrets:
+      # - name: cluster-healthchecks-ocir-secret
+
+      nodeSelector:
+        cluster-healthchecks-active: "true"
+
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: In
+                values: ["true"]
+            - matchExpressions:
+              - key: amd.com/gpu
+                operator: In
+                values: ["true"]
+
+      containers:
+      - name: main
+        image: iad.ocir.io/iduyx1qnmway/lens-metric-collector/oci-dr-hpc-v2:cuda-12.6.0-1.0.103
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          privileged: true
+        env:
+        - name: RESULTS_DIR
+          value: "/results"
+        - name: RESULTS_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-healthchecks-results
+              key: bucketName
+              optional: true
+        - name: RESULTS_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-healthchecks-results
+              key: namespace
+              optional: true
+        - name: VERBOSE
+          value: "false"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: OCI_GO_SDK_DEBUG
+          value: info
+        volumeMounts:
+        - name: results
+          mountPath: "/results"
+        - name: host-root
+          mountPath: /host
+          readOnly: false
+        - name: host-run
+          mountPath: /host/run
+          readOnly: true
+        - name: host-dbus
+          mountPath: /run/dbus/system_bus_socket
+          readOnly: true
+        command: ["/bin/bash"]
+        args:
+        - "-lc"
+        - |
+          set -euo pipefail
+
+          # ---- OCI region auto-detect (must be BEFORE any OCI SDK/CLI call) ----
+          IMDS="http://169.254.169.254/opc/v2/instance"
+          HDR="Authorization: Bearer Oracle"
+
+          REGION_ID="$(curl -sfH "$HDR" "$IMDS/regionInfo/regionIdentifier" || true)"
+          if [ -z "$REGION_ID" ]; then
+            REGION_ID="$(curl -sfH "$HDR" "$IMDS/canonicalRegionName" || true)"
+          fi
+
+          REALM_KEY="$(curl -sfH "$HDR" "$IMDS/regionInfo/realmKey" || true)"
+          REALM_DOM="$(curl -sfH "$HDR" "$IMDS/regionInfo/realmDomainComponent" || true)"
+          REGION_KEY="$(curl -sfH "$HDR" "$IMDS/regionInfo/regionKey" || true)"
+
+          export OCI_REGION="${REGION_ID}"
+          export OCI_REGION_METADATA="{\"realmKey\":\"${REALM_KEY}\",\"realmDomainComponent\":\"${REALM_DOM}\",\"regionKey\":\"${REGION_KEY}\",\"regionIdentifier\":\"${REGION_ID}\"}"
+
+          echo "Detected OCI_REGION=${OCI_REGION}"
+          # -------------------------------------------------------------------
+
+          RESULTS_DIR="${RESULTS_DIR:-/results}"
+          if [ -z "${RESULTS_BUCKET:-}" ] || [ -z "${RESULTS_NAMESPACE:-}" ]; then
+            echo "ERROR: ConfigMap cluster-healthchecks-results missing bucketName/namespace"
+            exit 1
+          fi
+          BUCKET="${RESULTS_BUCKET}"
+          NAMESPACE="${RESULTS_NAMESPACE}"
+          TESTNAME="${TESTNAME}"
+          if [ -z "${TESTNAME}" ]; then
+            echo "ERROR: TESTNAME is empty; set TESTNAME in this manifest"
+            exit 1
+          fi
+          mkdir -p "${RESULTS_DIR}"
+
+          ts="$(date -u +%Y%m%dT%H%M%SZ)"
+
+          echo "=== Kueue Active Test start ts=${ts}"
+
+          # Always capture a verbose log, regardless of where the tool writes its own logs
+          VERBOSE_FLAG=""
+          if [ "${VERBOSE:-false}" = "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          {
+
+            oci-dr-hpc-v2 active-checks \
+              --container \
+              --test "${TESTNAME}" \
+              --output json \
+              --output-dir "${RESULTS_DIR}" \
+              ${VERBOSE_FLAG} \
+              --upload --bucket "${BUCKET}" --namespace "${NAMESPACE}" || true
+          }
+
+          echo "=== Files ==="
+          ls -lah "${RESULTS_DIR}" || true
+
+          echo "Sleeping 300 seconds for inspection..."
+          sleep 300

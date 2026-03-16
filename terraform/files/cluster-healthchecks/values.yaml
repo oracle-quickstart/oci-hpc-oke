@@ -1,0 +1,40 @@
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+commonLabels: {}
+
+podSecurityContext: {}
+securityContext: {}
+
+passive:
+  enabled: true
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu
+            operator: In
+            values: ["true"]
+          - key: cluster-healthchecks
+            operator: NotIn
+            values: ["disabled"]
+        - matchExpressions:
+          - key: amd.com/gpu
+            operator: In
+            values: ["true"]
+          - key: cluster-healthchecks
+            operator: NotIn
+            values: ["disabled"]
+  verbose: false
+
+results:
+  path: "/tmp/cluster-healthcheck"
+  mountPath: "/results"
+  bucketName: ""
+  namespace: ""
