@@ -60,7 +60,7 @@ oci.oraclecloud.com/rdma.network_block_id=7xmzl4p4wba
 ## Kueue with Topology Aware Scheduling (Recommended)
 
 > [!NOTE]
-> Starting with stack v26.3.0, Kueue is deployed by default along with the Topology and ResourceFlavor resources. If you deployed using v26.3.0 or later, skip to [Step 3](#step-3-create-a-clusterqueue).
+> Starting with stack v26.3.0, Kueue is deployed by default along with the Topology, ResourceFlavor, ClusterQueue, and LocalQueue resources. If you deployed using v26.3.0 or later, skip to [Step 6](#step-6-submit-a-job).
 
 Kueue's **Topology Aware Scheduling (TAS)** automatically places pods as close together as possible in the RDMA network hierarchy. You define a preferred topology level (e.g., Local Block), and Kueue will pack pods there if capacity allows. If not, it progressively falls back to Network Block, then HPC Island — no manual label lookups or affinity rules required.
 
@@ -69,15 +69,21 @@ This is the recommended approach because:
 - **Automatic fallback** — jobs are never stuck waiting; Kueue finds the best available placement
 - **Integrates with quotas** — ClusterQueue resource quotas prevent overcommitment
 
-### Step 1: Create a Topology
+### Step 1: Install Kueue
+
+```sh
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
+```
+
+### Step 2: Create a Topology
 
 Define how nodes are grouped at different hierarchy levels.
 
 ```yaml
-apiVersion: kueue.x-k8s.io/v1alpha1
+apiVersion: kueue.x-k8s.io/v1beta1
 kind: Topology
 metadata:
-  name: "oci-topology"
+  name: "oci-rdma"
 spec:
   levels:
   - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
@@ -90,26 +96,29 @@ spec:
 kubectl apply -f topology.yaml
 ```
 
-### Step 2: Create a ResourceFlavor
+### Step 3: Create a ResourceFlavor
 
 Define a flavor for your node type and reference the topology.
+
+> [!NOTE]
+> The examples below use `BM.GPU.H100.8` as the shape. Change the shape and resource names to match your GPU shape (e.g., `BM.GPU.B200.8`, `BM.GPU.MI300X.8`).
 
 ```yaml
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ResourceFlavor
 metadata:
-  name: "tas-flavor"
+  name: "bm-gpu-h100-8"
 spec:
   nodeLabels:
     node.kubernetes.io/instance-type: "BM.GPU.H100.8"
-  topologyName: "oci-topology"
+  topologyName: "oci-rdma"
 ```
 
 ```bash
 kubectl apply -f resourceflavor.yaml
 ```
 
-### Step 3: Create a ClusterQueue
+### Step 4: Create a ClusterQueue
 
 Define a shared queue of resources available to all namespaces.
 
@@ -117,13 +126,13 @@ Define a shared queue of resources available to all namespaces.
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: ClusterQueue
 metadata:
-  name: "tas-cluster-queue"
+  name: "bm-gpu-h100-8"
 spec:
   namespaceSelector: {}
   resourceGroups:
   - coveredResources: ["cpu", "memory", "nvidia.com/gpu"]
     flavors:
-    - name: "tas-flavor"
+    - name: "bm-gpu-h100-8"
       resources:
       - name: "cpu"
         nominalQuota: 1000
@@ -137,7 +146,7 @@ spec:
 kubectl apply -f clusterqueue.yaml
 ```
 
-### Step 4: Create a LocalQueue
+### Step 5: Create a LocalQueue
 
 Create a namespace-specific queue linked to the cluster queue.
 
@@ -145,16 +154,16 @@ Create a namespace-specific queue linked to the cluster queue.
 apiVersion: kueue.x-k8s.io/v1beta1
 kind: LocalQueue
 metadata:
-  name: tas-user-queue
+  name: bm-gpu-h100-8
 spec:
-  clusterQueue: tas-cluster-queue
+  clusterQueue: bm-gpu-h100-8
 ```
 
 ```bash
 kubectl apply -f localqueue.yaml
 ```
 
-### Step 5: Submit a Job
+### Step 6: Submit a Job
 
 Add the `kueue.x-k8s.io/queue-name` label and the `kueue.x-k8s.io/podset-preferred-topology` annotation to your workload. Kueue will prefer placing all pods within the same topology domain. If that is not possible, Kueue will progressively move up the hierarchy until it finds a level where the job fits.
 
@@ -164,7 +173,7 @@ kind: Job
 metadata:
   generateName: tas-sample-preferred-
   labels:
-    kueue.x-k8s.io/queue-name: tas-user-queue
+    kueue.x-k8s.io/queue-name: bm-gpu-h100-8
 spec:
   parallelism: 2
   completions: 2
