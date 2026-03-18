@@ -96,6 +96,7 @@ variableGroups:
       - networking_advanced_options
       - custom_subnet_ids
       - bastion_sn_cidr
+      - bastion_service_sn_cidr
       - operator_sn_cidr
       - int_lb_sn_cidr
       - pub_lb_sn_cidr
@@ -105,6 +106,7 @@ variableGroups:
       - lustre_sn_cidr
       - pods_sn_cidr
       - bastion_sn_id
+      - bastion_service_sn_id
       - operator_sn_id
       - int_lb_sn_id
       - pub_lb_sn_id
@@ -133,6 +135,11 @@ variableGroups:
       - operator_shape_ocpus_denseIO_e5_flex
       - operator_shape_memory
       - operator_shape_boot
+
+  - title: Bastion Service
+    variables:
+      - create_oci_bastion_service
+      - bastion_service_allowed_cidrs
 
   - title: OKE Cluster
     variables:
@@ -398,6 +405,18 @@ variables:
       - { not: [create_vcn] }
       - custom_subnet_ids
       - networking_advanced_options
+  bastion_service_sn_id:
+    title: Existing subnet to use for the bastion service
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${vcn_compartment_ocid}
+      vcnId: ${vcn_id}
+    visible: 
+      and:
+      - { not: [create_vcn] }
+      - custom_subnet_ids
+      - networking_advanced_options
   operator_sn_id:
     title: Existing subnet to use for the operator
     type: oci:core:subnet:id
@@ -497,6 +516,21 @@ variables:
   bastion_sn_cidr:
     title: Subnet CIDR for the bastion subnet
     description: CIDR subnet to use for the bastion subnet. If not provided a dynamic subnet will be created if required.
+    type: string
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    required: false
+    visible:
+      or:
+      - and:
+        - { not: [create_vcn] }
+        - { not: [custom_subnet_ids] }
+        - networking_advanced_options
+      - and:
+        - create_vcn
+        - networking_advanced_options
+  bastion_service_sn_cidr:
+    title: Subnet CIDR for the bastion service subnet
+    description: CIDR subnet to use for the bastion service subnet. If not provided a dynamic subnet will be created if required.
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
     required: false
@@ -756,6 +790,25 @@ variables:
           - eq: [bastion_shape_name, "VM.Standard.Ampere.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.Intel.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.E3.Flex"]
+
+  # Bastion Service
+  create_oci_bastion_service:
+    title: Create OCI Bastion service
+    type: boolean
+    description: Create an OCI Bastion service in a dedicated subnet for private endpoint access.
+    default: false
+  bastion_service_allowed_cidrs:
+    title: Bastion service CIDR allowlist
+    description: CIDR ranges allowed to initiate OCI Bastion sessions.
+    required: true
+    type: array
+    items:
+      type: string
+      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+    unique_items: true
+    minItems: 1
+    default: ["0.0.0.0/0"]
+    visible: ${create_oci_bastion_service}
 
   # Operator
   create_operator:
@@ -1771,6 +1824,12 @@ outputGroups:
       - bastion_ssh_command
       - bastion_ssh_secret_id
 
+  - title: Bastion Service
+    outputs:
+      - bastion_service_id
+      - bastion_service_subnet_id
+      - bastion_service_subnet_cidr
+
   - title: Operator
     outputs:
       - operator_id
@@ -1890,6 +1949,17 @@ outputs:
   bastion_ssh_command:
     title: SSH command
     type: copyableString
+
+# Bastion Service
+  bastion_service_id:
+    title: Bastion service
+    type: ocid
+  bastion_service_subnet_id:
+    title: Bastion service subnet
+    type: ocid
+  bastion_service_subnet_cidr:
+    title: Bastion service subnet CIDR
+    type: string
 
   # Operator
   operator_id:
