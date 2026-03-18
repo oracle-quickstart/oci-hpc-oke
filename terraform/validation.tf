@@ -134,10 +134,10 @@ resource "null_resource" "validate_pods_capacity" {
       error_message = <<-EOT
         Total required pod IPs (${local.total_pods_required}) exceeds pods subnet capacity (${local.pods_subnet_capacity}).
         Breakdown:
-          - oke-system: ${local.pods_required_ops} (${var.worker_ops_pool_size} nodes × ${var.worker_ops_max_pods_per_node} pods)
-          - oke-cpu: ${local.pods_required_cpu} (${var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0} nodes × ${var.worker_cpu_max_pods_per_node} pods)
-          - oke-gpu: ${local.pods_required_gpu} (${var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0} nodes × ${var.worker_gpu_max_pods_per_node} pods)
-          - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
+          - oke-system-${local.state_id}: ${local.pods_required_ops} (${var.worker_ops_pool_size} nodes × ${var.worker_ops_max_pods_per_node} pods)
+          - oke-cpu-${local.state_id}: ${local.pods_required_cpu} (${var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0} nodes × ${var.worker_cpu_max_pods_per_node} pods)
+          - oke-gpu-${local.state_id}: ${local.pods_required_gpu} (${var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0} nodes × ${var.worker_gpu_max_pods_per_node} pods)
+          - oke-rdma-${local.state_id}: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
         Consider increasing the pods subnet size or reducing max_pods_per_node/pool_size values.
       EOT
     }

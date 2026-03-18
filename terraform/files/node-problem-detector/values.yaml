@@ -126,7 +126,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-gpu-pcie.json: |
         {
@@ -219,7 +219,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-rdma-link.json: |
         {
@@ -250,7 +250,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-rdma-link-flapping.json: |
         {
@@ -281,7 +281,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-rdma-wpa-auth.json: |
         {
@@ -312,7 +312,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-rdma-rttcc.json: |
         {
@@ -374,7 +374,7 @@ settings:
             "timeout": "30s"
             }
         ]
-                }
+        }
 
     oke-cpu-profile.json: |
         {
@@ -608,7 +608,7 @@ settings:
         readonly UNKNOWN=2
 
         healthcheck_type=$1
-        healtcheck_log_file=/host/tmp/oke-latest-${healthcheck_type}-healthcheck.log
+        healthcheck_log_file=/host/tmp/oke-latest-${healthcheck_type}-healthcheck.log
 
         cp ./config/*.py /host/tmp
 
@@ -619,8 +619,8 @@ settings:
 
         EXIT_CODE=$(nsenter -n/host/proc/1/ns/net chroot /host bash -c "/tmp/uv run /tmp/check_gpu_setup.py --dry-run --$healthcheck_type > /tmp/oke-latest-${healthcheck_type}-healthcheck.log 2>&1")
 
-        ERROR_MSG=$(cat "$healtcheck_log_file" | grep "Healthcheck::")
-        UNKNOWN_MSG=$(cat "$healtcheck_log_file" | grep -o 'Skipping.*')
+        ERROR_MSG=$(grep "Healthcheck::" "$healthcheck_log_file")
+        UNKNOWN_MSG=$(grep -o 'Skipping.*' "$healthcheck_log_file")
 
         if [ "$ERROR_MSG" != "" ]
         then
