@@ -38,6 +38,13 @@ data:
     NO_IMDS = "no-imds-data"
     GPU_MEMORY_FABRIC_SHAPES = ("GB200", "GB300")
 
+    FALLBACK_LABELS = {
+        "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
+        "oci.oraclecloud.com/rdma.host_id": NO_IMDS,
+        "oci.oraclecloud.com/rdma.local_block_id": NO_IMDS,
+        "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
+    }
+
 
     def _imds_get(path: str) -> requests.Response | None:
         try:
@@ -55,23 +62,13 @@ data:
         resp = _imds_get("/host/rdmaTopologyData")
 
         if resp is None or resp.status_code != 200 or not resp.text.strip():
-            return {
-                "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.host_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.local_block_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
-            }
+            return dict(FALLBACK_LABELS)
 
         try:
             data = resp.json()
         except requests.exceptions.JSONDecodeError:
             log.warning("IMDS returned non-JSON response for /host/rdmaTopologyData")
-            return {
-                "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.host_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.local_block_id": NO_IMDS,
-                "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
-            }
+            return dict(FALLBACK_LABELS)
 
         keys = [
             ("oci.oraclecloud.com/rdma.hpc_island_id", "customerHPCIslandId"),
