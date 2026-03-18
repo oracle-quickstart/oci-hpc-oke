@@ -46,6 +46,8 @@ variableGroups:
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
       - cert_manager_chart_version
+      # Kueue
+      - kueue_chart_version
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
@@ -225,7 +227,9 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
-  
+      - install_kueue
+      - kueue_local_queue_default_namespace
+
   - title: "SSH Access"
     variables:
     - ssh_public_key
@@ -1793,6 +1797,31 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
       clusterOptionId: "all"
+
+  # Kueue
+  install_kueue:
+    title: Install Kueue
+    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the GPU + RDMA worker pool. Also deploys the RDMA topology labeler DaemonSet."
+    type: boolean
+    default: true
+    visible: ${worker_rdma_enabled}
+  kueue_chart_version:
+    title: Kueue Helm chart version
+    type: string
+    default: "0.16.3"
+    required: true
+    visible: false
+  kueue_local_queue_default_namespace:
+    title: LocalQueue namespace
+    description: "The namespace where the Kueue default LocalQueue will be created."
+    type: string
+    default: "default"
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+    required: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${install_kueue}
 
   # SSH access to the nodes
   ssh_public_key:

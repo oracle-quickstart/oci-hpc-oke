@@ -1,0 +1,264 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rdma-topology-labeler
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rdma-topology-labeler
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rdma-topology-labeler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rdma-topology-labeler
+subjects:
+  - kind: ServiceAccount
+    name: rdma-topology-labeler
+    namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rdma-topology-labeler-script
+  namespace: kube-system
+data:
+  rdma_topology_labeler.py: |
+    # /// script
+    # requires-python = ">=3.12"
+    # dependencies = [
+    #     "kubernetes>=31.0.0",
+    #     "requests>=2.32.0",
+    # ]
+    # ///
+
+    import logging
+    import os
+    import pathlib
+    import time
+
+    import requests
+    from kubernetes import client, config
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    log = logging.getLogger("rdma-topology-labeler")
+
+    IMDS_BASE = "http://169.254.169.254/opc/v2"
+    IMDS_HEADERS = {"Authorization": "Bearer Oracle"}
+    FALLBACK = "no-imds-data"
+    HEARTBEAT = pathlib.Path("/tmp/healthy")
+
+    GPU_MEMORY_FABRIC_SHAPES = ("GB200", "GB300")
+
+    FALLBACK_LABELS = {
+        "oci.oraclecloud.com/rdma.hpc_island_id": FALLBACK,
+        "oci.oraclecloud.com/rdma.host_id": FALLBACK,
+        "oci.oraclecloud.com/rdma.local_block_id": FALLBACK,
+        "oci.oraclecloud.com/rdma.network_block_id": FALLBACK,
+    }
+
+
+    def imds_get(path: str) -> requests.Response | None:
+        try:
+            return requests.get(f"{IMDS_BASE}{path}", headers=IMDS_HEADERS, timeout=10)
+        except requests.RequestException:
+            log.warning("IMDS request failed for %s", path)
+            return None
+
+
+    def imds_json(resp: requests.Response, path: str) -> dict | None:
+        try:
+            return resp.json()
+        except (ValueError, requests.JSONDecodeError):
+            log.warning("IMDS returned non-JSON response for %s", path)
+            return None
+
+
+    def ocid_suffix(value: str | None, field: str) -> str:
+        if not value:
+            return FALLBACK
+        if len(value) < 11:
+            log.warning("IMDS value for %s shorter than expected: %s", field, value)
+        return value[-11:]
+
+
+    def get_rdma_labels() -> dict[str, str]:
+        resp = imds_get("/host/rdmaTopologyData")
+        if resp is None or resp.status_code != 200 or not resp.text.strip():
+            return dict(FALLBACK_LABELS)
+
+        data = imds_json(resp, "/host/rdmaTopologyData")
+        if data is None:
+            return dict(FALLBACK_LABELS)
+
+        keys = [
+            ("oci.oraclecloud.com/rdma.hpc_island_id", "customerHPCIslandId"),
+            ("oci.oraclecloud.com/rdma.host_id", "customerHostId"),
+            ("oci.oraclecloud.com/rdma.local_block_id", "customerLocalBlock"),
+            ("oci.oraclecloud.com/rdma.network_block_id", "customerNetworkBlock"),
+        ]
+
+        labels = {}
+        for label_key, imds_key in keys:
+            labels[label_key] = ocid_suffix(data.get(imds_key), imds_key)
+
+        # GB200/GB300 have additional GPU memory fabric labels
+        instance_resp = imds_get("/instance/")
+        instance_data = imds_json(instance_resp, "/instance/") if instance_resp and instance_resp.ok else None
+        shape = instance_data.get("shape", "") if instance_data else ""
+
+        if any(s in shape for s in GPU_MEMORY_FABRIC_SHAPES):
+            labels["oci.oraclecloud.com/rdma.gpu_memory_fabric_id"] = ocid_suffix(
+                data.get("customerGpuMemoryFabric"), "customerGpuMemoryFabric",
+            )
+            cluster_ocid = (
+                instance_data.get("freeformTags", {}).get("oci:compute:gpumemorycluster")
+                if instance_data else None
+            )
+            labels["oci.oraclecloud.com/rdma.gpu_memory_cluster_id"] = ocid_suffix(
+                cluster_ocid, "gpumemorycluster",
+            )
+
+        return labels
+
+
+    def apply_labels(v1: client.CoreV1Api, node_name: str):
+        node = v1.read_node(node_name)
+        existing = node.metadata.labels or {}
+
+        desired = get_rdma_labels()
+        updates = {}
+        for k, v in desired.items():
+            current = existing.get(k)
+            if current == v:
+                continue
+            # Don't overwrite real data with fallback when IMDS is temporarily unavailable
+            if v == FALLBACK and current is not None and current != FALLBACK:
+                log.info("Keeping existing label %s=%s (IMDS unavailable)", k.split(".")[-1], current)
+                continue
+            updates[k] = v
+
+        if not updates:
+            log.info("%s already labeled, skipping", node_name)
+            return
+
+        v1.patch_node(node_name, {"metadata": {"labels": updates}})
+        formatted = ", ".join(f"{k.split('.')[-1]}={v}" for k, v in updates.items())
+        log.info("Applied to %s: %s", node_name, formatted)
+
+
+    def main():
+        config.load_incluster_config()
+        v1 = client.CoreV1Api()
+
+        node_name = os.environ["NODE_NAME"]
+        interval = int(os.environ.get("INTERVAL", "300"))
+
+        log.info("Node: %s | Interval: %ds", node_name, interval)
+
+        while True:
+            try:
+                apply_labels(v1, node_name)
+            except Exception:
+                log.exception("Failed on %s", node_name)
+            HEARTBEAT.touch()
+            time.sleep(interval)
+
+
+    if __name__ == "__main__":
+        main()
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rdma-topology-labeler
+  namespace: kube-system
+  labels:
+    app: rdma-topology-labeler
+spec:
+  selector:
+    matchLabels:
+      app: rdma-topology-labeler
+  template:
+    metadata:
+      labels:
+        app: rdma-topology-labeler
+    spec:
+      serviceAccountName: rdma-topology-labeler
+      priorityClassName: system-node-critical
+      hostNetwork: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+              - matchExpressions:
+                  - key: amd.com/gpu
+                    operator: Exists
+      tolerations:
+        - operator: Exists
+      volumes:
+        - name: script
+          configMap:
+            name: rdma-topology-labeler-script
+        - name: uv-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: labeler
+          image: ghcr.io/astral-sh/uv:0.7.12-python3.12-bookworm-slim
+          command: ["uv", "run", "/scripts/rdma_topology_labeler.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: uv-cache
+              mountPath: /tmp/uv-cache
+            - name: tmp
+              mountPath: /tmp
+          env:
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: INTERVAL
+              value: "300"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/healthy"]
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL

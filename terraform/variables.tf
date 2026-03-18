@@ -620,6 +620,24 @@ variable "worker_rdma_kubernetes_version" {
   type        = string
 }
 
+# Kueue
+variable "install_kueue" {
+  default     = true
+  type        = bool
+  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue). Requires worker_rdma_enabled."
+}
+
+variable "kueue_chart_version" {
+  default = "0.16.3"
+  type    = string
+}
+
+variable "kueue_local_queue_default_namespace" {
+  default     = "default"
+  type        = string
+  description = "The namespace where the Kueue LocalQueue will be created."
+}
+
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {
   type        = bool
