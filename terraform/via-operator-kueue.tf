@@ -25,10 +25,6 @@ module "kueue" {
   deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
 
   post_deployment_commands = flatten([
-    # Deploy RDMA topology labeler
-    "cat <<'EOF' | kubectl apply -f -",
-    split("\n", file("${path.module}/files/rdma-topology-labeler/daemonset.yaml")),
-    "EOF",
     # Deploy Kueue Topology
     "cat <<'EOF' | kubectl apply -f -",
     split("\n", file("${path.module}/files/kueue/topology.yaml")),

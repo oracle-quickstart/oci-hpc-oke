@@ -1,0 +1,16 @@
+{{- if .Values.labeler.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: labeler
+spec:
+  maxUnavailable: "25%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: labeler
+{{- end }}

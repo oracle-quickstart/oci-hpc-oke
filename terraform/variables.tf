@@ -392,17 +392,17 @@ variable "disable_gpu_device_plugin" { default = false }
 variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string
-  default     = "" 
+  default     = ""
   description = "Bash commands to be executed on all of the worker nodes before the OKE Bootstrapping."
 }
-variable "oke_post_bootstrap_script" { 
+variable "oke_post_bootstrap_script" {
   type        = string
-  default     = "" 
+  default     = ""
   description = "Bash commands to be executed on all of the worker nodes after the OKE Bootstrapping."
 }
-variable "oke_kubelet_extra_args" { 
+variable "oke_kubelet_extra_args" {
   type        = string
-  default     = "" 
+  default     = ""
   description = "kubelet-extra-args to be used for the kubelet configuration. https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/"
 }
 
@@ -636,6 +636,20 @@ variable "kueue_local_queue_default_namespace" {
   default     = "default"
   type        = string
   description = "The namespace where the Kueue LocalQueue will be created."
+}
+
+# RDMA topology labeler
+variable "install_rdma_labeler" {
+  default     = true
+  type        = bool
+  description = "Deploy the RDMA topology labeler DaemonSet to populate node labels required for Topology Aware Scheduling."
+}
+
+# Image prepuller
+variable "install_image_prepuller" {
+  default     = false
+  type        = bool
+  description = "Deploy the image prepuller DaemonSet to pre-pull container images on GPU worker nodes."
 }
 
 # K8s resources deployment method

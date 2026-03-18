@@ -1,0 +1,162 @@
+{{- if .Values.labeler.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+data:
+  labeler.py: |
+    # /// script
+    # requires-python = ">=3.12"
+    # dependencies = [
+    #     "kubernetes>=31.0.0",
+    #     "requests>=2.32.0",
+    # ]
+    # ///
+
+    import logging
+    import os
+    import time
+    from pathlib import Path
+
+    import requests
+    from kubernetes import client, config
+
+    HEALTH_FILE = Path("/tmp/health/alive")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    log = logging.getLogger("labeler")
+
+    IMDS_BASE = "http://169.254.169.254/opc/v2"
+    IMDS_HEADERS = {"Authorization": "Bearer Oracle"}
+    NO_IMDS = "no-imds-data"
+    GPU_MEMORY_FABRIC_SHAPES = ("GB200", "GB300")
+
+
+    def _imds_get(path: str) -> requests.Response | None:
+        try:
+            return requests.get(
+                f"{IMDS_BASE}{path}",
+                headers=IMDS_HEADERS,
+                timeout=10,
+            )
+        except requests.RequestException:
+            log.warning("IMDS request failed for %s%s", IMDS_BASE, path)
+            return None
+
+
+    def rdma_topology_labels() -> dict[str, str]:
+        resp = _imds_get("/host/rdmaTopologyData")
+
+        if resp is None or resp.status_code != 200 or not resp.text.strip():
+            return {
+                "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.host_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.local_block_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
+            }
+
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError:
+            log.warning("IMDS returned non-JSON response for /host/rdmaTopologyData")
+            return {
+                "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.host_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.local_block_id": NO_IMDS,
+                "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
+            }
+
+        keys = [
+            ("oci.oraclecloud.com/rdma.hpc_island_id", "customerHPCIslandId"),
+            ("oci.oraclecloud.com/rdma.host_id", "customerHostId"),
+            ("oci.oraclecloud.com/rdma.local_block_id", "customerLocalBlock"),
+            ("oci.oraclecloud.com/rdma.network_block_id", "customerNetworkBlock"),
+        ]
+
+        shape_resp = _imds_get("/instance/shape")
+        shape = shape_resp.text.strip() if shape_resp and shape_resp.ok else ""
+        is_gpu_memory_fabric = any(s in shape for s in GPU_MEMORY_FABRIC_SHAPES)
+
+        if is_gpu_memory_fabric:
+            keys.append(
+                ("oci.oraclecloud.com/host.gpu_memory_fabric_id", "customerGpuMemoryFabric"),
+            )
+
+        labels = {}
+        for label_key, imds_key in keys:
+            value = data.get(imds_key)
+            labels[label_key] = value[-11:] if value else NO_IMDS
+
+        if is_gpu_memory_fabric:
+            instance_resp = _imds_get("/instance/")
+            if instance_resp and instance_resp.ok:
+                try:
+                    instance_data = instance_resp.json()
+                except requests.exceptions.JSONDecodeError:
+                    log.warning("IMDS returned non-JSON response for /instance/")
+                    instance_data = {}
+                cluster_ocid = instance_data.get("freeformTags", {}).get(
+                    "oci:compute:gpumemorycluster"
+                )
+                labels["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = (
+                    cluster_ocid[-11:] if cluster_ocid else NO_IMDS
+                )
+            else:
+                labels["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = NO_IMDS
+
+        return labels
+
+
+    def main():
+        config.load_incluster_config()
+        v1 = client.CoreV1Api()
+
+        node_name = os.environ["NODE_NAME"]
+        interval = int(os.environ.get("INTERVAL", "300"))
+
+        log.info("Node: %s | Interval: %ds", node_name, interval)
+
+        while True:
+            try:
+                node = v1.read_node(node_name)
+                existing = node.metadata.labels or {}
+            except Exception:
+                log.exception("Failed to read node %s", node_name)
+                time.sleep(interval)
+                continue
+
+            try:
+                desired = rdma_topology_labels()
+                updates = {}
+                for k, v in desired.items():
+                    current = existing.get(k)
+                    if current == v:
+                        continue
+                    # Don't overwrite real data with fallback when IMDS is temporarily unavailable
+                    if v == NO_IMDS and current is not None and current != NO_IMDS:
+                        log.info("Keeping existing label %s=%s (IMDS unavailable)", k.split(".")[-1], current)
+                        continue
+                    updates[k] = v
+                if updates:
+                    v1.patch_node(node_name, {"metadata": {"labels": updates}})
+                    formatted = ", ".join(f"{k.split('.')[-1]}={v}" for k, v in updates.items())
+                    log.info("Applied to %s: %s", node_name, formatted)
+                else:
+                    log.info("%s already labeled, skipping", node_name)
+            except Exception:
+                log.exception("Failed to label %s", node_name)
+
+            HEALTH_FILE.touch()
+            time.sleep(interval)
+
+
+    if __name__ == "__main__":
+        main()
+{{- end }}

@@ -24,20 +24,6 @@ resource "helm_release" "kueue" {
   max_history      = 1
 }
 
-# Deploy RDMA topology labeler to populate node labels required for TAS
-data "kubectl_file_documents" "rdma_topology_labeler" {
-  content = file("${path.module}/files/rdma-topology-labeler/daemonset.yaml")
-}
-
-resource "kubectl_manifest" "rdma_topology_labeler" {
-  for_each  = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? data.kubectl_file_documents.rdma_topology_labeler.manifests : {}
-  yaml_body = each.value
-  depends_on = [
-    module.oke,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
-  ]
-}
-
 # Kueue Topology for RDMA-aware scheduling
 resource "kubectl_manifest" "kueue_topology" {
   count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0

@@ -1,0 +1,25 @@
+{{ include "oci-hpc-oke-utils.fullname" . }} deployed to {{ .Release.Namespace }}.
+
+{{- if .Values.labeler.enabled }}
+
+Labeler:
+  DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler
+  Interval:  {{ .Values.labeler.interval }}s
+  Labels applied: oci.oraclecloud.com/rdma.*
+{{- end }}
+
+{{- if .Values.prepuller.enabled }}
+
+Prepullers:
+{{- range $name, $group := .Values.prepuller.groups }}
+{{- if $group.images }}
+  - {{ $name }}: {{ len $group.images }} image(s)
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if or .Values.labeler.enabled .Values.prepuller.enabled }}
+
+Verify with:
+  kubectl get ds -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+{{- end }}

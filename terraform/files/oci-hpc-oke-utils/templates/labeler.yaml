@@ -1,0 +1,98 @@
+{{- if .Values.labeler.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: labeler
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "25%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: labeler
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: labeler
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: true  # Required for Kubernetes API access
+      serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: system-node-critical
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-script
+        - name: uv-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: labeler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uv", "run", "/scripts/labeler.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: uv-cache
+              mountPath: /tmp/uv-cache
+            - name: tmp
+              mountPath: /tmp/health
+          env:
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: INTERVAL
+              value: {{ .Values.labeler.interval | quote }}
+          livenessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/alive"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.labeler.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

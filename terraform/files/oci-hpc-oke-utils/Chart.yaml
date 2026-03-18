@@ -1,0 +1,17 @@
+apiVersion: v2
+name: oci-hpc-oke-utils
+description: OKE node utility DaemonSet — RDMA topology labeling and image pre-pulling
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
+keywords:
+  - oke
+  - gpu
+  - rdma
+  - labeler
+  - prepuller
+home: https://github.com/oracle/oci-hpc-oke
+sources:
+  - https://github.com/oracle/oci-hpc-oke
+maintainers:
+  - name: Oguz Pastirmaci

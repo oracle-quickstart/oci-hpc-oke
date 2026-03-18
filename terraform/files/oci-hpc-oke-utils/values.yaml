@@ -1,0 +1,65 @@
+image:
+  repository: ghcr.io/astral-sh/uv
+  tag: "0.7.12-python3.12-bookworm-slim"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+labeler:
+  enabled: true
+  interval: 300
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+prepuller:
+  enabled: false
+  pauseImage: registry.k8s.io/pause:3.10
+  initResources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  pauseResources:
+    requests:
+      cpu: 1m
+      memory: 16Mi
+    limits:
+      cpu: 10m
+      memory: 16Mi
+  groups:
+    nvidia:
+      nodeSelector:
+        nvidia.com/gpu: "true"
+      images:
+        - iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+    amd:
+      nodeSelector:
+        amd.com/gpu: "true"
+      images:
+        - iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
+
+tolerations:
+  - operator: Exists
+
+nodeSelector: {}
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nvidia.com/gpu
+              operator: Exists
+        - matchExpressions:
+            - key: amd.com/gpu
+              operator: Exists
+
+podAnnotations: {}
+podLabels: {}
