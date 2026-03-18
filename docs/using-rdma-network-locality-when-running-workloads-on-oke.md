@@ -33,29 +33,29 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
 When the locality information is available in the instance metadata service, OKE will add the following labels to your nodes during bootstrapping:
 
 ```
-oci.oraclecloud.com/rdma.host_id
 oci.oraclecloud.com/rdma.hpc_island_id
-oci.oraclecloud.com/rdma.local_block_id
 oci.oraclecloud.com/rdma.network_block_id
+oci.oraclecloud.com/rdma.local_block_id
+oci.oraclecloud.com/rdma.host_id
 ```
 The values of the labels are hashes of the information available in instance metadata and they will be different than the OCIDs above.
 
 Example:
 ```
-oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 oci.oraclecloud.com/rdma.hpc_island_id=af7ubvouuyq
-oci.oraclecloud.com/rdma.local_block_id=4tjxbt4s6ua
 oci.oraclecloud.com/rdma.network_block_id=7xmzl4p4wba
+oci.oraclecloud.com/rdma.local_block_id=4tjxbt4s6ua
+oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 ```
 
 ## Scheduling Methods
 
-| Method | Requires Label Values | Auto Fallback | Shapes |
-|--------|----------------------|---------------|--------|
-| **Kueue (recommended)** | No | Yes | H100, H200, B200, B300, MI300X, MI355X |
-| Node Affinity | Yes | With soft rules | All |
-| Pod Affinity | No | With soft rules | All |
-| Node Ordering Init Container | No | No | All (including A100) |
+| Method | Requires Manual Label Values | Auto Fallback |
+|--------|----------------------|---------------|
+| **Kueue (recommended)** | No | Yes |
+| Node Affinity | Yes | With soft rules |
+| Pod Affinity | No | With soft rules |
+| Node Ordering Init Container | No | No |
 
 ## Kueue with Topology Aware Scheduling (Recommended)
 
@@ -383,7 +383,7 @@ spec:
               emptyDir: {}
             containers:
             - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
-              name: nccl-tests
+              name: rccl-tests
               volumeMounts:
               - name: node-ordering
                 mountPath: "/node-ordering"
