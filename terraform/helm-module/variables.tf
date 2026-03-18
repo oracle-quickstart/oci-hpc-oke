@@ -3,7 +3,6 @@
 
 variable "deployment_name" {
   type        = string
-  default     = false
   description = "The name of the helm deployment."
 }
 

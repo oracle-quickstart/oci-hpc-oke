@@ -1,4 +1,4 @@
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
 metadata:
   name: bm-gpu-mi355x-v1.8
@@ -7,7 +7,7 @@ spec:
     node.kubernetes.io/instance-type: BM.GPU.MI355X-v1.8
     amd.com/gpu: "true"
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: bm-gpu-mi355x-v1.8-rccl-tests-queue
@@ -27,7 +27,7 @@ spec:
       - name: ephemeral-storage
         nominalQuota: "12800Gi"
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: bm-gpu-mi355x-v1.8-rccl-tests
