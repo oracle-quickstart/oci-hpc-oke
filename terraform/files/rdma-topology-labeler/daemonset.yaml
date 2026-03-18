@@ -122,14 +122,14 @@ data:
         shape = instance_data.get("shape", "") if instance_data else ""
 
         if any(s in shape for s in GPU_MEMORY_FABRIC_SHAPES):
-            labels["oci.oraclecloud.com/rdma.gpu_memory_fabric_id"] = ocid_suffix(
+            labels["oci.oraclecloud.com/host.gpu_memory_fabric_id"] = ocid_suffix(
                 data.get("customerGpuMemoryFabric"), "customerGpuMemoryFabric",
             )
             cluster_ocid = (
                 instance_data.get("freeformTags", {}).get("oci:compute:gpumemorycluster")
                 if instance_data else None
             )
-            labels["oci.oraclecloud.com/rdma.gpu_memory_cluster_id"] = ocid_suffix(
+            labels["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = ocid_suffix(
                 cluster_ocid, "gpumemorycluster",
             )
 
