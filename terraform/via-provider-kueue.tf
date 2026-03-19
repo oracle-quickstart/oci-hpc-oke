@@ -5,7 +5,7 @@ locals {
   kueue_amd_shapes   = ["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"]
   kueue_is_amd       = contains(local.kueue_amd_shapes, var.worker_rdma_shape)
   kueue_gpu_resource = local.kueue_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
-  kueue_flavor_name  = lower(replace(var.worker_rdma_shape, ".", "-"))
+  kueue_flavor_name  = "${lower(replace(var.worker_rdma_shape, ".", "-"))}-rdma-topology-aware"
 }
 
 resource "helm_release" "kueue" {
