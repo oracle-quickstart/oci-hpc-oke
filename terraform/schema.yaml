@@ -46,6 +46,8 @@ variableGroups:
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
       - cert_manager_chart_version
+      # MPI Operator
+      - install_mpi_operator
       # Kueue
       - kueue_chart_version
       - kueue_local_queue_default_namespace

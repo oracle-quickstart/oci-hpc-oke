@@ -284,6 +284,12 @@ variable "install_amd_device_metrics_exporter" {
   type    = bool
 }
 
+variable "install_mpi_operator" {
+  default     = true
+  type        = bool
+  description = "Install MPI Operator for running MPIJob workloads."
+}
+
 variable "monitoring_namespace" {
   default = "monitoring"
   type    = string
