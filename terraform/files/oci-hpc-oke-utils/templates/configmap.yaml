@@ -138,13 +138,14 @@ data:
                         continue
                     # Don't overwrite real data with fallback when IMDS is temporarily unavailable
                     if v == NO_IMDS and current is not None and current != NO_IMDS:
-                        log.info("Keeping existing label %s=%s (IMDS unavailable)", k.split(".")[-1], current)
+                        log.info("Keeping existing label %s=%s (IMDS unavailable)", k, current)
                         continue
                     updates[k] = v
                 if updates:
                     v1.patch_node(node_name, {"metadata": {"labels": updates}})
-                    formatted = ", ".join(f"{k.split('.')[-1]}={v}" for k, v in updates.items())
-                    log.info("Applied to %s: %s", node_name, formatted)
+                    log.info("Applied labels to %s:", node_name)
+                    for k, v in updates.items():
+                        log.info("  %s=%s", k, v)
                 else:
                     log.info("%s already labeled, skipping", node_name)
             except Exception:
