@@ -20,6 +20,8 @@ locals {
 }
 
 data "oci_core_vcn" "bastion_service_vcn" {
+  count  = var.create_oci_bastion_service ? 1 : 0
+
   vcn_id = coalesce(var.vcn_id, module.oke.vcn_id)
 }
 
@@ -38,16 +40,19 @@ resource "oci_core_subnet" "bastion_service" {
   display_name               = format("bastion_svc-%v", local.state_id)
   route_table_id             = module.oke.nat_route_table_id
   prohibit_public_ip_on_vnic = true
+  security_list_ids          = [one(oci_core_security_list.bastion_service[*].id)]
 
   lifecycle {
     ignore_changes = [defined_tags]
   }
 }
 
-resource "oci_core_default_security_list" "bastion_service_default" {
+resource "oci_core_security_list" "bastion_service" {
   count = var.create_oci_bastion_service ? 1 : 0
 
-  manage_default_resource_id = data.oci_core_vcn.bastion_service_vcn.default_security_list_id
+  compartment_id = var.compartment_ocid
+  vcn_id         = one(data.oci_core_vcn.bastion_service_vcn[*].id)
+  display_name   = format("bastion_svc-%v", local.state_id)
 
   ingress_security_rules {
     protocol    = "6"

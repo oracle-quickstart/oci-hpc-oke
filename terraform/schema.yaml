@@ -409,6 +409,7 @@ variables:
     title: Existing subnet to use for the bastion service
     type: oci:core:subnet:id
     required: false
+    description: "NOTE: When using custom_subnet_ids=true (existing subnet), attach the security list output `bastion_service_security_list_id` to your bastion-service subnet outside of this module."
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
@@ -1829,6 +1830,7 @@ outputGroups:
       - bastion_service_id
       - bastion_service_subnet_id
       - bastion_service_subnet_cidr
+      - bastion_service_session_command
 
   - title: Operator
     outputs:
@@ -1960,6 +1962,9 @@ outputs:
   bastion_service_subnet_cidr:
     title: Bastion service subnet CIDR
     type: string
+  bastion_service_session_command:
+    title: Bastion service non-interactive session command
+    type: copyableString
 
   # Operator
   operator_id:
