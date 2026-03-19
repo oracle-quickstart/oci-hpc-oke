@@ -78,6 +78,7 @@ variable "create_public_subnets" {
   default = true
 }
 variable "bastion_sn_cidr" { default = null }
+variable "bastion_service_sn_cidr" { default = null }
 variable "operator_sn_cidr" { default = null }
 variable "int_lb_sn_cidr" { default = null }
 variable "pub_lb_sn_cidr" { default = null }
@@ -87,6 +88,7 @@ variable "pods_sn_cidr" { default = null }
 variable "fss_sn_cidr" { default = null }
 variable "lustre_sn_cidr" { default = null }
 variable "bastion_sn_id" { default = null }
+variable "bastion_service_sn_id" { default = null }
 variable "operator_sn_id" { default = null }
 variable "int_lb_sn_id" { default = null }
 variable "pub_lb_sn_id" { default = null }
@@ -160,6 +162,18 @@ variable "bastion_user" {
   default     = "ubuntu"
   description = "The user used to SSH into the bastion instance."
   type        = string
+}
+
+# Bastion Service
+variable "create_oci_bastion_service" {
+  default     = false
+  description = "Create an OCI Bastion service in a dedicated subnet."
+  type        = bool
+}
+variable "bastion_service_allowed_cidrs" {
+  default     = ["0.0.0.0/0"]
+  description = "CIDR allowlist for OCI Bastion service clients."
+  type        = list(string)
 }
 
 # Operator

@@ -137,6 +137,16 @@ locals {
         { id = var.pods_sn_id, create = "never" } : {},
         lookup(var.subnet_advanced_attrs, "pods", {})
       )
+      bastion_service = merge(
+        var.create_oci_bastion_service ? { create = "auto" } : { create = "never" },
+        (var.create_vcn && var.bastion_service_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
+        { newbits = 11, netnum = 4 } : {},
+        var.create_vcn && var.bastion_service_sn_cidr != null ?
+        { cidr = var.bastion_service_sn_cidr } : {},
+        !var.create_vcn && var.custom_subnet_ids ?
+        { id = var.bastion_service_sn_id, create = "never" } : {},
+        lookup(var.subnet_advanced_attrs, "bastion_service", {})
+      )
     },
     var.create_fss ? {
       fss = merge(

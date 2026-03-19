@@ -19,6 +19,25 @@ output "bastion_subnet_id" { value = module.oke.bastion_subnet_id }
 output "bastion_subnet_cidr" { value = module.oke.bastion_subnet_cidr }
 output "bastion_nsg_id" { value = module.oke.bastion_nsg_id }
 
+# Bastion Service
+output "bastion_service_id" { value = var.create_oci_bastion_service ? one(oci_bastion_bastion.bastion_service[*].id) : "" }
+output "bastion_service_subnet_id" { value = var.create_oci_bastion_service ? local.bastion_service_subnet_id : "" }
+output "bastion_service_subnet_cidr" { value = var.create_oci_bastion_service ? local.bastion_service_subnet_cidr : "" }
+output "bastion_service_security_list_id" { value = var.create_oci_bastion_service ? one(oci_core_security_list.bastion_service[*].id) : "" }
+output "bastion_service_session_command" {
+  value = var.create_oci_bastion_service ? format(
+    "./files/oke-bastion-service-session.sh --bastion-ocid %s --cluster-ocid %s --oke-endpoint-ip %s --region %s --profile %s --ssh-key %s --local-port %d --ttl-seconds %d --non-interactive",
+    one(oci_bastion_bastion.bastion_service[*].id),
+    module.oke.cluster_id,
+    local.oke_private_endpoint_ip,
+    var.region,
+    var.oci_profile != null ? var.oci_profile : "DEFAULT",
+    "~/.ssh/id_rsa",
+    6443,
+    10800,
+  ) : ""
+}
+
 # Operator
 output "operator_id" { value = module.oke.operator_id }
 output "operator_private_ip" { value = module.oke.operator_private_ip }
