@@ -77,6 +77,13 @@ variableGroups:
       - use_stateless_rules
       # Workers
       - legacy_imds_endpoints_disabled
+      - disable_gpu_device_plugin
+      # GPU Operator addon
+      - deploy_node_feature_discovery
+      - nvidia_gpu_operator_addon_version
+      - nvidia_gpu_operator_disable_plugin
+      - nvidia_gpu_operator_cdi_enabled
+      - nvidia_gpu_operator_toolkit_enabled
 
   - title: "Identity"
     variables:
@@ -155,8 +162,8 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
-      - disable_gpu_device_plugin
       - setup_credential_provider_for_ocir
+      - deploy_nvidia_gpu_operator
 
   - title: "Workers: System"
     variables:
@@ -1273,6 +1280,37 @@ variables:
     title: Disable OKE GPU device plugin
     type: boolean
     description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
+    default: false
+  deploy_node_feature_discovery:
+    title: Deploy NodeFeatureDiscovery addon
+    type: boolean
+    description: Deploy the NodeFeatureDiscovery OKE addon.
+    default: true
+  deploy_nvidia_gpu_operator:
+    title: Deploy GPU Operator addon
+    type: boolean
+    description: Deploy the NvidiaGpuOperator OKE addon.
+    default: true
+  nvidia_gpu_operator_addon_version:
+    title: GPU Operator addon version
+    type: string
+    description: Version of the NvidiaGpuOperator OKE addon.
+    default: "v25.3.4"
+    required: true
+  nvidia_gpu_operator_disable_plugin:
+    title: Disable NvidiaGpuPlugin in GPU Operator
+    type: boolean
+    description: Disable the NvidiaGpuPlugin when using the GPU Operator addon.
+    default: true
+  nvidia_gpu_operator_cdi_enabled:
+    title: Enable CDI in GPU Operator
+    type: boolean
+    description: Enable CDI (Container Device Interface) in the GPU Operator addon.
+    default: true
+  nvidia_gpu_operator_toolkit_enabled:
+    title: Enable NVIDIA toolkit in GPU Operator
+    type: boolean
+    description: Enable the NVIDIA container toolkit in the GPU Operator addon.
     default: false
 
   # Workers - System pool

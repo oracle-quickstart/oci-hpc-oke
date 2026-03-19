@@ -398,6 +398,43 @@ variable "override_hostnames" {
   type    = bool
 }
 variable "disable_gpu_device_plugin" { default = false }
+
+variable "deploy_node_feature_discovery" {
+  type        = bool
+  default     = true
+  description = "Deploy the NodeFeatureDiscovery OKE addon."
+}
+
+variable "deploy_nvidia_gpu_operator" {
+  type        = bool
+  default     = true
+  description = "Deploy the NvidiaGpuOperator OKE addon."
+}
+
+variable "nvidia_gpu_operator_addon_version" {
+  type        = string
+  default     = "v25.3.4"
+  description = "Version of the NvidiaGpuOperator OKE addon."
+}
+
+variable "nvidia_gpu_operator_disable_plugin" {
+  type        = bool
+  default     = true
+  description = "Disable the NvidiaGpuPlugin when using the GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_cdi_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable CDI (Container Device Interface) in the GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_toolkit_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable the NVIDIA container toolkit in the GPU Operator addon."
+}
+
 variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string

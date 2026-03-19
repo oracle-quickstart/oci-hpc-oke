@@ -245,6 +245,33 @@ module "oke" {
         ]
       }
     },
+    var.deploy_node_feature_discovery ? {
+      "NodeFeatureDiscovery" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
+      }
+    } : {},
+    var.deploy_nvidia_gpu_operator ? {
+      "NvidiaGpuOperator" = {
+        remove_addon_resources_on_delete = true
+        override_existing                = true
+        version                          = var.nvidia_gpu_operator_addon_version
+        configurations = [
+          {
+            key   = "disableNvidiaGpuPlugin"
+            value = tostring(var.nvidia_gpu_operator_disable_plugin)
+          },
+          {
+            key   = "cdi.enabled"
+            value = tostring(var.nvidia_gpu_operator_cdi_enabled)
+          },
+          {
+            key   = "toolkit.enabled"
+            value = tostring(var.nvidia_gpu_operator_toolkit_enabled)
+          }
+        ]
+      }
+    } : {},
     local.total_worker_nodes > 50 ? {
       "CoreDNS" = {
         remove_addon_resources_on_delete = true
