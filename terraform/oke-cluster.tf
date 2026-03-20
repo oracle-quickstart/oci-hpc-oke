@@ -287,7 +287,14 @@ module "oke" {
   operator_image_os                  = var.operator_image_os # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = var.operator_image_os_version
   operator_user                      = var.operator_user
-  operator_await_cloudinit           = local.deploy_from_operator ? true : false
+  operator_await_cloudinit           = alltrue([
+    local.deploy_from_operator, 
+    anytrue([
+      var.install_monitoring, 
+      var.install_node_problem_detector_kube_prometheus_stack,
+      var.install_lustre_client
+    ])
+  ]) ? true : false
   operator_install_kubectl_from_repo = true
   operator_install_helm_from_repo    = true
   operator_install_oci_cli_from_repo = true
