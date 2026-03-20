@@ -18,6 +18,15 @@ locals {
   deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])
 
+  any_deployments_via_operator = alltrue([
+    local.deploy_from_operator,
+    anytrue([
+      var.install_monitoring, 
+      var.install_node_problem_detector_kube_prometheus_stack,
+      var.install_lustre_client
+    ])
+  ])
+
   vcn_name = format("%v-%v", var.vcn_name, local.state_id)
 
   cluster_endpoints        = module.oke.cluster_endpoints
@@ -287,14 +296,7 @@ module "oke" {
   operator_image_os                  = var.operator_image_os # Ignored when bastion_image_type = "custom"
   operator_image_os_version          = var.operator_image_os_version
   operator_user                      = var.operator_user
-  operator_await_cloudinit           = alltrue([
-    local.deploy_from_operator, 
-    anytrue([
-      var.install_monitoring, 
-      var.install_node_problem_detector_kube_prometheus_stack,
-      var.install_lustre_client
-    ])
-  ]) ? true : false
+  operator_await_cloudinit           = local.any_deployments_via_operator ? true : false
   operator_install_kubectl_from_repo = true
   operator_install_helm_from_repo    = true
   operator_install_oci_cli_from_repo = true
