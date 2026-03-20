@@ -644,6 +644,13 @@ variable "kueue_local_queue_default_namespace" {
   description = "The namespace where the Kueue LocalQueue will be created."
 }
 
+# OCI HPC OKE Utils
+variable "install_oci_hpc_oke_utils" {
+  default     = true
+  type        = bool
+  description = "Install the OCI HPC OKE Utils Helm chart (includes RDMA topology labeler and image prepuller)."
+}
+
 # RDMA topology labeler
 variable "install_rdma_labeler" {
   default     = true
