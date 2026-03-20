@@ -83,7 +83,7 @@ spec:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
             initialDelaySeconds: 30
-            periodSeconds: 60
+            periodSeconds: 120
             failureThreshold: 5
           resources:
             {{- toYaml .Values.labeler.resources | nindent 12 }}
