@@ -1,0 +1,90 @@
+{{- if .Values.prepuller.enabled }}
+{{- range $name, $group := .Values.prepuller.groups }}
+{{- if $group.images }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" $ }}-prepuller-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: prepuller-{{ $name }}
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "25%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: prepuller-{{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: prepuller-{{ $name }}
+        {{- with $.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      priorityClassName: system-node-critical
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # initContainers will retry on image pull failure via pod restart (restartPolicy: Always)
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        {{- toYaml $.Values.tolerations | nindent 8 }}
+      {{- if or $.Values.nodeSelector $group.nodeSelector }}
+      nodeSelector:
+        {{- with $.Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $group.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- range $i, $image := $group.images }}
+        {{- if $image }}
+        - name: pull-{{ $i }}
+          image: "{{ $image }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["sh", "-c", "echo Image cached"]
+          resources:
+            {{- toYaml $.Values.prepuller.initResources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+        {{- end }}
+        {{- end }}
+      containers:
+        - name: pause
+          image: {{ $.Values.prepuller.pauseImage }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          resources:
+            {{- toYaml $.Values.prepuller.pauseResources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}
+{{- end }}
+{{- end }}

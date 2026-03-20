@@ -46,6 +46,13 @@ variableGroups:
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
       - cert_manager_chart_version
+      # MPI Operator
+      - install_mpi_operator
+      # Kueue
+      - kueue_chart_version
+      - kueue_local_queue_default_namespace
+      # OCI HPC OKE Utils
+      - install_image_prepuller
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options
@@ -151,8 +158,8 @@ variableGroups:
       - control_plane_is_public
       - control_plane_allowed_cidrs
       - max_pods_per_node
-      - disable_gpu_device_plugin
       - preferred_kubernetes_services
+      - disable_gpu_device_plugin
       - setup_credential_provider_for_ocir
 
   - title: "Workers: System"
@@ -225,7 +232,9 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
-  
+      - install_kueue
+      - install_rdma_labeler
+
   - title: "SSH Access"
     variables:
     - ssh_public_key
@@ -329,6 +338,10 @@ variables:
     description: "Use the default identity domain of the tenancy. Disable to select a different identity domain."
     type: boolean
     default: true
+    visible:
+      or:
+        - create_policies
+        - create_dynamic_group
   identity_domain_compartment_id:
     title: Identity Domain Compartment
     description: "Select the compartment where your identity domain is located."
@@ -1793,6 +1806,40 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
       clusterOptionId: "all"
+
+  # Kueue
+  install_kueue:
+    title: Install Kueue
+    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the GPU + RDMA worker pool."
+    type: boolean
+    default: true
+    visible: ${worker_rdma_enabled}
+  install_rdma_labeler:
+    title: Install RDMA Topology Labeler
+    description: "Deploy the RDMA topology labeler DaemonSet to populate node labels required for Topology Aware Scheduling."
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${install_kueue}
+  kueue_chart_version:
+    title: Kueue Helm chart version
+    type: string
+    default: "0.16.3"
+    required: true
+    visible: false
+  kueue_local_queue_default_namespace:
+    title: LocalQueue namespace
+    description: "The namespace where the Kueue default LocalQueue will be created."
+    type: string
+    default: "default"
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+    required: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${install_kueue}
 
   # SSH access to the nodes
   ssh_public_key:

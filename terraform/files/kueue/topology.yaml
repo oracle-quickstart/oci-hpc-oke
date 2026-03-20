@@ -1,0 +1,10 @@
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: Topology
+metadata:
+  name: oci-rdma
+spec:
+  levels:
+  - nodeLabel: "oci.oraclecloud.com/rdma.hpc_island_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.network_block_id"
+  - nodeLabel: "oci.oraclecloud.com/rdma.local_block_id"
+  - nodeLabel: "kubernetes.io/hostname"

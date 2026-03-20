@@ -26,7 +26,7 @@ You can use the following images for both CPU and GPU pools.
 
 You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the images below to your tenancy.
 
-#### VM.GPU.A10.1, VM.GPU.A10.2, BM.GPU.A10.4, BM.GPU4.8, BM.GPU.B4.8, BM.GPU.A100-v2.8, BM.GPU.L40S.4, BM.GPU.H100.8, BM.GPU.H200.8, BM.GPU.B200.8
+#### VM.GPU.A10.1, VM.GPU.A10.2, BM.GPU.A10.4, BM.GPU4.8, BM.GPU.B4.8, BM.GPU.A100-v2.8, BM.GPU.L40S.4, BM.GPU.H100.8, BM.GPU.H200.8, BM.GPU.B200.8, BM.GPU.B300.8
 
 ##### Ubuntu 24.04
 
@@ -98,24 +98,6 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.82     Ready      node     2d23h   v1.31.1
 ```
 
-### Add a Service Account Authentication Token (Optional but Recommended)
-
-For more information, see [Adding a Service Account Token](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengaddingserviceaccttoken.htm).
-
-```sh
-kubectl -n kube-system create serviceaccount kubeconfig-sa
-
-kubectl create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:kubeconfig-sa
-
-kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/service-account/oke-kubeconfig-sa-token.yaml
-
-TOKEN=$(kubectl -n kube-system get secret oke-kubeconfig-sa-token -o jsonpath='{.data.token}' | base64 --decode)
-
-kubectl config set-credentials kubeconfig-sa --token=$TOKEN
-
-kubectl config set-context --current --user=kubeconfig-sa
-```
-
 ### Using Host RDMA Network Interfaces in Manifests
 
 To use the RDMA interfaces on the host in your pods, include the following sections in your manifests:
@@ -179,11 +161,15 @@ spec:
 
 ## Optional: Deploy Kueue & MPI Operator to Run NCCL Tests
 
-Kueue and MPI Operator are required for running the optional NCCL tests.
+Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
+
+> [!NOTE]
+> Starting with stack v26.3.0, Kueue is deployed by default.
 
 ### Deploy MPI Operator and Kueue
+
 ```sh
-kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.8.0/deploy/v2beta1/mpi-operator.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/mpi-operator/manifests/mpi-operator/mpi-operator.yaml
 
 helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
 ```

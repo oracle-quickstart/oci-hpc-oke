@@ -81,7 +81,7 @@ The RBAC permissions allow the health check jobs to:
 Install Kueue and MPI Operator (required for NCCL tests):
 
 ```bash
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.14.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
 
 kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.6.0/deploy/v2beta1/mpi-operator.yaml
 ```
