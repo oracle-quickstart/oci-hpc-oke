@@ -32,8 +32,9 @@ resource "null_resource" "mpi_operator" {
   provisioner "remote-exec" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
-      "if ! kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
+      "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
       "kubectl apply --server-side -f /tmp/mpi-operator.yaml",
       "rm -f /tmp/mpi-operator.yaml"
     ]
@@ -43,6 +44,7 @@ resource "null_resource" "mpi_operator" {
     when = destroy
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
       "kubectl delete namespace mpi-operator --ignore-not-found --wait=false"
     ]
     on_failure = continue

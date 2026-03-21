@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 module "oci_hpc_oke_utils" {
-  count  = alltrue([var.worker_rdma_enabled, local.deploy_from_operator]) ? 1 : 0
+  count  = alltrue([var.install_oci_hpc_oke_utils, var.worker_rdma_enabled, local.deploy_from_operator]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip

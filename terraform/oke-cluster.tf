@@ -21,9 +21,12 @@ locals {
   any_deployments_via_operator = alltrue([
     local.deploy_from_operator,
     anytrue([
-      var.install_monitoring, 
+      var.install_monitoring,
       var.install_node_problem_detector_kube_prometheus_stack,
-      var.install_lustre_client
+      var.install_lustre_client,
+      var.install_mpi_operator,
+      var.install_kueue,
+      var.install_oci_hpc_oke_utils,
     ])
   ])
 
