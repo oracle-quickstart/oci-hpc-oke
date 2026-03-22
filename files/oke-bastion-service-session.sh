@@ -100,7 +100,7 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 section() { printf '\n── %s ──\n' "$*"; }
-banner() {
+summary() {
   local width=60
   local border
   border=$(printf '═%.0s' $(seq 1 "$width"))
@@ -534,7 +534,7 @@ if $AUTO_TUNNEL; then
   fi
   TUNNEL_PID_FILE="/tmp/oke-bastion-tunnel-${SESSION_ID}.pid"
   echo "$SSH_PID" > "$TUNNEL_PID_FILE"
-  log "Tunnel running (PID: $SSH_PID), forwarding localhost:${LOCAL_PORT} -> ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
+  log "Tunnel running (PID: $SSH_PID), forwarding localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
 else
   section "SSH tunnel command"
   log "Run the following command in another terminal to start the tunnel:"
@@ -563,10 +563,10 @@ CLEANUP_CMD="$0 --cleanup-session $SESSION_ID"
 [[ -n "$PROFILE" ]] && CLEANUP_CMD="$CLEANUP_CMD --profile $PROFILE"
 
 if $AUTO_TUNNEL; then
-  banner \
+  summary \
     "Setup complete" \
     "" \
-    "Tunnel:     localhost:${LOCAL_PORT} -> ${OKE_ENDPOINT_IP}:${TARGET_PORT} (PID: $SSH_PID)" \
+    "Tunnel:     localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT} (PID: $SSH_PID)" \
     "Kubeconfig: $KCFG" \
     "Session:    $SESSION_ID" \
     "" \
@@ -582,7 +582,7 @@ if $AUTO_TUNNEL; then
     "  Delete kubeconfig only:" \
     "    $0 --cleanup-kubeconfig --cluster-ocid $CLUSTER_OCID"
 else
-  banner \
+  summary \
     "Setup complete" \
     "" \
     "Kubeconfig: $KCFG" \

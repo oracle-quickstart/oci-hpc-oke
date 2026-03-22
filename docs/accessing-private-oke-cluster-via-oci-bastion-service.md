@@ -47,8 +47,6 @@ If you deployed the stack with Terraform, the full script invocation is availabl
 terraform output -raw bastion_service_session_command
 ```
 
-**Example output:**
-
 ```
 ./files/oke-bastion-service-session.sh \
   --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa... \
@@ -171,7 +169,7 @@ By default, the kubeconfig is written to `~/.kube/oke-bastion/<cluster-ocid>.yam
 
 ### Stop the Tunnel and Delete the Session
 
-The banner at the end of a successful run prints the exact cleanup command, including region and profile:
+The setup summary printed at the end of a successful run includes the exact cleanup command, including region and profile:
 
 ```sh
 ./files/oke-bastion-service-session.sh \
