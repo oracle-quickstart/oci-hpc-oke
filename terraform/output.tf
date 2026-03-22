@@ -24,9 +24,10 @@ output "bastion_service_id" { value = var.create_oci_bastion_service ? one(oci_b
 output "bastion_service_subnet_id" { value = var.create_oci_bastion_service ? local.bastion_service_subnet_id : "" }
 output "bastion_service_subnet_cidr" { value = var.create_oci_bastion_service ? local.bastion_service_subnet_cidr : "" }
 output "bastion_service_security_list_id" { value = var.create_oci_bastion_service ? one(oci_core_security_list.bastion_service[*].id) : "" }
+output "oke_private_endpoint_ip" { value = var.create_oci_bastion_service ? local.oke_private_endpoint_ip : "" }
 output "bastion_service_session_command" {
   value = var.create_oci_bastion_service ? format(
-    "./files/oke-bastion-service-session.sh --bastion-ocid %s --cluster-ocid %s --oke-endpoint-ip %s --region %s --profile %s --ssh-key %s --local-port %d --ttl-seconds %d --non-interactive",
+    "./files/oke-bastion-service-session.sh --bastion-ocid %s --cluster-ocid %s --oke-endpoint-ip %s --region %s --profile %s --ssh-key %s --local-port %d --ttl-seconds %d --auto-tunnel --non-interactive",
     one(oci_bastion_bastion.bastion_service[*].id),
     module.oke.cluster_id,
     local.oke_private_endpoint_ip,
@@ -85,7 +86,7 @@ output "grafana_fetch_endpoint_command" {
 output "grafana_url" {
   value = var.install_node_problem_detector_kube_prometheus_stack ? (
     var.preferred_kubernetes_services == "public" ?
-    format("https://grafana.%s.%s", try(data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain):
+    format("https://grafana.%s.%s", try(data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain) :
     format("http://%s", try(data.kubernetes_service.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
   ) : "N/A"
 }
