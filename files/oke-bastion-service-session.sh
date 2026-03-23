@@ -329,8 +329,15 @@ if $CLEANUP_SESSION; then
     rm -f "$TUNNEL_PID_FILE"
   fi
   log "Deleting bastion session: $SESSION_ID_OVERRIDE"
-  oci "${OCI_CLEANUP_ARGS[@]}" bastion session delete \
-    --session-id "$SESSION_ID_OVERRIDE" --force 2>&1 || die "Failed to delete bastion session"
+  DELETE_OUT=$(oci "${OCI_CLEANUP_ARGS[@]}" bastion session delete \
+    --session-id "$SESSION_ID_OVERRIDE" --force 2>&1) || {
+    if grep -q '"status": 409' <<<"$DELETE_OUT" || grep -q '"code": "Conflict"' <<<"$DELETE_OUT"; then
+      log "Session already deleted or expired."
+    else
+      printf '%s\n' "$DELETE_OUT" >&2
+      die "Failed to delete bastion session"
+    fi
+  }
   log "Bastion session deleted."
   exit 0
 fi
