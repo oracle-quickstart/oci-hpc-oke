@@ -821,9 +821,9 @@ variables:
     default: ["0.0.0.0/0"]
     visible: ${create_oci_bastion_service}
   bastion_service_allow_worker_ssh:
-    title: Allow SSH access to worker nodes
+    title: Allow SSH access to worker nodes via OCI Bastion Service
     type: boolean
-    description: Allow SSH access to worker nodes via OCI Bastion Service.
+    description: Add security list rules to allow SSH connections from the bastion service subnet to worker nodes. Enable this to use the bastion service worker SSH command.
     default: false
     visible: ${create_oci_bastion_service}
   bastion_service_max_session_ttl:
