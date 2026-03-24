@@ -1890,6 +1890,7 @@ outputGroups:
       - bastion_service_id
       - bastion_service_subnet_id
       - bastion_service_subnet_cidr
+      - oke_private_endpoint_ip
       - bastion_service_session_command
       - bastion_service_worker_ssh_command
 
@@ -2022,6 +2023,9 @@ outputs:
     type: ocid
   bastion_service_subnet_cidr:
     title: Bastion service subnet CIDR
+    type: string
+  oke_private_endpoint_ip:
+    title: OKE private endpoint IP
     type: string
   bastion_service_session_command:
     title: Bastion service Kubernetes endpoint session command

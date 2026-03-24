@@ -83,7 +83,7 @@ Alternatively, the template deploys an `operator` instance with the kubeconfig p
 
 You can also access the cluster directly from your local machine via the OCI Bastion Service. The template creates a bastion service and provides a ready-to-run command under the **Application information** tab. See [Accessing a Private OKE Cluster via OCI Bastion Service](docs/accessing-private-oke-cluster-via-oci-bastion-service.md) for details.
 
-![Application Information Tab](./docs/images/rms-application-information.png)
+![Application Information Tab](./docs/images/rms-operator-ssh-command.png)
 
 ### Verify Node Availability
 
