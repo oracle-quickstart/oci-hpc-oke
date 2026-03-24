@@ -4,9 +4,7 @@
 locals {
   create_workers = true
   fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
-  ssh_authorized_keys = compact([
-    trimspace(local.ssh_public_key),
-  ])
+  ssh_authorized_keys = compact(split("\n", trimspace(local.ssh_public_key)))
 
   worker_ops_image_id    = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, "none")
   worker_cpu_denseio_ocpus = { 
