@@ -429,6 +429,12 @@ variable "worker_ops_boot_volume_size" { default = 128 }
 variable "worker_ops_image_type" { default = "Custom" }
 variable "worker_ops_image_custom_id" { default = "" }
 variable "worker_ops_image_custom_uri" { default = "" }
+variable "worker_ops_image_platform_id" {
+  default = null
+  type    = string
+}
+variable "worker_ops_image_os" { default = "Oracle Linux" }
+variable "worker_ops_image_os_version" { default = "8" }
 variable "worker_ops_image_use_uri" {
   default = false
   type    = bool
@@ -493,7 +499,6 @@ variable "worker_cpu_image_use_uri" {
   default = false
   type    = bool
 }
-variable "worker_cpu_image_id" { default = "" }
 variable "worker_cpu_image_os" { default = "Oracle Linux" }
 variable "worker_cpu_image_os_version" { default = "8" }
 variable "worker_cpu_image_platform_id" {
@@ -556,7 +561,6 @@ variable "worker_gpu_image_platform_id" {
   default = null
   type    = string
 }
-variable "worker_gpu_image_id" { default = "" }
 variable "worker_gpu_max_pods_per_node" {
   default     = 64
   description = "Maximum number of pods per node for the GPU worker pool. Max is 110."
@@ -614,7 +618,6 @@ variable "worker_rdma_image_use_uri" {
   default = false
   type    = bool
 }
-variable "worker_rdma_image_id" { default = "" }
 variable "worker_rdma_max_pods_per_node" {
   default     = 64
   description = "Maximum number of pods per node for the RDMA worker pool. Max is 110."

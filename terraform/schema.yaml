@@ -35,10 +35,6 @@ variableGroups:
       # Storage
       - lustre_cluster_placement_group_id
       - lustre_file_system_name
-      # Conditional visibility by type
-      - worker_cpu_image_id
-      - worker_gpu_image_id
-      - worker_rdma_image_id
       # Max pods per node (per pool)
       - worker_ops_max_pods_per_node
       - worker_cpu_max_pods_per_node
@@ -172,6 +168,9 @@ variableGroups:
       - worker_ops_boot_volume_size
       - worker_ops_kubernetes_version
       - worker_ops_image_type
+      - worker_ops_image_os
+      - worker_ops_image_os_version
+      - worker_ops_image_platform_id
       - worker_ops_image_use_uri
       - worker_ops_image_custom_uri
       - worker_ops_image_compartment
@@ -1362,6 +1361,36 @@ variables:
       and:
         - eq: [worker_ops_image_type, Custom]
         - not: [worker_ops_image_use_uri]
+  worker_ops_image_os:
+    title: Operating system
+    type: enum
+    default: "Ubuntu"
+    enum: ["Ubuntu"]
+    required: true
+    visible:
+      or:
+        - eq: [worker_ops_image_type, OKE]
+        - eq: [worker_ops_image_type, Platform]
+  worker_ops_image_os_version:
+    title: Operating system version
+    type: enum
+    default: "22.04"
+    enum: ["22.04"]
+    required: true
+    visible:
+      or:
+        - eq: [worker_ops_image_type, OKE]
+        - eq: [worker_ops_image_type, Platform]
+  worker_ops_image_platform_id:
+    title: Image
+    type: oci:core:image:id
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      operatingSystem: ${worker_ops_image_os}
+      operatingSystemVersion: ${worker_ops_image_os_version}
+    visible:
+      eq: [worker_ops_image_type, Platform]
   worker_ops_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the system worker pool. Defaults to the cluster version.

@@ -6,7 +6,8 @@ locals {
   fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
   ssh_authorized_keys = compact(split("\n", trimspace(local.ssh_public_key)))
 
-  worker_ops_image_id    = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, "none")
+  worker_ops_image_type  = contains(["platform", "custom"], lower(var.worker_ops_image_type)) ? "custom" : "oke"
+  worker_ops_image_id    = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, var.worker_ops_image_platform_id, "none")
   worker_cpu_denseio_ocpus = { 
     "VM.DenseIO.E4.Flex" = var.worker_cpu_ocpus_denseIO_e4_flex, 
     "VM.DenseIO.E5.Flex" = var.worker_cpu_ocpus_denseIO_e5_flex
@@ -94,7 +95,9 @@ locals {
       ocpus              = var.worker_ops_ocpus
       memory             = var.worker_ops_memory
       boot_volume_size   = var.worker_ops_boot_volume_size
-      image_type         = "custom"
+      image_type         = local.worker_ops_image_type
+      os                 = var.worker_ops_image_os
+      os_version         = var.worker_ops_image_os_version
       image_id           = local.worker_ops_image_id
       max_pods_per_node  = local.worker_ops_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
@@ -118,7 +121,9 @@ locals {
       ocpus              = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
       memory             = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
       boot_volume_size   = var.worker_cpu_boot_volume_size
-      image_type         = "custom"
+      image_type         = local.worker_cpu_image_type
+      os                 = var.worker_cpu_image_os
+      os_version         = var.worker_cpu_image_os_version
       image_id           = local.worker_cpu_image_id
       max_pods_per_node  = local.worker_cpu_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
@@ -140,7 +145,9 @@ locals {
       size               = var.worker_gpu_pool_size
       shape              = var.worker_gpu_shape
       boot_volume_size   = var.worker_gpu_boot_volume_size
-      image_type         = "custom"
+      image_type         = local.worker_gpu_image_type
+      os                 = var.worker_gpu_image_os
+      os_version         = var.worker_gpu_image_os_version
       image_id           = local.worker_gpu_image_id
       max_pods_per_node  = var.worker_gpu_max_pods_per_node
       kubernetes_version = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
@@ -164,7 +171,7 @@ locals {
       shape                          = var.worker_rdma_shape
       boot_volume_size               = var.worker_rdma_boot_volume_size
       boot_volume_vpus_per_gb        = var.worker_rdma_boot_volume_vpus_per_gb
-      image_type                     = "custom"
+      image_type                     = "custom" # only custom is supported.
       image_id                       = local.worker_rdma_image_id
       max_pods_per_node              = var.worker_rdma_max_pods_per_node
       kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
