@@ -81,6 +81,8 @@ You can [access the cluster locally](https://docs.oracle.com/en-us/iaas/Content/
 
 Alternatively, the template deploys an `operator` instance with the kubeconfig pre-configured and tools like Helm and k9s pre-installed. You can find the SSH command to access the operator node under the **Application information** tab in the OCI Resource Manager stack.
 
+You can also access the cluster directly from your local machine via the OCI Bastion Service. The template creates a bastion service and provides a ready-to-run command under the **Application information** tab. See [Accessing a Private OKE Cluster via OCI Bastion Service](docs/accessing-private-oke-cluster-via-oci-bastion-service.md) for details.
+
 ![Application Information Tab](./docs/images/rms-application-information.png)
 
 ### Verify Node Availability
@@ -164,7 +166,7 @@ spec:
 Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
 
 > [!NOTE]
-> Starting with stack v26.3.0, Kueue is deployed by default.
+> Starting with stack v26.3.0, Kueue and MPI Operator are deployed by default.
 
 ### Deploy MPI Operator and Kueue
 
