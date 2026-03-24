@@ -45,7 +45,7 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	compartmentOCID := required("OCI_COMPARTMENT_OCID", "TF_VAR_compartment_ocid")
 	workerOpsAD := required("WORKER_OPS_AD", "OCI_WORKER_OPS_AD", "TF_VAR_worker_ops_ad")
 	workerOpsImageID := required("WORKER_OPS_IMAGE_ID", "WORKER_OPS_IMAGE_CUSTOM_ID", "OCI_WORKER_OPS_IMAGE_ID", "TF_VAR_worker_ops_image_custom_id")
-	sshPublicKey := loadSSHPublicKey(t, !opts.includeDefaults)
+	sshPublicKey := loadSSHPublicKey(t, !opts.allowMissingRequired)
 
 	// var userOCID string
 	var profile string
