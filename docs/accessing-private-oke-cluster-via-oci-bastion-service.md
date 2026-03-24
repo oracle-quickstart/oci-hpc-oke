@@ -2,13 +2,23 @@
 
 This guide explains how to use the `oke-bastion-service-session.sh` script to access a private OKE cluster endpoint through an OCI Bastion Service port-forwarding session. The script creates a bastion session, establishes an SSH tunnel to the OKE private endpoint, and generates a kubeconfig pointing to the local tunnel.
 
-## Getting the Script
+## Prerequisites
 
-### If you deployed the stack using this repository
+- [OCI CLI](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm) installed and configured
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) installed
+- `ssh` installed
+- `lsof` or `ss` installed (for port availability checks)
+- An SSH keypair (`~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub` by default)
 
-The script is already available in your local clone at `files/oke-bastion-service-session.sh`. Run all commands from the repository root.
+## Quick Start
 
-### If you do not have the repository cloned
+> [!TIP]
+> If you're here to connect to your cluster, start here.
+
+<details>
+<summary><strong>If you deployed the stack using OCI Resource Manager</strong></summary>
+
+### Step 1: Get the Script
 
 Download the script directly:
 
@@ -17,41 +27,67 @@ curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/fi
 chmod +x oke-bastion-service-session.sh
 ```
 
-Then replace `./files/oke-bastion-service-session.sh` with `./oke-bastion-service-session.sh` in all commands below.
+### Step 2: Get the Session Command from OCI Console
 
-## Prerequisites
+In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service non-interactive session** command.
 
-- [OCI CLI](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm) installed and configured
-- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) installed
-- `ssh` installed
-- `lsof` or `ss` installed (for port availability checks)
-- An SSH keypair (`~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub` by default)
-- An OKE cluster deployed with `create_oci_bastion_service = true`
+![Bastion Service Command in OCI Resource Manager](images/bastion-service-command-rms.png)
 
-## Overview
+The command will look like this:
 
-The script supports two modes for starting the SSH tunnel:
+```sh
+./oke-bastion-service-session.sh \
+  --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa2bemolaa66wfsz2y5ujwtw674fjadttnf5nkxcbe7aeh3lamvhda \
+  --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa62abxyehozslx23nm55hy2tv4jlxxlhbqspwb6fdcklrj65ncxq \
+  --oke-endpoint-ip 10.140.0.3 \
+  --region us-ashburn-1 \
+  --profile DEFAULT \
+  --ssh-key ~/.ssh/id_rsa \
+  --local-port 6443 \
+  --ttl-seconds 10800 \
+  --auto-tunnel \
+  --non-interactive
+```
 
-- **Auto-tunnel** (`--auto-tunnel`): The script starts the SSH tunnel in the background and writes the kubeconfig automatically. This is the recommended mode.
-- **Manual tunnel**: The script prints the SSH command for you to run in a separate terminal, then generates the kubeconfig.
+Run it directly to create the session, start the tunnel, and generate the kubeconfig.
 
-Inputs can be provided as CLI flags, environment variables, or interactive prompts.
+### Step 3: Connect to the Cluster
 
-## Procedure
+Once the script completes, export the kubeconfig path printed in the output and verify access:
 
-### Step 1: Get the Session Command from Terraform Output
+```sh
+export KUBECONFIG=~/.kube/oke-bastion/<cluster-ocid>.yaml
+kubectl get nodes
+```
 
-If you deployed the stack with Terraform, the full script invocation is available as a Terraform output:
+</details>
+
+<details>
+<summary><strong>If you deployed the stack using local Terraform</strong></summary>
+
+### Step 1: Get the Script
+
+The script is in the `files/` directory of your local clone. Change to that directory before running commands:
+
+```sh
+cd files
+```
+
+### Step 2: Get the Session Command from Terraform Output
+
+The full script invocation is available as a Terraform output:
 
 ```sh
 terraform output -raw bastion_service_session_command
 ```
 
-```
-./files/oke-bastion-service-session.sh \
-  --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa... \
-  --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa... \
-  --oke-endpoint-ip 10.140.0.4 \
+The command will look like this:
+
+```sh
+./oke-bastion-service-session.sh \
+  --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa2bemolaa66wfsz2y5ujwtw674fjadttnf5nkxcbe7aeh3lamvhda \
+  --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa62abxyehozslx23nm55hy2tv4jlxxlhbqspwb6fdcklrj65ncxq \
+  --oke-endpoint-ip 10.140.0.3 \
   --region us-ashburn-1 \
   --profile DEFAULT \
   --ssh-key ~/.ssh/id_rsa \
@@ -63,14 +99,25 @@ terraform output -raw bastion_service_session_command
 
 Run this command directly to create the session, start the tunnel, and generate the kubeconfig.
 
-### Step 2: Connect to the Cluster
+### Step 3: Connect to the Cluster
 
-Once the script completes, export the kubeconfig path printed in the banner and verify access:
+Once the script completes, export the kubeconfig path printed in the output and verify access:
 
 ```sh
 export KUBECONFIG=~/.kube/oke-bastion/<cluster-ocid>.yaml
 kubectl get nodes
 ```
+
+</details>
+
+## Overview
+
+The script supports two modes for starting the SSH tunnel:
+
+- **Auto-tunnel** (`--auto-tunnel`): The script starts the SSH tunnel in the background and writes the kubeconfig automatically. This is the recommended mode.
+- **Manual tunnel**: The script prints the SSH command for you to run in a separate terminal, then generates the kubeconfig.
+
+Inputs can be provided as CLI flags, environment variables, or interactive prompts.
 
 ## Usage Options
 
@@ -79,7 +126,7 @@ kubectl get nodes
 Pass all required values as flags:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa... \
   --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa... \
   --oke-endpoint-ip 10.140.0.4 \
@@ -97,7 +144,7 @@ Pass all required values as flags:
 Run the script with only the flags you want to fix, and it will prompt for any missing required values:
 
 ```sh
-./files/oke-bastion-service-session.sh --auto-tunnel
+./oke-bastion-service-session.sh --auto-tunnel
 ```
 
 You will be prompted for:
@@ -118,7 +165,7 @@ export OKE_ENDPOINT_IP=10.140.0.4
 export REGION=us-ashburn-1
 export PROFILE=DEFAULT
 
-./files/oke-bastion-service-session.sh --auto-tunnel --non-interactive
+./oke-bastion-service-session.sh --auto-tunnel --non-interactive
 ```
 
 ### Manual Tunnel Mode
@@ -126,7 +173,7 @@ export PROFILE=DEFAULT
 Without `--auto-tunnel`, the script prints the SSH command and exits after generating the kubeconfig. Run the printed SSH command in a separate terminal to start the tunnel:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa... \
   --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa... \
   --oke-endpoint-ip 10.140.0.4 \
@@ -147,7 +194,7 @@ Run the following command in another terminal to start the tunnel:
 If you already have an active bastion session, pass its OCID with `--session-id` to skip session creation:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --session-id ocid1.bastionsession.oc1.iad.amaaaaaa... \
   --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa... \
   --oke-endpoint-ip 10.140.0.4 \
@@ -160,7 +207,7 @@ If you already have an active bastion session, pass its OCID with `--session-id`
 By default, the kubeconfig is written to `~/.kube/oke-bastion/<cluster-ocid>.yaml`. To use a custom path:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --kubeconfig ~/my-cluster.yaml \
   ...
 ```
@@ -172,7 +219,7 @@ By default, the kubeconfig is written to `~/.kube/oke-bastion/<cluster-ocid>.yam
 The setup summary printed at the end of a successful run includes the exact cleanup command, including region and profile:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --cleanup-session ocid1.bastionsession.oc1.iad.amaaaaaa... \
   --region us-ashburn-1 \
   --profile DEFAULT
@@ -185,7 +232,7 @@ This kills the background SSH tunnel process and deletes the bastion session.
 To remove the generated kubeconfig without touching the session:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --cleanup-kubeconfig \
   --cluster-ocid ocid1.cluster.oc1.iad.aaaaaaaaa...
 ```
@@ -219,7 +266,7 @@ OCI Bastion occasionally marks a session as `ACTIVE` before the SSH endpoint is 
 If all retries fail, clean up the session and try again:
 
 ```sh
-./files/oke-bastion-service-session.sh \
+./oke-bastion-service-session.sh \
   --cleanup-session ocid1.bastionsession.oc1.iad.amaaaaaa... \
   --region us-ashburn-1 \
   --profile DEFAULT
@@ -249,7 +296,7 @@ If the script exits unexpectedly after creating a session, it prints a cleanup c
 
 ```
 Script exited unexpectedly. To clean up the bastion session:
-  ./files/oke-bastion-service-session.sh --cleanup-session ocid1.bastionsession... --region us-ashburn-1 --profile DEFAULT
+  ./oke-bastion-service-session.sh --cleanup-session ocid1.bastionsession... --region us-ashburn-1 --profile DEFAULT
 ```
 
 Run that command to delete the orphaned session.

@@ -125,8 +125,11 @@ variableGroups:
       - private_subnet_route_table
       - public_subnet_route_table
 
-  - title: Bastion & Operator
+  - title: Cluster Access
     variables:
+      - create_oci_bastion_service
+      - bastion_service_allowed_cidrs
+      - bastion_service_max_session_ttl
       - create_bastion
       - bastion_is_public
       - bastion_allowed_cidrs
@@ -142,11 +145,6 @@ variableGroups:
       - operator_shape_ocpus_denseIO_e5_flex
       - operator_shape_memory
       - operator_shape_boot
-
-  - title: Bastion Service
-    variables:
-      - create_oci_bastion_service
-      - bastion_service_allowed_cidrs
 
   - title: OKE Cluster
     variables:
@@ -234,6 +232,7 @@ variableGroups:
       - worker_rdma_image_custom_id
       - install_kueue
       - install_rdma_labeler
+      - install_oci_hpc_oke_utils
 
   - title: "SSH Access"
     variables:
@@ -721,8 +720,8 @@ variables:
     title: Create bastion instance
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
-    default: true
-    visible: ${create_public_subnets}
+    default: false
+    visible: true
   bastion_is_public:
     title: Create the bastion in a public subnet
     type: boolean
@@ -740,7 +739,6 @@ variables:
     visible:
       and:
       - create_bastion
-      - create_public_subnets
   bastion_shape_config:
     title: Configure the bastion shape
     type: boolean
@@ -749,7 +747,6 @@ variables:
     visible:
       and:
       - create_bastion
-      - create_public_subnets
   bastion_shape_name:
     title: Bastion instance shape
     type: oci:core:instanceshape:name
@@ -807,10 +804,10 @@ variables:
 
   # Bastion Service
   create_oci_bastion_service:
-    title: Create OCI Bastion service
+    title: Use OCI Bastion Service
     type: boolean
     description: Create an OCI Bastion service in a dedicated subnet for private endpoint access.
-    default: false
+    default: true
   bastion_service_allowed_cidrs:
     title: Bastion service CIDR allowlist
     description: CIDR ranges allowed to initiate OCI Bastion sessions.
@@ -823,25 +820,33 @@ variables:
     minItems: 1
     default: ["0.0.0.0/0"]
     visible: ${create_oci_bastion_service}
+  bastion_service_max_session_ttl:
+    title: Bastion service max session TTL
+    type: integer
+    visible: false
 
   # Operator
   create_operator:
     title: Create operator instance
     description: Provision an OCI Compute instance configured with access to interact with the OKE Kubernetes endpoint.
     type: boolean
+    default: false
     required: false
+    visible: true
   operator_shape_config:
     title: Configure operator shape
     type: boolean
     default: false
     required: false
-    visible: ${create_operator}
+    visible:
+      and:
+      - create_operator
   operator_shape_name:
     title: Shape
     type: oci:core:instanceshape:name
     pattern: "^(VM|BM)\\.(?!GPU).*$"
     required: true
-    visible: 
+    visible:
       and:
       - create_operator
       - operator_shape_config
@@ -1840,6 +1845,14 @@ variables:
       and:
         - ${worker_rdma_enabled}
         - ${install_kueue}
+
+  # OCI HPC OKE Utils
+  install_oci_hpc_oke_utils:
+    title: Install OCI HPC OKE Utils
+    description: Install the OCI HPC OKE Utils Helm chart (includes RDMA topology labeler and image prepuller).
+    type: boolean
+    default: true
+    visible: ${worker_rdma_enabled}
 
   # SSH access to the nodes
   ssh_public_key:
