@@ -177,7 +177,7 @@ locals {
         is_management_disabled   = false
         is_monitoring_disabled   = false
         plugins_config = {
-          "Bastion"                             = "ENABLED"
+          "Bastion"                             = "DISABLED"
           "Block Volume Management"             = "DISABLED"
           "Compute HPC RDMA Authentication"     = "ENABLED"
           "Compute HPC RDMA Auto-Configuration" = "ENABLED"

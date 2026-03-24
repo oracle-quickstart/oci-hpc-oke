@@ -29,7 +29,7 @@ chmod +x oke-bastion-service-session.sh
 
 ### Step 2: Get the Session Command from OCI Console
 
-In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service non-interactive session** command.
+In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service Kubernetes endpoint session command**.
 
 ![Bastion Service Command in OCI Resource Manager](images/bastion-service-command-rms.png)
 
@@ -289,20 +289,22 @@ To remove the generated kubeconfig without touching the session:
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--bastion-ocid` | OCI Bastion OCID | — |
-| `--cluster-ocid` | OKE Cluster OCID | — |
-| `--oke-endpoint-ip` | OKE private endpoint IP | — |
+| `--cluster-ocid` | OKE Cluster OCID (cluster access mode) | — |
+| `--oke-endpoint-ip` | OKE private endpoint IP (cluster access mode) | — |
+| `--worker-ip` | Worker node IP (worker SSH mode) | — |
+| `--worker-user` | SSH username for the worker node (worker SSH mode) | `ubuntu` |
 | `--region` | OCI region | CLI default |
 | `--profile` | OCI CLI profile | `DEFAULT` |
 | `--ssh-key` | Path to SSH private key | `~/.ssh/id_rsa` |
-| `--local-port` | Local port for the tunnel | `6443` |
-| `--target-port` | Target port on the OKE endpoint | `6443` |
+| `--local-port` | Local port for the SSH tunnel | `6443` (cluster access) / `2222` (worker SSH) |
+| `--target-port` | Target port on the OKE endpoint (cluster access mode) | `6443` |
 | `--ttl-seconds` | Session TTL in seconds (max 10800) | `10800` |
-| `--kubeconfig` | Custom kubeconfig output path | `~/.kube/oke-bastion/<cluster-ocid>.yaml` |
+| `--kubeconfig` | Custom kubeconfig output path (cluster access mode) | `~/.kube/oke-bastion/<cluster-ocid>.yaml` |
 | `--auto-tunnel` | Start SSH tunnel in background automatically | off |
 | `--session-id` | Reuse an existing bastion session | — |
 | `--non-interactive` | Fail fast if required inputs are missing | off |
 | `--cleanup-session` | Delete a session and stop its tunnel | — |
-| `--cleanup-kubeconfig` | Delete the generated kubeconfig | — |
+| `--cleanup-kubeconfig` | Delete the generated kubeconfig (cluster access mode) | — |
 
 ## Troubleshooting
 
@@ -321,10 +323,11 @@ If all retries fail, clean up the session and try again:
 
 ### "Port is already in use"
 
-Port 6443 (or the port specified by `--local-port`) is already bound. Either use a different port with `--local-port`, or identify and stop the process holding it:
+The local port is already bound. The default is `6443` for cluster access and `2222` for worker SSH. Either use a different port with `--local-port`, or identify and stop the process holding it:
 
 ```sh
-lsof -iTCP:6443 -sTCP:LISTEN
+lsof -iTCP:6443 -sTCP:LISTEN   # cluster access
+lsof -iTCP:2222 -sTCP:LISTEN   # worker SSH
 ```
 
 ### "OCI CLI authentication failed"

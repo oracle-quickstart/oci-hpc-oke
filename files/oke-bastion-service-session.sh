@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # =============================================================================
-# OKE Private Endpoint Access via OCI Bastion (Port Forwarding)
+# OKE Access via OCI Bastion Service (Port Forwarding)
 # =============================================================================
 # README
 # -----
-# This script creates (or reuses) an OCI Bastion port-forwarding session to an
-# OKE private endpoint, prints the SSH tunnel command to run manually, and
-# generates a kubeconfig that points to https://127.0.0.1:<LOCAL_PORT>.
+# This script creates (or reuses) an OCI Bastion port-forwarding session and
+# supports two modes:
+#
+#   Cluster access mode (default):
+#     Forwards a local port to the OKE private endpoint, generates a kubeconfig
+#     pointing to https://127.0.0.1:<LOCAL_PORT>, and optionally starts the
+#     SSH tunnel automatically.
+#
+#   Worker SSH mode (--worker-ip):
+#     Forwards a local port to port 22 on a worker node, then SSH connects
+#     through the tunnel. No OCA Bastion plugin required on the worker.
 #
 # Input precedence:
 #   1) CLI flags
@@ -14,13 +22,11 @@
 #   3) Interactive prompts (unless --non-interactive)
 #
 # Requirements:
-#   - oci CLI, kubectl, ssh
+#   - oci CLI, ssh, lsof or ss
+#   - kubectl (cluster access mode only)
 #   - An SSH keypair authorized for the bastion session
 #
-# Usage (interactive prompts for missing values):
-#   ./files/oke-bastion-service-session.sh
-#
-# Usage example (fully non-interactive):
+# Usage example — cluster access (fully non-interactive):
 #   ./files/oke-bastion-service-session.sh \
 #     --bastion-ocid ocid1.bastion... \
 #     --cluster-ocid ocid1.cluster... \
@@ -29,20 +35,23 @@
 #     --profile DEFAULT \
 #     --ssh-key ~/.ssh/id_rsa \
 #     --local-port 6443 \
-#     --target-port 6443 \
 #     --ttl-seconds 10800 \
+#     --auto-tunnel \
 #     --non-interactive
 #
-# Usage example (env vars + prompt for missing):
-#   export BASTION_OCID=ocid1.bastion...
-#   export CLUSTER_OCID=ocid1.cluster...
-#   export OKE_ENDPOINT_IP=10.140.0.6
-#   export REGION=us-ashburn-1
-#   export PROFILE=DEFAULT
-#   ./files/oke-bastion-service-session.sh
+# Usage example — worker SSH (fully non-interactive):
+#   ./files/oke-bastion-service-session.sh \
+#     --bastion-ocid ocid1.bastion... \
+#     --worker-ip 10.0.0.5 \
+#     --region us-ashburn-1 \
+#     --profile DEFAULT \
+#     --ssh-key ~/.ssh/id_rsa \
+#     --ttl-seconds 10800 \
+#     --auto-tunnel \
+#     --non-interactive
 #
 # Optional flags:
-#   --kubeconfig <path>         Persist kubeconfig at a custom path
+#   --kubeconfig <path>         Persist kubeconfig at a custom path (cluster mode only)
 #   --cleanup-kubeconfig        Delete the default kubeconfig for this cluster
 #   --cleanup-session <ocid>    Delete a bastion session (and kill its auto-tunnel)
 #   --auto-tunnel               Start the SSH tunnel in the background automatically
@@ -51,26 +60,25 @@
 #
 # Notes:
 #   - Default kubeconfig path: ~/.kube/oke-bastion/<cluster-ocid>.yaml
+#   - Default local port: 6443 (cluster access), 2222 (worker SSH)
 #   - By default the script does NOT start the SSH tunnel automatically.
 #     Run the printed SSH command in another terminal before using kubectl.
 #   - Use --auto-tunnel to start the SSH tunnel in the background automatically.
-#   - The script prints the KUBECONFIG path. To persist in your shell:
-#       export KUBECONFIG=<path>
-#   - Use --cleanup-kubeconfig to delete the default kubeconfig file for the cluster and exit.
+#   - Use --cleanup-session <ocid> to stop the tunnel and delete the session.
 # =============================================================================
 
 set -euo pipefail
 
 # Defaults (can be overridden by env or flags)
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_rsa}"
-LOCAL_PORT="${LOCAL_PORT:-6443}"
+LOCAL_PORT="${LOCAL_PORT:-}"
 TTL_SECONDS="${TTL_SECONDS:-10800}"
 REGION="${REGION:-}"
 PROFILE="${PROFILE:-}"
 BASTION_OCID="${BASTION_OCID:-}"
 CLUSTER_OCID="${CLUSTER_OCID:-}"
 OKE_ENDPOINT_IP="${OKE_ENDPOINT_IP:-}"
-TARGET_PORT="${TARGET_PORT:-6443}"
+TARGET_PORT="${TARGET_PORT:-}"
 KUBECONFIG_OUT="${KUBECONFIG_OUT:-}"
 DEFAULT_KUBECONFIG_DIR="$HOME/.kube/oke-bastion"
 DEFAULT_KUBECONFIG_FILE=""
@@ -129,7 +137,7 @@ Optional:
   --region <region>
   --profile <profile>
   --ssh-key <path>
-  --local-port <port>           (cluster access mode only)
+  --local-port <port>           (default: 6443 for cluster access, 2222 for worker SSH)
   --ttl-seconds <seconds>
   --target-port <port>          (cluster access mode only)
   --kubeconfig <path>           (cluster access mode only)
@@ -298,6 +306,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$WORKER_IP" ]] && WORKER_MODE=true
+if $WORKER_MODE; then
+  LOCAL_PORT="${LOCAL_PORT:-2222}"
+  TARGET_PORT="${TARGET_PORT:-22}"
+else
+  LOCAL_PORT="${LOCAL_PORT:-6443}"
+  TARGET_PORT="${TARGET_PORT:-6443}"
+fi
 
 if $CLEANUP_KUBECONFIG; then
   section "Cleanup: Kubeconfig"
@@ -362,11 +377,9 @@ if ! $WORKER_MODE; then
   https://kubernetes.io/docs/tasks/tools/#kubectl"
 fi
 require_cmd ssh
-if ! $WORKER_MODE; then
-  command -v lsof >/dev/null 2>&1 || command -v ss >/dev/null 2>&1 || \
-    die "Neither 'lsof' nor 'ss' is installed. At least one is required to check port availability."
-  validate_local_port
-fi
+command -v lsof >/dev/null 2>&1 || command -v ss >/dev/null 2>&1 || \
+  die "Neither 'lsof' nor 'ss' is installed. At least one is required to check port availability."
+validate_local_port
 validate_ttl
 
 prompt_required BASTION_OCID "Enter Bastion OCID"
@@ -427,14 +440,13 @@ if [[ -n "$SESSION_ID_OVERRIDE" ]]; then
   log "Session: $SESSION_ID"
 else
   if $WORKER_MODE; then
-    section "Creating Bastion managed SSH session"
-    log "Target: ${WORKER_IP}:22 (user: ${WORKER_USER})"
+    section "Creating Bastion port-forwarding session"
+    log "Target: ${WORKER_IP}:22"
     CREATE_OUTPUT=$(
-      oci "${OCI_COMMON_ARGS[@]}" bastion session create-managed-ssh \
+      oci "${OCI_COMMON_ARGS[@]}" bastion session create-port-forwarding \
         --bastion-id "$BASTION_OCID" \
         --target-private-ip "$WORKER_IP" \
-        --target-os-username "$WORKER_USER" \
-        --target-resource-port 22 \
+        --target-port 22 \
         --ssh-public-key-file "${SSH_KEY}.pub" \
         --session-ttl "$TTL_SECONDS" \
         --query 'data.id' --raw-output 2>&1
@@ -520,8 +532,13 @@ SSH_CMD="${SSH_CMD//<private_key>/$SSH_KEY}"
 SSH_CMD="${SSH_CMD//<keyfile>/$SSH_KEY}"
 SSH_CMD="${SSH_CMD//<localPort>/$LOCAL_PORT}"
 SSH_CMD="${SSH_CMD//<targetPort>/$TARGET_PORT}"
-SSH_CMD="${SSH_CMD//<targetHost>/$OKE_ENDPOINT_IP}"
-SSH_CMD="${SSH_CMD//<targetPrivateIp>/$OKE_ENDPOINT_IP}"
+if $WORKER_MODE; then
+  SSH_CMD="${SSH_CMD//<targetHost>/$WORKER_IP}"
+  SSH_CMD="${SSH_CMD//<targetPrivateIp>/$WORKER_IP}"
+else
+  SSH_CMD="${SSH_CMD//<targetHost>/$OKE_ENDPOINT_IP}"
+  SSH_CMD="${SSH_CMD//<targetPrivateIp>/$OKE_ENDPOINT_IP}"
+fi
 
 if [[ "$SSH_CMD" =~ \<[a-zA-Z_]+\> ]]; then
   log "WARNING: Unresolved placeholder(s) in SSH command: $(grep -oE '<[a-zA-Z_]+>' <<<"$SSH_CMD" | tr '\n' ' ')"
@@ -531,7 +548,11 @@ if ! grep -qE '(^| )-i ' <<<"$SSH_CMD"; then
   SSH_CMD="$SSH_CMD -i '$SSH_KEY'"
 fi
 if ! grep -qE '(^| )-L ' <<<"$SSH_CMD"; then
-  SSH_CMD="$SSH_CMD -N -L ${LOCAL_PORT}:${OKE_ENDPOINT_IP}:${TARGET_PORT}"
+  if $WORKER_MODE; then
+    SSH_CMD="$SSH_CMD -N -L ${LOCAL_PORT}:${WORKER_IP}:${TARGET_PORT}"
+  else
+    SSH_CMD="$SSH_CMD -N -L ${LOCAL_PORT}:${OKE_ENDPOINT_IP}:${TARGET_PORT}"
+  fi
 elif ! grep -qE '(^| )-N( |$)' <<<"$SSH_CMD"; then
   SSH_CMD="$SSH_CMD -N"
 fi
@@ -547,30 +568,66 @@ fi
 if ! grep -qE 'TCPKeepAlive' <<<"$SSH_CMD"; then
   SSH_CMD="$SSH_CMD -o TCPKeepAlive=yes"
 fi
+if $NON_INTERACTIVE && ! grep -qE 'StrictHostKeyChecking' <<<"$SSH_CMD"; then
+  SSH_CMD="$SSH_CMD -o StrictHostKeyChecking=accept-new"
+fi
 
 CLEANUP_CMD="$0 --cleanup-session $SESSION_ID"
 [[ -n "$REGION" ]] && CLEANUP_CMD="$CLEANUP_CMD --region $REGION"
 [[ -n "$PROFILE" ]] && CLEANUP_CMD="$CLEANUP_CMD --profile $PROFILE"
 
 if $WORKER_MODE; then
+  DIRECT_SSH_CMD="ssh -i '$SSH_KEY' -p $LOCAL_PORT $WORKER_USER@127.0.0.1"
+  if $NON_INTERACTIVE; then
+    DIRECT_SSH_CMD="$DIRECT_SSH_CMD -o StrictHostKeyChecking=accept-new"
+  fi
   if $AUTO_TUNNEL; then
-    section "Connecting to worker node"
-    log "Exec-ing into SSH session for ${WORKER_USER}@${WORKER_IP}..."
-    exec bash -c "$SSH_CMD"
+    section "Starting SSH tunnel to worker node"
+    SSH_PID=""
+    SSH_MAX_RETRIES=3
+    SSH_RETRY_DELAY=10
+    for _ssh_attempt in 1 2 3 4; do
+      bash -c "exec $SSH_CMD" &
+      SSH_PID=$!
+      TUNNEL_WAIT=0
+      TUNNEL_TIMEOUT=15
+      while (( TUNNEL_WAIT < TUNNEL_TIMEOUT )); do
+        if ! kill -0 "$SSH_PID" 2>/dev/null; then
+          break
+        fi
+        if lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 || \
+           ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
+          break 2
+        fi
+        sleep 1
+        (( TUNNEL_WAIT++ )) || true
+      done
+      if (( _ssh_attempt <= SSH_MAX_RETRIES )); then
+        log "SSH tunnel attempt ${_ssh_attempt} failed, retrying in ${SSH_RETRY_DELAY}s..."
+        sleep "$SSH_RETRY_DELAY"
+      fi
+    done
+    if ! lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 && \
+       ! ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
+      die "SSH tunnel failed to start after $((SSH_MAX_RETRIES + 1)) attempts"
+    fi
+    TUNNEL_PID_FILE="/tmp/oke-bastion-tunnel-${SESSION_ID}.pid"
+    echo "$SSH_PID" > "$TUNNEL_PID_FILE"
+    log "Tunnel running (PID: $SSH_PID), connecting to ${WORKER_USER}@${WORKER_IP} via localhost:${LOCAL_PORT}..."
+    exec bash -c "$DIRECT_SSH_CMD"
   else
-    section "SSH command"
-    log "Run the following command to connect to the worker node:"
-    log ""
-    log "  $SSH_CMD"
-    log ""
+    section "SSH tunnel and connect commands"
     summary \
       "Session ready" \
       "" \
       "Worker:  ${WORKER_USER}@${WORKER_IP}" \
       "Session: $SESSION_ID" \
       "" \
-      "Connect:" \
+      "1. Start tunnel:" \
       "  $SSH_CMD" \
+      "" \
+      "2. Connect:" \
+      "  $DIRECT_SSH_CMD" \
       "" \
       "Cleanup:" \
       "  $CLEANUP_CMD"

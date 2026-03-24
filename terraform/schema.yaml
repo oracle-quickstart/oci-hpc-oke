@@ -127,10 +127,6 @@ variableGroups:
 
   - title: Cluster Access
     variables:
-      - create_oci_bastion_service
-      - bastion_service_allowed_cidrs
-      - bastion_service_max_session_ttl
-      - bastion_service_allow_worker_ssh
       - create_bastion
       - bastion_is_public
       - bastion_allowed_cidrs
@@ -146,6 +142,10 @@ variableGroups:
       - operator_shape_ocpus_denseIO_e5_flex
       - operator_shape_memory
       - operator_shape_boot
+      - create_oci_bastion_service
+      - bastion_service_allowed_cidrs
+      - bastion_service_max_session_ttl
+      - bastion_service_allow_worker_ssh
 
   - title: OKE Cluster
     variables:
@@ -720,7 +720,7 @@ variables:
     title: Create bastion instance
     type: boolean
     description: Create a Compute instance for public SSH access to VCN.
-    default: false
+    default: true
     visible: true
   bastion_is_public:
     title: Create the bastion in a public subnet
@@ -807,7 +807,7 @@ variables:
     title: Use OCI Bastion Service
     type: boolean
     description: Create an OCI Bastion service in a dedicated subnet for private endpoint access.
-    default: true
+    default: false
   bastion_service_allowed_cidrs:
     title: Bastion service CIDR allowlist
     description: CIDR ranges allowed to initiate OCI Bastion sessions.
@@ -836,7 +836,7 @@ variables:
     title: Create operator instance
     description: Provision an OCI Compute instance configured with access to interact with the OKE Kubernetes endpoint.
     type: boolean
-    default: false
+    default: true
     required: false
     visible: true
   operator_shape_config:
@@ -1875,7 +1875,7 @@ outputGroups:
       - ig_route_table_id
       - nat_route_table_id
 
-  - title: Bastion
+  - title: Bastion instance
     outputs:
       - bastion_id
       - bastion_subnet_id
@@ -1893,7 +1893,7 @@ outputGroups:
       - bastion_service_session_command
       - bastion_service_worker_ssh_command
 
-  - title: Operator
+  - title: Operator instance
     outputs:
       - operator_id
       - operator_subnet_id
@@ -2024,7 +2024,7 @@ outputs:
     title: Bastion service subnet CIDR
     type: string
   bastion_service_session_command:
-    title: Bastion service non-interactive session command
+    title: Bastion service Kubernetes endpoint session command
     type: copyableString
   bastion_service_worker_ssh_command:
     title: Bastion service worker SSH command
