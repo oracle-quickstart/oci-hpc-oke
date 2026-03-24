@@ -130,6 +130,7 @@ variableGroups:
       - create_oci_bastion_service
       - bastion_service_allowed_cidrs
       - bastion_service_max_session_ttl
+      - bastion_service_allow_worker_ssh
       - create_bastion
       - bastion_is_public
       - bastion_allowed_cidrs
@@ -231,7 +232,6 @@ variableGroups:
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
       - install_kueue
-      - install_rdma_labeler
       - install_oci_hpc_oke_utils
 
   - title: "SSH Access"
@@ -819,6 +819,12 @@ variables:
     unique_items: true
     minItems: 1
     default: ["0.0.0.0/0"]
+    visible: ${create_oci_bastion_service}
+  bastion_service_allow_worker_ssh:
+    title: Allow SSH access to worker nodes
+    type: boolean
+    description: Allow SSH access to worker nodes via OCI Bastion Service.
+    default: false
     visible: ${create_oci_bastion_service}
   bastion_service_max_session_ttl:
     title: Bastion service max session TTL
@@ -1821,13 +1827,7 @@ variables:
     visible: ${worker_rdma_enabled}
   install_rdma_labeler:
     title: Install RDMA Topology Labeler
-    description: "Deploy the RDMA topology labeler DaemonSet to populate node labels required for Topology Aware Scheduling."
-    type: boolean
-    default: true
-    visible:
-      and:
-        - ${worker_rdma_enabled}
-        - ${install_kueue}
+    visible: false
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
@@ -1891,6 +1891,7 @@ outputGroups:
       - bastion_service_subnet_id
       - bastion_service_subnet_cidr
       - bastion_service_session_command
+      - bastion_service_worker_ssh_command
 
   - title: Operator
     outputs:
@@ -2024,6 +2025,9 @@ outputs:
     type: string
   bastion_service_session_command:
     title: Bastion service non-interactive session command
+    type: copyableString
+  bastion_service_worker_ssh_command:
+    title: Bastion service worker SSH command
     type: copyableString
 
   # Operator

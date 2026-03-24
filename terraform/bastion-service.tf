@@ -3,6 +3,13 @@
 
 locals {
   oke_private_endpoint_ip = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
+  workers_subnet_cidr = (var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh ?
+    (var.custom_subnet_ids ?
+      one(data.oci_core_subnet.workers_bastion_svc[*].cidr_block) :
+      lookup(local.subnets["workers"], "cidr", cidrsubnet(local.vcn_cidr, lookup(local.subnets["workers"], "newbits"), lookup(local.subnets["workers"], "netnum")))
+    ) :
+    null
+  )
   bastion_service_subnet_cidr = (var.create_oci_bastion_service ?
     (var.custom_subnet_ids ?
       one(data.oci_core_subnet.bastion_service.*.cidr_block) :
@@ -29,6 +36,12 @@ data "oci_core_subnet" "bastion_service" {
   count = var.create_oci_bastion_service && var.custom_subnet_ids ? 1 : 0
 
   subnet_id = var.bastion_service_sn_id
+}
+
+data "oci_core_subnet" "workers_bastion_svc" {
+  count = var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh && var.custom_subnet_ids ? 1 : 0
+
+  subnet_id = var.workers_sn_id
 }
 
 resource "oci_core_subnet" "bastion_service" {
@@ -80,9 +93,44 @@ resource "oci_core_security_list" "bastion_service" {
     description = "Allow TCP 6443 egress to OKE private endpoint"
   }
 
+  dynamic "egress_security_rules" {
+    for_each = var.bastion_service_allow_worker_ssh ? [1] : []
+    content {
+      protocol         = "6"
+      destination      = local.workers_subnet_cidr
+      destination_type = "CIDR_BLOCK"
+
+      tcp_options {
+        min = 22
+        max = 22
+      }
+
+      description = "Allow SSH egress to worker nodes"
+    }
+  }
+
   lifecycle {
     ignore_changes = [defined_tags]
   }
+}
+
+resource "oci_core_network_security_group_security_rule" "bastion_service_worker_ssh" {
+  count = var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh ? 1 : 0
+
+  network_security_group_id = module.oke.worker_nsg_id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source                    = local.bastion_service_subnet_cidr
+  source_type               = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      min = 22
+      max = 22
+    }
+  }
+
+  description = "Allow SSH ingress to workers from OCI Bastion Service subnet"
 }
 
 resource "oci_bastion_bastion" "bastion_service" {

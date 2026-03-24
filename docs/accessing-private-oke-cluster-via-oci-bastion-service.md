@@ -110,6 +110,53 @@ kubectl get nodes
 
 </details>
 
+## SSH into Worker Nodes
+
+> [!NOTE]
+> Requires `bastion_service_allow_worker_ssh = true` in your Terraform configuration.
+
+Get the worker node IP from the cluster:
+
+```sh
+kubectl get nodes -o wide
+```
+
+Then run the script with `--worker-ip`. The command is available as a Terraform output:
+
+<details>
+<summary><strong>If you deployed the stack using OCI Resource Manager</strong></summary>
+
+In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service worker SSH command** and replace `<worker-ip>` with the node IP.
+
+</details>
+
+<details>
+<summary><strong>If you deployed the stack using local Terraform</strong></summary>
+
+```sh
+terraform output -raw bastion_service_worker_ssh_command
+```
+
+Replace `<worker-ip>` with the node IP and run the command.
+
+</details>
+
+The command will look like this:
+
+```sh
+./oke-bastion-service-session.sh \
+  --bastion-ocid ocid1.bastion.oc1.iad.amaaaaaa2bemolaa66wfsz2y5ujwtw674fjadttnf5nkxcbe7aeh3lamvhda \
+  --worker-ip 10.0.2.5 \
+  --region us-ashburn-1 \
+  --profile DEFAULT \
+  --ssh-key ~/.ssh/id_rsa \
+  --ttl-seconds 10800 \
+  --auto-tunnel \
+  --non-interactive
+```
+
+With `--auto-tunnel`, the script connects you directly to the worker node. Without it, it prints the SSH command to run manually.
+
 ## Overview
 
 The script supports two modes for starting the SSH tunnel:

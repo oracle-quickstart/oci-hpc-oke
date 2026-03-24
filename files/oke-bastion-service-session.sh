@@ -84,6 +84,9 @@ TUNNEL_PID=""
 KCFG=""
 SESSION_ID=""
 SESSION_ID_OVERRIDE=""
+WORKER_IP="${WORKER_IP:-}"
+WORKER_USER="${WORKER_USER:-ubuntu}"
+WORKER_MODE=false
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -116,19 +119,22 @@ usage() {
 Usage:
   oke-bastion-service-session.sh [options]
 
-Required (can be flags, env, or prompts):
-  --bastion-ocid <ocid>
-  --cluster-ocid <ocid>
-  --oke-endpoint-ip <ip>
+Cluster access mode (default):
+  Required: --bastion-ocid, --cluster-ocid, --oke-endpoint-ip
+
+Worker SSH mode (when --worker-ip is set):
+  Required: --bastion-ocid, --worker-ip
 
 Optional:
   --region <region>
   --profile <profile>
   --ssh-key <path>
-  --local-port <port>
+  --local-port <port>           (cluster access mode only)
   --ttl-seconds <seconds>
-  --target-port <port>
-  --kubeconfig <path>
+  --target-port <port>          (cluster access mode only)
+  --kubeconfig <path>           (cluster access mode only)
+  --worker-ip <ip>              (worker SSH mode)
+  --worker-user <username>      (worker SSH mode, default: ubuntu)
   --cleanup-kubeconfig
   --cleanup-session <ocid>
   --auto-tunnel
@@ -137,7 +143,8 @@ Optional:
   -h, --help
 
 Examples:
-  ./files/oke-bastion-service-session.sh --bastion-ocid ... --cluster-ocid ... --oke-endpoint-ip 10.140.0.6
+  ./oke-bastion-service-session.sh --bastion-ocid ... --cluster-ocid ... --oke-endpoint-ip 10.140.0.6
+  ./oke-bastion-service-session.sh --bastion-ocid ... --worker-ip 10.0.0.5 --auto-tunnel
 USAGE
 }
 
@@ -279,12 +286,18 @@ while [[ $# -gt 0 ]]; do
       SESSION_ID_OVERRIDE="$2"; shift 2; ;;
     --non-interactive)
       NON_INTERACTIVE=true; shift; ;;
+    --worker-ip)
+      WORKER_IP="$2"; shift 2; ;;
+    --worker-user)
+      WORKER_USER="$2"; shift 2; ;;
     -h|--help)
       usage; exit 0; ;;
     *)
       die "Unknown argument: $1"; ;;
   esac
 done
+
+[[ -n "$WORKER_IP" ]] && WORKER_MODE=true
 
 if $CLEANUP_KUBECONFIG; then
   section "Cleanup: Kubeconfig"
@@ -344,23 +357,30 @@ fi
 
 command -v oci >/dev/null 2>&1 || die "OCI CLI not found. Install and configure it first:
   https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm"
-command -v kubectl >/dev/null 2>&1 || die "kubectl not found. Install it first:
+if ! $WORKER_MODE; then
+  command -v kubectl >/dev/null 2>&1 || die "kubectl not found. Install it first:
   https://kubernetes.io/docs/tasks/tools/#kubectl"
+fi
 require_cmd ssh
-command -v lsof >/dev/null 2>&1 || command -v ss >/dev/null 2>&1 || \
-  die "Neither 'lsof' nor 'ss' is installed. At least one is required to check port availability."
-
-validate_local_port
+if ! $WORKER_MODE; then
+  command -v lsof >/dev/null 2>&1 || command -v ss >/dev/null 2>&1 || \
+    die "Neither 'lsof' nor 'ss' is installed. At least one is required to check port availability."
+  validate_local_port
+fi
 validate_ttl
 
 prompt_required BASTION_OCID "Enter Bastion OCID"
 validate_ocid "$BASTION_OCID" "bastion"
-prompt_required CLUSTER_OCID "Enter OKE Cluster OCID"
-validate_ocid "$CLUSTER_OCID" "cluster"
-prompt_required OKE_ENDPOINT_IP "Enter OKE private endpoint IP (e.g., 10.140.0.6)"
-validate_ip "$OKE_ENDPOINT_IP"
-
-DEFAULT_KUBECONFIG_FILE="${DEFAULT_KUBECONFIG_DIR}/${CLUSTER_OCID}.yaml"
+if $WORKER_MODE; then
+  prompt_required WORKER_IP "Enter worker node IP"
+  validate_ip "$WORKER_IP"
+else
+  prompt_required CLUSTER_OCID "Enter OKE Cluster OCID"
+  validate_ocid "$CLUSTER_OCID" "cluster"
+  prompt_required OKE_ENDPOINT_IP "Enter OKE private endpoint IP (e.g., 10.140.0.6)"
+  validate_ip "$OKE_ENDPOINT_IP"
+  DEFAULT_KUBECONFIG_FILE="${DEFAULT_KUBECONFIG_DIR}/${CLUSTER_OCID}.yaml"
+fi
 
 prompt_optional REGION "Enter OCI region (leave blank for CLI default)"
 prompt_optional PROFILE "Enter OCI CLI profile (leave blank for default)"
@@ -383,20 +403,22 @@ Details: ${REGION_CHECK_OUT}"
 }
 log "OCI CLI configuration OK"
 
-section "Validating kubectl"
-KUBECTL_CHECK_OUT=$(kubectl version --client 2>&1) || {
-  die "kubectl is not working correctly. Reinstall or check your PATH:
+if ! $WORKER_MODE; then
+  section "Validating kubectl"
+  KUBECTL_CHECK_OUT=$(kubectl version --client 2>&1) || {
+    die "kubectl is not working correctly. Reinstall or check your PATH:
   https://kubernetes.io/docs/tasks/tools/#kubectl
 Details: ${KUBECTL_CHECK_OUT}"
-}
-log "kubectl OK"
+  }
+  log "kubectl OK"
 
-if [[ -n "$KUBECONFIG_OUT" ]]; then
-  KCFG="$KUBECONFIG_OUT"
-  mkdir -p "$(dirname "$KCFG")"
-else
-  mkdir -p "$DEFAULT_KUBECONFIG_DIR"
-  KCFG="$DEFAULT_KUBECONFIG_FILE"
+  if [[ -n "$KUBECONFIG_OUT" ]]; then
+    KCFG="$KUBECONFIG_OUT"
+    mkdir -p "$(dirname "$KCFG")"
+  else
+    mkdir -p "$DEFAULT_KUBECONFIG_DIR"
+    KCFG="$DEFAULT_KUBECONFIG_FILE"
+  fi
 fi
 
 if [[ -n "$SESSION_ID_OVERRIDE" ]]; then
@@ -404,19 +426,36 @@ if [[ -n "$SESSION_ID_OVERRIDE" ]]; then
   section "Reusing existing Bastion session"
   log "Session: $SESSION_ID"
 else
-  section "Creating Bastion port-forwarding session"
-  log "Target: ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
-  CREATE_OUTPUT=$(
-    oci "${OCI_COMMON_ARGS[@]}" bastion session create-port-forwarding \
-      --bastion-id "$BASTION_OCID" \
-      --target-private-ip "$OKE_ENDPOINT_IP" \
-      --target-port "$TARGET_PORT" \
-      --ssh-public-key-file "${SSH_KEY}.pub" \
-      --session-ttl "$TTL_SECONDS" \
-      --query 'data.id' --raw-output 2>&1
-  ) || {
-    die "Bastion session create failed:"$'\n'"${CREATE_OUTPUT}"
-  }
+  if $WORKER_MODE; then
+    section "Creating Bastion managed SSH session"
+    log "Target: ${WORKER_IP}:22 (user: ${WORKER_USER})"
+    CREATE_OUTPUT=$(
+      oci "${OCI_COMMON_ARGS[@]}" bastion session create-managed-ssh \
+        --bastion-id "$BASTION_OCID" \
+        --target-private-ip "$WORKER_IP" \
+        --target-os-username "$WORKER_USER" \
+        --target-resource-port 22 \
+        --ssh-public-key-file "${SSH_KEY}.pub" \
+        --session-ttl "$TTL_SECONDS" \
+        --query 'data.id' --raw-output 2>&1
+    ) || {
+      die "Bastion session create failed:"$'\n'"${CREATE_OUTPUT}"
+    }
+  else
+    section "Creating Bastion port-forwarding session"
+    log "Target: ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
+    CREATE_OUTPUT=$(
+      oci "${OCI_COMMON_ARGS[@]}" bastion session create-port-forwarding \
+        --bastion-id "$BASTION_OCID" \
+        --target-private-ip "$OKE_ENDPOINT_IP" \
+        --target-port "$TARGET_PORT" \
+        --ssh-public-key-file "${SSH_KEY}.pub" \
+        --session-ttl "$TTL_SECONDS" \
+        --query 'data.id' --raw-output 2>&1
+    ) || {
+      die "Bastion session create failed:"$'\n'"${CREATE_OUTPUT}"
+    }
+  fi
   SESSION_ID="$CREATE_OUTPUT"
 fi
 
@@ -509,103 +548,128 @@ if ! grep -qE 'TCPKeepAlive' <<<"$SSH_CMD"; then
   SSH_CMD="$SSH_CMD -o TCPKeepAlive=yes"
 fi
 
-if $AUTO_TUNNEL; then
-  section "Starting SSH tunnel"
-  SSH_PID=""
-  SSH_MAX_RETRIES=3
-  SSH_RETRY_DELAY=10
-  for _ssh_attempt in 1 2 3 4; do
-    bash -c "exec $SSH_CMD" &
-    SSH_PID=$!
-    TUNNEL_WAIT=0
-    TUNNEL_TIMEOUT=15
-    while (( TUNNEL_WAIT < TUNNEL_TIMEOUT )); do
-      if ! kill -0 "$SSH_PID" 2>/dev/null; then
-        break
-      fi
-      if lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 || \
-         ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
-        break 2
-      fi
-      sleep 1
-      (( TUNNEL_WAIT++ )) || true
-    done
-    if (( _ssh_attempt <= SSH_MAX_RETRIES )); then
-      log "SSH tunnel attempt ${_ssh_attempt} failed, retrying in ${SSH_RETRY_DELAY}s..."
-      sleep "$SSH_RETRY_DELAY"
-    fi
-  done
-  if ! lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 && \
-     ! ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
-    die "SSH tunnel failed to start after $((SSH_MAX_RETRIES + 1)) attempts"
-  fi
-  TUNNEL_PID_FILE="/tmp/oke-bastion-tunnel-${SESSION_ID}.pid"
-  echo "$SSH_PID" > "$TUNNEL_PID_FILE"
-  log "Tunnel running (PID: $SSH_PID), forwarding localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
-else
-  section "SSH tunnel command"
-  log "Run the following command in another terminal to start the tunnel:"
-  log ""
-  log "  $SSH_CMD"
-  log ""
-fi
-
-section "Generating kubeconfig"
-oci "${OCI_COMMON_ARGS[@]}" ce cluster create-kubeconfig \
-  --cluster-id "$CLUSTER_OCID" \
-  --token-version 2.0.0 \
-  --kube-endpoint PRIVATE_ENDPOINT \
-  --file "$KCFG"
-
-log "Rewriting server address to use localhost tunnel..."
-CLUSTER_NAME="$(kubectl config view --kubeconfig "$KCFG" -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)"
-if [[ -z "$CLUSTER_NAME" ]]; then
-  die "Failed to detect cluster name in kubeconfig."
-fi
-kubectl config set-cluster "$CLUSTER_NAME" --server "https://127.0.0.1:${LOCAL_PORT}" --kubeconfig "$KCFG" >/dev/null
-log "Kubeconfig ready: $KCFG"
-
 CLEANUP_CMD="$0 --cleanup-session $SESSION_ID"
 [[ -n "$REGION" ]] && CLEANUP_CMD="$CLEANUP_CMD --region $REGION"
 [[ -n "$PROFILE" ]] && CLEANUP_CMD="$CLEANUP_CMD --profile $PROFILE"
 
-if $AUTO_TUNNEL; then
-  summary \
-    "Setup complete" \
-    "" \
-    "Tunnel:     localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT} (PID: $SSH_PID)" \
-    "Kubeconfig: $KCFG" \
-    "Session:    $SESSION_ID" \
-    "" \
-    "Next steps:" \
-    "  1. Set the kubeconfig for your shell:" \
-    "     export KUBECONFIG=$KCFG" \
-    "  2. Verify cluster access:" \
-    "     kubectl get nodes" \
-    "" \
-    "Cleanup:" \
-    "  Stop tunnel + delete session:" \
-    "    $CLEANUP_CMD" \
-    "  Delete kubeconfig only:" \
-    "    $0 --cleanup-kubeconfig --cluster-ocid $CLUSTER_OCID"
+if $WORKER_MODE; then
+  if $AUTO_TUNNEL; then
+    section "Connecting to worker node"
+    log "Exec-ing into SSH session for ${WORKER_USER}@${WORKER_IP}..."
+    exec bash -c "$SSH_CMD"
+  else
+    section "SSH command"
+    log "Run the following command to connect to the worker node:"
+    log ""
+    log "  $SSH_CMD"
+    log ""
+    summary \
+      "Session ready" \
+      "" \
+      "Worker:  ${WORKER_USER}@${WORKER_IP}" \
+      "Session: $SESSION_ID" \
+      "" \
+      "Connect:" \
+      "  $SSH_CMD" \
+      "" \
+      "Cleanup:" \
+      "  $CLEANUP_CMD"
+  fi
 else
-  summary \
-    "Setup complete" \
-    "" \
-    "Kubeconfig: $KCFG" \
-    "Session:    $SESSION_ID" \
-    "" \
-    "Next steps:" \
-    "  1. Start the SSH tunnel (in another terminal):" \
-    "     $SSH_CMD" \
-    "  2. Set the kubeconfig for your shell:" \
-    "     export KUBECONFIG=$KCFG" \
-    "  3. Verify cluster access:" \
-    "     kubectl get nodes" \
-    "" \
-    "Cleanup:" \
-    "  Delete session:" \
-    "    $CLEANUP_CMD" \
-    "  Delete kubeconfig only:" \
-    "    $0 --cleanup-kubeconfig --cluster-ocid $CLUSTER_OCID"
+  if $AUTO_TUNNEL; then
+    section "Starting SSH tunnel"
+    SSH_PID=""
+    SSH_MAX_RETRIES=3
+    SSH_RETRY_DELAY=10
+    for _ssh_attempt in 1 2 3 4; do
+      bash -c "exec $SSH_CMD" &
+      SSH_PID=$!
+      TUNNEL_WAIT=0
+      TUNNEL_TIMEOUT=15
+      while (( TUNNEL_WAIT < TUNNEL_TIMEOUT )); do
+        if ! kill -0 "$SSH_PID" 2>/dev/null; then
+          break
+        fi
+        if lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 || \
+           ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
+          break 2
+        fi
+        sleep 1
+        (( TUNNEL_WAIT++ )) || true
+      done
+      if (( _ssh_attempt <= SSH_MAX_RETRIES )); then
+        log "SSH tunnel attempt ${_ssh_attempt} failed, retrying in ${SSH_RETRY_DELAY}s..."
+        sleep "$SSH_RETRY_DELAY"
+      fi
+    done
+    if ! lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 && \
+       ! ss -tlnH "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q .; then
+      die "SSH tunnel failed to start after $((SSH_MAX_RETRIES + 1)) attempts"
+    fi
+    TUNNEL_PID_FILE="/tmp/oke-bastion-tunnel-${SESSION_ID}.pid"
+    echo "$SSH_PID" > "$TUNNEL_PID_FILE"
+    log "Tunnel running (PID: $SSH_PID), forwarding localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT}"
+  else
+    section "SSH tunnel command"
+    log "Run the following command in another terminal to start the tunnel:"
+    log ""
+    log "  $SSH_CMD"
+    log ""
+  fi
+
+  section "Generating kubeconfig"
+  oci "${OCI_COMMON_ARGS[@]}" ce cluster create-kubeconfig \
+    --cluster-id "$CLUSTER_OCID" \
+    --token-version 2.0.0 \
+    --kube-endpoint PRIVATE_ENDPOINT \
+    --file "$KCFG"
+
+  log "Rewriting server address to use localhost tunnel..."
+  CLUSTER_NAME="$(kubectl config view --kubeconfig "$KCFG" -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)"
+  if [[ -z "$CLUSTER_NAME" ]]; then
+    die "Failed to detect cluster name in kubeconfig."
+  fi
+  kubectl config set-cluster "$CLUSTER_NAME" --server "https://127.0.0.1:${LOCAL_PORT}" --kubeconfig "$KCFG" >/dev/null
+  log "Kubeconfig ready: $KCFG"
+
+  if $AUTO_TUNNEL; then
+    summary \
+      "Setup complete" \
+      "" \
+      "Tunnel:     localhost:${LOCAL_PORT} to ${OKE_ENDPOINT_IP}:${TARGET_PORT} (PID: $SSH_PID)" \
+      "Kubeconfig: $KCFG" \
+      "Session:    $SESSION_ID" \
+      "" \
+      "Next steps:" \
+      "  1. Set the kubeconfig for your shell:" \
+      "     export KUBECONFIG=$KCFG" \
+      "  2. Verify cluster access:" \
+      "     kubectl get nodes" \
+      "" \
+      "Cleanup:" \
+      "  Stop tunnel + delete session:" \
+      "    $CLEANUP_CMD" \
+      "  Delete kubeconfig only:" \
+      "    $0 --cleanup-kubeconfig --cluster-ocid $CLUSTER_OCID"
+  else
+    summary \
+      "Setup complete" \
+      "" \
+      "Kubeconfig: $KCFG" \
+      "Session:    $SESSION_ID" \
+      "" \
+      "Next steps:" \
+      "  1. Start the SSH tunnel (in another terminal):" \
+      "     $SSH_CMD" \
+      "  2. Set the kubeconfig for your shell:" \
+      "     export KUBECONFIG=$KCFG" \
+      "  3. Verify cluster access:" \
+      "     kubectl get nodes" \
+      "" \
+      "Cleanup:" \
+      "  Delete session:" \
+      "    $CLEANUP_CMD" \
+      "  Delete kubeconfig only:" \
+      "    $0 --cleanup-kubeconfig --cluster-ocid $CLUSTER_OCID"
+  fi
 fi

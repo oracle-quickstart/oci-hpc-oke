@@ -27,7 +27,7 @@ output "bastion_service_security_list_id" { value = var.create_oci_bastion_servi
 output "oke_private_endpoint_ip" { value = var.create_oci_bastion_service ? local.oke_private_endpoint_ip : "" }
 output "bastion_service_session_command" {
   value = var.create_oci_bastion_service ? format(
-    "./files/oke-bastion-service-session.sh --bastion-ocid %s --cluster-ocid %s --oke-endpoint-ip %s --region %s --profile %s --ssh-key %s --local-port %d --ttl-seconds %d --auto-tunnel --non-interactive",
+    "./oke-bastion-service-session.sh --bastion-ocid %s --cluster-ocid %s --oke-endpoint-ip %s --region %s --profile %s --ssh-key %s --local-port %d --ttl-seconds %d --auto-tunnel --non-interactive",
     one(oci_bastion_bastion.bastion_service[*].id),
     module.oke.cluster_id,
     local.oke_private_endpoint_ip,
@@ -35,6 +35,16 @@ output "bastion_service_session_command" {
     var.oci_profile != null ? var.oci_profile : "DEFAULT",
     "~/.ssh/id_rsa",
     6443,
+    10800,
+  ) : ""
+}
+output "bastion_service_worker_ssh_command" {
+  value = var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh ? format(
+    "./oke-bastion-service-session.sh --bastion-ocid %s --worker-ip <worker-ip> --region %s --profile %s --ssh-key %s --ttl-seconds %d --auto-tunnel --non-interactive",
+    one(oci_bastion_bastion.bastion_service[*].id),
+    var.region,
+    var.oci_profile != null ? var.oci_profile : "DEFAULT",
+    "~/.ssh/id_rsa",
     10800,
   ) : ""
 }
