@@ -32,6 +32,9 @@ locals {
   pods_subnet_capacity   = pow(2, 32 - local.pods_subnet_prefix) - 3
   is_vcn_native_cni      = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
   invalid_pods_capacity  = local.is_vcn_native_cni && local.total_pods_required > local.pods_subnet_capacity
+
+  # Check if the ssh_public_key has comment
+  ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -140,6 +143,17 @@ resource "null_resource" "validate_pods_capacity" {
           - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
         Consider increasing the pods subnet size or reducing max_pods_per_node/pool_size values.
       EOT
+    }
+  }
+}
+
+resource "null_resource" "private_key_should_have_comment" {
+  count = alltrue([local.any_deployments_via_operator, var.ssh_public_key != null]) ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = local.ssh_public_key_has_comment
+      error_message = "Error: SSH public key should have a comment. Please ensure the SSH public key has a comment."
     }
   }
 }
