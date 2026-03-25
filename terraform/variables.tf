@@ -175,6 +175,16 @@ variable "bastion_service_allowed_cidrs" {
   description = "CIDR allowlist for OCI Bastion service clients."
   type        = list(string)
 }
+variable "bastion_service_allow_worker_ssh" {
+  default     = false
+  description = "Allow SSH access to worker nodes via OCI Bastion Service."
+  type        = bool
+}
+variable "bastion_service_max_session_ttl" {
+  default     = 10800
+  description = "Max session TTL in seconds for the OCI Bastion service (max 10800)."
+  type        = number
+}
 
 # Operator
 variable "create_operator" { default = true }
