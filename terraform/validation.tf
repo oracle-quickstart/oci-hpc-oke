@@ -147,7 +147,7 @@ resource "null_resource" "validate_pods_capacity" {
   }
 }
 
-resource "null_resource" "private_key_should_have_comment" {
+resource "null_resource" "ssh_public_key_should_have_comment" {
   count = alltrue([local.any_deployments_via_operator, var.ssh_public_key != null]) ? 1 : 0
 
   lifecycle {
