@@ -12,6 +12,7 @@ on:
           - all-public-orm
           - all-private-orm
           - all-private-bastion-service-orm
+          - all-public-monitoring-orm
 
   issue_comment:
     types: [created]

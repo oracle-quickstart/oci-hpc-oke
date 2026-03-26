@@ -77,6 +77,7 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform) and `t
 | `tfvars/orm/all-public-orm.json` | ORM all-public topology |
 | `tfvars/orm/all-private-orm.json` | ORM all-private topology |
 | `tfvars/orm/all-private-bastion-service-orm.json` | ORM all-private with bastion service |
+| `tfvars/orm/all-public-monitoring-orm.json` | ORM all-public with monitoring stack |
 
 ## Optional suites
 Storage (FSS & Lustre):
