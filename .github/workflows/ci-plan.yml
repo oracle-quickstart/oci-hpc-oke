@@ -237,6 +237,7 @@ jobs:
           - topology: all-public-orm
           - topology: all-private-orm
           - topology: all-private-bastion-service-orm
+          - topology: all-public-monitoring-orm
     env:
       TOPOLOGY: ${{ matrix.topology }}
 
