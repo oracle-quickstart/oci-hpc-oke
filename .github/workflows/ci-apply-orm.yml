@@ -7,7 +7,7 @@ on:
         description: "Network topology to test"
         required: true
         type: choice
-        default: "all-public-orm"
+        default: "all-public-monitoring-orm"
         options:
           - all-public-orm
           - all-private-orm
@@ -21,7 +21,7 @@ on:
     inputs:
       topology:
         type: string
-        default: 'all-public-orm'
+        default: 'all-public-monitoring-orm'
       pr_number:
         type: number
         default: 0
@@ -79,7 +79,7 @@ jobs:
         run: |
           topology=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-apply-orm\s)\S+' | xargs || true)
           if [ -z "$topology" ]; then
-            topology="all-public-orm"
+            topology="all-public-monitoring-orm"
           fi
           echo "topology=$topology" >> "$GITHUB_OUTPUT"
 
@@ -87,14 +87,14 @@ jobs:
   # Apply: create ORM stack, apply, assert outputs, then always destroy + delete.
   # ---------------------------------------------------------------------------
   apply-orm:
-    name: ORM provisioning / ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-orm' }}
+    name: ORM provisioning / ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
     needs: [check-orm-trigger]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-orm-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
     env:
-      TOPOLOGY: ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-orm' }}
+      TOPOLOGY: ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5

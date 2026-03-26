@@ -7,7 +7,7 @@ on:
         description: "tfvars configuration to apply"
         required: true
         type: choice
-        default: "tfvars/core/cluster-only.tfvars"
+        default: "tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars"
         options:
           - tfvars/core/cluster-only.tfvars
           - tfvars/core/all-public-bastion-operator.tfvars
@@ -25,7 +25,7 @@ on:
     inputs:
       tfvars:
         type: string
-        default: 'tfvars/core/cluster-only.tfvars'
+        default: 'tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars'
       pr_number:
         type: number
         default: 0
@@ -90,7 +90,7 @@ jobs:
           # Extract everything after /ok-to-run-apply, trim whitespace
           tfvars=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-apply\s)\S+' | xargs || true)
           if [ -z "$tfvars" ]; then
-            tfvars="tfvars/core/cluster-only.tfvars"
+            tfvars="tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars"
           fi
           echo "tfvars=$tfvars" >> "$GITHUB_OUTPUT"
 
@@ -160,5 +160,5 @@ jobs:
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
-          TFVARS_FILE: ${{ inputs.tfvars || needs.check-apply-trigger.outputs.tfvars || 'tfvars/core/cluster-only.tfvars' }}
+          TFVARS_FILE: ${{ inputs.tfvars || needs.check-apply-trigger.outputs.tfvars || 'tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars' }}
         run: go test -v -count=1 -run TestCoreProvisioning -timeout 150m ./...
