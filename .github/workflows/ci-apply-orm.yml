@@ -316,10 +316,29 @@ jobs:
             check_ocid bastion_service_id
           fi
 
+          if [ "$TOPOLOGY" = "all-public-monitoring-orm" ]; then
+            check_ocid pub_lb_subnet_id
+            check_ocid pub_lb_nsg_id
+            GRAFANA_URL=$(jq -r '.outputs.grafana_url.value // empty' state.json)
+            if [[ "$GRAFANA_URL" != http* ]]; then
+              echo "FAIL: grafana_url is not a valid URL: $GRAFANA_URL"
+              FAILED=1
+            else
+              echo "OK:   grafana_url = $GRAFANA_URL"
+            fi
+            GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value // empty' state.json)
+            if [ -z "$GRAFANA_PASS" ]; then
+              echo "FAIL: grafana_admin_password is empty"
+              FAILED=1
+            else
+              echo "OK:   grafana_admin_password is set"
+            fi
+          fi
+
           [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Generate kubeconfig
-        if: env.TOPOLOGY == 'all-public-orm'
+        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: |
@@ -333,7 +352,7 @@ jobs:
             --kube-endpoint PUBLIC_ENDPOINT
 
       - name: Cluster health checks
-        if: env.TOPOLOGY == 'all-public-orm'
+        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
         run: |
           echo "Health check: API server connectivity"
           kubectl cluster-info
@@ -353,6 +372,31 @@ jobs:
           kubectl wait --for=condition=Ready pods -l k8s-app=kube-proxy -n kube-system --timeout=120s
 
           echo "Health check: all cluster health checks passed"
+
+      - name: Monitoring health checks
+        if: env.TOPOLOGY == 'all-public-monitoring-orm'
+        run: |
+          echo "Health check: Prometheus pods"
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus -n monitoring --timeout=300s
+
+          echo "Health check: Grafana pods"
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana -n monitoring --timeout=300s
+
+          echo "Health check: Grafana API"
+          GRAFANA_URL=$(jq -r '.outputs.grafana_url.value' state.json)
+          GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value' state.json)
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/org" --insecure || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "OK:   Grafana API responded 200"
+              break
+            fi
+            echo "  attempt $i: status=$STATUS, retrying in 10s..."
+            sleep 10
+          done
+          [ "$STATUS" = "200" ] || { echo "FAIL: Grafana API did not respond 200 after 30 attempts"; exit 1; }
+
+          echo "Health check: all monitoring health checks passed"
 
       - name: Destroy stack
         if: always() && env.STACK_ID != ''
