@@ -1,6 +1,6 @@
 # Terratest
 
-These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. Storage, monitoring, and operator-path suites are optional and gated by env flags.
+These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. Storage, monitoring, OCI Resource Manager (ORM), and operator-path suites are optional and gated by env flags.
 
 ## Prereqs
 - Terraform installed and available on PATH.
