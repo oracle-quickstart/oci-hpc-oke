@@ -186,7 +186,7 @@ locals {
     } : {}
   )
 
-  cni_type = var.cni_type == "VCN-Native Pod Networking" ? "npn" : "flannel"
+  cni_type = contains(["npn", "VCN-Native Pod Networking"], var.cni_type) ? "npn" : "flannel"
 
   operator_denseio_ocpus = {
     "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex,
