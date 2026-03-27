@@ -101,16 +101,16 @@ var validationTestCases = []validationTestCase{
 		expectedError: "GB200/GB300 shapes",
 	},
 	{
-		// Reproduces oracle-quickstart/oci-hpc-oke#97: private endpoint + create_fss=true
-		// with no operator and no ORM should fail with a clear precondition error,
-		// not hang with an i/o timeout.
+		// Reproduces oracle-quickstart/oci-hpc-oke#97: create_fss=true with no
+		// reachable deploy path should fail with a clear precondition error, not
+		// hang with an i/o timeout.
+		// deploy_to_oke_from_orm=true disables deploy_from_local and deploy_from_operator.
+		// current_user_ocid defaults to null so deploy_from_orm is also false,
+		// making all three deploy paths inactive and triggering fss_pv_unreachable.
 		name: "FSSPVUnreachable",
 		vars: map[string]interface{}{
-			"create_fss":             true,
-			"control_plane_is_public": false,
-			"create_bastion":          false,
-			"create_operator":         false,
-			"deploy_to_oke_from_orm":  false,
+			"create_fss":            true,
+			"deploy_to_oke_from_orm": true,
 		},
 		expectedError: "FSS PersistentVolume will not be created",
 	},
