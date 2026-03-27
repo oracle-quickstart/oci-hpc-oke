@@ -1,65 +1,44 @@
-name: CI - Apply (ORM)
+name: CI - Apply (FSS ORM)
 
 on:
   workflow_dispatch:
-    inputs:
-      topology:
-        description: "Network topology to test"
-        required: true
-        type: choice
-        default: "all-public-monitoring-orm"
-        options:
-          - all-public-orm
-          - all-private-orm
-          - all-private-bastion-service-orm
-          - all-public-monitoring-orm
 
   issue_comment:
     types: [created]
 
   workflow_call:
     inputs:
-      topology:
-        type: string
-        default: 'all-public-monitoring-orm'
       pr_number:
         type: number
         default: 0
 
-# Never run two ORM apply jobs at the same time.
-# PR-triggered runs get their own concurrency group per PR number.
 concurrency:
   group: >-
     ${{
-      github.event_name == 'issue_comment' && format('ci-apply-orm-pr-{0}', github.event.issue.number) ||
-      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-orm-pr-{0}', inputs.pr_number) ||
-      'ci-apply-orm'
+      github.event_name == 'issue_comment' && format('ci-apply-fss-orm-pr-{0}', github.event.issue.number) ||
+      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-fss-orm-pr-{0}', inputs.pr_number) ||
+      'ci-apply-fss-orm'
     }}
   cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GIT_TEMPLATE_DIR: ""
+  TOPOLOGY: all-public-fss-orm
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Gate: verify /ok-to-run-apply-orm comment is authorized. Skipped for
-  # workflow_dispatch so the apply job runs unconditionally in that case.
-  # ---------------------------------------------------------------------------
-  check-orm-trigger:
-    name: Check ORM trigger
+  check-fss-orm-trigger:
+    name: Check FSS ORM trigger
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      (contains(github.event.comment.body, '/ok-to-run-apply-orm') || contains(github.event.comment.body, '/ok-to-run-apply-both')) &&
+      contains(github.event.comment.body, '/ok-to-run-apply-fss-orm') &&
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
     runs-on: ubuntu-latest
-    outputs:
-      topology: ${{ steps.parse.outputs.topology }}
     steps:
       - name: React to trigger comment
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
@@ -72,29 +51,12 @@ jobs:
               content: 'rocket'
             })
 
-      - name: Parse topology from comment
-        id: parse
-        env:
-          COMMENT: ${{ github.event.comment.body }}
-        run: |
-          topology=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-apply-orm\s)\S+' | xargs || true)
-          if [ -z "$topology" ]; then
-            topology="all-public-monitoring-orm"
-          fi
-          echo "topology=$topology" >> "$GITHUB_OUTPUT"
-
-  # ---------------------------------------------------------------------------
-  # Apply: create ORM stack, apply, assert outputs, then always destroy + delete.
-  # ---------------------------------------------------------------------------
-  apply-orm:
-    name: ORM provisioning / ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
-    needs: [check-orm-trigger]
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-orm-trigger.result == 'success')
+  apply-fss-orm:
+    name: FSS ORM provisioning
+    needs: [check-fss-orm-trigger]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-fss-orm-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
-
-    env:
-      TOPOLOGY: ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -142,7 +104,6 @@ jobs:
             echo "Unknown topology: $TOPOLOGY (no file at $TFVARS_FILE)" && exit 1
           fi
 
-          # Secrets/vars that can't be stored in the file
           jq -n \
             --arg tenancy_ocid               "$OCI_TENANCY_OCID" \
             --arg region                     "$OCI_REGION" \
@@ -161,7 +122,6 @@ jobs:
               ssh_public_key:             $ssh_public_key
             }' > secrets.json
 
-          # Merge secrets with topology vars file
           jq -s '.[0] * .[1]' "$TFVARS_FILE" secrets.json > variables.json
           echo "Variables for topology '$TOPOLOGY' (secrets redacted):"
           jq 'del(.ssh_public_key, .tenancy_ocid, .compartment_ocid, .current_user_ocid)' variables.json
@@ -224,7 +184,7 @@ jobs:
       - name: Wait for apply to complete
         run: |
           echo "Waiting for apply job $APPLY_JOB_ID..."
-          MAX_POLLS=120  # 120 x 30s = 60 minutes
+          MAX_POLLS=120
           POLL=0
           while true; do
             POLL=$((POLL + 1))
@@ -290,55 +250,37 @@ jobs:
             echo "OK:   cluster_private_endpoint = $PRIVATE_EP"
           fi
 
-          if [ "$TOPOLOGY" = "all-public-orm" ]; then
-            PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
-            if [[ "$PUBLIC_EP" != https://* ]]; then
-              echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
-              FAILED=1
-            else
-              echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
-            fi
-            check_ocid pub_lb_subnet_id
-            check_ocid pub_lb_nsg_id
+          PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
+          if [[ "$PUBLIC_EP" != https://* ]]; then
+            echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
+            FAILED=1
+          else
+            echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
           fi
 
-          if [ "$TOPOLOGY" = "all-private-orm" ] || [ "$TOPOLOGY" = "all-private-bastion-service-orm" ]; then
-            PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
-            if [ -n "$PUBLIC_EP" ]; then
-              echo "FAIL: cluster_public_endpoint should be empty for private topology: $PUBLIC_EP"
-              FAILED=1
-            else
-              echo "OK:   cluster_public_endpoint is empty (private topology)"
-            fi
+          check_ocid fss_file_system_id
+          check_ocid fss_nsg_id
+          check_ocid fss_subnet_id
+
+          FSS_MT_IP=$(jq -r '.outputs.fss_mount_target_ip.value // empty' state.json)
+          if [[ -z "$FSS_MT_IP" || ! "$FSS_MT_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "FAIL: fss_mount_target_ip is not a valid IPv4: $FSS_MT_IP"
+            FAILED=1
+          else
+            echo "OK:   fss_mount_target_ip = $FSS_MT_IP"
           fi
 
-          if [ "$TOPOLOGY" = "all-private-bastion-service-orm" ]; then
-            check_ocid bastion_service_id
-          fi
-
-          if [ "$TOPOLOGY" = "all-public-monitoring-orm" ]; then
-            check_ocid pub_lb_subnet_id
-            check_ocid pub_lb_nsg_id
-            GRAFANA_URL=$(jq -r '.outputs.grafana_url.value // empty' state.json)
-            if [[ "$GRAFANA_URL" != http* ]]; then
-              echo "FAIL: grafana_url is not a valid URL: $GRAFANA_URL"
-              FAILED=1
-            else
-              echo "OK:   grafana_url = $GRAFANA_URL"
-            fi
-            GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value // empty' state.json)
-            if [ -z "$GRAFANA_PASS" ]; then
-              echo "FAIL: grafana_admin_password is empty"
-              FAILED=1
-            else
-              echo "OK:   grafana_admin_password is set"
-            fi
+          FSS_EXPORT_PATH=$(jq -r '.outputs.fss_export_path.value // empty' state.json)
+          if [[ -z "$FSS_EXPORT_PATH" || "$FSS_EXPORT_PATH" != /oke-gpu-* ]]; then
+            echo "FAIL: fss_export_path has unexpected format: $FSS_EXPORT_PATH"
+            FAILED=1
+          else
+            echo "OK:   fss_export_path = $FSS_EXPORT_PATH"
           fi
 
           [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Generate kubeconfig
-        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: |
@@ -352,7 +294,6 @@ jobs:
             --kube-endpoint PUBLIC_ENDPOINT
 
       - name: Cluster health checks
-        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
         run: |
           echo "Health check: API server connectivity"
           kubectl cluster-info
@@ -373,30 +314,88 @@ jobs:
 
           echo "Health check: all cluster health checks passed"
 
-      - name: Monitoring health checks
-        if: env.TOPOLOGY == 'all-public-monitoring-orm'
+      - name: FSS health checks
         run: |
-          echo "Health check: Prometheus pods"
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus -n monitoring --timeout=300s
+          echo "Health check: PVC binding"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: fss-test-pvc
+          spec:
+            accessModes:
+              - ReadWriteMany
+            storageClassName: ""
+            resources:
+              requests:
+                storage: 50Gi
+            volumeName: fss-pv
+          EOF
 
-          echo "Health check: Grafana pods"
-          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana -n monitoring --timeout=300s
+          kubectl wait --for='jsonpath={.status.phase}=Bound' pvc/fss-test-pvc --timeout=120s
+          echo "OK:   FSS PVC bound"
 
-          echo "Health check: Grafana API"
-          GRAFANA_URL=$(jq -r '.outputs.grafana_url.value' state.json)
-          GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value' state.json)
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/org" --insecure || true)
-            if [ "$STATUS" = "200" ]; then
-              echo "OK:   Grafana API responded 200"
-              break
-            fi
-            echo "  attempt $i: status=$STATUS, retrying in 10s..."
-            sleep 10
-          done
-          [ "$STATUS" = "200" ] || { echo "FAIL: Grafana API did not respond 200 after 30 attempts"; exit 1; }
+          echo "Health check: FSS write"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: fss-writer
+          spec:
+            restartPolicy: Never
+            containers:
+            - name: writer
+              image: busybox
+              command: ["sh", "-c", "echo 'fss-test-content' > /mnt/fss/testfile.txt"]
+              volumeMounts:
+              - name: fss
+                mountPath: /mnt/fss
+            volumes:
+            - name: fss
+              persistentVolumeClaim:
+                claimName: fss-test-pvc
+          EOF
 
-          echo "Health check: all monitoring health checks passed"
+          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-writer --timeout=120s
+          echo "OK:   FSS writer pod completed"
+
+          echo "Health check: FSS read"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: fss-reader
+          spec:
+            restartPolicy: Never
+            containers:
+            - name: reader
+              image: busybox
+              command: ["sh", "-c", "cat /mnt/fss/testfile.txt"]
+              volumeMounts:
+              - name: fss
+                mountPath: /mnt/fss
+            volumes:
+            - name: fss
+              persistentVolumeClaim:
+                claimName: fss-test-pvc
+          EOF
+
+          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-reader --timeout=120s
+          CONTENT=$(kubectl logs fss-reader)
+          if [[ "$CONTENT" != *"fss-test-content"* ]]; then
+            echo "FAIL: reader pod output does not contain expected content: $CONTENT"
+            exit 1
+          fi
+          echo "OK:   FSS reader output: $CONTENT"
+          echo "Health check: all FSS health checks passed"
+
+      - name: Clean up FSS test resources
+        if: always()
+        run: |
+          if [ -f "$HOME/.kube/config" ]; then
+            kubectl delete pod fss-writer fss-reader --ignore-not-found --wait=true --timeout=60s || true
+            kubectl delete pvc fss-test-pvc --ignore-not-found --wait=true --timeout=120s || true
+          fi
 
       - name: Destroy stack
         if: always() && env.STACK_ID != ''
@@ -461,16 +460,15 @@ jobs:
           PR_NUMBER: ${{ github.event_name == 'workflow_call' && inputs.pr_number != 0 && inputs.pr_number || github.event.issue.number }}
         with:
           script: |
-            const status   = process.env.JOB_STATUS
-            const icon     = status === 'success' ? '✅' : '❌'
-            const topology = process.env.TOPOLOGY
-            const runUrl   = process.env.RUN_URL
+            const status  = process.env.JOB_STATUS
+            const icon    = status === 'success' ? '✅' : '❌'
+            const runUrl  = process.env.RUN_URL
             const body = [
-              `### ${icon} CI - Apply (ORM) results`,
+              `### ${icon} CI - Apply (FSS ORM) results`,
               '',
               `| | |`,
               `|---|---|`,
-              `| Topology | \`${topology}\` |`,
+              `| Topology | \`all-public-fss-orm\` |`,
               `| Result   | ${icon} ${status} |`,
               '',
               `[View full run log](${runUrl})`,
