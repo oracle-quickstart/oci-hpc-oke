@@ -77,21 +77,28 @@ var validationTestCases = []validationTestCase{
 		vars: map[string]interface{}{
 			"worker_rdma_shape": "BM.GPU.GB200.4",
 		},
-		expectedError: "GB200 shapes",
+		expectedError: "GB200/GB300 shapes",
 	},
 	{
 		name: "GB200v2ShapeBlocked",
 		vars: map[string]interface{}{
 			"worker_rdma_shape": "BM.GPU.GB200-v2.4",
 		},
-		expectedError: "GB200 shapes",
+		expectedError: "GB200/GB300 shapes",
 	},
 	{
 		name: "GB200v3ShapeBlocked",
 		vars: map[string]interface{}{
 			"worker_rdma_shape": "BM.GPU.GB200-v3.4",
 		},
-		expectedError: "GB200 shapes",
+		expectedError: "GB200/GB300 shapes",
+	},
+	{
+		name: "GB300ShapeBlocked",
+		vars: map[string]interface{}{
+			"worker_rdma_shape": "BM.GPU.GB300.4",
+		},
+		expectedError: "GB200/GB300 shapes",
 	},
 	{
 		name: "PodCapacityExceeded",
