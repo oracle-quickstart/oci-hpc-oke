@@ -45,7 +45,7 @@ jobs:
       run-tests: ${{ steps.filter.outputs.infra }}
     steps:
       - name: React to trigger comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -55,7 +55,7 @@ jobs:
               content: 'rocket'
             })
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
           fetch-depth: 0
@@ -63,17 +63,16 @@ jobs:
       - name: Fetch base branch for diff
         run: git fetch origin main
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+      - name: Check for infra-relevant changes
         id: filter
-        with:
-          base: main
-          filters: |
-            infra:
-              - 'terraform/**'
-              - 'test/**'
-              - 'files/**'
-              - 'manifests/**'
-              - '.github/workflows/**'
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD -- \
+            'terraform/' 'test/' 'files/' 'manifests/' '.github/workflows/' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "infra=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # ---------------------------------------------------------------------------
   # Validation tests: check all terraform preconditions produce the expected
@@ -85,7 +84,7 @@ jobs:
     if: needs.check-changes.outputs.run-tests == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
 
@@ -95,12 +94,16 @@ jobs:
           cache: true
           cache-dependency-path: test/go.sum
 
-      - uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85
-        with:
-          terraform_wrapper: false
+      - name: Install Terraform
+        run: |
+          TF_VERSION="1.5.7"
+          curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o tf.zip
+          unzip -o tf.zip -d /usr/local/bin
+          rm tf.zip
+          terraform version
 
       - name: Cache Terraform providers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: terraform/.terraform
           key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
@@ -169,7 +172,7 @@ jobs:
             tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/lustre.tfvars
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
 
@@ -179,12 +182,16 @@ jobs:
           cache: true
           cache-dependency-path: test/go.sum
 
-      - uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85
-        with:
-          terraform_wrapper: false
+      - name: Install Terraform
+        run: |
+          TF_VERSION="1.5.7"
+          curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o tf.zip
+          unzip -o tf.zip -d /usr/local/bin
+          rm tf.zip
+          terraform version
 
       - name: Cache Terraform providers
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: terraform/.terraform
           key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
@@ -242,7 +249,7 @@ jobs:
       TOPOLOGY: ${{ matrix.topology }}
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
 
@@ -402,7 +409,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post result comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           VALIDATE_RESULT: ${{ needs.validate.result }}
           PLAN_TF_RESULT: ${{ needs.plan-terraform.result }}
