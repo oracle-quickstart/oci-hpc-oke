@@ -146,7 +146,13 @@ func TestValidation(t *testing.T) {
 
 func assertPlanFailsWithError(t *testing.T, options *terraform.Options, expected string) {
 	t.Helper()
-	_, err := terraform.InitAndPlanE(t, options)
+	// Use zero retries so the exact terraform error output is returned directly.
+	// Retries wrap errors in MaxRetriesExceeded/FatalError, which drops the
+	// original terraform plan output and breaks require.Contains.
+	noRetry := *options
+	noRetry.MaxRetries = 0
+	noRetry.RetryableTerraformErrors = nil
+	_, err := terraform.InitAndPlanE(t, &noRetry)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), expected)
 }
