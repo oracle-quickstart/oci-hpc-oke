@@ -112,7 +112,7 @@ var validationTestCases = []validationTestCase{
 			"create_fss":            true,
 			"deploy_to_oke_from_orm": true,
 		},
-		expectedError: "FSS PersistentVolume will not be created",
+		expectedError: "fss_pv_unreachable",
 	},
 	{
 		name: "PodCapacityExceeded",
