@@ -101,6 +101,20 @@ var validationTestCases = []validationTestCase{
 		expectedError: "GB200/GB300 shapes",
 	},
 	{
+		// Reproduces oracle-quickstart/oci-hpc-oke#97: private endpoint + create_fss=true
+		// with no operator and no ORM should fail with a clear precondition error,
+		// not hang with an i/o timeout.
+		name: "FSSPVUnreachable",
+		vars: map[string]interface{}{
+			"create_fss":             true,
+			"control_plane_is_public": false,
+			"create_bastion":          false,
+			"create_operator":         false,
+			"deploy_to_oke_from_orm":  false,
+		},
+		expectedError: "FSS PersistentVolume will not be created",
+	},
+	{
 		name: "PodCapacityExceeded",
 		vars: map[string]interface{}{
 			// /30 subnet = 4 IPs - 3 reserved = 1 usable
