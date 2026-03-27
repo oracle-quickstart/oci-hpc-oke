@@ -1,10 +1,10 @@
 # Terratest
 
-These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. Storage, monitoring, and operator-path suites are optional and gated by env flags.
+These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. Storage, monitoring, OCI Resource Manager (ORM), and operator-path suites are optional and gated by env flags.
 
 ## Prereqs
 - Terraform installed and available on PATH.
-- Go installed (1.21+ recommended).
+- Go installed (1.26+).
 - OCI CLI installed and configured (required for monitoring, FSS, and operator tests).
 - API key auth configured in `~/.oci/config` (unless using instance principal).
 
@@ -40,7 +40,7 @@ go test -count=1 ./... -run TestCoreProvisioning -timeout 2h
 ```
 
 ## Using tfvars files
-Set `TFVARS_FILE` to a comma-separated list of var files (relative or absolute paths). When set, the test harness does not force the default feature flags, so include any desired toggles in your var file (for example, `create_policies=false` if you lack tenancy permissions).
+Set `TFVARS_FILE` (or `TFVARS_FILES`) to a comma-separated list of var files (relative or absolute paths). When set, the test harness does not force the default feature flags, so include any desired toggles in your var file (for example, `create_policies=false` if you lack tenancy permissions).
 
 ```sh
 TFVARS_FILE=./tfvars/base/base.tfvars go test -count=1 ./... -run TestCoreProvisioning -timeout 2h
@@ -65,6 +65,20 @@ Monitoring example:
 TFVARS_FILE=./tfvars/base/base.tfvars,./tfvars/monitoring/monitoring.tfvars go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
 
+Pre-built topology configs are available under `tfvars/core/` (Terraform) and `tfvars/orm/` (ORM JSON):
+
+| Path | Description |
+|------|-------------|
+| `tfvars/core/cluster-only.tfvars` | Minimal cluster, no bastion or operator |
+| `tfvars/core/all-public-bastion-operator.tfvars` | Public cluster with bastion and operator |
+| `tfvars/core/all-private.tfvars` | Fully private cluster |
+| `tfvars/core/all-private-operator.tfvars` | Fully private cluster with operator |
+| `tfvars/core/all-private-bastion-service.tfvars` | Fully private cluster with bastion service |
+| `tfvars/orm/all-public-orm.json` | ORM all-public topology |
+| `tfvars/orm/all-private-orm.json` | ORM all-private topology |
+| `tfvars/orm/all-private-bastion-service-orm.json` | ORM all-private with bastion service |
+| `tfvars/orm/all-public-monitoring-orm.json` | ORM all-public with monitoring stack |
+
 ## Optional suites
 Storage (FSS & Lustre):
 
@@ -75,7 +89,7 @@ RUN_LUSTRE_TESTS=1 go test -count=1 ./... -run TestStorageLustre -timeout 3h
 
 Both FSS and Lustre default to `worker_ops_ad`. Override with `FSS_AD` or `LUSTRE_AD` if needed.
 
-Monitoring (provider path):
+Monitoring:
 
 ```sh
 RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h

@@ -1,0 +1,97 @@
+name: CI - Release (All Topologies)
+# Triggered on pre-release: runs all Terraform and ORM apply topologies in parallel.
+
+on:
+  release:
+    types: [prereleased]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Terraform apply — all topologies
+  # ---------------------------------------------------------------------------
+  tf-cluster-only:
+    name: Terraform / cluster-only
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/cluster-only.tfvars
+    secrets: inherit
+
+  tf-all-public-bastion-operator:
+    name: Terraform / all-public-bastion-operator
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/all-public-bastion-operator.tfvars
+    secrets: inherit
+
+  tf-all-private:
+    name: Terraform / all-private
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/all-private.tfvars
+    secrets: inherit
+
+  tf-all-private-operator:
+    name: Terraform / all-private-operator
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/all-private-operator.tfvars
+    secrets: inherit
+
+  tf-all-private-bastion-service:
+    name: Terraform / all-private-bastion-service
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/all-private-bastion-service.tfvars
+    secrets: inherit
+
+  tf-monitoring:
+    name: Terraform / monitoring
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars
+    secrets: inherit
+
+  tf-storage-fss:
+    name: Terraform / storage-fss
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/fss.tfvars
+    secrets: inherit
+
+  tf-storage-lustre:
+    name: Terraform / storage-lustre
+    uses: ./.github/workflows/ci-apply-core.yml
+    with:
+      tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/lustre.tfvars
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # ORM apply — all topologies
+  # ---------------------------------------------------------------------------
+  orm-all-public:
+    name: ORM / all-public-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: all-public-orm
+    secrets: inherit
+
+  orm-all-private:
+    name: ORM / all-private-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: all-private-orm
+    secrets: inherit
+
+  orm-all-private-bastion-service:
+    name: ORM / all-private-bastion-service-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: all-private-bastion-service-orm
+    secrets: inherit
+
+  orm-all-public-monitoring:
+    name: ORM / all-public-monitoring-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: all-public-monitoring-orm
+    secrets: inherit

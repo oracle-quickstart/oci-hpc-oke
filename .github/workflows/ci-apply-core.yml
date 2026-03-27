@@ -1,0 +1,164 @@
+name: CI - Apply (Terraform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tfvars:
+        description: "tfvars configuration to apply"
+        required: true
+        type: choice
+        default: "tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars"
+        options:
+          - tfvars/core/cluster-only.tfvars
+          - tfvars/core/all-public-bastion-operator.tfvars
+          - tfvars/core/all-private.tfvars
+          - tfvars/core/all-private-operator.tfvars
+          - tfvars/core/all-private-bastion-service.tfvars
+          - tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars
+          - tfvars/core/cluster-only.tfvars,tfvars/storage/fss.tfvars
+          - tfvars/core/cluster-only.tfvars,tfvars/storage/lustre.tfvars
+
+  issue_comment:
+    types: [created]
+
+  workflow_call:
+    inputs:
+      tfvars:
+        type: string
+        default: 'tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars'
+      pr_number:
+        type: number
+        default: 0
+
+  # schedule:
+  #   - cron: '0 2 * * 1-5'  # Weeknights at 02:00 UTC
+
+# Concurrency groups prevent duplicate applies for the same config/PR.
+# - PR comment runs: one group per PR (all configs on the same PR queue behind each other)
+# - workflow_dispatch: one group per tfvars value so each config can run in parallel
+# - workflow_call: one group per calling PR number
+concurrency:
+  group: >-
+    ${{
+      github.event_name == 'issue_comment' && format('ci-apply-terraform-pr-{0}', github.event.issue.number) ||
+      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-terraform-pr-{0}', inputs.pr_number) ||
+      format('ci-apply-terraform-{0}', inputs.tfvars)
+    }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GIT_TEMPLATE_DIR: ""  # workaround for missing git hook templates on ubuntu-24.04 runners
+
+permissions:
+  contents: read
+  pull-requests: write  # needed to post the rocket reaction on the trigger comment
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate: verify the /ok-to-run-apply comment is authorized. Skipped entirely for
+  # workflow_dispatch so the apply job runs unconditionally in that case.
+  # ---------------------------------------------------------------------------
+  check-apply-trigger:
+    name: Check apply trigger
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/ok-to-run-apply') &&
+      !contains(github.event.comment.body, '/ok-to-run-apply-orm') &&
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
+    runs-on: ubuntu-latest
+    outputs:
+      tfvars: ${{ steps.parse.outputs.tfvars }}
+    steps:
+      - name: React to trigger comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            })
+
+      - name: Parse tfvars from comment
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          # Extract everything after /ok-to-run-apply, trim whitespace
+          tfvars=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-apply\s)\S+' | xargs || true)
+          if [ -z "$tfvars" ]; then
+            tfvars="tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars"
+          fi
+          echo "tfvars=$tfvars" >> "$GITHUB_OUTPUT"
+
+  apply-terraform:
+    name: Terraform provisioning
+    needs: [check-apply-trigger]
+    # Run for workflow_dispatch (gate is skipped) or after a successful gate
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-apply-trigger.result == 'success')
+    runs-on: ubuntu-latest
+    # Generous timeout: cluster create ~45 min + Helm deploys + destroy ~20 min
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: >-
+            ${{
+              github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) ||
+              github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('refs/pull/{0}/head', inputs.pr_number) ||
+              github.ref
+            }}
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: test/go.mod
+          cache: true
+          cache-dependency-path: test/go.sum
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_wrapper: false
+
+      - name: Cache Terraform providers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Install OCI CLI
+        run: pip install oci-cli --quiet
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Run Terraform provisioning test
+        working-directory: test
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+          TFVARS_FILE: ${{ inputs.tfvars || needs.check-apply-trigger.outputs.tfvars || 'tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars' }}
+        run: go test -v -count=1 -run TestCoreProvisioning -timeout 150m ./...

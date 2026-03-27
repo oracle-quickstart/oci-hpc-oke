@@ -1,0 +1,474 @@
+name: CI - Apply (ORM)
+
+on:
+  workflow_dispatch:
+    inputs:
+      topology:
+        description: "Network topology to test"
+        required: true
+        type: choice
+        default: "all-public-monitoring-orm"
+        options:
+          - all-public-orm
+          - all-private-orm
+          - all-private-bastion-service-orm
+          - all-public-monitoring-orm
+
+  issue_comment:
+    types: [created]
+
+  workflow_call:
+    inputs:
+      topology:
+        type: string
+        default: 'all-public-monitoring-orm'
+      pr_number:
+        type: number
+        default: 0
+
+# Never run two ORM apply jobs at the same time.
+# PR-triggered runs get their own concurrency group per PR number.
+concurrency:
+  group: >-
+    ${{
+      github.event_name == 'issue_comment' && format('ci-apply-orm-pr-{0}', github.event.issue.number) ||
+      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-orm-pr-{0}', inputs.pr_number) ||
+      'ci-apply-orm'
+    }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GIT_TEMPLATE_DIR: ""
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate: verify /ok-to-run-apply-orm comment is authorized. Skipped for
+  # workflow_dispatch so the apply job runs unconditionally in that case.
+  # ---------------------------------------------------------------------------
+  check-orm-trigger:
+    name: Check ORM trigger
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      (contains(github.event.comment.body, '/ok-to-run-apply-orm') || contains(github.event.comment.body, '/ok-to-run-apply-both')) &&
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
+    runs-on: ubuntu-latest
+    outputs:
+      topology: ${{ steps.parse.outputs.topology }}
+    steps:
+      - name: React to trigger comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            })
+
+      - name: Parse topology from comment
+        id: parse
+        env:
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          topology=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-apply-orm\s)\S+' | xargs || true)
+          if [ -z "$topology" ]; then
+            topology="all-public-monitoring-orm"
+          fi
+          echo "topology=$topology" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Apply: create ORM stack, apply, assert outputs, then always destroy + delete.
+  # ---------------------------------------------------------------------------
+  apply-orm:
+    name: ORM provisioning / ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
+    needs: [check-orm-trigger]
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-orm-trigger.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    env:
+      TOPOLOGY: ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'all-public-monitoring-orm' }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: >-
+            ${{
+              github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) ||
+              github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('refs/pull/{0}/head', inputs.pr_number) ||
+              github.ref
+            }}
+
+      - name: Install OCI CLI
+        run: pip install oci-cli --quiet
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Build variables JSON
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+        run: |
+          TFVARS_FILE="test/tfvars/orm/${TOPOLOGY}.json"
+          if [ ! -f "$TFVARS_FILE" ]; then
+            echo "Unknown topology: $TOPOLOGY (no file at $TFVARS_FILE)" && exit 1
+          fi
+
+          # Secrets/vars that can't be stored in the file
+          jq -n \
+            --arg tenancy_ocid               "$OCI_TENANCY_OCID" \
+            --arg region                     "$OCI_REGION" \
+            --arg compartment_ocid           "$OCI_COMPARTMENT_OCID" \
+            --arg current_user_ocid          "$OCI_USER_OCID" \
+            --arg worker_ops_ad              "$WORKER_OPS_AD" \
+            --arg worker_ops_image_custom_id "$WORKER_OPS_IMAGE_CUSTOM_ID" \
+            --arg ssh_public_key             "$SSH_PUBLIC_KEY" \
+            '{
+              tenancy_ocid:               $tenancy_ocid,
+              region:                     $region,
+              compartment_ocid:           $compartment_ocid,
+              current_user_ocid:          $current_user_ocid,
+              worker_ops_ad:              $worker_ops_ad,
+              worker_ops_image_custom_id: $worker_ops_image_custom_id,
+              ssh_public_key:             $ssh_public_key
+            }' > secrets.json
+
+          # Merge secrets with topology vars file
+          jq -s '.[0] * .[1]' "$TFVARS_FILE" secrets.json > variables.json
+          echo "Variables for topology '$TOPOLOGY' (secrets redacted):"
+          jq 'del(.ssh_public_key, .tenancy_ocid, .compartment_ocid, .current_user_ocid)' variables.json
+
+      - name: Zip Terraform directory
+        run: |
+          cd terraform
+          zip -r ../stack.zip . -x "*.terraform/*" -x "*.tfstate*"
+
+      - name: Create ORM stack
+        shell: python3 {0}
+        env:
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          import oci, base64, json, os
+
+          config = oci.config.from_file()
+          client = oci.resource_manager.ResourceManagerClient(config)
+
+          with open('stack.zip', 'rb') as f:
+              zip_b64 = base64.b64encode(f.read()).decode()
+
+          with open('variables.json') as f:
+              variables = json.load(f)
+
+          details = oci.resource_manager.models.CreateStackDetails(
+              compartment_id=os.environ['OCI_COMPARTMENT_OCID'],
+              display_name='ci-orm-{}-{}'.format(
+                  os.environ['GITHUB_RUN_ID'],
+                  os.environ['TOPOLOGY']
+              ),
+              config_source=oci.resource_manager.models.CreateZipUploadConfigSourceDetails(
+                  config_source_type='ZIP_UPLOAD',
+                  zip_file_base64_encoded=zip_b64
+              ),
+              variables=variables,
+              terraform_version='1.5.x'
+          )
+
+          response = client.create_stack(details)
+          stack_id = response.data.id
+
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('STACK_ID={}\n'.format(stack_id))
+
+          print('Created stack: {}'.format(stack_id))
+
+      - name: Apply stack
+        run: |
+          JOB_ID=$(oci resource-manager job create-apply-job \
+            --stack-id "$STACK_ID" \
+            --execution-plan-strategy AUTO_APPROVED \
+            --query 'data.id' \
+            --raw-output)
+          echo "APPLY_JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
+          echo "Apply job: $JOB_ID"
+
+      - name: Wait for apply to complete
+        run: |
+          echo "Waiting for apply job $APPLY_JOB_ID..."
+          MAX_POLLS=120  # 120 x 30s = 60 minutes
+          POLL=0
+          while true; do
+            POLL=$((POLL + 1))
+            if [ "$POLL" -gt "$MAX_POLLS" ]; then
+              echo "Timed out waiting for apply job after $MAX_POLLS polls"
+              exit 1
+            fi
+            STATUS=$(oci resource-manager job get \
+              --job-id "$APPLY_JOB_ID" \
+              --query 'data."lifecycle-state"' \
+              --raw-output)
+            echo "  [$POLL/$MAX_POLLS] Status: $STATUS"
+            case "$STATUS" in
+              SUCCEEDED) echo "Apply succeeded."; break ;;
+              FAILED|CANCELING|CANCELED)
+                oci resource-manager job get-job-logs \
+                  --job-id "$APPLY_JOB_ID" \
+                  --query 'data[*].message' --raw-output 2>/dev/null | tail -50 || true
+                echo "Apply job failed with status: $STATUS"
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+
+      - name: Assert outputs
+        run: |
+          oci resource-manager job get-job-tf-state \
+            --job-id "$APPLY_JOB_ID" \
+            --file state.json
+
+          FAILED=0
+
+          check_ocid() {
+            local key=$1
+            local val
+            val=$(jq -r ".outputs.${key}.value // empty" state.json)
+            if [[ -z "$val" || "$val" == "null" ]]; then
+              echo "FAIL: $key is empty"
+              FAILED=1; return
+            fi
+            if [[ "$val" != ocid1.* ]] || [[ $(echo "$val" | tr -cd '.' | wc -c) -lt 4 ]]; then
+              echo "FAIL: $key is not a valid OCID: $val"
+              FAILED=1; return
+            fi
+            echo "OK:   $key = $val"
+          }
+
+          check_ocid cluster_id
+          check_ocid vcn_id
+          check_ocid worker_subnet_id
+          check_ocid worker_nsg_id
+          check_ocid control_plane_subnet_id
+          check_ocid control_plane_nsg_id
+          check_ocid int_lb_subnet_id
+          check_ocid int_lb_nsg_id
+          check_ocid worker_ops_pool_id
+
+          PRIVATE_EP=$(jq -r '.outputs.cluster_private_endpoint.value // empty' state.json)
+          if [[ "$PRIVATE_EP" != https://* ]]; then
+            echo "FAIL: cluster_private_endpoint does not start with https://: $PRIVATE_EP"
+            FAILED=1
+          else
+            echo "OK:   cluster_private_endpoint = $PRIVATE_EP"
+          fi
+
+          if [ "$TOPOLOGY" = "all-public-orm" ]; then
+            PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
+            if [[ "$PUBLIC_EP" != https://* ]]; then
+              echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
+              FAILED=1
+            else
+              echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
+            fi
+            check_ocid pub_lb_subnet_id
+            check_ocid pub_lb_nsg_id
+          fi
+
+          if [ "$TOPOLOGY" = "all-private-orm" ] || [ "$TOPOLOGY" = "all-private-bastion-service-orm" ]; then
+            PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
+            if [ -n "$PUBLIC_EP" ]; then
+              echo "FAIL: cluster_public_endpoint should be empty for private topology: $PUBLIC_EP"
+              FAILED=1
+            else
+              echo "OK:   cluster_public_endpoint is empty (private topology)"
+            fi
+          fi
+
+          if [ "$TOPOLOGY" = "all-private-bastion-service-orm" ]; then
+            check_ocid bastion_service_id
+          fi
+
+          if [ "$TOPOLOGY" = "all-public-monitoring-orm" ]; then
+            check_ocid pub_lb_subnet_id
+            check_ocid pub_lb_nsg_id
+            GRAFANA_URL=$(jq -r '.outputs.grafana_url.value // empty' state.json)
+            if [[ "$GRAFANA_URL" != http* ]]; then
+              echo "FAIL: grafana_url is not a valid URL: $GRAFANA_URL"
+              FAILED=1
+            else
+              echo "OK:   grafana_url = $GRAFANA_URL"
+            fi
+            GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value // empty' state.json)
+            if [ -z "$GRAFANA_PASS" ]; then
+              echo "FAIL: grafana_admin_password is empty"
+              FAILED=1
+            else
+              echo "OK:   grafana_admin_password is set"
+            fi
+          fi
+
+          [ "$FAILED" -eq 0 ] || exit 1
+
+      - name: Generate kubeconfig
+        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
+        env:
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+        run: |
+          CLUSTER_ID=$(jq -r '.outputs.cluster_id.value' state.json)
+          mkdir -p "$HOME/.kube"
+          oci ce cluster create-kubeconfig \
+            --cluster-id "$CLUSTER_ID" \
+            --file "$HOME/.kube/config" \
+            --region "$OCI_REGION" \
+            --token-version 2.0.0 \
+            --kube-endpoint PUBLIC_ENDPOINT
+
+      - name: Cluster health checks
+        if: env.TOPOLOGY == 'all-public-orm' || env.TOPOLOGY == 'all-public-monitoring-orm'
+        run: |
+          echo "Health check: API server connectivity"
+          kubectl cluster-info
+
+          echo "Health check: waiting for nodes to be Ready"
+          kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+          echo "Health check: node count"
+          NODE_COUNT=$(kubectl get nodes --no-headers | wc -l)
+          echo "  $NODE_COUNT node(s) ready"
+          [ "$NODE_COUNT" -ge 1 ] || { echo "FAIL: no nodes found"; exit 1; }
+
+          echo "Health check: CoreDNS pods"
+          kubectl wait --for=condition=Ready pods -l k8s-app=kube-dns -n kube-system --timeout=120s
+
+          echo "Health check: kube-proxy pods"
+          kubectl wait --for=condition=Ready pods -l k8s-app=kube-proxy -n kube-system --timeout=120s
+
+          echo "Health check: all cluster health checks passed"
+
+      - name: Monitoring health checks
+        if: env.TOPOLOGY == 'all-public-monitoring-orm'
+        run: |
+          echo "Health check: Prometheus pods"
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus -n monitoring --timeout=300s
+
+          echo "Health check: Grafana pods"
+          kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=grafana -n monitoring --timeout=300s
+
+          echo "Health check: Grafana API"
+          GRAFANA_URL=$(jq -r '.outputs.grafana_url.value' state.json)
+          GRAFANA_PASS=$(jq -r '.outputs.grafana_admin_password.value' state.json)
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/org" --insecure || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "OK:   Grafana API responded 200"
+              break
+            fi
+            echo "  attempt $i: status=$STATUS, retrying in 10s..."
+            sleep 10
+          done
+          [ "$STATUS" = "200" ] || { echo "FAIL: Grafana API did not respond 200 after 30 attempts"; exit 1; }
+
+          echo "Health check: all monitoring health checks passed"
+
+      - name: Destroy stack
+        if: always() && env.STACK_ID != ''
+        run: |
+          DESTROY_JOB_ID=$(oci resource-manager job create-destroy-job \
+            --stack-id "$STACK_ID" \
+            --execution-plan-strategy AUTO_APPROVED \
+            --query 'data.id' \
+            --raw-output)
+          echo "DESTROY_JOB_ID=$DESTROY_JOB_ID" >> "$GITHUB_ENV"
+          echo "Destroy job: $DESTROY_JOB_ID"
+
+      - name: Wait for destroy to complete
+        if: always() && env.DESTROY_JOB_ID != ''
+        run: |
+          echo "Waiting for destroy job $DESTROY_JOB_ID..."
+          MAX_POLLS=120
+          POLL=0
+          while true; do
+            POLL=$((POLL + 1))
+            if [ "$POLL" -gt "$MAX_POLLS" ]; then
+              echo "Timed out waiting for destroy job after $MAX_POLLS polls"
+              exit 1
+            fi
+            STATUS=$(oci resource-manager job get \
+              --job-id "$DESTROY_JOB_ID" \
+              --query 'data."lifecycle-state"' \
+              --raw-output)
+            echo "  [$POLL/$MAX_POLLS] Status: $STATUS"
+            case "$STATUS" in
+              SUCCEEDED) echo "Destroy succeeded."; break ;;
+              FAILED|CANCELING|CANCELED)
+                echo "Destroy job failed with status: $STATUS"
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+
+      - name: Delete stack
+        if: always() && env.STACK_ID != ''
+        run: |
+          oci resource-manager stack delete \
+            --stack-id "$STACK_ID" \
+            --force
+          echo "Stack $STACK_ID deleted."
+
+      - name: Post result comment
+        if: always() && (github.event_name == 'issue_comment' || (github.event_name == 'workflow_call' && inputs.pr_number != 0))
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ github.event_name == 'workflow_call' && inputs.pr_number != 0 && inputs.pr_number || github.event.issue.number }}
+        with:
+          script: |
+            const status   = process.env.JOB_STATUS
+            const icon     = status === 'success' ? '✅' : '❌'
+            const topology = process.env.TOPOLOGY
+            const runUrl   = process.env.RUN_URL
+            const body = [
+              `### ${icon} CI - Apply (ORM) results`,
+              '',
+              `| | |`,
+              `|---|---|`,
+              `| Topology | \`${topology}\` |`,
+              `| Result   | ${icon} ${status} |`,
+              '',
+              `[View full run log](${runUrl})`,
+            ].join('\n')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PR_NUMBER),
+              body,
+            })

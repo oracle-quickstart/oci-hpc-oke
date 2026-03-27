@@ -1,6 +1,5 @@
 **/.terraform/
 **/.terraform.lock.hcl
-test/go.sum
 *.tfstate
 *.tfstate.*
 .env

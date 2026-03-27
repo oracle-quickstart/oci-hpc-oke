@@ -1,8 +1,10 @@
+create_public_subnets         = true
+control_plane_is_public       = true
+preferred_kubernetes_services = "public"
+
 create_bastion  = false
 create_operator = false
-create_policies = false
 
-create_bv_high = false
 create_fss     = false
 create_lustre  = false
 
@@ -14,8 +16,16 @@ install_grafana                                = false
 install_grafana_dashboards                     = false
 install_nvidia_dcgm_exporter                   = false
 install_amd_device_metrics_exporter            = false
+install_mpi_operator                           = false
+install_kueue                                  = false
+install_oci_hpc_oke_utils                      = false
+install_rdma_labeler                           = false
+install_lustre_client                          = false
 setup_alerting                                 = false
 
 worker_cpu_enabled  = false
 worker_gpu_enabled  = false
 worker_rdma_enabled = false
+
+create_policies      = true
+create_dynamic_group = true

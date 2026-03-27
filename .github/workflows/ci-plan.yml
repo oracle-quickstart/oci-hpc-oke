@@ -1,0 +1,436 @@
+name: CI - Plan (Both)
+# Runs validation, Terraform plan, and ORM plan jobs on /ok-to-run-plan
+
+on:
+  issue_comment:
+    types: [created]
+
+# Cancel in-flight plan runs for the same PR when a new /ok-to-run-plan is triggered.
+# Non-plan comments (e.g. /ok-to-run-apply-both) also fire this workflow; give them
+# a unique group so they don't cancel a real plan run.
+concurrency:
+  group: >-
+    ${{
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/ok-to-run-plan') &&
+      !contains(github.event.comment.body, '/ok-to-run-plan-') &&
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login) &&
+      format('ci-plan-{0}', github.event.issue.number) ||
+      github.run_id
+    }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GIT_TEMPLATE_DIR: ""  # workaround for missing git hook templates on ubuntu-24.04 runners
+
+permissions:
+  contents: read
+  pull-requests: write  # needed to post the rocket reaction on the trigger comment
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate: verify the comment is authorized, post a reaction, and check which
+  # files changed. Downstream jobs only run if infra-relevant files changed.
+  # ---------------------------------------------------------------------------
+  check-changes:
+    name: Check changed files
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/ok-to-run-plan') &&
+      !contains(github.event.comment.body, '/ok-to-run-plan-') &&
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
+    runs-on: ubuntu-latest
+    outputs:
+      run-tests: ${{ steps.filter.outputs.infra }}
+    steps:
+      - name: React to trigger comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            })
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - name: Fetch base branch for diff
+        run: git fetch origin main
+
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        id: filter
+        with:
+          base: main
+          filters: |
+            infra:
+              - 'terraform/**'
+              - 'test/**'
+              - 'files/**'
+              - 'manifests/**'
+              - '.github/workflows/**'
+
+  # ---------------------------------------------------------------------------
+  # Validation tests: check all terraform preconditions produce the expected
+  # errors (no apply required, but OCI auth is still needed for terraform plan)
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Validation tests
+    needs: check-changes
+    if: needs.check-changes.outputs.run-tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: test/go.mod
+          cache: true
+          cache-dependency-path: test/go.sum
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_wrapper: false
+
+      - name: Cache Terraform providers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Run validation tests
+        working-directory: test
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+        run: go test -v -count=1 -run TestValidation -timeout 30m ./...
+
+  # ---------------------------------------------------------------------------
+  # Terraform plan smoke tests: run terraform plan (no apply) across multiple
+  # config combinations to catch regressions before anything is provisioned.
+  # All matrix jobs run in parallel; a single failure does not stop the others.
+  # ---------------------------------------------------------------------------
+  plan-terraform:
+    name: Terraform Plan / ${{ matrix.name }}
+    needs: check-changes
+    if: needs.check-changes.outputs.run-tests == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Core network / access patterns
+          - name: cluster-only
+            tfvars: tfvars/core/cluster-only.tfvars
+          - name: all-public-bastion-operator
+            tfvars: tfvars/core/all-public-bastion-operator.tfvars
+          - name: all-private
+            tfvars: tfvars/core/all-private.tfvars
+          - name: all-private-operator
+            tfvars: tfvars/core/all-private-operator.tfvars
+          - name: all-private-bastion-service
+            tfvars: tfvars/core/all-private-bastion-service.tfvars
+          # Add-on components layered on top of the minimal cluster config
+          - name: monitoring
+            tfvars: tfvars/core/cluster-only.tfvars,tfvars/monitoring/monitoring.tfvars
+          - name: storage-fss
+            tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/fss.tfvars
+          - name: storage-lustre
+            tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/lustre.tfvars
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: test/go.mod
+          cache: true
+          cache-dependency-path: test/go.sum
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_wrapper: false
+
+      - name: Cache Terraform providers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Run Terraform plan test
+        working-directory: test
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+          TFVARS_FILE: ${{ matrix.tfvars }}
+        run: go test -v -count=1 -run TestPlanSmoke -timeout 15m ./...
+
+  # ---------------------------------------------------------------------------
+  # ORM plan tests: create an ORM stack and run a plan job (no apply) for each
+  # network topology. Stack is deleted immediately after — no resources created.
+  # ---------------------------------------------------------------------------
+  plan-orm:
+    name: ORM Plan / ${{ matrix.topology }}
+    needs: check-changes
+    if: needs.check-changes.outputs.run-tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - topology: all-public-orm
+          - topology: all-private-orm
+          - topology: all-private-bastion-service-orm
+          - topology: all-public-monitoring-orm
+    env:
+      TOPOLOGY: ${{ matrix.topology }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - name: Install OCI CLI
+        run: pip install oci-cli --quiet
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Build variables JSON
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+        run: |
+          TFVARS_FILE="test/tfvars/orm/${TOPOLOGY}.json"
+          if [ ! -f "$TFVARS_FILE" ]; then
+            echo "Unknown topology: $TOPOLOGY (no file at $TFVARS_FILE)" && exit 1
+          fi
+
+          jq -n \
+            --arg tenancy_ocid               "$OCI_TENANCY_OCID" \
+            --arg region                     "$OCI_REGION" \
+            --arg compartment_ocid           "$OCI_COMPARTMENT_OCID" \
+            --arg current_user_ocid          "$OCI_USER_OCID" \
+            --arg worker_ops_ad              "$WORKER_OPS_AD" \
+            --arg worker_ops_image_custom_id "$WORKER_OPS_IMAGE_CUSTOM_ID" \
+            --arg ssh_public_key             "$SSH_PUBLIC_KEY" \
+            '{
+              tenancy_ocid:               $tenancy_ocid,
+              region:                     $region,
+              compartment_ocid:           $compartment_ocid,
+              current_user_ocid:          $current_user_ocid,
+              worker_ops_ad:              $worker_ops_ad,
+              worker_ops_image_custom_id: $worker_ops_image_custom_id,
+              ssh_public_key:             $ssh_public_key
+            }' > secrets.json
+
+          jq -s '.[0] * .[1]' "$TFVARS_FILE" secrets.json > variables.json
+
+      - name: Zip Terraform directory
+        run: |
+          cd terraform
+          zip -r ../stack.zip . -x "*.terraform/*" -x "*.tfstate*"
+
+      - name: Create ORM stack
+        shell: python3 {0}
+        env:
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          import oci, base64, json, os
+
+          config = oci.config.from_file()
+          client = oci.resource_manager.ResourceManagerClient(config)
+
+          with open('stack.zip', 'rb') as f:
+              zip_b64 = base64.b64encode(f.read()).decode()
+
+          with open('variables.json') as f:
+              variables = json.load(f)
+
+          details = oci.resource_manager.models.CreateStackDetails(
+              compartment_id=os.environ['OCI_COMPARTMENT_OCID'],
+              display_name='ci-orm-plan-{}-{}'.format(
+                  os.environ['GITHUB_RUN_ID'],
+                  os.environ['TOPOLOGY']
+              ),
+              config_source=oci.resource_manager.models.CreateZipUploadConfigSourceDetails(
+                  config_source_type='ZIP_UPLOAD',
+                  zip_file_base64_encoded=zip_b64
+              ),
+              variables=variables,
+              terraform_version='1.5.x'
+          )
+
+          response = client.create_stack(details)
+          stack_id = response.data.id
+
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('STACK_ID={}\n'.format(stack_id))
+
+          print('Created stack: {}'.format(stack_id))
+
+      - name: Plan stack
+        run: |
+          PLAN_JOB_ID=$(oci resource-manager job create-plan-job \
+            --stack-id "$STACK_ID" \
+            --query 'data.id' \
+            --raw-output)
+          echo "PLAN_JOB_ID=$PLAN_JOB_ID" >> "$GITHUB_ENV"
+          echo "Plan job: $PLAN_JOB_ID"
+
+      - name: Wait for plan to complete
+        run: |
+          echo "Waiting for plan job $PLAN_JOB_ID..."
+          MAX_POLLS=40  # 40 x 30s = 20 minutes
+          POLL=0
+          while true; do
+            POLL=$((POLL + 1))
+            if [ "$POLL" -gt "$MAX_POLLS" ]; then
+              echo "Timed out waiting for plan job after $MAX_POLLS polls"
+              exit 1
+            fi
+            STATUS=$(oci resource-manager job get \
+              --job-id "$PLAN_JOB_ID" \
+              --query 'data."lifecycle-state"' \
+              --raw-output)
+            echo "  [$POLL/$MAX_POLLS] Status: $STATUS"
+            case "$STATUS" in
+              SUCCEEDED) echo "Plan succeeded."; break ;;
+              FAILED|CANCELING|CANCELED)
+                oci resource-manager job get-job-logs \
+                  --job-id "$PLAN_JOB_ID" \
+                  --query 'data[*].message' --raw-output 2>/dev/null | tail -50 || true
+                echo "Plan job failed with status: $STATUS"
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+
+      - name: Delete stack
+        if: always() && env.STACK_ID != ''
+        run: |
+          oci resource-manager stack delete \
+            --stack-id "$STACK_ID" \
+            --force
+          echo "Stack $STACK_ID deleted."
+
+  # ---------------------------------------------------------------------------
+  # Summary: post a single comment to the PR with pass/fail for every job and
+  # a direct link to the run log. Runs even if upstream jobs fail.
+  # ---------------------------------------------------------------------------
+  summarize:
+    name: Post results
+    needs: [check-changes, validate, plan-terraform, plan-orm]
+    if: always() && needs.check-changes.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post result comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          PLAN_TF_RESULT: ${{ needs.plan-terraform.result }}
+          PLAN_ORM_RESULT: ${{ needs.plan-orm.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const icon = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌'
+            const validate  = process.env.VALIDATE_RESULT
+            const planTf    = process.env.PLAN_TF_RESULT
+            const planOrm   = process.env.PLAN_ORM_RESULT
+            const runUrl    = process.env.RUN_URL
+            const ok = (r) => r === 'success' || r === 'skipped'
+            const overall = ok(validate) && ok(planTf) && ok(planOrm)
+            const body = [
+              `### ${overall ? '✅' : '❌'} CI - Plan (Both) results`,
+              '',
+              `| Job | Result |`,
+              `|-----|--------|`,
+              `| Validation tests    | ${icon(validate)} ${validate} |`,
+              `| Terraform plan tests       | ${icon(planTf)} ${planTf} |`,
+              `| ORM plan tests      | ${icon(planOrm)} ${planOrm} |`,
+              '',
+              `[View full run log](${runUrl})`,
+            ].join('\n')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })

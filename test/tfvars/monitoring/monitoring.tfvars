@@ -9,3 +9,5 @@ install_amd_device_metrics_exporter            = false
 setup_alerting                                 = false
 preferred_kubernetes_services                  = "public"
 use_lets_encrypt_prod_endpoint = false
+create_policies                = true
+create_dynamic_group           = true
