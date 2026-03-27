@@ -24,34 +24,36 @@ spec:
       labels:
         {{- include "oci-hpc-oke-utils.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/component: prepuller-{{ $name }}
-        {{- with $.Values.podLabels }}
+        {{- with $.Values.prepuller.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with $.Values.podAnnotations }}
+      {{- with $.Values.prepuller.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
       automountServiceAccountToken: false
       priorityClassName: system-node-critical
-      {{- with $.Values.imagePullSecrets }}
+      {{- with $.Values.prepuller.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       # initContainers will retry on image pull failure via pod restart (restartPolicy: Always)
       terminationGracePeriodSeconds: 300
+      {{- with $.Values.prepuller.tolerations }}
       tolerations:
-        {{- toYaml $.Values.tolerations | nindent 8 }}
-      {{- if or $.Values.nodeSelector $group.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or $.Values.prepuller.nodeSelector $group.nodeSelector }}
       nodeSelector:
-        {{- with $.Values.nodeSelector }}
+        {{- with $.Values.prepuller.nodeSelector }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- with $group.nodeSelector }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- with $.Values.affinity }}
+      {{- with $.Values.prepuller.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -60,7 +62,7 @@ spec:
         {{- if $image }}
         - name: pull-{{ $i }}
           image: "{{ $image }}"
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          imagePullPolicy: {{ $.Values.prepuller.image.pullPolicy }}
           command: ["sh", "-c", "echo Image cached"]
           resources:
             {{- toYaml $.Values.prepuller.initResources | nindent 12 }}
@@ -75,7 +77,7 @@ spec:
       containers:
         - name: pause
           image: {{ $.Values.prepuller.pauseImage }}
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          imagePullPolicy: {{ $.Values.prepuller.image.pullPolicy }}
           resources:
             {{- toYaml $.Values.prepuller.pauseResources | nindent 12 }}
           securityContext:

@@ -1,0 +1,79 @@
+{{- if .Values.hostexec.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-hostexec
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hostexec
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "100%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: hostexec
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: hostexec
+        {{- with .Values.hostexec.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/hostexec-configmap.yaml") . | sha256sum }}
+        {{- with .Values.hostexec.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      hostPID: true
+      priorityClassName: {{ .Values.hostexec.priorityClassName }}
+      {{- with .Values.hostexec.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostexec.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostexec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostexec.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-hostexec-script
+            defaultMode: 0755
+        - name: host-root
+          hostPath:
+            path: {{ .Values.hostexec.hostRootPath | quote }}
+            type: Directory
+      containers:
+        - name: hostexec
+          image: "{{ .Values.hostexec.image.repository }}:{{ .Values.hostexec.image.tag }}"
+          imagePullPolicy: {{ .Values.hostexec.image.pullPolicy }}
+          command: ["/bin/bash", "/scripts/runner.sh"]
+          env:
+            - name: HOSTEXEC_INTERVAL
+              value: {{ .Values.hostexec.interval | quote }}
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: host-root
+              mountPath: /host
+          resources:
+            {{- toYaml .Values.hostexec.image.resources | nindent 12 }}
+{{- end }}

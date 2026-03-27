@@ -22,5 +22,8 @@ resource "helm_release" "oci_hpc_oke_utils" {
     prepuller = {
       enabled = var.install_image_prepuller
     }
+    hostexec = {
+      enabled = var.install_hostexec
+    }
   })]
 }
