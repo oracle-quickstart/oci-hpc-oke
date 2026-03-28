@@ -24,7 +24,6 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   GIT_TEMPLATE_DIR: ""
-  TOPOLOGY: all-public-fss-orm
 
 permissions:
   contents: read
@@ -52,11 +51,17 @@ jobs:
             })
 
   apply-fss-orm:
-    name: FSS ORM provisioning
+    name: FSS ORM provisioning (${{ matrix.topology }})
     needs: [check-fss-orm-trigger]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-fss-orm-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    strategy:
+      matrix:
+        topology: [all-public-fss-orm, all-private-fss-orm]
+      fail-fast: false
+    env:
+      TOPOLOGY: ${{ matrix.topology }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -200,9 +205,9 @@ jobs:
             case "$STATUS" in
               SUCCEEDED) echo "Apply succeeded."; break ;;
               FAILED|CANCELING|CANCELED)
-                oci resource-manager job get-job-logs \
+                oci resource-manager job get-job-logs --all \
                   --job-id "$APPLY_JOB_ID" \
-                  --query 'data[*].message' --raw-output 2>/dev/null | tail -50 || true
+                  --query 'data[*].message' --raw-output 2>/dev/null | tail -100 || true
                 echo "Apply job failed with status: $STATUS"
                 exit 1 ;;
             esac
@@ -250,12 +255,14 @@ jobs:
             echo "OK:   cluster_private_endpoint = $PRIVATE_EP"
           fi
 
-          PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
-          if [[ "$PUBLIC_EP" != https://* ]]; then
-            echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
-            FAILED=1
-          else
-            echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
+          if [[ "$TOPOLOGY" != all-private* ]]; then
+            PUBLIC_EP=$(jq -r '.outputs.cluster_public_endpoint.value // empty' state.json)
+            if [[ "$PUBLIC_EP" != https://* ]]; then
+              echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
+              FAILED=1
+            else
+              echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
+            fi
           fi
 
           check_ocid fss_file_system_id
@@ -278,9 +285,18 @@ jobs:
             echo "OK:   fss_export_path = $FSS_EXPORT_PATH"
           fi
 
+          PV_COUNT=$(jq '[.resources[] | select(.type == "kubernetes_persistent_volume_v1" and .name == "fss")] | length' state.json)
+          if [[ "$PV_COUNT" -lt 1 ]]; then
+            echo "FAIL: kubernetes_persistent_volume_v1.fss not found in state"
+            FAILED=1
+          else
+            echo "OK:   FSS PersistentVolume resource found in state"
+          fi
+
           [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Generate kubeconfig
+        if: matrix.topology == 'all-public-fss-orm'
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: |
@@ -294,6 +310,7 @@ jobs:
             --kube-endpoint PUBLIC_ENDPOINT
 
       - name: Cluster health checks
+        if: matrix.topology == 'all-public-fss-orm'
         run: |
           echo "Health check: API server connectivity"
           kubectl cluster-info
@@ -315,6 +332,7 @@ jobs:
           echo "Health check: all cluster health checks passed"
 
       - name: FSS health checks
+        if: matrix.topology == 'all-public-fss-orm'
         run: |
           echo "Health check: PVC binding"
           kubectl apply -f - <<'EOF'
@@ -390,7 +408,7 @@ jobs:
           echo "Health check: all FSS health checks passed"
 
       - name: Clean up FSS test resources
-        if: always()
+        if: always() && matrix.topology == 'all-public-fss-orm'
         run: |
           if [ -f "$HOME/.kube/config" ]; then
             kubectl delete pod fss-writer fss-reader --ignore-not-found --wait=true --timeout=60s || true
@@ -438,10 +456,10 @@ jobs:
         if: always() && env.DESTROY_JOB_ID != '' && failure()
         run: |
           echo "=== ORM destroy job logs ==="
-          oci resource-manager job get-job-logs \
+          oci resource-manager job get-job-logs --all \
             --job-id "$DESTROY_JOB_ID" \
             --query 'data[*].message' \
-            --raw-output 2>&1 || echo "Could not fetch destroy job logs."
+            --raw-output 2>&1 | tail -100 || echo "Could not fetch destroy job logs."
 
       - name: Delete stack
         if: env.STACK_ID != '' && !failure()
@@ -458,17 +476,19 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           PR_NUMBER: ${{ github.event_name == 'workflow_call' && inputs.pr_number != 0 && inputs.pr_number || github.event.issue.number }}
+          TOPOLOGY: ${{ matrix.topology }}
         with:
           script: |
-            const status  = process.env.JOB_STATUS
-            const icon    = status === 'success' ? '✅' : '❌'
-            const runUrl  = process.env.RUN_URL
+            const status   = process.env.JOB_STATUS
+            const icon     = status === 'success' ? '✅' : '❌'
+            const runUrl   = process.env.RUN_URL
+            const topology = process.env.TOPOLOGY
             const body = [
               `### ${icon} CI - Apply (FSS ORM) results`,
               '',
               `| | |`,
               `|---|---|`,
-              `| Topology | \`all-public-fss-orm\` |`,
+              `| Topology | \`${topology}\` |`,
               `| Result   | ${icon} ${status} |`,
               '',
               `[View full run log](${runUrl})`,

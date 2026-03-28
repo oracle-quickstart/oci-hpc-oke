@@ -7,7 +7,7 @@ locals {
   invalid_bastion                = !var.create_public_subnets && var.create_bastion
   invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
   invalid_grace_blackwell_shape  = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4"], var.worker_rdma_shape)
-  invalid_image_uri              = anytrue([
+  invalid_image_uri = anytrue([
     var.worker_ops_image_use_uri && !startswith(coalesce(var.worker_ops_image_custom_uri, "none"), "http"),
     var.worker_cpu_image_use_uri && !startswith(coalesce(var.worker_cpu_image_custom_uri, "none"), "http"),
     var.worker_gpu_image_use_uri && !startswith(coalesce(var.worker_gpu_image_custom_uri, "none"), "http"),
@@ -27,11 +27,19 @@ locals {
   )
 
   # Calculate pods subnet capacity (IPs available minus 3 reserved IPs)
-  vcn_prefix_length      = tonumber(split("/", var.vcn_cidrs)[1])
-  pods_subnet_prefix     = var.pods_sn_cidr != null ? tonumber(split("/", var.pods_sn_cidr)[1]) : local.vcn_prefix_length + 1
-  pods_subnet_capacity   = pow(2, 32 - local.pods_subnet_prefix) - 3
-  is_vcn_native_cni      = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
-  invalid_pods_capacity  = local.is_vcn_native_cni && local.total_pods_required > local.pods_subnet_capacity
+  vcn_prefix_length     = tonumber(split("/", var.vcn_cidrs)[1])
+  pods_subnet_prefix    = var.pods_sn_cidr != null ? tonumber(split("/", var.pods_sn_cidr)[1]) : local.vcn_prefix_length + 1
+  pods_subnet_capacity  = pow(2, 32 - local.pods_subnet_prefix) - 3
+  is_vcn_native_cni     = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
+  invalid_pods_capacity = local.is_vcn_native_cni && local.total_pods_required > local.pods_subnet_capacity
+
+  # FSS PV cannot be created when all deploy paths are inactive (private endpoint, no operator, no ORM)
+  fss_pv_unreachable = alltrue([
+    var.create_fss,
+    !local.deploy_from_local,
+    !local.deploy_from_orm,
+    !local.deploy_from_operator,
+  ])
 
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
@@ -143,6 +151,21 @@ resource "null_resource" "validate_pods_capacity" {
           - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
         Consider increasing the pods subnet size or reducing max_pods_per_node/pool_size values.
       EOT
+    }
+  }
+}
+
+resource "null_resource" "warn_fss_pv_unreachable" {
+  count = local.fss_pv_unreachable ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Warning: create_fss=true but the Kubernetes API server is unreachable from this context (private endpoint, no operator, no ORM private endpoint). The FSS PersistentVolume will not be created. To resolve, enable the operator (create_operator=true with create_bastion=true), use a public control plane endpoint, or enable deploy_to_oke_from_orm=true when deploying via ORM.'"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !local.fss_pv_unreachable
+      error_message = "create_fss=true but the Kubernetes API server is unreachable from this context (private endpoint, no operator, no ORM private endpoint). The FSS PersistentVolume will not be created. To resolve: enable the operator (create_operator=true with create_bastion=true), use a public control plane endpoint, or enable deploy_to_oke_from_orm=true when deploying via ORM."
     }
   }
 }
