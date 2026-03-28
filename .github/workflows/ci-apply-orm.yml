@@ -240,42 +240,83 @@ jobs:
           print('Created stack: {}'.format(stack_id))
 
       - name: Apply stack
+        env:
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
         run: |
-          JOB_ID=$(oci resource-manager job create-apply-job \
-            --stack-id "$STACK_ID" \
-            --execution-plan-strategy AUTO_APPROVED \
-            --query 'data.id' \
-            --raw-output)
-          echo "APPLY_JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
-          echo "Apply job: $JOB_ID"
+          # For lustre topologies, fetch ADs dynamically and retry on capacity errors.
+          # For all other topologies, a single apply with no AD override.
+          if [[ "$TOPOLOGY" == *lustre* ]]; then
+            mapfile -t ADS < <(oci iam availability-domain list \
+              --compartment-id "$OCI_COMPARTMENT_OCID" \
+              --query 'data[*].name' \
+              --raw-output | jq -r '.[]')
+          else
+            ADS=("")
+          fi
 
-      - name: Wait for apply to complete
-        run: |
-          echo "Waiting for apply job $APPLY_JOB_ID..."
-          MAX_POLLS=120  # 120 x 30s = 60 minutes
-          POLL=0
-          while true; do
-            POLL=$((POLL + 1))
-            if [ "$POLL" -gt "$MAX_POLLS" ]; then
-              echo "Timed out waiting for apply job after $MAX_POLLS polls"
-              exit 1
+          APPLY_SUCCESS=false
+          for AD in "${ADS[@]}"; do
+            if [ -n "$AD" ]; then
+              echo "Setting lustre_ad=$AD"
+              jq --arg ad "$AD" '. + {lustre_ad: $ad}' variables.json > vars_ad.json
+              oci resource-manager stack update \
+                --stack-id "$STACK_ID" \
+                --variables "$(cat vars_ad.json)" \
+                --force
             fi
-            STATUS=$(oci resource-manager job get \
-              --job-id "$APPLY_JOB_ID" \
-              --query 'data."lifecycle-state"' \
+
+            JOB_ID=$(oci resource-manager job create-apply-job \
+              --stack-id "$STACK_ID" \
+              --execution-plan-strategy AUTO_APPROVED \
+              --query 'data.id' \
               --raw-output)
-            echo "  [$POLL/$MAX_POLLS] Status: $STATUS"
-            case "$STATUS" in
-              SUCCEEDED) echo "Apply succeeded."; break ;;
-              FAILED|CANCELING|CANCELED)
-                oci resource-manager job get-job-logs --all \
-                  --job-id "$APPLY_JOB_ID" \
-                  --query 'data[*].message' --raw-output 2>/dev/null | tail -100 || true
-                echo "Apply job failed with status: $STATUS"
-                exit 1 ;;
-            esac
-            sleep 30
+            echo "APPLY_JOB_ID=$JOB_ID" >> "$GITHUB_ENV"
+            echo "Apply job: $JOB_ID (AD: ${AD:-default})"
+
+            MAX_POLLS=120  # 120 x 30s = 60 minutes
+            POLL=0
+            JOB_STATUS=""
+            while true; do
+              POLL=$((POLL + 1))
+              if [ "$POLL" -gt "$MAX_POLLS" ]; then
+                echo "Timed out waiting for apply job after $MAX_POLLS polls"
+                exit 1
+              fi
+              JOB_STATUS=$(oci resource-manager job get \
+                --job-id "$JOB_ID" \
+                --query 'data."lifecycle-state"' \
+                --raw-output)
+              echo "  [$POLL/$MAX_POLLS] AD=${AD:-default} Status: $JOB_STATUS"
+              case "$JOB_STATUS" in
+                SUCCEEDED) APPLY_SUCCESS=true; break ;;
+                FAILED|CANCELING|CANCELED) break ;;
+              esac
+              sleep 30
+            done
+
+            if $APPLY_SUCCESS; then
+              echo "Apply succeeded."
+              break
+            fi
+
+            LOGS=$(oci resource-manager job get-job-logs --all \
+              --job-id "$JOB_ID" \
+              --query 'data[*].message' --raw-output 2>/dev/null | tail -100 || true)
+            echo "$LOGS"
+
+            if echo "$LOGS" | grep -q "Not enough capacity to create Lustre file system"; then
+              echo "No Lustre capacity in AD '${AD:-default}', trying next..."
+              continue
+            fi
+
+            echo "Apply job failed with status: $JOB_STATUS"
+            exit 1
           done
+
+          if ! $APPLY_SUCCESS; then
+            echo "Apply failed: no Lustre capacity available in any AD."
+            exit 1
+          fi
 
       - name: Assert outputs
         run: |
