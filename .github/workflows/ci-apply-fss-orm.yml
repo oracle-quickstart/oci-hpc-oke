@@ -205,9 +205,9 @@ jobs:
             case "$STATUS" in
               SUCCEEDED) echo "Apply succeeded."; break ;;
               FAILED|CANCELING|CANCELED)
-                oci resource-manager job get-job-logs \
+                oci resource-manager job get-job-logs --all \
                   --job-id "$APPLY_JOB_ID" \
-                  --query 'data[*].message' --raw-output 2>/dev/null | tail -50 || true
+                  --query 'data[*].message' --raw-output 2>/dev/null | tail -100 || true
                 echo "Apply job failed with status: $STATUS"
                 exit 1 ;;
             esac
@@ -456,10 +456,10 @@ jobs:
         if: always() && env.DESTROY_JOB_ID != '' && failure()
         run: |
           echo "=== ORM destroy job logs ==="
-          oci resource-manager job get-job-logs \
+          oci resource-manager job get-job-logs --all \
             --job-id "$DESTROY_JOB_ID" \
             --query 'data[*].message' \
-            --raw-output 2>&1 || echo "Could not fetch destroy job logs."
+            --raw-output 2>&1 | tail -100 || echo "Could not fetch destroy job logs."
 
       - name: Delete stack
         if: env.STACK_ID != '' && !failure()
