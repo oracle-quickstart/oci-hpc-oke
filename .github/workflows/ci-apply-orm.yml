@@ -429,6 +429,14 @@ jobs:
             else
               echo "OK:   lustre_management_service_address = $LUSTRE_MGS"
             fi
+
+            PV_COUNT=$(jq '[.resources[] | select(.type == "kubectl_manifest" and .name == "lustre_pv")] | length' state.json)
+            if [[ "$PV_COUNT" -lt 1 ]]; then
+              echo "FAIL: kubectl_manifest.lustre_pv not found in state"
+              FAILED=1
+            else
+              echo "OK:   Lustre PersistentVolume resource found in state"
+            fi
           fi
 
           # Monitoring topology checks
