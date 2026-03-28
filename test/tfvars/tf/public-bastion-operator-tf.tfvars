@@ -1,6 +1,7 @@
 create_public_subnets         = true
 control_plane_is_public       = true
 preferred_kubernetes_services = "public"
+cni_type                      = "VCN-Native Pod Networking"
 
 create_bastion    = true
 bastion_is_public = true
