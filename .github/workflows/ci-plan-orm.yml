@@ -7,12 +7,19 @@ on:
         description: "ORM topology to plan"
         required: true
         type: choice
-        default: "all-public-monitoring-orm"
+        default: "all-public-fss-monitoring-orm"
         options:
-          - all-public-orm
-          - all-private-orm
-          - all-private-bastion-service-orm
-          - all-public-monitoring-orm
+          - all-public-base-orm
+          - all-public-fss-monitoring-orm
+          - all-public-lustre-orm
+          - all-private-base-orm
+          - all-private-fss-monitoring-orm
+          - all-private-lustre-orm
+      overrides:
+        description: 'Extra variable overrides as JSON (e.g. {"worker_gpu_enabled":"true"})'
+        required: false
+        type: string
+        default: '{}'
 
   issue_comment:
     types: [created]
@@ -21,7 +28,10 @@ on:
     inputs:
       topology:
         type: string
-        default: 'all-public-monitoring-orm'
+        default: 'all-public-fss-monitoring-orm'
+      overrides:
+        type: string
+        default: '{}'
       pr_number:
         type: number
         default: 0
@@ -54,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       topology: ${{ steps.parse.outputs.topology }}
+      overrides: ${{ steps.parse.outputs.overrides }}
     steps:
       - name: React to trigger comment
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
@@ -66,26 +77,39 @@ jobs:
               content: 'rocket'
             })
 
-      - name: Parse topology from comment
+      - name: Parse topology and overrides from comment
         id: parse
         env:
           COMMENT: ${{ github.event.comment.body }}
         run: |
-          topology=$(echo "$COMMENT" | grep -oP '(?<=/ok-to-run-plan-orm\s)\S+' | xargs || true)
-          if [ -z "$topology" ]; then
-            topology="all-public-monitoring-orm"
-          fi
+          cmd_line=$(echo "$COMMENT" | grep -oP '/ok-to-run-plan-orm.*' | head -1 || true)
+          read -ra words <<< "$cmd_line"
+
+          topology="${words[1]:-all-public-fss-monitoring-orm}"
+
+          overrides="{"
+          for word in "${words[@]:2}"; do
+            if [[ "$word" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.+$ ]]; then
+              key="${word%%=*}"
+              val="${word#*=}"
+              overrides="${overrides}\"${key}\":\"${val}\","
+            fi
+          done
+          overrides="${overrides%,}}"
+
           echo "topology=$topology" >> "$GITHUB_OUTPUT"
+          echo "overrides=$overrides" >> "$GITHUB_OUTPUT"
 
   plan-orm:
-    name: ORM Plan / ${{ inputs.topology || needs.check-orm-plan-trigger.outputs.topology || 'all-public-monitoring-orm' }}
+    name: ORM Plan / ${{ inputs.topology || needs.check-orm-plan-trigger.outputs.topology || 'all-public-fss-monitoring-orm' }}
     needs: [check-orm-plan-trigger]
     if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-orm-plan-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
-      TOPOLOGY: ${{ inputs.topology || needs.check-orm-plan-trigger.outputs.topology || 'all-public-monitoring-orm' }}
+      TOPOLOGY: ${{ inputs.topology || needs.check-orm-plan-trigger.outputs.topology || 'all-public-fss-monitoring-orm' }}
+      OVERRIDES_JSON: ${{ inputs.overrides || needs.check-orm-plan-trigger.outputs.overrides || '{}' }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -151,7 +175,8 @@ jobs:
               ssh_public_key:             $ssh_public_key
             }' > secrets.json
 
-          jq -s '.[0] * .[1]' "$TFVARS_FILE" secrets.json > variables.json
+          echo "$OVERRIDES_JSON" > overrides.json
+          jq -s '.[0] * .[1] * .[2]' "$TFVARS_FILE" secrets.json overrides.json > variables.json
 
       - name: Zip Terraform directory
         run: |
