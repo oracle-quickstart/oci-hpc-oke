@@ -40,7 +40,7 @@ locals {
   ) : ""
 
   runcmd_lustre_mount = var.create_lustre && local.lustre_mount_ip != "" ? format(
-    "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/feat/lustre-worker-mount/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
+    "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/OguzPastirmaci/oci-hpc-oke/refs/heads/feat/lustre-worker-mount/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
     local.lustre_mount_ip, var.lustre_file_system_name, var.lustre_mount_path
   ) : ""
 
