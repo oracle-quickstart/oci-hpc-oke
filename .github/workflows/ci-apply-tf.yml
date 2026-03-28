@@ -350,6 +350,15 @@ jobs:
           if [[ "$TOPOLOGY" == *lustre* ]]; then
             check_ocid lustre_subnet_id
             check_ocid lustre_nsg_id
+            check_ocid lustre_file_system_id
+
+            LUSTRE_MGS=$(jq -r '.lustre_management_service_address.value // empty' state.json)
+            if [[ -z "$LUSTRE_MGS" || ! "$LUSTRE_MGS" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+              echo "FAIL: lustre_management_service_address is not a valid IPv4: $LUSTRE_MGS"
+              FAILED=1
+            else
+              echo "OK:   lustre_management_service_address = $LUSTRE_MGS"
+            fi
           fi
 
           # Monitoring topology checks

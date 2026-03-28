@@ -76,13 +76,15 @@ output "pub_lb_nsg_id" { value = module.oke.pub_lb_nsg_id }
 output "pod_subnet_id" { value = module.oke.pod_subnet_id }
 output "pod_subnet_cidr" { value = module.oke.pod_subnet_cidr }
 output "pod_nsg_id" { value = module.oke.pod_nsg_id }
-output "lustre_subnet_id" { value = one(oci_core_subnet.lustre_subnet[*].id) }
-output "lustre_nsg_id" { value = one(oci_core_network_security_group.lustre_nsg[*].id) }
-output "fss_file_system_id"  { value = one(oci_file_storage_file_system.fss[*].id) }
+output "lustre_subnet_id"                   { value = one(oci_core_subnet.lustre_subnet[*].id) }
+output "lustre_nsg_id"                      { value = one(oci_core_network_security_group.lustre_nsg[*].id) }
+output "lustre_file_system_id"              { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].id) }
+output "lustre_management_service_address"  { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].management_service_address) }
+output "fss_file_system_id" { value = one(oci_file_storage_file_system.fss[*].id) }
 output "fss_mount_target_ip" { value = one(data.oci_core_private_ip.fss_mt_ip[*].ip_address) }
-output "fss_export_path"     { value = one(oci_file_storage_export.FSSExport[*].path) }
-output "fss_nsg_id"          { value = module.oke.fss_nsg_id }
-output "fss_subnet_id"       { value = module.oke.fss_subnet_id }
+output "fss_export_path" { value = one(oci_file_storage_export.FSSExport[*].path) }
+output "fss_nsg_id" { value = module.oke.fss_nsg_id }
+output "fss_subnet_id" { value = module.oke.fss_subnet_id }
 
 # Workers
 output "worker_subnet_id" { value = module.oke.worker_subnet_id }
