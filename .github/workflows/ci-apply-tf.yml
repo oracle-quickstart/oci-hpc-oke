@@ -489,6 +489,82 @@ jobs:
           echo "OK:   FSS reader output: $CONTENT"
           echo "Health check: all FSS health checks passed"
 
+      - name: Lustre health checks
+        if: startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'lustre')
+        run: |
+          echo "Health check: PVC binding"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: lustre-test-pvc
+          spec:
+            accessModes:
+              - ReadWriteMany
+            storageClassName: ""
+            resources:
+              requests:
+                storage: 50Gi
+            volumeName: lustre-pv
+          EOF
+
+          kubectl wait --for='jsonpath={.status.phase}=Bound' pvc/lustre-test-pvc --timeout=120s
+          echo "OK:   Lustre PVC bound"
+
+          echo "Health check: Lustre write"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: lustre-writer
+          spec:
+            restartPolicy: Never
+            containers:
+            - name: writer
+              image: busybox
+              command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt"]
+              volumeMounts:
+              - name: lustre
+                mountPath: /mnt/lustre
+            volumes:
+            - name: lustre
+              persistentVolumeClaim:
+                claimName: lustre-test-pvc
+          EOF
+
+          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-writer --timeout=120s
+          echo "OK:   Lustre writer pod completed"
+
+          echo "Health check: Lustre read"
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: lustre-reader
+          spec:
+            restartPolicy: Never
+            containers:
+            - name: reader
+              image: busybox
+              command: ["sh", "-c", "cat /mnt/lustre/testfile.txt"]
+              volumeMounts:
+              - name: lustre
+                mountPath: /mnt/lustre
+            volumes:
+            - name: lustre
+              persistentVolumeClaim:
+                claimName: lustre-test-pvc
+          EOF
+
+          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-reader --timeout=120s
+          CONTENT=$(kubectl logs lustre-reader)
+          if [[ "$CONTENT" != *"lustre-test-content"* ]]; then
+            echo "FAIL: reader pod output does not contain expected content: $CONTENT"
+            exit 1
+          fi
+          echo "OK:   Lustre reader output: $CONTENT"
+          echo "Health check: all Lustre health checks passed"
+
       - name: Monitoring health checks
         if: contains(env.TOPOLOGY, 'monitoring')
         run: |
@@ -512,6 +588,14 @@ jobs:
           if [ -f "$HOME/.kube/config" ]; then
             kubectl delete pod fss-writer fss-reader --ignore-not-found --wait=true --timeout=60s || true
             kubectl delete pvc fss-test-pvc --ignore-not-found --wait=true --timeout=120s || true
+          fi
+
+      - name: Clean up Lustre test resources
+        if: always() && startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'lustre')
+        run: |
+          if [ -f "$HOME/.kube/config" ]; then
+            kubectl delete pod lustre-writer lustre-reader --ignore-not-found --wait=true --timeout=60s || true
+            kubectl delete pvc lustre-test-pvc --ignore-not-found --wait=true --timeout=120s || true
           fi
 
       - name: Destroy
