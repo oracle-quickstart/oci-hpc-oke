@@ -1,13 +1,18 @@
 {
   "deploy_to_oke_from_orm": "true",
   "create_public_subnets": "true",
-  "control_plane_is_public": "true",
+  "control_plane_is_public": "false",
   "preferred_kubernetes_services": "public",
   "create_oci_bastion_service": "false",
   "create_bastion": "false",
   "create_operator": "false",
   "create_fss": "false",
-  "create_lustre": "false",
+  "create_lustre": "true",
+<<<<<<<< HEAD:test/tfvars/orm/all-private-lustre-orm.json
+  "install_lustre_client": "true",
+  "create_lustre_pv": "true",
+========
+>>>>>>>> c6aadd5 (feat(ci): add local Terraform apply workflows and combined FSS+Lustre ORM topologies):test/tfvars/orm/private-lustre-orm.json
   "install_monitoring": "false",
   "install_node_problem_detector_kube_prometheus_stack": "false",
   "install_grafana": "false",
@@ -18,10 +23,10 @@
   "install_kueue": "false",
   "install_oci_hpc_oke_utils": "false",
   "install_rdma_labeler": "false",
-  "install_lustre_client": "false",
   "setup_alerting": "false",
   "worker_cpu_enabled": "false",
   "worker_gpu_enabled": "false",
   "worker_rdma_enabled": "false",
-  "create_policies": "false"
+  "create_policies": "true",
+  "create_dynamic_group": "true"
 }

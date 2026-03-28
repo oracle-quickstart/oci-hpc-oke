@@ -241,10 +241,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - topology: all-public-orm
-          - topology: all-private-orm
-          - topology: all-private-bastion-service-orm
-          - topology: all-public-monitoring-orm
+          - topology: public-base-orm
+          - topology: public-fss-monitoring-orm
+          - topology: public-lustre-orm
+          - topology: public-fss-lustre-monitoring-orm
+          - topology: private-base-orm
+          - topology: private-fss-monitoring-orm
+          - topology: private-lustre-orm
+          - topology: private-fss-lustre-monitoring-orm
     env:
       TOPOLOGY: ${{ matrix.topology }}
 
@@ -399,12 +403,98 @@ jobs:
           echo "Stack $STACK_ID deleted."
 
   # ---------------------------------------------------------------------------
+  # Terraform plan smoke tests: run terraform plan (no apply) for each of the
+  # 8 Terraform topology tfvars files to catch regressions before apply.
+  # ---------------------------------------------------------------------------
+  plan-tf:
+    name: TF Plan / ${{ matrix.name }}
+    needs: check-changes
+    if: needs.check-changes.outputs.run-tests == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: public-base-tf
+            tfvars: tfvars/tf/public-base-tf.tfvars
+          - name: public-bastion-operator-tf
+            tfvars: tfvars/tf/public-bastion-operator-tf.tfvars
+          - name: public-fss-monitoring-tf
+            tfvars: tfvars/tf/public-fss-monitoring-tf.tfvars
+          - name: public-lustre-tf
+            tfvars: tfvars/tf/public-lustre-tf.tfvars
+          - name: private-base-tf
+            tfvars: tfvars/tf/private-base-tf.tfvars
+          - name: private-bastion-operator-tf
+            tfvars: tfvars/tf/private-bastion-operator-tf.tfvars
+          - name: private-fss-monitoring-tf
+            tfvars: tfvars/tf/private-fss-monitoring-tf.tfvars
+          - name: private-lustre-tf
+            tfvars: tfvars/tf/private-lustre-tf.tfvars
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417
+        with:
+          go-version-file: test/go.mod
+          cache: true
+          cache-dependency-path: test/go.sum
+
+      - name: Install Terraform
+        run: |
+          TF_VERSION="1.5.7"
+          curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o tf.zip
+          unzip -o tf.zip -d /usr/local/bin
+          rm tf.zip
+          terraform version
+
+      - name: Cache Terraform providers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/versions.tf', 'terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - name: Set up OCI credentials
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.oci
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
+            "$OCI_USER_OCID" \
+            "$OCI_API_KEY_FINGERPRINT" \
+            "$OCI_TENANCY_OCID" \
+            "$OCI_REGION" \
+            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
+          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Run Terraform plan test
+        working-directory: test
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
+          WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+          TFVARS_FILE: ${{ matrix.tfvars }}
+        run: go test -v -count=1 -run TestPlanSmoke -timeout 15m ./...
+
+  # ---------------------------------------------------------------------------
   # Summary: post a single comment to the PR with pass/fail for every job and
   # a direct link to the run log. Runs even if upstream jobs fail.
   # ---------------------------------------------------------------------------
   summarize:
     name: Post results
-    needs: [check-changes, validate, plan-terraform, plan-orm]
+    needs: [check-changes, validate, plan-terraform, plan-tf, plan-orm]
     if: always() && needs.check-changes.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -413,25 +503,28 @@ jobs:
         env:
           VALIDATE_RESULT: ${{ needs.validate.result }}
           PLAN_TF_RESULT: ${{ needs.plan-terraform.result }}
+          PLAN_TF_TOPOLOGIES_RESULT: ${{ needs.plan-tf.result }}
           PLAN_ORM_RESULT: ${{ needs.plan-orm.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           script: |
             const icon = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌'
-            const validate  = process.env.VALIDATE_RESULT
-            const planTf    = process.env.PLAN_TF_RESULT
-            const planOrm   = process.env.PLAN_ORM_RESULT
-            const runUrl    = process.env.RUN_URL
+            const validate    = process.env.VALIDATE_RESULT
+            const planTf      = process.env.PLAN_TF_RESULT
+            const planTfTop   = process.env.PLAN_TF_TOPOLOGIES_RESULT
+            const planOrm     = process.env.PLAN_ORM_RESULT
+            const runUrl      = process.env.RUN_URL
             const ok = (r) => r === 'success' || r === 'skipped'
-            const overall = ok(validate) && ok(planTf) && ok(planOrm)
+            const overall = ok(validate) && ok(planTf) && ok(planTfTop) && ok(planOrm)
             const body = [
               `### ${overall ? '✅' : '❌'} CI - Plan (Both) results`,
               '',
               `| Job | Result |`,
               `|-----|--------|`,
-              `| Validation tests    | ${icon(validate)} ${validate} |`,
-              `| Terraform plan tests       | ${icon(planTf)} ${planTf} |`,
-              `| ORM plan tests      | ${icon(planOrm)} ${planOrm} |`,
+              `| Validation tests         | ${icon(validate)}  ${validate}  |`,
+              `| Terraform plan tests     | ${icon(planTf)}    ${planTf}    |`,
+              `| TF topology plan tests   | ${icon(planTfTop)} ${planTfTop} |`,
+              `| ORM plan tests           | ${icon(planOrm)}   ${planOrm}   |`,
               '',
               `[View full run log](${runUrl})`,
             ].join('\n')

@@ -1,5 +1,5 @@
 name: CI - Release (All Topologies)
-# Triggered on pre-release: runs all ORM apply topologies in parallel.
+# Triggered on pre-release: runs all ORM and Terraform apply topologies in parallel.
 
 on:
   release:
@@ -9,44 +9,117 @@ jobs:
   # ---------------------------------------------------------------------------
   # ORM apply — all topologies
   # ---------------------------------------------------------------------------
-  orm-all-public-base:
-    name: ORM / all-public-base-orm
+  orm-public-base:
+    name: ORM / public-base-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-public-base-orm
+      topology: public-base-orm
     secrets: inherit
 
-  orm-all-public-fss-monitoring:
-    name: ORM / all-public-fss-monitoring-orm
+  orm-public-fss-monitoring:
+    name: ORM / public-fss-monitoring-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-public-fss-monitoring-orm
+      topology: public-fss-monitoring-orm
     secrets: inherit
 
-  orm-all-public-lustre:
-    name: ORM / all-public-lustre-orm
+  orm-public-lustre:
+    name: ORM / public-lustre-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-public-lustre-orm
+      topology: public-lustre-orm
     secrets: inherit
 
-  orm-all-private-base:
-    name: ORM / all-private-base-orm
+  orm-private-base:
+    name: ORM / private-base-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-private-base-orm
+      topology: private-base-orm
     secrets: inherit
 
-  orm-all-private-fss-monitoring:
-    name: ORM / all-private-fss-monitoring-orm
+  orm-private-fss-monitoring:
+    name: ORM / private-fss-monitoring-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-private-fss-monitoring-orm
+      topology: private-fss-monitoring-orm
     secrets: inherit
 
-  orm-all-private-lustre:
-    name: ORM / all-private-lustre-orm
+  orm-private-lustre:
+    name: ORM / private-lustre-orm
     uses: ./.github/workflows/ci-apply-orm.yml
     with:
-      topology: all-private-lustre-orm
+      topology: private-lustre-orm
+    secrets: inherit
+
+  orm-public-fss-lustre-monitoring:
+    name: ORM / public-fss-lustre-monitoring-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: public-fss-lustre-monitoring-orm
+    secrets: inherit
+
+  orm-private-fss-lustre-monitoring:
+    name: ORM / private-fss-lustre-monitoring-orm
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: private-fss-lustre-monitoring-orm
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Terraform apply — all topologies
+  # ---------------------------------------------------------------------------
+  tf-public-base:
+    name: TF / public-base-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-base-tf
+    secrets: inherit
+
+  tf-public-bastion-operator:
+    name: TF / public-bastion-operator-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-bastion-operator-tf
+    secrets: inherit
+
+  tf-public-fss-monitoring:
+    name: TF / public-fss-monitoring-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-fss-monitoring-tf
+    secrets: inherit
+
+  tf-public-lustre:
+    name: TF / public-lustre-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-lustre-tf
+    secrets: inherit
+
+  tf-private-base:
+    name: TF / private-base-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-base-tf
+    secrets: inherit
+
+  tf-private-bastion-operator:
+    name: TF / private-bastion-operator-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-bastion-operator-tf
+    secrets: inherit
+
+  tf-private-fss-monitoring:
+    name: TF / private-fss-monitoring-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-fss-monitoring-tf
+    secrets: inherit
+
+  tf-private-lustre:
+    name: TF / private-lustre-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-lustre-tf
     secrets: inherit
