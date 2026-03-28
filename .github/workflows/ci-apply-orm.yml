@@ -42,8 +42,8 @@ concurrency:
   group: >-
     ${{
       github.event_name == 'issue_comment' && format('ci-apply-orm-pr-{0}', github.event.issue.number) ||
-      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-orm-pr-{0}', inputs.pr_number) ||
-      'ci-apply-orm'
+      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-orm-pr-{0}-{1}', inputs.pr_number, inputs.topology) ||
+      format('ci-apply-orm-{0}', inputs.topology || github.run_id)
     }}
   cancel-in-progress: false
 
