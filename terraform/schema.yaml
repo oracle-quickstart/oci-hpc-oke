@@ -49,6 +49,7 @@ variableGroups:
       - kueue_local_queue_default_namespace
       # OCI HPC OKE Utils
       - install_image_prepuller
+      - install_hostexec
       # Monitoring
       - wildcard_dns_domain
       - monitoring_advanced_options

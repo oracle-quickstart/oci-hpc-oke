@@ -1,0 +1,28 @@
+{{- if .Values.hostexec.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-hostexec-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hostexec
+data:
+  runner.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    script_dir=/tmp/oci-hpc-oke-utils-hostexec
+    target_script="${script_dir}/hostexec.sh"
+    interval="${HOSTEXEC_INTERVAL:-30}"
+
+    mkdir -p "/host${script_dir}"
+    while true; do
+      cp /scripts/hostexec.sh "/host${target_script}"
+      chmod 700 "/host${target_script}"
+      nsenter --target 1 --net --mount --uts --ipc --pid -- /bin/bash "${target_script}"
+      sleep "${interval}"
+    done
+  hostexec.sh: |
+{{ .Values.hostexec.script | indent 4 }}
+{{- end }}

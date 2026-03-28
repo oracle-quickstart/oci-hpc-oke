@@ -21,12 +21,12 @@ spec:
       labels:
         {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: labeler
-        {{- with .Values.podLabels }}
+        {{- with .Values.labeler.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        {{- with .Values.podAnnotations }}
+        {{- with .Values.labeler.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
@@ -35,32 +35,34 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       priorityClassName: system-node-critical
-      {{- with .Values.imagePullSecrets }}
+      {{- with .Values.labeler.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.labeler.tolerations }}
       tolerations:
-        {{- toYaml .Values.tolerations | nindent 8 }}
-      {{- with .Values.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.labeler.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with .Values.labeler.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
         - name: script
           configMap:
-            name: {{ include "oci-hpc-oke-utils.fullname" . }}-script
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler-script
         - name: uv-cache
           emptyDir: {}
         - name: tmp
           emptyDir: {}
       containers:
         - name: labeler
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
+          imagePullPolicy: {{ .Values.labeler.image.pullPolicy }}
           command: ["uv", "run", "/scripts/labeler.py"]
           volumeMounts:
             - name: script

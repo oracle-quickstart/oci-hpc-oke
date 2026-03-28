@@ -678,6 +678,14 @@ variable "install_image_prepuller" {
   description = "Deploy the image prepuller DaemonSet to pre-pull container images on GPU worker nodes."
 }
 
+# hostexec
+variable "install_hostexec" {
+  default     = false
+  type        = bool
+  description = "Deploy the hostexec DaemonSet to execute commands on the host."
+}
+
+
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {
   type        = bool

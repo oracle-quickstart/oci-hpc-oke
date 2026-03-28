@@ -18,7 +18,15 @@ Prepullers:
 {{- end }}
 {{- end }}
 
-{{- if or .Values.labeler.enabled .Values.prepuller.enabled }}
+{{- if .Values.hostexec.enabled }}
+
+Hostexec:
+  DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-hostexec
+  Host root: {{ .Values.hostexec.hostRootPath }}
+  Interval:  {{ .Values.hostexec.interval }}s
+{{- end }}
+
+{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled }}
 
 Verify with:
   kubectl get ds -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}

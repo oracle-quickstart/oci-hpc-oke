@@ -1,12 +1,25 @@
-image:
-  repository: ghcr.io/astral-sh/uv
-  tag: "0.7.12-python3.12-bookworm-slim"
-  pullPolicy: IfNotPresent
-
-imagePullSecrets: []
-
 labeler:
   enabled: true
+  image:
+    repository: ghcr.io/astral-sh/uv
+    tag: "0.7.12-python3.12-bookworm-slim"
+    pullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: Exists
+          - matchExpressions:
+              - key: amd.com/gpu
+                operator: Exists
+  podAnnotations: {}
+  podLabels: {}
   interval: 300
   resources:
     requests:
@@ -18,6 +31,24 @@ labeler:
 
 prepuller:
   enabled: false
+  image:
+    pullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: nvidia.com/gpu
+                operator: Exists
+          - matchExpressions:
+              - key: amd.com/gpu
+                operator: Exists
+  podAnnotations: {}
+  podLabels: {}
   pauseImage: registry.k8s.io/pause:3.10
   initResources:
     requests:
@@ -45,21 +76,48 @@ prepuller:
       images:
         - iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
 
-tolerations:
-  - operator: Exists
+hostexec:
+  enabled: false
+  imagePullSecrets: []
+  hostRootPath: /
+  interval: 30
+  priorityClassName: system-node-critical
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
+  image:
+    repository: docker.io/debian
+    tag: bookworm-slim
+    pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  script: |
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-nodeSelector: {}
+    if ! modinfo lnet >/dev/null 2>&1; then
+      echo "lnet kernel module is not available on this node; skipping"
+      exit 0
+    fi
 
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: nvidia.com/gpu
-              operator: Exists
-        - matchExpressions:
-            - key: amd.com/gpu
-              operator: Exists
+    if ! grep -q '^lnet ' /proc/modules 2>/dev/null; then
+      echo "LNet not loaded, loading..."
+      modprobe lnet
+    fi
 
-podAnnotations: {}
-podLabels: {}
+    lnet_output="$(lnetctl net show 2>&1 || true)"
+
+    if printf '%s\n' "$lnet_output" | grep -q "LNet stack down"; then
+      lnetctl lnet configure
+      DEFAULT_IFACE=$(ip route show default | awk '/default/ {print $5}')
+      lnetctl net add --net tcp --if "$DEFAULT_IFACE" --peer-timeout 180 --peer-credits 120 --credits 1024
+      echo "LNet configured successfully"
+    fi
