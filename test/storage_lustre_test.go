@@ -10,9 +10,7 @@ func TestStorageLustre(t *testing.T) {
 	skipUnlessEnv(t, "RUN_LUSTRE_TESTS")
 
 	options := newTerraformOptions(t, map[string]interface{}{
-		"create_lustre":         true,
-		"install_lustre_client": true,
-		"create_lustre_pv":      true,
+		"create_lustre": true,
 	})
 
 	defer terraform.Destroy(t, options)

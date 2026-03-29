@@ -7,12 +7,12 @@ resource "helm_release" "cert_manager" {
     module.oke,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
   ]
-  namespace  = "cert-manager"
-  name       = "cert-manager"
-  chart      = "cert-manager"
-  repository = "oci://quay.io/jetstack/charts"
-  version    = var.cert_manager_chart_version
-  values = ["${file("${path.module}/files/cert-manager/values.yaml")}"]
+  namespace         = "cert-manager"
+  name              = "cert-manager"
+  chart             = "cert-manager"
+  repository        = "oci://quay.io/jetstack/charts"
+  version           = var.cert_manager_chart_version
+  values            = ["${file("${path.module}/files/cert-manager/values.yaml")}"]
   create_namespace  = true
   recreate_pods     = false
   force_update      = true

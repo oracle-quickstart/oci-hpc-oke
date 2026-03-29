@@ -87,7 +87,7 @@ resource "null_resource" "helm_deployment_via_operator" {
       [
         "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
         "export OCI_CLI_AUTH=instance_principal",
-        "echo 'Checking for kubeconfig...'",       
+        "echo 'Checking for kubeconfig...'",
         "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
         "if ! kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
         "echo 'Checking for helm installation...'",
@@ -100,7 +100,7 @@ resource "null_resource" "helm_deployment_via_operator" {
         join(" ", compact(concat([
           "helm upgrade --install ${var.deployment_name}",
           var.helm_chart_path != "" ? local.operator_helm_chart_path : "%{if var.helm_repository_url != "" && lower(substr(var.helm_repository_url, 0, 4)) == "http"}${var.helm_chart_name} --repo ${var.helm_repository_url}%{else}${var.helm_repository_url}/${var.helm_chart_name}%{endif}",
-          var.helm_chart_path != "" ? "%{if var.helm_chart_version != ""}--version ${var.helm_chart_version}%{endif}": "",
+          var.helm_chart_path != "" ? "%{if var.helm_chart_version != ""}--version ${var.helm_chart_version}%{endif}" : "",
           "--namespace ${var.namespace} --create-namespace",
           "-f ${local.operator_helm_values_override_template_file_path}",
           "-f ${local.operator_helm_values_override_user_file_path}"

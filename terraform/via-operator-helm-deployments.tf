@@ -21,13 +21,13 @@ module "certmanager" {
     "export PATH=$PATH:/home/${var.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
-  
+
   post_deployment_commands = []
 
   deployment_extra_args = ["--force", "--dependency-update", "--history-max 1", "--wait"]
 
   helm_template_values_override = file("${path.module}/files/cert-manager/values.yaml")
-  helm_user_values_override = ""
+  helm_user_values_override     = ""
 
   depends_on = [module.oke]
 }
@@ -54,7 +54,7 @@ module "ingress" {
   ]
   post_deployment_commands = flatten([
     "cat <<'EOF' | kubectl apply -f -",
-    ( var.use_lets_encrypt_prod_endpoint == true ? 
+    (var.use_lets_encrypt_prod_endpoint == true ?
       split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-prod.yaml", { state = local.state_id })) :
       split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-staging.yaml", { state = local.state_id }))
     ),
@@ -130,7 +130,7 @@ module "kube_prometheus_stack" {
 
   post_deployment_commands = []
 
-  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services})
+  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services })
 
   helm_user_values_override = yamlencode(
     {
@@ -139,14 +139,14 @@ module "kube_prometheus_stack" {
           adminPassword = random_password.grafana_admin_password.result
         },
         var.preferred_kubernetes_services == "internal" ?
-        { 
+        {
           service = {
             annotations = {
-              "oci.oraclecloud.com/initial-freeform-tags-override": jsonencode({"state_id"=local.state_id, "application": "grafana"})
+              "oci.oraclecloud.com/initial-freeform-tags-override" : jsonencode({ "state_id" = local.state_id, "application" : "grafana" })
             }
           }
-        } : {})
-      }
+      } : {})
+    }
   )
   depends_on = [module.ingress]
 }
@@ -240,46 +240,6 @@ module "amd_device_metrics_exporter" {
   depends_on = [module.kube_prometheus_stack]
 }
 
-module "lustre_client" {
-  count  = alltrue([local.deploy_from_operator, var.create_lustre, var.install_lustre_client]) ? 1 : 0
-  source = "./helm-module"
-
-  bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
-  operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
-  ssh_private_key = tls_private_key.stack_key.private_key_openssh
-
-  deployment_name     = "lustre-client-installer"
-  helm_chart_name     = "lustre-client-installer"
-  namespace           = "kube-system"
-  helm_repository_url = "https://oci-hpc.github.io/oke-lustre-client/"
-  helm_chart_version  = var.lustre_client_helm_chart_version
-
-  pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
-  ]
-  deployment_extra_args = ["--force", "--dependency-update", "--history-max 1"]
-  post_deployment_commands = var.create_lustre_pv ? flatten([
-    "cat <<'EOF' | kubectl apply -f -",
-    split("\n", templatefile(
-      "${path.module}/files/lustre/lustre-pv.yaml.tpl",
-      {
-        lustre_storage_size = floor(var.lustre_size_in_tb),
-        lustre_ip           = one(oci_lustre_file_storage_lustre_file_system.lustre.*.management_service_address),
-        lustre_fs_name      = var.lustre_file_system_name,
-      }
-    )),
-    "EOF"
-  ]) : []
-
-  helm_template_values_override = ""
-  helm_user_values_override     = ""
-
-  depends_on = [module.oke]
-}
-
 
 module "oke-ons-webhook" {
   count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_alerting]) ? 1 : 0
@@ -304,7 +264,7 @@ module "oke-ons-webhook" {
   post_deployment_commands = []
 
   helm_template_values_override = ""
-  helm_user_values_override     = yamlencode({
+  helm_user_values_override = yamlencode({
     deploy = {
       env = {
         ONS_TOPIC_OCID           = try(oci_ons_notification_topic.grafana_alerts[0].id, "")

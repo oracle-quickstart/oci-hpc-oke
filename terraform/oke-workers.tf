@@ -2,18 +2,19 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  create_workers = true
-  fss_mount_ip = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
+  create_workers      = true
+  fss_mount_ip        = try(data.oci_core_private_ip.fss_mt_ip[0].ip_address, "")
+  lustre_mount_ip     = try(oci_lustre_file_storage_lustre_file_system.lustre[0].management_service_address, "")
   ssh_authorized_keys = compact(split("\n", trimspace(local.ssh_public_key)))
 
-  worker_ops_image_type  = contains(["platform", "custom"], lower(var.worker_ops_image_type)) ? "custom" : "oke"
-  worker_ops_image_id    = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, var.worker_ops_image_platform_id, "none")
-  worker_cpu_denseio_ocpus = { 
-    "VM.DenseIO.E4.Flex" = var.worker_cpu_ocpus_denseIO_e4_flex, 
+  worker_ops_image_type = contains(["platform", "custom"], lower(var.worker_ops_image_type)) ? "custom" : "oke"
+  worker_ops_image_id   = var.worker_ops_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_ops_image_custom_uri, {}), "id", null) : coalesce(var.worker_ops_image_custom_id, var.worker_ops_image_platform_id, "none")
+  worker_cpu_denseio_ocpus = {
+    "VM.DenseIO.E4.Flex" = var.worker_cpu_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = var.worker_cpu_ocpus_denseIO_e5_flex
   }
-  worker_cpu_denseio_memory = { 
-    "VM.DenseIO.E4.Flex" = 16 * var.worker_cpu_ocpus_denseIO_e4_flex, 
+  worker_cpu_denseio_memory = {
+    "VM.DenseIO.E4.Flex" = 16 * var.worker_cpu_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = 12 * var.worker_cpu_ocpus_denseIO_e5_flex
   }
   worker_cpu_image_type  = contains(["platform", "custom"], lower(var.worker_cpu_image_type)) ? "custom" : "oke"
@@ -36,6 +37,11 @@ locals {
   runcmd_fss_mount = var.create_fss && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
     "curl -sL -o /var/run/oke-fss-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-fss-mount.sh && (bash /var/run/oke-fss-mount.sh '%v' '%v' '%v' || echo 'Error initializing RAID' >&2)",
     local.fss_export_path, var.fss_mount_path, local.fss_mount_ip
+  ) : ""
+
+  runcmd_lustre_mount = var.create_lustre && local.lustre_mount_ip != "" ? format(
+    "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/OguzPastirmaci/oci-hpc-oke/refs/heads/feat/lustre-worker-mount/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
+    local.lustre_mount_ip, var.lustre_file_system_name, var.lustre_mount_path
   ) : ""
 
   write_files = [
@@ -67,6 +73,7 @@ locals {
       local.runcmd_nvme_raid,
       local.runcmd_bootstrap,
       local.runcmd_fss_mount,
+      local.runcmd_lustre_mount,
       "if . /etc/os-release && [ \"$ID\" = \"ubuntu\" ]; then systemctl restart systemd-networkd && echo 'networkd patched' || echo 'networkd not patched'; fi",
     ])
     write_files = local.write_files
@@ -77,90 +84,90 @@ locals {
     var.oke_kubelet_extra_args != "" ? { "kubelet-extra-args" : var.oke_kubelet_extra_args } : {},
     var.oke_post_bootstrap_script != "" ? { "post_oke" : base64encode(var.oke_post_bootstrap_script) } : {},
   )
-  
-  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? ( var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31 ) : var.max_pods_per_node
-  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? ( var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31 ) : var.max_pods_per_node
+
+  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? (var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31) : var.max_pods_per_node
+  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? (var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31) : var.max_pods_per_node
 
   worker_ops_max_pods_per_node = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
   worker_cpu_max_pods_per_node = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
 
   worker_pools = {
     "oke-system" = {
-      create             = local.create_workers
-      description        = "OKE-managed VM Node Pool for cluster operations and monitoring"
-      placement_ads      = [substr(var.worker_ops_ad, -1, 0)]
-      mode               = "node-pool"
-      size               = var.worker_ops_pool_size
-      shape              = var.worker_ops_shape
-      ocpus              = var.worker_ops_ocpus
-      memory             = var.worker_ops_memory
-      boot_volume_size   = var.worker_ops_boot_volume_size
-      image_type         = local.worker_ops_image_type
-      os                 = var.worker_ops_image_os
-      os_version         = var.worker_ops_image_os_version
-      image_id           = local.worker_ops_image_id
-      max_pods_per_node  = local.worker_ops_max_pods_per_node
+      create                       = local.create_workers
+      description                  = "OKE-managed VM Node Pool for cluster operations and monitoring"
+      placement_ads                = [substr(var.worker_ops_ad, -1, 0)]
+      mode                         = "node-pool"
+      size                         = var.worker_ops_pool_size
+      shape                        = var.worker_ops_shape
+      ocpus                        = var.worker_ops_ocpus
+      memory                       = var.worker_ops_memory
+      boot_volume_size             = var.worker_ops_boot_volume_size
+      image_type                   = local.worker_ops_image_type
+      os                           = var.worker_ops_image_os
+      os_version                   = var.worker_ops_image_os_version
+      image_id                     = local.worker_ops_image_id
+      max_pods_per_node            = local.worker_ops_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
       node_cycling_enabled         = var.worker_ops_node_cycling_enabled
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_ops_node_cycling_mode]
-      node_metadata                = merge(
-        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
       )
-      cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
-      create             = local.create_workers && var.worker_cpu_enabled
-      description        = "OKE-managed CPU Node Pool"
-      placement_ads      = [substr(var.worker_cpu_ad, -1, 0)]
-      mode               = "node-pool"
-      size               = var.worker_cpu_pool_size
-      shape              = var.worker_cpu_shape
-      ocpus              = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
-      memory             = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
-      boot_volume_size   = var.worker_cpu_boot_volume_size
-      image_type         = local.worker_cpu_image_type
-      os                 = var.worker_cpu_image_os
-      os_version         = var.worker_cpu_image_os_version
-      image_id           = local.worker_cpu_image_id
-      max_pods_per_node  = local.worker_cpu_max_pods_per_node
+      create                       = local.create_workers && var.worker_cpu_enabled
+      description                  = "OKE-managed CPU Node Pool"
+      placement_ads                = [substr(var.worker_cpu_ad, -1, 0)]
+      mode                         = "node-pool"
+      size                         = var.worker_cpu_pool_size
+      shape                        = var.worker_cpu_shape
+      ocpus                        = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
+      memory                       = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
+      boot_volume_size             = var.worker_cpu_boot_volume_size
+      image_type                   = local.worker_cpu_image_type
+      os                           = var.worker_cpu_image_os
+      os_version                   = var.worker_cpu_image_os_version
+      image_id                     = local.worker_cpu_image_id
+      max_pods_per_node            = local.worker_cpu_max_pods_per_node
       kubernetes_version           = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
       node_cycling_enabled         = var.worker_cpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
-      node_metadata                = merge(
-        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
       )
-      cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-gpu" = {
-      create             = local.create_workers && var.worker_gpu_enabled
-      description        = "OKE-managed GPU Node Pool"
-      placement_ads      = [substr(var.worker_gpu_ad, -1, 0)]
-      mode               = "node-pool"
-      size               = var.worker_gpu_pool_size
-      shape              = var.worker_gpu_shape
-      boot_volume_size   = var.worker_gpu_boot_volume_size
-      image_type         = local.worker_gpu_image_type
-      os                 = var.worker_gpu_image_os
-      os_version         = var.worker_gpu_image_os_version
-      image_id           = local.worker_gpu_image_id
-      max_pods_per_node  = var.worker_gpu_max_pods_per_node
-      kubernetes_version = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
+      create                       = local.create_workers && var.worker_gpu_enabled
+      description                  = "OKE-managed GPU Node Pool"
+      placement_ads                = [substr(var.worker_gpu_ad, -1, 0)]
+      mode                         = "node-pool"
+      size                         = var.worker_gpu_pool_size
+      shape                        = var.worker_gpu_shape
+      boot_volume_size             = var.worker_gpu_boot_volume_size
+      image_type                   = local.worker_gpu_image_type
+      os                           = var.worker_gpu_image_os
+      os_version                   = var.worker_gpu_image_os_version
+      image_id                     = local.worker_gpu_image_id
+      max_pods_per_node            = var.worker_gpu_max_pods_per_node
+      kubernetes_version           = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
       node_labels                  = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
       node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
-      node_metadata                = merge(
-        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled }, 
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
       )
-      cloud_init                   = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
       create                         = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image

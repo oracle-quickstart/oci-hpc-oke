@@ -16,11 +16,3 @@ spec:
     fsType: lustre
     volumeAttributes:
       setupLnet: "true"
-  nodeAffinity:
-    required:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: oci.oraclecloud.com/lustre-client-configured
-          operator: In
-          values:
-          - "true"

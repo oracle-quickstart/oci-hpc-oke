@@ -233,6 +233,7 @@ variable "fss_ad" { default = "" }
 variable "nvme_raid_enabled" { default = true }
 variable "nvme_raid_level" { default = 10 }
 variable "create_lustre" { default = false }
+variable "create_lustre_pv" { default = true }
 variable "lustre_ad" { default = "" }
 variable "lustre_size_in_tb" {
   type    = number
@@ -244,17 +245,9 @@ variable "lustre_performance_tier" {
 }
 variable "lustre_cluster_placement_group_id" { default = null }
 variable "lustre_file_system_name" { default = "lustrefs" }
-variable "install_lustre_client" {
-  default = true
-  type    = bool
-}
-variable "lustre_client_helm_chart_version" {
-  default = "0.1.2"
+variable "lustre_mount_path" {
+  default = "/mnt/oci-lustre"
   type    = string
-}
-variable "create_lustre_pv" {
-  default = true
-  type    = bool
 }
 # created variable for fss mounting
 variable "fss_mount_path" {
