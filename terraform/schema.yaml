@@ -983,7 +983,7 @@ variables:
     visible: nvme_raid_enabled
   create_lustre:
     title: Create Lustre FS
-    description: Provision a shared Lustre file system and a PV backed by the Lustre file system.
+    description: Provision a shared Lustre file system and a PV backed by the Lustre file system. The OS images used for the worker nodes must have the Lustre client installed.
     type: boolean
     default: false
     required: true
