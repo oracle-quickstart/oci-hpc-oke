@@ -96,7 +96,7 @@ Install the Network Operator with SR-IOV support:
 helm install network-operator nvidia/network-operator \
   -n nvidia-network-operator \
   --create-namespace \
-  --version v25.10.0 \
+  --version v26.1.0 \
   --set nfd.enabled=false \
   --set sriovNetworkOperator.enabled=true
 ```
