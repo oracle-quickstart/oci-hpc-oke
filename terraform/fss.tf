@@ -53,7 +53,7 @@ resource "oci_file_storage_export" "FSSExport" {
 }
 
 resource "kubernetes_persistent_volume_v1" "fss" {
-  count      = var.create_fss ? 1 : 0
+  count      = alltrue([var.create_fss, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [oci_file_storage_mount_target.fss_mt, module.oke]
   metadata {
     name = "fss-pv"

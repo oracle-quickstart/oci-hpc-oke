@@ -20,7 +20,6 @@ install_mpi_operator                           = false
 install_kueue                                  = false
 install_oci_hpc_oke_utils                      = false
 install_rdma_labeler                           = false
-install_lustre_client                          = false
 setup_alerting                                 = false
 
 worker_cpu_enabled  = false
