@@ -245,12 +245,11 @@ variableGroups:
     - fss_ad
     - fss_mount_path
     - create_lustre
+    - create_lustre_pv
     - lustre_ad
     - lustre_size_in_tb
     - lustre_performance_tier
-    - install_lustre_client
-    - lustre_client_helm_chart_version
-    - create_lustre_pv
+    - lustre_mount_path
 
   - title: "Monitoring & Observability"
     variables:
@@ -988,6 +987,13 @@ variables:
     default: false
     required: true
     visible: true
+  create_lustre_pv:
+    title: Create Lustre PV
+    description: Create a Kubernetes PersistentVolume backed by the Lustre file system.
+    type: boolean
+    default: true
+    required: true
+    visible: ${create_lustre}
   lustre_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
@@ -1013,25 +1019,13 @@ variables:
     default: 125
     required: ${create_lustre}
     visible: ${create_lustre}
-  install_lustre_client:
-    type: boolean
-    title: Install Lustre Client Helm Chart
-    description: Install the Lustre client Helm chart to install the Lustre client on the worker nodes. 
-    visible: ${create_lustre}
-  lustre_client_helm_chart_version:
-    title: Lustre client helm chart version
+  lustre_mount_path:
+    title: Lustre mount path
     type: string
-    default: "0.1.2"
-    visible: false
-  create_lustre_pv:
-    type: boolean
-    title: Create Lustre Persistent Volume
-    description: Create a Lustre persistent volume for the Lustre file system.
-    default: true
-    visible:
-      and:
-      - create_lustre
-      - install_lustre_client
+    default: "/mnt/oci-lustre"
+    description: Local directory where the Lustre file system will be mounted on worker nodes.
+    required: ${create_lustre}
+    visible: ${create_lustre}
 
   # Monitoring
   install_monitoring:

@@ -9,7 +9,7 @@ resource "oci_core_image" "imported_image" {
   for_each = toset(local.unique_image_urls)
 
   compartment_id = var.compartment_ocid
-  display_name   = format("%v-%v", element(split("/", each.value), length(split("/", each.value))-1), local.state_id) 
+  display_name   = format("%v-%v", element(split("/", each.value), length(split("/", each.value)) - 1), local.state_id)
 
   image_source_details {
     source_type = "objectStorageUri"
