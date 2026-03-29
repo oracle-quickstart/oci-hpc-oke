@@ -78,10 +78,8 @@ Install the GPU Operator with RDMA support enabled:
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v25.10.0 \
-  --set driver.enabled=false \
-  --set driver.rdma.enabled=true \
-  --set driver.rdma.useHostMofed=true
+  --version v26.3.0 \
+  --set driver.enabled=false
 ```
 
 Verify all GPU Operator pods are running:
