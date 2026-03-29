@@ -121,17 +121,17 @@ spec:
   nvIpam:
     image: nvidia-k8s-ipam
     repository: nvcr.io/nvidia/mellanox
-    version: network-operator-v25.10.0
+    version: network-operator-v26.1.0
     enableWebhook: false
   secondaryNetwork:
     cniPlugins:
       image: plugins
       repository: nvcr.io/nvidia/mellanox
-      version: network-operator-v25.10.0
+      version: network-operator-v26.1.0
     multus:
       image: multus-cni
       repository: nvcr.io/nvidia/mellanox
-      version: network-operator-v25.10.0
+      version: network-operator-v26.1.0
 EOF
 ```
 
