@@ -47,6 +47,10 @@ compute_client.list_compute_gpu_memory_fabrics(compartment_id="ocid1.tenancy.oc1
 oci compute compute-gpu-memory-fabric list --compartment-id $TENANCY_ID
 ```
 
+### Import the image
+
+Import one of the images [listed here for GB200s](https://github.com/oracle-quickstart/oci-hpc-oke?tab=readme-ov-file#bmgpugb2004-bmgpugb200-v34-bmgpugb3004).
+
 ### Create cloud-init
 Follow the instructions [here](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcloudinitforselfmanagednodes.htm#contengcloudinitforselfmanagednodes) for getting the API Server Host IP and CA cert.
 
@@ -235,10 +239,6 @@ oci compute compute-gpu-memory-cluster update \
 ```
 
 You can also delete a node from the console and the size will be automatically updated. 
-
-### Import the image
-
-Import one of the images [listed here for GB200s](https://github.com/oracle-quickstart/oci-hpc-oke?tab=readme-ov-file#bmgpugb2004-bmgpugb200-v34-bmgpugb3004).
 
 ### Delete the OCI GPU device plugin
 
