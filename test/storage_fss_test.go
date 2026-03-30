@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -63,13 +64,13 @@ func TestStorageFSS(t *testing.T) {
 	clusterID := terraform.Output(t, options, "cluster_id")
 	region := os.Getenv("OCI_REGION")
 	kubeconfigPath := generateKubeconfig(t, clusterID, region)
-	testFSSKubernetes(t, kubeconfigPath)
+	testFSSKubernetes(t, kubeconfigPath, options)
 }
 
 // testFSSKubernetes verifies PVC binding and shared filesystem write/read.
 // Both tests share one PVC because fss-pv uses the Retain reclaim policy —
 // after a PVC is deleted the PV enters Released state and cannot be rebound.
-func testFSSKubernetes(t *testing.T, kubeconfigPath string) {
+func testFSSKubernetes(t *testing.T, kubeconfigPath string, options *terraform.Options) {
 	t.Helper()
 	opts := k8s.NewKubectlOptions("", kubeconfigPath, "default")
 
@@ -104,6 +105,11 @@ metadata:
   name: fss-writer
 spec:
   restartPolicy: Never
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+  - key: amd.com/gpu
+    operator: Exists
   containers:
   - name: writer
     image: busybox
@@ -126,13 +132,28 @@ spec:
 		"--timeout=120s",
 	)
 
-	readerYAML := `
+	writerNodeRaw, err := k8s.RunKubectlAndGetOutputE(t, opts,
+		"get", "pod", "fss-writer",
+		"-o", "jsonpath={.spec.nodeName}",
+	)
+	require.NoError(t, err)
+	writerNode := strings.TrimSpace(writerNodeRaw)
+	require.NotEmpty(t, writerNode, "fss-writer pod should have a nodeName")
+	t.Logf("FSS writer ran on node: %s", writerNode)
+
+	readerYAML := fmt.Sprintf(`
 apiVersion: v1
 kind: Pod
 metadata:
   name: fss-reader
 spec:
   restartPolicy: Never
+  nodeName: %s
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+  - key: amd.com/gpu
+    operator: Exists
   containers:
   - name: reader
     image: busybox
@@ -144,7 +165,7 @@ spec:
   - name: fss
     persistentVolumeClaim:
       claimName: fss-test-pvc
-`
+`, writerNode)
 	k8s.KubectlApplyFromString(t, opts, readerYAML)
 	defer k8s.RunKubectl(t, opts, "delete", "pod", "fss-reader", "--ignore-not-found=true")
 
@@ -160,4 +181,51 @@ spec:
 	require.Contains(t, output, "fss-test-content",
 		"reader pod output should contain written content")
 	t.Log("FSS write/read test passed")
+
+	// OS-level mount check: read the file written via CSI using a hostPath pod on the same node
+	fssMountPath := terraform.Output(t, options, "fss_mount_path")
+	require.NotEmpty(t, fssMountPath)
+
+	hostpathReaderYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fss-hostpath-reader
+spec:
+  restartPolicy: Never
+  nodeName: %s
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+  - key: amd.com/gpu
+    operator: Exists
+  containers:
+  - name: reader
+    image: busybox
+    command: ["sh", "-c", "cat /mnt/fss-host/testfile.txt"]
+    volumeMounts:
+    - name: fss-host
+      mountPath: /mnt/fss-host
+  volumes:
+  - name: fss-host
+    hostPath:
+      path: %s
+      type: Directory
+`, writerNode, fssMountPath)
+
+	k8s.KubectlApplyFromString(t, opts, hostpathReaderYAML)
+	defer k8s.RunKubectl(t, opts, "delete", "pod", "fss-hostpath-reader", "--ignore-not-found=true")
+
+	t.Log("Waiting for FSS hostPath reader pod to complete")
+	k8s.RunKubectl(t, opts, "wait",
+		"--for=jsonpath={.status.phase}=Succeeded",
+		"pod/fss-hostpath-reader",
+		"--timeout=120s",
+	)
+
+	hostOutput, err := k8s.RunKubectlAndGetOutputE(t, opts, "logs", "fss-hostpath-reader")
+	require.NoError(t, err)
+	require.Contains(t, hostOutput, "fss-test-content",
+		"FSS hostPath reader should see the file written via CSI path")
+	t.Log("FSS OS-level mount (hostPath) test passed")
 }

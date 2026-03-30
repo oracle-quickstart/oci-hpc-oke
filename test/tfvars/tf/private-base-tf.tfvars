@@ -1,13 +1,10 @@
-create_bastion             = false
-bastion_is_public          = false
-create_operator            = false
-create_oci_bastion_service = true
-
+create_public_subnets         = false
 control_plane_is_public       = false
 preferred_kubernetes_services = "internal"
-create_public_subnets         = false
+cni_type                      = "VCN-Native Pod Networking"
 
-cni_type = "VCN-Native Pod Networking"
+create_bastion  = false
+create_operator = false
 
 create_fss    = false
 create_lustre = false
@@ -19,11 +16,11 @@ install_node_problem_detector_kube_prometheus_stack = false
 install_grafana                                     = false
 install_grafana_dashboards                          = false
 install_nvidia_dcgm_exporter                        = false
+install_amd_device_metrics_exporter                 = false
 install_mpi_operator                                = false
 install_kueue                                       = false
 install_oci_hpc_oke_utils                           = false
 install_rdma_labeler                                = false
-install_amd_device_metrics_exporter                 = false
 setup_alerting                                      = false
 
 worker_cpu_enabled  = false

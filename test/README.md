@@ -74,10 +74,14 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform) and `t
 | `tfvars/core/all-private.tfvars` | Fully private cluster |
 | `tfvars/core/all-private-operator.tfvars` | Fully private cluster with operator |
 | `tfvars/core/all-private-bastion-service.tfvars` | Fully private cluster with bastion service |
-| `tfvars/orm/all-public-orm.json` | ORM all-public topology |
-| `tfvars/orm/all-private-orm.json` | ORM all-private topology |
-| `tfvars/orm/all-private-bastion-service-orm.json` | ORM all-private with bastion service |
-| `tfvars/orm/all-public-monitoring-orm.json` | ORM all-public with monitoring stack |
+| `tfvars/orm/public-base-orm.json` | ORM public cluster, base topology |
+| `tfvars/orm/public-fss-monitoring-orm.json` | ORM public cluster with FSS and monitoring |
+| `tfvars/orm/public-lustre-orm.json` | ORM public cluster with Lustre |
+| `tfvars/orm/public-fss-lustre-monitoring-orm.json` | ORM public cluster with FSS, Lustre, and monitoring |
+| `tfvars/orm/private-base-orm.json` | ORM private cluster, base topology |
+| `tfvars/orm/private-fss-monitoring-orm.json` | ORM private cluster with FSS and monitoring |
+| `tfvars/orm/private-lustre-orm.json` | ORM private cluster with Lustre |
+| `tfvars/orm/private-fss-lustre-monitoring-orm.json` | ORM private cluster with FSS, Lustre, and monitoring |
 
 ## Optional suites
 Storage (FSS & Lustre):
@@ -94,6 +98,37 @@ Monitoring:
 ```sh
 RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
+
+## CI health checks and assertions
+
+The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. All checks run for public topologies only (kubectl must be reachable).
+
+**Cluster**
+- API server connectivity
+- All nodes Ready, count matches expected pool sizes (30 min timeout)
+- CoreDNS and kube-proxy pods Ready
+- All kube-system pods Running or Completed
+
+**Network**
+- Pod-to-pod connectivity (httpd server + wget client)
+- DNS resolution (`nslookup kubernetes.default.svc.cluster.local`)
+
+**GPU** (skipped if no GPU/RDMA pools)
+- `nvidia.com/gpu` or `amd.com/gpu` resources advertised on GPU nodes
+
+**Storage** (FSS/Lustre topologies only)
+- Output assertions: file system OCID, mount target IP / MGS address, NSG, subnet
+- CSI write/read: writer pod writes via PVC, reader pod reads back (pinned to same node)
+- OS-level mount: hostPath reader verifies cloud-init mount serves the same data (Lustre uses 60s retry for cache coherency)
+- ORM: Lustre PV state check (`kubectl_manifest.lustre_pv` in Terraform state)
+
+**Monitoring** (monitoring topologies only)
+- Grafana API responds 200
+- Dashboards exist (count > 0)
+- Prometheus queryable via Grafana (`up` query returns success)
+- Node-exporter DaemonSet desired == ready
+
+All test pods include `nvidia.com/gpu` and `amd.com/gpu` tolerations.
 
 ## Notes
 - The default suite (no `TFVARS_FILE`) sets `create_policies=false` to avoid tenancy-level policy creation. When using a var file, set this explicitly if needed.

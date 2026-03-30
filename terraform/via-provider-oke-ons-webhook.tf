@@ -2,13 +2,13 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "helm_release" "oke-ons-webhook" {
-  count             = alltrue([var.install_monitoring, var.setup_alerting, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
-  depends_on        = [helm_release.prometheus]
-  namespace         = var.monitoring_namespace
-  name              = "oke-ons-webhook"
-  chart             = "${path.module}/files/oke-ons-webhook"
-  version           = var.oke_ons_webhook_chart_version
-  set              = [
+  count      = alltrue([var.install_monitoring, var.setup_alerting, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  depends_on = [helm_release.prometheus]
+  namespace  = var.monitoring_namespace
+  name       = "oke-ons-webhook"
+  chart      = "${path.module}/files/oke-ons-webhook"
+  version    = var.oke_ons_webhook_chart_version
+  set = [
     {
       name  = "deploy.env.ONS_TOPIC_OCID"
       value = try(oci_ons_notification_topic.grafana_alerts[0].id, "")

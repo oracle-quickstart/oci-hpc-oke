@@ -101,6 +101,20 @@ var validationTestCases = []validationTestCase{
 		expectedError: "GB200/GB300 shapes",
 	},
 	{
+		// Reproduces oracle-quickstart/oci-hpc-oke#97: create_fss=true with no
+		// reachable deploy path should fail with a clear precondition error, not
+		// hang with an i/o timeout.
+		// deploy_to_oke_from_orm=true disables deploy_from_local and deploy_from_operator.
+		// current_user_ocid defaults to null so deploy_from_orm is also false,
+		// making all three deploy paths inactive and triggering fss_pv_unreachable.
+		name: "FSSPVUnreachable",
+		vars: map[string]interface{}{
+			"create_fss":            true,
+			"deploy_to_oke_from_orm": true,
+		},
+		expectedError: "fss_pv_unreachable",
+	},
+	{
 		name: "PodCapacityExceeded",
 		vars: map[string]interface{}{
 			// /30 subnet = 4 IPs - 3 reserved = 1 usable
@@ -132,7 +146,13 @@ func TestValidation(t *testing.T) {
 
 func assertPlanFailsWithError(t *testing.T, options *terraform.Options, expected string) {
 	t.Helper()
-	_, err := terraform.InitAndPlanE(t, options)
+	// Use zero retries so the exact terraform error output is returned directly.
+	// Retries wrap errors in MaxRetriesExceeded/FatalError, which drops the
+	// original terraform plan output and breaks require.Contains.
+	noRetry := *options
+	noRetry.MaxRetries = 0
+	noRetry.RetryableTerraformErrors = nil
+	_, err := terraform.InitAndPlanE(t, &noRetry)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), expected)
 }

@@ -3,7 +3,7 @@
 
 locals {
   lustre_subnet_cidr = (var.create_lustre ?
-    ( var.custom_subnet_ids ?
+    (var.custom_subnet_ids ?
       one(data.oci_core_subnet.lustre.*.cidr_block) :
       lookup(local.subnets["lustre"], "cidr", cidrsubnet(local.vcn_cidr, lookup(local.subnets["lustre"], "newbits"), lookup(local.subnets["lustre"], "netnum")))
     ) :
@@ -62,13 +62,13 @@ locals {
   }
 
   all_lustre_rules = !var.create_lustre ? {} : { for x, y in merge(
-      local.default_lustre_nsg_rules,
-      var.allow_rules_lustre
+    local.default_lustre_nsg_rules,
+    var.allow_rules_lustre
     ) : x => merge(y, {
-      description               = x
-      stateless                 = lookup(y, "stateless", false)
-      direction                 = contains(keys(y), "source") ? "INGRESS" : "EGRESS"
-      protocol                  = lookup(y, "protocol", "16")
+      description = x
+      stateless   = lookup(y, "stateless", false)
+      direction   = contains(keys(y), "source") ? "INGRESS" : "EGRESS"
+      protocol    = lookup(y, "protocol", "16")
       source = (
         alltrue([
           upper(lookup(y, "source_type", "")) == local.rule_type_nsg,
@@ -113,18 +113,18 @@ resource "oci_core_network_security_group" "lustre_nsg" {
 
 
 resource "oci_core_network_security_group_security_rule" "lustre_rules" {
-  for_each                  = var.create_lustre ? local.all_lustre_rules : {}
+  for_each = var.create_lustre ? local.all_lustre_rules : {}
 
   network_security_group_id = one(oci_core_network_security_group.lustre_nsg[*].id)
 
-  stateless                 = each.value.stateless
-  description               = each.value.description
-  destination               = each.value.destination
-  destination_type          = each.value.destination_type
-  direction                 = each.value.direction
-  protocol                  = each.value.protocol
-  source                    = each.value.source
-  source_type               = each.value.source_type
+  stateless        = each.value.stateless
+  description      = each.value.description
+  destination      = each.value.destination
+  destination_type = each.value.destination_type
+  direction        = each.value.direction
+  protocol         = each.value.protocol
+  source           = each.value.source
+  source_type      = each.value.source_type
 
   dynamic "tcp_options" {
     for_each = (tostring(each.value.protocol) == tostring(local.tcp_protocol) &&
