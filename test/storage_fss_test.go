@@ -103,6 +103,9 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: fss-writer
+  labels:
+    app.kubernetes.io/name: fss-test
+    app.kubernetes.io/component: writer
 spec:
   restartPolicy: Never
   tolerations:
@@ -141,14 +144,24 @@ spec:
 	require.NotEmpty(t, writerNode, "fss-writer pod should have a nodeName")
 	t.Logf("FSS writer ran on node: %s", writerNode)
 
-	readerYAML := fmt.Sprintf(`
+	readerYAML := `
 apiVersion: v1
 kind: Pod
 metadata:
   name: fss-reader
+  labels:
+    app.kubernetes.io/name: fss-test
+    app.kubernetes.io/component: reader
 spec:
   restartPolicy: Never
-  nodeName: %s
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: fss-test
+            app.kubernetes.io/component: writer
+        topologyKey: kubernetes.io/hostname
   tolerations:
   - key: nvidia.com/gpu
     operator: Exists
@@ -165,7 +178,7 @@ spec:
   - name: fss
     persistentVolumeClaim:
       claimName: fss-test-pvc
-`, writerNode)
+`
 	k8s.KubectlApplyFromString(t, opts, readerYAML)
 	defer k8s.RunKubectl(t, opts, "delete", "pod", "fss-reader", "--ignore-not-found=true")
 
