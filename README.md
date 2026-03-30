@@ -237,7 +237,8 @@ oci compute compute-gpu-memory-cluster update \
 You can also delete a node from the console and the size will be automatically updated. 
 
 ### Import the image
-https://objectstorage.us-ashburn-1.oraclecloud.com/p/D62MHqp6A_NlJ-UAK2Yo2tKnrosEHyJmUzRMme4Z6LvarsBfbEeydI-PwAa-nvGD/n/imagegen/b/GPU-imaging/o/Canonical-Ubuntu-22.04-aarch64-2025.07.24-0-OCA-OFED-24.10-1.1.4.0-GPU-570-OPEN-CUDA-12.8-2025.08.12-0
+
+Import one of the images [listed here for GB200s](https://github.com/oracle-quickstart/oci-hpc-oke?tab=readme-ov-file#bmgpugb2004-bmgpugb200-v34-bmgpugb3004).
 
 ### Delete the OCI GPU device plugin
 
