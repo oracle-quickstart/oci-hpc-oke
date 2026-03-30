@@ -8,11 +8,6 @@
   "create_operator": "false",
   "create_fss": "false",
   "create_lustre": "true",
-<<<<<<<< HEAD:test/tfvars/orm/all-private-lustre-orm.json
-  "install_lustre_client": "true",
-  "create_lustre_pv": "true",
-========
->>>>>>>> c6aadd5 (feat(ci): add local Terraform apply workflows and combined FSS+Lustre ORM topologies):test/tfvars/orm/private-lustre-orm.json
   "install_monitoring": "false",
   "install_node_problem_detector_kube_prometheus_stack": "false",
   "install_grafana": "false",
