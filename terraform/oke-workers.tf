@@ -20,7 +20,7 @@ locals {
   worker_cpu_image_type  = contains(["platform", "custom"], lower(var.worker_cpu_image_type)) ? "custom" : "oke"
   worker_cpu_image_id    = var.worker_cpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_cpu_image_custom_uri, {}), "id", null) : coalesce(var.worker_cpu_image_custom_id, var.worker_cpu_image_platform_id, "none")
   worker_gpu_image_type  = contains(["platform", "custom"], lower(var.worker_gpu_image_type)) ? "custom" : "oke"
-  worker_gpu_image_id    = var.worker_gpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_gpu_image_use_uri, {}), "id", null) : coalesce(var.worker_gpu_image_custom_id, var.worker_gpu_image_platform_id, "none")
+  worker_gpu_image_id    = var.worker_gpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_gpu_image_custom_uri, {}), "id", null) : coalesce(var.worker_gpu_image_custom_id, var.worker_gpu_image_platform_id, "none")
   worker_rdma_image_type = contains(["platform", "custom"], lower(var.worker_rdma_image_type)) ? "custom" : "oke"
   worker_rdma_image_id   = var.worker_rdma_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_rdma_image_custom_uri, {}), "id", null) : coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
 

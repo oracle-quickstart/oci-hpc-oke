@@ -76,16 +76,16 @@ output "pub_lb_nsg_id" { value = module.oke.pub_lb_nsg_id }
 output "pod_subnet_id" { value = module.oke.pod_subnet_id }
 output "pod_subnet_cidr" { value = module.oke.pod_subnet_cidr }
 output "pod_nsg_id" { value = module.oke.pod_nsg_id }
-output "lustre_subnet_id"                   { value = one(oci_core_subnet.lustre_subnet[*].id) }
-output "lustre_nsg_id"                      { value = one(oci_core_network_security_group.lustre_nsg[*].id) }
-output "lustre_file_system_id"              { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].id) }
-output "lustre_management_service_address"  { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].management_service_address) }
+output "lustre_subnet_id" { value = one(oci_core_subnet.lustre_subnet[*].id) }
+output "lustre_nsg_id" { value = one(oci_core_network_security_group.lustre_nsg[*].id) }
+output "lustre_file_system_id" { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].id) }
+output "lustre_management_service_address" { value = one(oci_lustre_file_storage_lustre_file_system.lustre[*].management_service_address) }
 output "fss_file_system_id" { value = one(oci_file_storage_file_system.fss[*].id) }
 output "fss_mount_target_ip" { value = one(data.oci_core_private_ip.fss_mt_ip[*].ip_address) }
 output "fss_export_path" { value = one(oci_file_storage_export.FSSExport[*].path) }
 output "fss_nsg_id" { value = module.oke.fss_nsg_id }
 output "fss_subnet_id" { value = module.oke.fss_subnet_id }
-output "fss_mount_path"    { value = var.fss_mount_path }
+output "fss_mount_path" { value = var.fss_mount_path }
 output "lustre_mount_path" { value = var.lustre_mount_path }
 
 # Workers
@@ -105,8 +105,8 @@ output "grafana_fetch_endpoint_command" {
 output "grafana_url" {
   value = var.install_node_problem_detector_kube_prometheus_stack ? (
     var.preferred_kubernetes_services == "public" ?
-    format("https://grafana.%s.%s", try(data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain) :
-    format("http://%s", try(data.kubernetes_service.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
+    format("https://grafana.%s.%s", try(data.kubernetes_service_v1.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain) :
+    format("http://%s", try(data.kubernetes_service_v1.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
   ) : "N/A"
 }
 
