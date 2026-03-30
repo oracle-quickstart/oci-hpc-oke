@@ -65,7 +65,7 @@ Monitoring example:
 TFVARS_FILE=./tfvars/base/base.tfvars,./tfvars/monitoring/monitoring.tfvars go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
 
-Pre-built topology configs are available under `tfvars/core/` (Terraform) and `tfvars/orm/` (ORM JSON):
+Pre-built topology configs are available under `tfvars/core/` (Terraform core), `tfvars/tf/` (Terraform topologies), and `tfvars/orm/` (ORM JSON):
 
 | Path | Description |
 |------|-------------|
@@ -74,6 +74,14 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform) and `t
 | `tfvars/core/all-private.tfvars` | Fully private cluster |
 | `tfvars/core/all-private-operator.tfvars` | Fully private cluster with operator |
 | `tfvars/core/all-private-bastion-service.tfvars` | Fully private cluster with bastion service |
+| `tfvars/tf/public-base-tf.tfvars` | TF public cluster, base topology |
+| `tfvars/tf/public-bastion-operator-tf.tfvars` | TF public cluster with bastion and operator |
+| `tfvars/tf/public-fss-monitoring-tf.tfvars` | TF public cluster with FSS and monitoring |
+| `tfvars/tf/public-lustre-tf.tfvars` | TF public cluster with Lustre |
+| `tfvars/tf/private-base-tf.tfvars` | TF private cluster, base topology |
+| `tfvars/tf/private-bastion-operator-tf.tfvars` | TF private cluster with bastion and operator |
+| `tfvars/tf/private-fss-monitoring-tf.tfvars` | TF private cluster with FSS and monitoring |
+| `tfvars/tf/private-lustre-tf.tfvars` | TF private cluster with Lustre |
 | `tfvars/orm/public-base-orm.json` | ORM public cluster, base topology |
 | `tfvars/orm/public-fss-monitoring-orm.json` | ORM public cluster with FSS and monitoring |
 | `tfvars/orm/public-lustre-orm.json` | ORM public cluster with Lustre |
@@ -101,32 +109,70 @@ RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 
 ## CI health checks and assertions
 
-The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. All checks run for public topologies only (kubectl must be reachable).
+The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health checks run for public topologies only (kubectl must be reachable). Output assertions run for all topologies.
 
-**Cluster**
-- API server connectivity
-- All nodes Ready, count matches expected pool sizes (30 min timeout)
+### Output assertions
+
+**All topologies:**
+- `cluster_id`, `vcn_id`, `worker_subnet_id`, `worker_nsg_id`, `control_plane_subnet_id`, `control_plane_nsg_id`, `int_lb_subnet_id`, `int_lb_nsg_id`, `worker_ops_pool_id` are valid OCIDs
+- `cluster_private_endpoint` starts with `https://`
+
+**Public topologies (`public-*`):**
+- `cluster_public_endpoint` starts with `https://`
+- `pub_lb_subnet_id`, `pub_lb_nsg_id` are valid OCIDs
+
+**Private topologies (`private-*`):**
+- `cluster_public_endpoint` is empty
+
+**FSS topologies (`*fss*`):**
+- `fss_file_system_id`, `fss_nsg_id`, `fss_subnet_id` are valid OCIDs
+- `fss_mount_target_ip` is a valid IPv4
+- `fss_export_path` matches `/oke-gpu-*`
+- FSS PersistentVolume resource exists in state (ORM: `kubernetes_persistent_volume_v1.fss`)
+
+**Lustre topologies (`*lustre*`):**
+- `lustre_subnet_id`, `lustre_nsg_id`, `lustre_file_system_id` are valid OCIDs
+- `lustre_management_service_address` is a valid IPv4
+- Lustre PersistentVolume resource exists in state (ORM: `kubectl_manifest.lustre_pv`)
+
+**Monitoring topologies (`*monitoring*`):**
+- `pub_lb_subnet_id`, `pub_lb_nsg_id` are valid OCIDs
+- `grafana_url` starts with `http`
+- `grafana_admin_password` is not empty
+
+### Health checks (public topologies only)
+
+**Cluster:**
+- API server connectivity (`kubectl cluster-info`)
+- Node count matches expected pool sizes (30 min timeout, polls every 30s)
+- All nodes Ready
 - CoreDNS and kube-proxy pods Ready
 - All kube-system pods Running or Completed
 
-**Network**
-- Pod-to-pod connectivity (httpd server + wget client)
+**Network:**
+- Pod-to-pod connectivity (httpd server pod + wget client pod)
 - DNS resolution (`nslookup kubernetes.default.svc.cluster.local`)
 
-**GPU** (skipped if no GPU/RDMA pools)
-- `nvidia.com/gpu` or `amd.com/gpu` resources advertised on GPU nodes
+**GPU** (skipped if no GPU/RDMA pools)**:**
+- `nvidia.com/gpu` or `amd.com/gpu` resources advertised on nodes
 
-**Storage** (FSS/Lustre topologies only)
-- Output assertions: file system OCID, mount target IP / MGS address, NSG, subnet
-- CSI write/read: writer pod writes via PVC, reader pod reads back (pinned to same node)
-- OS-level mount: hostPath reader verifies cloud-init mount serves the same data (Lustre uses 60s retry for cache coherency)
-- ORM: Lustre PV state check (`kubectl_manifest.lustre_pv` in Terraform state)
+**FSS** (`*fss*` topologies only)**:**
+- PVC binds to `fss-pv`
+- CSI write: writer pod writes file via PVC
+- CSI read: reader pod reads back on same node
+- OS-level mount: hostPath reader verifies cloud-init NFS mount serves the same data
 
-**Monitoring** (monitoring topologies only)
-- Grafana API responds 200
+**Lustre** (`*lustre*` topologies only)**:**
+- PVC binds to `lustre-pv`
+- CSI write: writer pod writes file via PVC
+- CSI read: reader pod reads back on same node
+- OS-level mount: hostPath reader verifies cloud-init Lustre mount (60s retry loop for cache coherency)
+
+**Monitoring** (`*monitoring*` topologies only)**:**
+- Grafana API responds 200 (up to 30 retries in ORM, 60 in TF)
 - Dashboards exist (count > 0)
-- Prometheus queryable via Grafana (`up` query returns success)
-- Node-exporter DaemonSet desired == ready
+- Prometheus queryable via Grafana (`up` query returns `success`)
+- node-exporter DaemonSet desired == ready
 
 All test pods include `nvidia.com/gpu` and `amd.com/gpu` tolerations.
 
