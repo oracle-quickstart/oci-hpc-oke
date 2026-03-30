@@ -96,6 +96,9 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: lustre-writer
+  labels:
+    app.kubernetes.io/name: lustre-test
+    app.kubernetes.io/component: writer
 spec:
   restartPolicy: Never
   tolerations:
@@ -134,14 +137,24 @@ spec:
 	require.NotEmpty(t, writerNode, "lustre-writer pod should have a nodeName")
 	t.Logf("Lustre writer ran on node: %s", writerNode)
 
-	readerYAML := fmt.Sprintf(`
+	readerYAML := `
 apiVersion: v1
 kind: Pod
 metadata:
   name: lustre-reader
+  labels:
+    app.kubernetes.io/name: lustre-test
+    app.kubernetes.io/component: reader
 spec:
   restartPolicy: Never
-  nodeName: %s
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: lustre-test
+            app.kubernetes.io/component: writer
+        topologyKey: kubernetes.io/hostname
   tolerations:
   - key: nvidia.com/gpu
     operator: Exists
@@ -158,7 +171,7 @@ spec:
   - name: lustre
     persistentVolumeClaim:
       claimName: lustre-test-pvc
-`, writerNode)
+`
 	k8s.KubectlApplyFromString(t, opts, readerYAML)
 	defer k8s.RunKubectl(t, opts, "delete", "pod", "lustre-reader", "--ignore-not-found=true")
 

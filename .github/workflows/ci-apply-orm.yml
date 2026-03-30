@@ -97,6 +97,15 @@ jobs:
           # words[0] = /ok-to-run-apply-orm, words[1] = topology, words[2+] = key=value
           topology="${words[1]:-public-fss-monitoring-orm}"
 
+          case "$topology" in
+            public-base-orm|public-fss-monitoring-orm|public-lustre-orm|public-fss-lustre-monitoring-orm|private-base-orm|private-fss-monitoring-orm|private-lustre-orm|private-fss-lustre-monitoring-orm)
+              ;;
+            *)
+              echo "Unsupported ORM topology: $topology"
+              exit 1
+              ;;
+          esac
+
           # Build overrides JSON from key=value pairs using jq for safe escaping
           overrides='{}'
           for word in "${words[@]:2}"; do
@@ -677,6 +686,9 @@ jobs:
           kind: Pod
           metadata:
             name: fss-writer
+            labels:
+              app.kubernetes.io/name: fss-test
+              app.kubernetes.io/component: writer
           spec:
             restartPolicy: Never
             tolerations:
@@ -707,9 +719,19 @@ jobs:
           kind: Pod
           metadata:
             name: fss-reader
+            labels:
+              app.kubernetes.io/name: fss-test
+              app.kubernetes.io/component: reader
           spec:
             restartPolicy: Never
-            nodeName: ${FSS_WRITER_NODE}
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: fss-test
+                      app.kubernetes.io/component: writer
+                  topologyKey: kubernetes.io/hostname
             tolerations:
             - key: nvidia.com/gpu
               operator: Exists
@@ -802,6 +824,9 @@ jobs:
           kind: Pod
           metadata:
             name: lustre-writer
+            labels:
+              app.kubernetes.io/name: lustre-test
+              app.kubernetes.io/component: writer
           spec:
             restartPolicy: Never
             tolerations:
@@ -832,9 +857,19 @@ jobs:
           kind: Pod
           metadata:
             name: lustre-reader
+            labels:
+              app.kubernetes.io/name: lustre-test
+              app.kubernetes.io/component: reader
           spec:
             restartPolicy: Never
-            nodeName: ${LUSTRE_WRITER_NODE}
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: lustre-test
+                      app.kubernetes.io/component: writer
+                  topologyKey: kubernetes.io/hostname
             tolerations:
             - key: nvidia.com/gpu
               operator: Exists

@@ -89,6 +89,15 @@ jobs:
 
           topology="${words[1]:-public-fss-monitoring-orm}"
 
+          case "$topology" in
+            public-base-orm|public-fss-monitoring-orm|public-lustre-orm|public-fss-lustre-monitoring-orm|private-base-orm|private-fss-monitoring-orm|private-lustre-orm|private-fss-lustre-monitoring-orm)
+              ;;
+            *)
+              echo "Unsupported ORM topology: $topology"
+              exit 1
+              ;;
+          esac
+
           overrides='{}'
           for word in "${words[@]:2}"; do
             if [[ "$word" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.+$ ]]; then

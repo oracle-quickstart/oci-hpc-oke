@@ -39,11 +39,11 @@ resource "helm_release" "prometheus" {
     },
     {
       name  = "grafana.ingress.hosts[0]",
-      value = "grafana.${data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
+      value = "grafana.${data.kubernetes_service_v1.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].hosts[0]",
-      value = "grafana.${data.kubernetes_service.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
+      value = "grafana.${data.kubernetes_service_v1.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip}.${var.wildcard_dns_domain}"
     },
     {
       name  = "grafana.ingress.tls[0].secretName",
@@ -107,7 +107,7 @@ resource "time_sleep" "wait_for_lb_provisioning" {
   create_duration = "60s"
 }
 
-data "kubernetes_service" "grafana_internal_ip" {
+data "kubernetes_service_v1" "grafana_internal_ip" {
   count = alltrue([anytrue([local.deploy_from_orm, local.deploy_from_local]), var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services != "public"]) ? 1 : 0
 
   depends_on = [time_sleep.wait_for_lb_provisioning]
