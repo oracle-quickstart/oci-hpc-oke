@@ -151,7 +151,7 @@ jobs:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           OCI_API_KEY_FINGERPRINT: ${{ secrets.OCI_API_KEY_FINGERPRINT }}
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.oci
@@ -173,7 +173,7 @@ jobs:
       - name: Build variables JSON
         env:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
@@ -218,7 +218,7 @@ jobs:
       - name: Create ORM stack
         shell: python3 {0}
         env:
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
@@ -480,7 +480,7 @@ jobs:
 
       - name: Generate kubeconfig
         env:
-          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
         run: |
           CLUSTER_ID=$(jq -r '.outputs.cluster_id.value' state.json)
           mkdir -p "$HOME/.kube"
@@ -573,13 +573,20 @@ jobs:
           kubectl wait --for=condition=Ready pods -l k8s-app=kube-proxy -n kube-system --timeout=120s
 
           echo "Health check: all kube-system pods healthy"
-          BAD_PODS=$(kubectl get pods -n kube-system --no-headers | grep -v -E 'Running|Completed' || true)
-          if [ -n "$BAD_PODS" ]; then
-            echo "FAIL: unhealthy pods in kube-system:"
-            echo "$BAD_PODS"
-            exit 1
-          fi
-          echo "OK:   all kube-system pods are Running or Completed"
+          for i in $(seq 1 20); do
+            BAD_PODS=$(kubectl get pods -n kube-system --no-headers | grep -v -E 'Running|Completed' || true)
+            if [ -z "$BAD_PODS" ]; then
+              echo "OK:   all kube-system pods are Running or Completed"
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "FAIL: unhealthy pods in kube-system after 5 minutes:"
+              echo "$BAD_PODS"
+              exit 1
+            fi
+            echo "  waiting for pods to be ready (attempt $i/20)..."
+            sleep 15
+          done
 
           echo "Health check: all cluster health checks passed"
 
