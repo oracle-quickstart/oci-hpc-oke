@@ -1,9 +1,20 @@
 #!/bin/bash
+set -euo pipefail
+
+if [ $# -lt 3 ]; then
+  echo "Usage: $0 <export_path> <mount_point> <mount_target_ip>" >&2
+  exit 1
+fi
 
 # Variables (set these to your OCI FSS details)
-MOUNT_TARGET_IP="$3"     # IP address of OCI FSS mount target
-EXPORT_PATH="$1"      # Export path of FSS (from OCI Console)
+EXPORT_PATH="$1"         # Export path of FSS (from OCI Console)
 MOUNT_POINT="$2"         # Local directory to mount FSS
+MOUNT_TARGET_IP="$3"     # IP address of OCI FSS mount target
+
+if [ -z "$EXPORT_PATH" ] || [ -z "$MOUNT_POINT" ] || [ -z "$MOUNT_TARGET_IP" ]; then
+  echo "Error: export_path, mount_point, and mount_target_ip must not be empty" >&2
+  exit 1
+fi
 
 # Install NFS utils on yum or apt-get systems
 if command -v yum >/dev/null 2>&1; then

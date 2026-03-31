@@ -38,6 +38,8 @@ apiVersion: kubeflow.org/v2beta1
 kind: MPIJob
 metadata:
   name: rccl-tests
+  labels:
+    kueue.x-k8s.io/queue-name: bm-gpu-mi355x-8-rccl-tests
 spec:
   slotsPerWorker: 8
   runPolicy:
