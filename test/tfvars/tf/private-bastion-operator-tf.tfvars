@@ -3,9 +3,10 @@ control_plane_is_public       = false
 preferred_kubernetes_services = "internal"
 cni_type                      = "VCN-Native Pod Networking"
 
-create_bastion    = true
-bastion_is_public = false
-create_operator   = true
+create_bastion             = true
+bastion_is_public          = false
+create_operator            = true
+create_oci_bastion_service = true
 
 create_fss    = false
 create_lustre = false

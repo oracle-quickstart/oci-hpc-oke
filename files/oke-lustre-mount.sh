@@ -1,8 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
+if [ $# -lt 3 ]; then
+  echo "Usage: $0 <lustre_ip> <lustre_fs_name> <mount_point>" >&2
+  exit 1
+fi
 
 LUSTRE_IP="$1"
 LUSTRE_FS_NAME="$2"
 MOUNT_POINT="$3"
+
+if [ -z "$LUSTRE_IP" ] || [ -z "$LUSTRE_FS_NAME" ] || [ -z "$MOUNT_POINT" ]; then
+  echo "Error: lustre_ip, lustre_fs_name, and mount_point must not be empty" >&2
+  exit 1
+fi
 
 if ! modinfo lnet >/dev/null 2>&1; then
   echo "Lustre client (lnet kernel module) is not available on this node; skipping mount"

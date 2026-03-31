@@ -171,7 +171,7 @@ Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
 ### Deploy MPI Operator and Kueue
 
 ```sh
-kubectl apply --server-side -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/mpi-operator/manifests/mpi-operator/mpi-operator.yaml
+kubectl apply --server-side -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/mpi-operator/mpi-operator.yaml
 
 helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
 ```

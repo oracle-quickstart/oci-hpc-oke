@@ -10,7 +10,7 @@ spec:
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
-  name: bm-gpu-gb200-4-nccl-tests-queue
+  name: bm-gpu-gb200-v2-4-nccl-tests-queue
 spec:
   namespaceSelector: {}
   resourceGroups:
@@ -32,7 +32,7 @@ kind: LocalQueue
 metadata:
   name: bm-gpu-gb200-v2.4-nccl-tests
 spec:
-  clusterQueue: bm-gpu-gb200-4-nccl-tests-queue
+  clusterQueue: bm-gpu-gb200-v2-4-nccl-tests-queue
 ---
 apiVersion: resource.nvidia.com/v1beta1
 kind: ComputeDomain

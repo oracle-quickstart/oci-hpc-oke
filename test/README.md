@@ -78,18 +78,18 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform core), 
 | `tfvars/tf/public-bastion-operator-tf.tfvars` | TF public cluster with bastion and operator |
 | `tfvars/tf/public-fss-monitoring-tf.tfvars` | TF public cluster with FSS and monitoring |
 | `tfvars/tf/public-lustre-tf.tfvars` | TF public cluster with Lustre |
-| `tfvars/tf/private-base-tf.tfvars` | TF private cluster, base topology |
-| `tfvars/tf/private-bastion-operator-tf.tfvars` | TF private cluster with bastion and operator |
-| `tfvars/tf/private-fss-monitoring-tf.tfvars` | TF private cluster with FSS and monitoring |
-| `tfvars/tf/private-lustre-tf.tfvars` | TF private cluster with Lustre |
+| `tfvars/tf/private-base-tf.tfvars` | TF private cluster with bastion service |
+| `tfvars/tf/private-bastion-operator-tf.tfvars` | TF private cluster with bastion VM, operator, and bastion service |
+| `tfvars/tf/private-fss-monitoring-tf.tfvars` | TF private cluster with FSS, monitoring, and bastion service |
+| `tfvars/tf/private-lustre-tf.tfvars` | TF private cluster with Lustre and bastion service |
 | `tfvars/orm/public-base-orm.json` | ORM public cluster, base topology |
 | `tfvars/orm/public-fss-monitoring-orm.json` | ORM public cluster with FSS and monitoring |
 | `tfvars/orm/public-lustre-orm.json` | ORM public cluster with Lustre |
 | `tfvars/orm/public-fss-lustre-monitoring-orm.json` | ORM public cluster with FSS, Lustre, and monitoring |
-| `tfvars/orm/private-base-orm.json` | ORM private cluster, base topology |
-| `tfvars/orm/private-fss-monitoring-orm.json` | ORM private cluster with FSS and monitoring |
-| `tfvars/orm/private-lustre-orm.json` | ORM private cluster with Lustre |
-| `tfvars/orm/private-fss-lustre-monitoring-orm.json` | ORM private cluster with FSS, Lustre, and monitoring |
+| `tfvars/orm/private-base-orm.json` | ORM private cluster with bastion service |
+| `tfvars/orm/private-fss-monitoring-orm.json` | ORM private cluster with FSS, monitoring, and bastion service |
+| `tfvars/orm/private-lustre-orm.json` | ORM private cluster with Lustre and bastion service |
+| `tfvars/orm/private-fss-lustre-monitoring-orm.json` | ORM private cluster with FSS, Lustre, monitoring, and bastion service |
 
 ## Optional suites
 Storage (FSS & Lustre):
@@ -109,7 +109,7 @@ RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 
 ## CI health checks and assertions
 
-The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health checks run for public topologies only (kubectl must be reachable). Output assertions run for all topologies.
+The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health checks run for all topologies. Public topologies connect to the API server directly; private topologies tunnel through OCI Bastion Service using an ephemeral SSH keypair generated at runtime. Output assertions also run for all topologies.
 
 ### Output assertions
 
@@ -123,6 +123,8 @@ The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following
 
 **Private topologies (`private-*`):**
 - `cluster_public_endpoint` is empty
+- `bastion_service_id` is a valid OCID
+- `oke_private_endpoint_ip` is a valid IPv4
 
 **FSS topologies (`*fss*`):**
 - `fss_file_system_id`, `fss_nsg_id`, `fss_subnet_id` are valid OCIDs
@@ -140,7 +142,7 @@ The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following
 - `grafana_url` starts with `http`
 - `grafana_admin_password` is not empty
 
-### Health checks (public topologies only)
+### Health checks (all topologies)
 
 **Cluster:**
 - API server connectivity (`kubectl cluster-info`)
@@ -179,4 +181,5 @@ All test pods include `nvidia.com/gpu` and `amd.com/gpu` tolerations.
 ## Notes
 - The default suite (no `TFVARS_FILE`) sets `create_policies=false` to avoid tenancy-level policy creation. When using a var file, set this explicitly if needed.
 - For instance principal runs, set `OCI_CLI_AUTH=instance_principal` when using monitoring tests so the `oci` CLI can authenticate.
-- Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`) are required to run those tests; missing flags will fail the test run.
+- Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`) are required to run those tests; missing flags will skip the test.
+- Private topologies use OCI Bastion Service for CI health checks. The CI runner generates an ephemeral SSH keypair, creates a bastion port-forwarding session, and tunnels kubectl through it. No stored SSH keys are needed.
