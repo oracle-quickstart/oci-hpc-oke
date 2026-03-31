@@ -17,10 +17,8 @@ The following policies are required. The OCI Resource Manager stack will create 
 
 You will need a CPU pool and a GPU pool. The OCI Resource Manager stack deploys a system worker pool by default, and you can choose to deploy additional CPU/GPU worker pools.
 
-You can use the following images for both CPU and GPU pools.
-
 > [!NOTE]  
-> The GPU image has the GPU drivers pre-installed.
+> Use the images listed below for **all** worker pools in the cluster (system, CPU, GPU, and RDMA). These images include GPU drivers, the Lustre client, and other components required by this stack.
 
 ### Images to Use
 
