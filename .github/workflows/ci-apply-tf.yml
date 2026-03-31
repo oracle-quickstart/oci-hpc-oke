@@ -166,6 +166,12 @@ jobs:
           printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
 
+      - name: Generate ephemeral SSH key for bastion tunnel
+        if: startsWith(env.TOPOLOGY, 'private')
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t rsa -b 4096 -f ~/.ssh/bastion_key -N "" -q
+
       - name: Cache Terraform providers
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
         with:
@@ -394,21 +400,51 @@ jobs:
           [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Generate kubeconfig
-        if: startsWith(env.TOPOLOGY, 'public')
         env:
           OCI_REGION: ${{ secrets.OCI_REGION }}
         run: |
           CLUSTER_ID=$(jq -r '.cluster_id.value' state.json)
           mkdir -p "$HOME/.kube"
-          oci ce cluster create-kubeconfig \
-            --cluster-id "$CLUSTER_ID" \
-            --file "$HOME/.kube/config" \
-            --region "$OCI_REGION" \
-            --token-version 2.0.0 \
-            --kube-endpoint PUBLIC_ENDPOINT
+
+          if [[ "$TOPOLOGY" == public* ]]; then
+            oci ce cluster create-kubeconfig \
+              --cluster-id "$CLUSTER_ID" \
+              --file "$HOME/.kube/config" \
+              --region "$OCI_REGION" \
+              --token-version 2.0.0 \
+              --kube-endpoint PUBLIC_ENDPOINT
+          else
+            BASTION_ID=$(jq -r '.bastion_service_id.value // empty' state.json)
+            ENDPOINT_IP=$(jq -r '.oke_private_endpoint_ip.value // empty' state.json)
+
+            if [ -z "$BASTION_ID" ] || [ -z "$ENDPOINT_IP" ]; then
+              echo "FAIL: bastion_service_id or oke_private_endpoint_ip is empty -- is create_oci_bastion_service enabled?"
+              exit 1
+            fi
+
+            ./files/oke-bastion-service-session.sh \
+              --bastion-ocid "$BASTION_ID" \
+              --cluster-ocid "$CLUSTER_ID" \
+              --oke-endpoint-ip "$ENDPOINT_IP" \
+              --region "$OCI_REGION" \
+              --ssh-key ~/.ssh/bastion_key \
+              --local-port 6443 \
+              --ttl-seconds 10800 \
+              --auto-tunnel \
+              --non-interactive
+
+            BASTION_KCFG="$HOME/.kube/oke-bastion/${CLUSTER_ID}.yaml"
+            if [ ! -f "$BASTION_KCFG" ]; then
+              echo "ERROR: bastion script did not produce kubeconfig at $BASTION_KCFG"
+              ls -la "$HOME/.kube/oke-bastion/" || true
+              exit 1
+            fi
+            cp "$BASTION_KCFG" "$HOME/.kube/config"
+            echo "Verifying tunnel connectivity..."
+            kubectl --kubeconfig "$HOME/.kube/config" cluster-info
+          fi
 
       - name: Cluster health checks
-        if: startsWith(env.TOPOLOGY, 'public')
         run: |
           echo "Health check: API server connectivity"
           kubectl cluster-info
@@ -465,7 +501,6 @@ jobs:
           echo "Health check: all cluster health checks passed"
 
       - name: Network health checks
-        if: startsWith(env.TOPOLOGY, 'public')
         run: |
           echo "Health check: pod-to-pod connectivity"
           kubectl apply -f - <<'EOF'
@@ -545,7 +580,6 @@ jobs:
           echo "Health check: all network health checks passed"
 
       - name: GPU resource health checks
-        if: startsWith(env.TOPOLOGY, 'public')
         run: |
           GPU_POOL_ID=$(jq -r '.worker_gpu_pool_id.value // empty' state.json)
           RDMA_POOL_ID=$(jq -r '.worker_rdma_pool_id.value // empty' state.json)
@@ -576,7 +610,7 @@ jobs:
           echo "OK:   GPU resources advertised on nodes"
 
       - name: FSS health checks
-        if: startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'fss')
+        if: contains(env.TOPOLOGY, 'fss')
         run: |
           echo "Health check: PVC binding"
           kubectl apply -f - <<'EOF'
@@ -712,7 +746,7 @@ jobs:
           echo "Health check: all FSS health checks passed"
 
       - name: Lustre health checks
-        if: startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'lustre')
+        if: contains(env.TOPOLOGY, 'lustre')
         run: |
           echo "Health check: PVC binding"
           kubectl apply -f - <<'EOF'
@@ -850,7 +884,7 @@ jobs:
           echo "Health check: all Lustre health checks passed"
 
       - name: Monitoring health checks
-        if: startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'monitoring')
+        if: contains(env.TOPOLOGY, 'monitoring')
         run: |
           GRAFANA_URL=$(jq -r '.grafana_url.value' state.json)
           GRAFANA_PASS=$(jq -r '.grafana_admin_password.value' state.json)
@@ -896,14 +930,14 @@ jobs:
           echo "Health check: all monitoring health checks passed"
 
       - name: Clean up network test resources
-        if: always() && startsWith(env.TOPOLOGY, 'public')
+        if: always()
         run: |
           if [ -f "$HOME/.kube/config" ]; then
             kubectl delete pod net-server net-client dns-checker --ignore-not-found --wait=true --timeout=60s || true
           fi
 
       - name: Clean up FSS test resources
-        if: always() && startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'fss')
+        if: always() && contains(env.TOPOLOGY, 'fss')
         run: |
           if [ -f "$HOME/.kube/config" ]; then
             kubectl delete pod fss-writer fss-reader fss-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
@@ -911,12 +945,26 @@ jobs:
           fi
 
       - name: Clean up Lustre test resources
-        if: always() && startsWith(env.TOPOLOGY, 'public') && contains(env.TOPOLOGY, 'lustre')
+        if: always() && contains(env.TOPOLOGY, 'lustre')
         run: |
           if [ -f "$HOME/.kube/config" ]; then
             kubectl delete pod lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
             kubectl delete pvc lustre-test-pvc --ignore-not-found --wait=true --timeout=120s || true
           fi
+
+      - name: Tear down bastion tunnel
+        if: always() && startsWith(env.TOPOLOGY, 'private')
+        run: |
+          for pidfile in /tmp/oke-bastion-tunnel-*.pid; do
+            [ -f "$pidfile" ] || continue
+            PID=$(cat "$pidfile")
+            if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+              kill "$PID" 2>/dev/null || true
+              echo "Killed SSH tunnel (PID: $PID)"
+            fi
+            rm -f "$pidfile"
+          done
+          rm -f "$HOME/.kube/config" "$HOME/.kube/oke-bastion/"*.yaml 2>/dev/null || true
 
       - name: Destroy
         if: always()
