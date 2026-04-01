@@ -81,6 +81,8 @@ spec:
                   fieldPath: spec.nodeName
             - name: INTERVAL
               value: {{ .Values.labeler.interval | quote }}
+            - name: HOST_INTERVAL
+              value: {{ .Values.labeler.hostInterval | quote }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]

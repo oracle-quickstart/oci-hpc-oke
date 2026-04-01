@@ -21,6 +21,7 @@ labeler:
   podAnnotations: {}
   podLabels: {}
   interval: 300
+  hostInterval: 900
   resources:
     requests:
       cpu: 10m

@@ -12,15 +12,19 @@ data:
     # requires-python = ">=3.12"
     # dependencies = [
     #     "kubernetes>=31.0.0",
+    #     "oci>=2.169.0",
     #     "requests>=2.32.0",
     # ]
     # ///
 
     import logging
     import os
+    import random
+    import re
     import time
     from pathlib import Path
 
+    import oci
     import requests
     from kubernetes import client, config
 
@@ -45,6 +49,9 @@ data:
         "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
     }
 
+    # Cached compute host ID to avoid repeated list+paginate lookups
+    _cached_compute_host_id: str | None = None
+
 
     def _imds_get(path: str) -> requests.Response | None:
         try:
@@ -56,6 +63,149 @@ data:
         except requests.RequestException:
             log.warning("IMDS request failed for %s%s", IMDS_BASE, path)
             return None
+
+
+    def _is_throttled(exc: Exception) -> bool:
+        """Check if an OCI exception is a 429 TooManyRequests."""
+        return isinstance(exc, oci.exceptions.ServiceError) and exc.status == 429
+
+
+    def _oci_call_with_backoff(func, *args, max_retries: int = 3, **kwargs):
+        """Call an OCI SDK function with exponential backoff on throttling."""
+        for attempt in range(max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                if _is_throttled(exc) and attempt < max_retries:
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    log.warning("OCI API throttled (429), retrying in %.1fs (attempt %d/%d)", wait, attempt + 1, max_retries)
+                    time.sleep(wait)
+                    continue
+                raise
+
+
+    def _find_compute_host_id(compute_client: oci.core.ComputeClient, tenant_id: str, instance_id: str) -> str | None:
+        """Find the compute host ID for this instance by paginating through list_compute_hosts."""
+        global _cached_compute_host_id
+        if _cached_compute_host_id:
+            return _cached_compute_host_id
+
+        page = None
+        while True:
+            kwargs = {"compartment_id": tenant_id, "limit": 100}
+            if page:
+                kwargs["page"] = page
+            result = _oci_call_with_backoff(compute_client.list_compute_hosts, **kwargs)
+            for h in result.data.items:
+                if h.instance_id == instance_id:
+                    _cached_compute_host_id = h.id
+                    return h.id
+            page = result.next_page
+            if not page:
+                break
+        return None
+
+
+    def _firmware_bundle_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str) -> dict[str, str]:
+        """Fetch firmware component versions from the firmware bundle and return as labels."""
+        try:
+            bundle = _oci_call_with_backoff(compute_client.get_firmware_bundle, firmware_bundle_id=firmware_bundle_id).data
+        except Exception:
+            log.exception("Failed to get firmware bundle %s", firmware_bundle_id)
+            return {}
+
+        labels = {}
+
+        # Bundle version from description (e.g. "Release for ...; update to 1.3.5; Passthrough")
+        if bundle.description:
+            m = re.search(r"update to (\S+)", bundle.description)
+            if m:
+                labels["oci.oraclecloud.com/host.fw.bundle_version"] = m.group(1).rstrip(";")
+
+        # Component versions per platform
+        for platform_entry in bundle.platforms or []:
+            platform_name = platform_entry.platform or ""
+            is_switch = platform_name != host_platform
+
+            for cv in platform_entry.versions or []:
+                component = cv.component_type.lower()
+                if not cv.version:
+                    continue
+                version = "_".join(cv.version)
+
+                if is_switch:
+                    key = f"oci.oraclecloud.com/host.fw.switch.{component}"
+                else:
+                    key = f"oci.oraclecloud.com/host.fw.{component}"
+
+                labels[key] = version
+
+        return labels
+
+
+    def compute_host_labels(compute_client: oci.core.ComputeClient | None) -> dict[str, str]:
+        """Fetch labels from the OCI ComputeHost API using instance principals.
+        Returns empty dict when data is unavailable -- nodes simply won't get these labels."""
+        if compute_client is None:
+            return {}
+
+        instance_resp = _imds_get("/instance/")
+        if not instance_resp or not instance_resp.ok:
+            log.warning("Cannot get instance metadata for compute host lookup")
+            return {}
+
+        try:
+            instance_data = instance_resp.json()
+        except requests.exceptions.JSONDecodeError:
+            log.warning("IMDS returned non-JSON for /instance/")
+            return {}
+
+        instance_id = instance_data.get("id")
+        tenant_id = instance_data.get("tenantId")
+        if not instance_id or not tenant_id:
+            log.warning("Missing instance id or tenant id from IMDS")
+            return {}
+
+        try:
+            host_id = _find_compute_host_id(compute_client, tenant_id, instance_id)
+        except Exception:
+            log.exception("Failed to list compute hosts for instance %s", instance_id)
+            return {}
+        if not host_id:
+            log.warning("Compute host not found for instance %s", instance_id)
+            return {}
+
+        try:
+            host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_id).data
+        except Exception:
+            log.exception("Failed to get compute host %s", host_id)
+            return {}
+
+        labels = {}
+
+        if host.platform:
+            labels["oci.oraclecloud.com/host.platform"] = host.platform
+        if host.health:
+            labels["oci.oraclecloud.com/host.health"] = host.health
+        if host.lifecycle_state:
+            labels["oci.oraclecloud.com/host.lifecycle_state"] = host.lifecycle_state
+        if host.has_impacted_components is not None:
+            labels["oci.oraclecloud.com/host.has_impacted_components"] = str(host.has_impacted_components).lower()
+        if host.capacity_reservation_id:
+            labels["oci.oraclecloud.com/host.capacity_reservation_id"] = host.capacity_reservation_id[-11:]
+        if host.compute_host_group_id:
+            labels["oci.oraclecloud.com/host.compute_host_group_id"] = host.compute_host_group_id[-11:]
+
+        recycle = host.recycle_details
+        if recycle and recycle.recycle_level:
+            labels["oci.oraclecloud.com/host.recycle_level"] = recycle.recycle_level
+
+        # Firmware bundle labels
+        if host.firmware_bundle_id:
+            fw_labels = _firmware_bundle_labels(compute_client, host.firmware_bundle_id, host.platform or "")
+            labels.update(fw_labels)
+
+        return labels
 
 
     def rdma_topology_labels() -> dict[str, str]:
@@ -111,45 +261,80 @@ data:
         return labels
 
 
+    def _create_compute_client() -> oci.core.ComputeClient | None:
+        """Create an OCI ComputeClient with instance principals. Returns None on failure."""
+        try:
+            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+            return oci.core.ComputeClient(config={}, signer=signer)
+        except Exception:
+            log.exception("Failed to create OCI ComputeClient with instance principals")
+            return None
+
+
+    def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str]):
+        """Compare desired labels with existing and patch the node if needed."""
+        try:
+            node = v1.read_node(node_name)
+            existing = node.metadata.labels or {}
+        except Exception:
+            log.exception("Failed to read node %s", node_name)
+            return
+
+        updates = {}
+        for k, v in desired.items():
+            current = existing.get(k)
+            if current == v:
+                continue
+            # Don't overwrite real data with fallback when IMDS is temporarily unavailable
+            if v == NO_IMDS and current is not None and current != NO_IMDS:
+                log.info("Keeping existing label %s=%s (source unavailable)", k, current)
+                continue
+            updates[k] = v
+
+        if updates:
+            try:
+                v1.patch_node(node_name, {"metadata": {"labels": updates}})
+                log.info("Applied labels to %s:", node_name)
+                for k, v in updates.items():
+                    log.info("  %s=%s", k, v)
+            except Exception:
+                log.exception("Failed to patch node %s", node_name)
+        else:
+            log.info("%s already labeled, skipping", node_name)
+
+
     def main():
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
         node_name = os.environ["NODE_NAME"]
         interval = int(os.environ.get("INTERVAL", "300"))
+        host_interval = int(os.environ.get("HOST_INTERVAL", "900"))
 
-        log.info("Node: %s | Interval: %ds", node_name, interval)
+        # Stagger startup so nodes don't all hit the OCI API at the same time
+        startup_jitter = random.uniform(0, 120)
+        log.info("Node: %s | IMDS interval: %ds | Host API interval: %ds | Startup jitter: %.1fs",
+                 node_name, interval, host_interval, startup_jitter)
+        time.sleep(startup_jitter)
+
+        compute_client = _create_compute_client()
+        if compute_client is None:
+            log.warning("OCI ComputeClient unavailable, host labels will use fallback values")
+
+        last_host_check = 0.0
+        cached_host_labels: dict[str, str] = {}
 
         while True:
-            try:
-                node = v1.read_node(node_name)
-                existing = node.metadata.labels or {}
-            except Exception:
-                log.exception("Failed to read node %s", node_name)
-                time.sleep(interval)
-                continue
+            now = time.monotonic()
 
-            try:
-                desired = rdma_topology_labels()
-                updates = {}
-                for k, v in desired.items():
-                    current = existing.get(k)
-                    if current == v:
-                        continue
-                    # Don't overwrite real data with fallback when IMDS is temporarily unavailable
-                    if v == NO_IMDS and current is not None and current != NO_IMDS:
-                        log.info("Keeping existing label %s=%s (IMDS unavailable)", k, current)
-                        continue
-                    updates[k] = v
-                if updates:
-                    v1.patch_node(node_name, {"metadata": {"labels": updates}})
-                    log.info("Applied labels to %s:", node_name)
-                    for k, v in updates.items():
-                        log.info("  %s=%s", k, v)
-                else:
-                    log.info("%s already labeled, skipping", node_name)
-            except Exception:
-                log.exception("Failed to label %s", node_name)
+            # Refresh compute host labels on a separate, longer interval
+            if now - last_host_check >= host_interval:
+                cached_host_labels = compute_host_labels(compute_client)
+                last_host_check = now
+
+            desired = rdma_topology_labels()
+            desired.update(cached_host_labels)
+            _apply_labels(v1, node_name, desired)
 
             HEALTH_FILE.touch()
             time.sleep(interval)
