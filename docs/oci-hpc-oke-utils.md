@@ -69,6 +69,18 @@ Applied to nodes where the OCI ComputeHost API returns data (currently bare meta
 | `oci.oraclecloud.com/host.capacity_reservation_id` | Capacity reservation (last 11 chars of OCID) | Only set when using reserved capacity |
 | `oci.oraclecloud.com/host.compute_host_group_id` | Host group association (last 11 chars of OCID) | Only set when part of a host group |
 
+#### Fault Labels
+
+When a host component has an active fault (`impacting: true`), a label is added per component type with the OCI fault ID:
+
+| Label | Description | Example |
+|-------|-------------|---------|
+| `oci.oraclecloud.com/host.fault.<component_type>` | Active fault ID for the component type | `SPENV-8000-9M` |
+
+For example, an actively faulting SSD would produce `oci.oraclecloud.com/host.fault.ssd = SPENV-8000-9M`. If multiple components of the same type have different fault IDs, they are joined with underscores.
+
+These labels are automatically removed when the fault clears. Stale fault labels are only cleaned up when the OCI API is reachable -- if the API is temporarily unavailable, existing fault labels are preserved to avoid false negatives.
+
 #### Firmware Labels
 
 Applied to nodes where the OCI FirmwareBundle API returns data. These labels are dynamic -- the exact set depends on the hardware platform and shape.

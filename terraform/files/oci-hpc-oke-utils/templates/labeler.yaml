@@ -86,7 +86,7 @@ spec:
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
-            initialDelaySeconds: 30
+            initialDelaySeconds: 180
             periodSeconds: 120
             failureThreshold: 5
           resources:
