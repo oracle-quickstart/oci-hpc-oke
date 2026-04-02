@@ -22,6 +22,12 @@ labeler:
   podLabels: {}
   interval: 300
   hostInterval: 900
+  labelMappings: {}
+  # Example:
+  # labelMappings:
+  #   gpu-fabric-racks.csv: |
+  #     oci.oraclecloud.com/host.gpu_memory_fabric_id,oci.oraclecloud.com/host.internal_rack_id
+  #     ocid1.computegpumemoryfabric...bq,sk-e6df6e21-5b1d-492e-a5b1-145abbbdaa1b
   resources:
     requests:
       cpu: 10m

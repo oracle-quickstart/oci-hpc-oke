@@ -17,6 +17,7 @@ data:
     # ]
     # ///
 
+    import csv
     import json
     import logging
     import os
@@ -291,9 +292,6 @@ data:
             labels["oci.oraclecloud.com/host.maintenance.reason"] = event.maintenance_reason or "UNKNOWN"
             labels["oci.oraclecloud.com/host.maintenance.action"] = event.instance_action or "NONE"
             labels["oci.oraclecloud.com/host.maintenance.state"] = event.lifecycle_state
-            # Use correlation_token to identify the event
-            if event.correlation_token:
-                labels["oci.oraclecloud.com/host.maintenance.correlation"] = event.correlation_token
             break  # One active event is enough for labels
 
         return labels
@@ -432,6 +430,73 @@ data:
                     log.exception("Failed to clear maintenance condition on %s", node_name)
 
 
+    def label_mapping_labels(existing_labels: dict[str, str]) -> tuple[dict[str, str], set[str]]:
+        """Read CSV files from the label mapping directory and return additional labels
+        based on matching existing node labels. Each CSV has a header where the first
+        column is the label key to match and remaining columns are label keys to add.
+        Data rows contain the value to match (suffix match supported) and the values to set.
+        Returns (matched_labels, all_managed_keys) where all_managed_keys is the set of
+        all label keys defined in CSV headers, used for stale label cleanup."""
+        mapping_dir = os.environ.get("LABEL_MAPPING_DIR", "")
+        if not mapping_dir or not os.path.isdir(mapping_dir):
+            return {}, set()
+
+        labels = {}
+        all_managed_keys: set[str] = set()
+
+        for filename in os.listdir(mapping_dir):
+            if not filename.endswith(".csv"):
+                continue
+            filepath = os.path.join(mapping_dir, filename)
+            try:
+                with open(filepath, "r") as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+                    if not header or len(header) < 2:
+                        log.warning("Skipping %s: needs at least 2 columns", filename)
+                        continue
+
+                    match_key = header[0].strip()
+                    new_keys = [h.strip() for h in header[1:]]
+                    all_managed_keys.update(new_keys)
+                    node_value = existing_labels.get(match_key, "")
+
+                    if not node_value:
+                        continue
+
+                    for row in reader:
+                        if not row or len(row) < 2:
+                            continue
+                        csv_value = row[0].strip()
+                        # Suffix match: the CSV value ends with the label value or vice versa
+                        if csv_value.endswith(node_value) or node_value.endswith(csv_value):
+                            for i, key in enumerate(new_keys):
+                                if i + 1 < len(row) and row[i + 1].strip():
+                                    labels[key] = row[i + 1].strip()
+                            log.info("Label mapping %s matched %s=%s", filename, match_key, node_value)
+                            break
+            except Exception:
+                log.exception("Failed to parse label mapping %s", filename)
+
+        return labels, all_managed_keys
+
+
+    GPU_INFO_DIR = "/tmp/gpu-info"
+
+
+    def gpu_info_labels() -> dict[str, str]:
+        """Read GPU platform info written by the init container."""
+        labels = {}
+        filepath = os.path.join(GPU_INFO_DIR, "tray_index")
+        try:
+            value = Path(filepath).read_text().strip()
+            if value:
+                labels["oci.oraclecloud.com/host.tray_index"] = value
+        except FileNotFoundError:
+            pass
+        return labels
+
+
     def rdma_topology_labels() -> dict[str, str]:
         resp = _imds_get("/host/rdmaTopologyData")
 
@@ -499,10 +564,11 @@ data:
     MANAGED_LABEL_PREFIXES = ("oci.oraclecloud.com/host.fault.", "oci.oraclecloud.com/host.maintenance.")
 
 
-    def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str], clean_managed: bool = False):
+    def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str],
+                       clean_managed: bool = False, managed_keys: set[str] | None = None):
         """Compare desired labels with existing and patch the node if needed.
-        When clean_managed is True, also removes stale labels under MANAGED_LABEL_PREFIXES
-        that are no longer desired. Only pass True when the data source is healthy."""
+        When clean_managed is True, removes stale labels under MANAGED_LABEL_PREFIXES.
+        Labels in managed_keys are always cleaned up (they come from local CSV, not OCI API)."""
         try:
             node = v1.read_node(node_name)
             existing = node.metadata.labels or {}
@@ -521,11 +587,19 @@ data:
                 continue
             updates[k] = v
 
-        # Remove stale managed labels that are no longer in desired (only when source is healthy)
+        # Remove stale labels that are no longer in desired
+        _managed_keys = managed_keys or set()
         for k in existing:
-            if clean_managed and any(k.startswith(p) for p in MANAGED_LABEL_PREFIXES) and k not in desired:
-                updates[k] = None  # None removes the label via strategic merge patch
+            if k in desired:
+                continue
+            # Prefix-based managed labels (fault, maintenance) only clean when OCI API is healthy
+            if clean_managed and any(k.startswith(p) for p in MANAGED_LABEL_PREFIXES):
+                updates[k] = None
                 log.info("Removing stale label %s from %s", k, node_name)
+            # CSV mapping labels always clean (local data source, no API dependency)
+            elif k in _managed_keys:
+                updates[k] = None
+                log.info("Removing stale mapping label %s from %s", k, node_name)
 
         if updates:
             try:
@@ -558,12 +632,18 @@ data:
         if compute_client is None:
             log.warning("OCI ComputeClient unavailable, host labels will use fallback values")
 
+        # GPU info labels are static (from init container), read once
+        static_gpu_labels = gpu_info_labels()
+        if static_gpu_labels:
+            log.info("GPU info labels: %s", static_gpu_labels)
+
         last_host_check = 0.0
         cached_host_labels: dict[str, str] = {}
         cached_maintenance_labels: dict[str, str] = {}
         cached_maintenance_conditions: list[dict] | None = None  # None = never polled
         host_labels_healthy = False
         maintenance_healthy = False
+        all_seen_mapping_keys: set[str] = set()  # Accumulates all keys ever seen from CSVs
 
         while True:
             now = time.monotonic()
@@ -593,9 +673,30 @@ data:
                 last_host_check = now
 
             desired = rdma_topology_labels()
+            desired.update(static_gpu_labels)
             desired.update(cached_host_labels)
             desired.update(cached_maintenance_labels)
-            _apply_labels(v1, node_name, desired, clean_managed=host_labels_healthy)
+
+            # Apply label mappings from user-provided CSV ConfigMap
+            # Use existing node labels as base, then overlay desired -- but skip fallback
+            # values so transient IMDS failures don't break CSV matching
+            mapping_read_ok = False
+            try:
+                node = v1.read_node(node_name)
+                all_labels = dict(node.metadata.labels or {})
+                for k, v in desired.items():
+                    if v != NO_IMDS:  # Don't overwrite real labels with fallback values
+                        all_labels[k] = v
+                mapping_labels, current_mapping_keys = label_mapping_labels(all_labels)
+                all_seen_mapping_keys.update(current_mapping_keys)
+                desired.update(mapping_labels)
+                mapping_read_ok = True
+            except Exception:
+                pass  # read_node failure is handled in _apply_labels
+
+            # Only pass managed_keys for cleanup when we successfully read mappings
+            _apply_labels(v1, node_name, desired, clean_managed=host_labels_healthy,
+                          managed_keys=all_seen_mapping_keys if mapping_read_ok else None)
             # Only reconcile maintenance conditions after at least one successful poll
             if cached_maintenance_conditions is not None:
                 _apply_maintenance_conditions(v1, node_name, cached_maintenance_conditions)

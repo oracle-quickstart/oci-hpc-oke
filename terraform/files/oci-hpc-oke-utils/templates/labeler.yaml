@@ -26,6 +26,9 @@ spec:
         {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/labeler-configmap.yaml") . | sha256sum }}
+        {{- if .Values.labeler.labelMappings }}
+        checksum/mapping: {{ include (print $.Template.BasePath "/labeler-mapping-configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.labeler.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -59,6 +62,48 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- if .Values.labeler.labelMappings }}
+        - name: label-mapping
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler-mapping
+        {{- end }}
+        - name: gpu-info
+          emptyDir: {}
+        - name: host-usr
+          hostPath:
+            path: /usr
+            type: Directory
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+      initContainers:
+        - name: gpu-info
+          image: "{{ .Values.labeler.gpuInfoImage | default "docker.io/debian:bookworm-slim" }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -x /host/usr/bin/nvidia-smi ]; then
+                /host/usr/bin/nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ' > /tmp/gpu-info/tray_index
+                echo "GPU info: tray=$(cat /tmp/gpu-info/tray_index)"
+              else
+                echo "nvidia-smi not found on host, skipping GPU info"
+              fi
+          volumeMounts:
+            - name: gpu-info
+              mountPath: /tmp/gpu-info
+            - name: host-usr
+              mountPath: /host/usr
+              readOnly: true
+            - name: host-dev
+              mountPath: /dev
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         - name: labeler
           image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
@@ -72,6 +117,14 @@ spec:
               mountPath: /tmp/uv-cache
             - name: tmp
               mountPath: /tmp/health
+            {{- if .Values.labeler.labelMappings }}
+            - name: label-mapping
+              mountPath: /etc/label-mapping
+              readOnly: true
+            {{- end }}
+            - name: gpu-info
+              mountPath: /tmp/gpu-info
+              readOnly: true
           env:
             - name: UV_CACHE_DIR
               value: /tmp/uv-cache
@@ -83,6 +136,10 @@ spec:
               value: {{ .Values.labeler.interval | quote }}
             - name: HOST_INTERVAL
               value: {{ .Values.labeler.hostInterval | quote }}
+            {{- if .Values.labeler.labelMappings }}
+            - name: LABEL_MAPPING_DIR
+              value: /etc/label-mapping
+            {{- end }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]

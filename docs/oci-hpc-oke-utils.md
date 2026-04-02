@@ -4,7 +4,7 @@
 
 | Component | Default | Description |
 |-----------|---------|-------------|
-| [Labeler](#labeler) | Enabled | Applies RDMA topology, compute host, and firmware labels to nodes |
+| [Labeler](#labeler) | Enabled | Applies RDMA topology, compute host, firmware, maintenance, and custom labels to nodes |
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Disabled | Runs shell scripts on the host via `nsenter` |
 
@@ -14,10 +14,11 @@ All three target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/g
 
 ## Labeler
 
-The labeler is a DaemonSet that automatically applies Kubernetes node labels with infrastructure metadata. It sources data from two places:
+The labeler is a DaemonSet that automatically applies Kubernetes node labels and conditions with infrastructure metadata. It sources data from three places:
 
 1. **Instance Metadata Service (IMDS)** -- RDMA topology and GPU memory fabric placement
-2. **OCI ComputeHost and FirmwareBundle APIs** -- host health, platform, firmware versions
+2. **OCI ComputeHost, FirmwareBundle, and MaintenanceEvent APIs** -- host health, platform, firmware versions, maintenance events
+3. **User-provided CSV label mappings** -- custom labels derived from existing labels
 
 Labels are applied periodically and kept up to date. If a data source is temporarily unavailable, existing labels are preserved rather than overwritten.
 
@@ -28,6 +29,7 @@ Labels are applied periodically and kept up to date. If a data source is tempora
 | `labeler.enabled` | `true` | Enable/disable the labeler DaemonSet |
 | `labeler.interval` | `300` | Seconds between IMDS label refreshes |
 | `labeler.hostInterval` | `900` | Seconds between OCI API label refreshes |
+| `labeler.labelMappings` | `{}` | CSV-based label mappings (see [Label Mappings](#label-mappings)) |
 
 The labeler staggers startup by a random 0-120 second jitter per node to avoid thundering herd API calls during DaemonSet rollout.
 
@@ -69,6 +71,16 @@ Applied to nodes where the OCI ComputeHost API returns data (currently bare meta
 | `oci.oraclecloud.com/host.capacity_reservation_id` | Capacity reservation (last 11 chars of OCID) | Only set when using reserved capacity |
 | `oci.oraclecloud.com/host.compute_host_group_id` | Host group association (last 11 chars of OCID) | Only set when part of a host group |
 
+#### GPU Tray Index Label
+
+On NVIDIA GPU nodes, the labeler reads the compute tray position from `nvidia-smi` via an init container:
+
+| Label | Description | Example |
+|-------|-------------|---------|
+| `oci.oraclecloud.com/host.tray_index` | Compute tray position within the rack (0-17 for NVL72) | `13` |
+
+This label is only set on nodes where `nvidia-smi` is available on the host. It is read once at pod startup and does not change.
+
 #### Fault Labels
 
 When a host component has an active fault (`impacting: true`), a label is added per component type with the OCI fault ID:
@@ -77,9 +89,41 @@ When a host component has an active fault (`impacting: true`), a label is added 
 |-------|-------------|---------|
 | `oci.oraclecloud.com/host.fault.<component_type>` | Active fault ID for the component type | `SPENV-8000-9M` |
 
-For example, an actively faulting SSD would produce `oci.oraclecloud.com/host.fault.ssd = SPENV-8000-9M`. If multiple components of the same type have different fault IDs, they are joined with underscores.
+For example, an actively faulting SSD would produce `oci.oraclecloud.com/host.fault.ssd = SPENV-8000-9M`. If multiple components of the same type have different fault IDs, the label shows the count and first ID (e.g., `4x_SPENV-8000-9M`).
 
 These labels are automatically removed when the fault clears. Stale fault labels are only cleaned up when the OCI API is reachable -- if the API is temporarily unavailable, existing fault labels are preserved to avoid false negatives.
+
+#### Maintenance Event Labels
+
+When an instance has an active maintenance event (`SCHEDULED` or `IN_PROGRESS`), the following labels are applied:
+
+| Label | Description | Example |
+|-------|-------------|---------|
+| `oci.oraclecloud.com/host.maintenance.reason` | Reason for maintenance | `EVACUATION` |
+| `oci.oraclecloud.com/host.maintenance.action` | Action OCI will take | `NONE`, `REBOOT`, `STOP`, `TERMINATE` |
+| `oci.oraclecloud.com/host.maintenance.state` | Maintenance lifecycle state | `SCHEDULED`, `IN_PROGRESS` |
+
+These labels are automatically removed when the maintenance event completes or is canceled.
+
+#### Maintenance Node Condition
+
+In addition to labels, the labeler sets a Kubernetes node condition for active maintenance events:
+
+```
+Type:    oci.oraclecloud.com/MaintenanceFault
+Status:  True
+Reason:  HPCGPU-0002-02
+Message: The GPU has exceeded the maximum number of ECC defective row remaps.
+```
+
+The condition includes fault details (fault ID, description) from the OCI `InstanceMaintenanceEvent` API when available. When the maintenance event resolves, the condition is set to `False`:
+
+```
+Type:    oci.oraclecloud.com/MaintenanceFault
+Status:  False
+Reason:  Resolved
+Message: No active maintenance events
+```
 
 #### Firmware Labels
 
@@ -114,9 +158,54 @@ Components with multiple firmware versions (e.g., NVMe drives with different fir
 
 The number of GPU firmware labels matches the GPU count of the shape (e.g., 4 labels for BM.GPU.GB200.4, 8 for BM.GPU.H100.8).
 
+### Label Mappings
+
+The labeler supports user-defined label mappings via CSV. This allows adding custom labels to nodes based on the value of an existing label. For example, mapping GPU memory fabric IDs to internal rack identifiers.
+
+#### Configuration
+
+Add CSV mappings in the Helm values:
+
+```yaml
+labeler:
+  labelMappings:
+    gpu-fabric-racks.csv: |
+      oci.oraclecloud.com/host.gpu_memory_fabric_id,oci.oraclecloud.com/host.internal_rack_id
+      ocid1.computegpumemoryfabric.oc1.ap-sydney-1.anzxsljr2472ivyc7lzxt7l3wo2...bq,sk-e6df6e21-5b1d-492e-a5b1-145abbbdaa1b
+      ocid1.computegpumemoryfabric.oc1.ap-sydney-1.anzxsljr2472ivycjwpjvudm7z...ga,sk-d8d2f63d-7c30-4284-a59a-193575cc9f4a
+```
+
+#### CSV Format
+
+- **Header row**: first column is the existing label key to match, remaining columns are new label keys to add
+- **Data rows**: first column is the value to match, remaining columns are the values to set
+
+#### Matching
+
+The labeler uses **suffix matching** -- the CSV value and the node's label value are compared by suffix. This means you can use full OCIDs in the CSV even though the labeler truncates OCIDs to the last 11 characters. For example, a CSV row with `ocid1.computegpumemoryfabric...pvtkj3zctga` matches a node label value of `pvtkj3zctga`.
+
+#### Multiple Mappings
+
+You can define multiple CSV files for different label keys:
+
+```yaml
+labeler:
+  labelMappings:
+    gpu-fabric-racks.csv: |
+      oci.oraclecloud.com/host.gpu_memory_fabric_id,oci.oraclecloud.com/host.internal_rack_id
+      ...
+    network-block-zones.csv: |
+      oci.oraclecloud.com/rdma.network_block_id,oci.oraclecloud.com/host.zone
+      ...
+```
+
+#### Cleanup
+
+When a CSV row is removed or a mapping no longer matches, the corresponding labels are automatically removed from nodes. Updating `labelMappings` in the Helm values triggers a pod restart via the checksum annotation.
+
 ### How It Works
 
-The labeler runs as a DaemonSet pod on each GPU node with `hostNetwork: true` for IMDS access. It uses two data sources on independent refresh intervals:
+The labeler runs as a DaemonSet pod on each GPU node with `hostNetwork: true` for IMDS access. It uses three data sources on independent refresh intervals:
 
 **IMDS path (every 5 minutes):**
 1. Queries `http://169.254.169.254/opc/v2/host/rdmaTopologyData` for RDMA placement
@@ -129,7 +218,15 @@ The labeler runs as a DaemonSet pod on each GPU node with `hostNetwork: true` fo
 3. Lists compute hosts in the tenancy (paginated, host ID cached after first lookup)
 4. Calls `get_compute_hosts` for full host details including firmware bundle ID
 5. Calls `get_firmware_bundle` for per-component firmware versions
-6. All API calls use exponential backoff on 429 throttling (up to 3 retries)
+6. Lists maintenance events for the instance, sets labels and node conditions for active events
+7. All API calls use exponential backoff on 429 throttling (up to 3 retries)
+
+**Label mappings (every 5 minutes):**
+1. Reads CSV files from the mounted ConfigMap
+2. For each CSV, checks if the node has the label specified in the header
+3. Suffix-matches the label value against CSV rows
+4. Applies additional labels from matching rows
+5. Removes stale mapping labels that no longer match
 
 If the ComputeHost API does not have an entry for the instance (e.g., non-bare-metal shapes), the host and firmware labels are simply not applied.
 
@@ -163,6 +260,24 @@ affinity:
             - key: oci.oraclecloud.com/host.has_impacted_components
               operator: In
               values: ["false"]
+```
+
+#### Avoiding nodes with active maintenance
+
+```yaml
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: oci.oraclecloud.com/host.maintenance.state
+              operator: DoesNotExist
+```
+
+#### Checking maintenance node conditions
+
+```bash
+kubectl get nodes -o custom-columns=NAME:.metadata.name,MAINTENANCE:.status.conditions[?(@.type==\"oci.oraclecloud.com/MaintenanceFault\")].status
 ```
 
 #### Selecting nodes by RDMA locality
