@@ -166,25 +166,27 @@ data:
         return labels
 
 
-    def compute_host_labels(compute_client: oci.core.ComputeClient | None) -> dict[str, str]:
-        """Fetch labels from the OCI ComputeHost API using instance principals.
-        Returns empty dict when data is unavailable -- nodes simply won't get these labels."""
-        if compute_client is None:
-            return {}
-
-        instance_resp = _imds_get("/instance/")
-        if not instance_resp or not instance_resp.ok:
-            log.warning("Cannot get instance metadata for compute host lookup")
-            return {}
-
+    def _fetch_instance_metadata() -> dict | None:
+        """Fetch and return the full instance metadata from IMDS, or None on failure."""
+        resp = _imds_get("/instance/")
+        if not resp or not resp.ok:
+            log.warning("Cannot get instance metadata from IMDS")
+            return None
         try:
-            instance_data = instance_resp.json()
+            return resp.json()
         except requests.exceptions.JSONDecodeError:
             log.warning("IMDS returned non-JSON for /instance/")
+            return None
+
+
+    def compute_host_labels(compute_client: oci.core.ComputeClient | None, instance_meta: dict | None = None) -> dict[str, str]:
+        """Fetch labels from the OCI ComputeHost API using instance principals.
+        Returns empty dict when data is unavailable -- nodes simply won't get these labels."""
+        if compute_client is None or instance_meta is None:
             return {}
 
-        instance_id = instance_data.get("id")
-        tenant_id = instance_data.get("tenantId")
+        instance_id = instance_meta.get("id")
+        tenant_id = instance_meta.get("tenantId")
         if not instance_id or not tenant_id:
             log.warning("Missing instance id or tenant id from IMDS")
             return {}
@@ -252,24 +254,13 @@ data:
     ACTIVE_MAINTENANCE_STATES = ("SCHEDULED", "IN_PROGRESS")
 
 
-    def _get_instance_metadata() -> tuple[str | None, str | None]:
-        """Return (instance_id, compartment_id) from IMDS, or (None, None) on failure."""
-        resp = _imds_get("/instance/")
-        if not resp or not resp.ok:
-            return None, None
-        try:
-            data = resp.json()
-            return data.get("id"), data.get("compartmentId")
-        except requests.exceptions.JSONDecodeError:
-            return None, None
-
-
-    def maintenance_event_labels(compute_client: oci.core.ComputeClient | None) -> dict[str, str]:
+    def maintenance_event_labels(compute_client: oci.core.ComputeClient | None, instance_meta: dict | None = None) -> dict[str, str]:
         """Return labels for active maintenance events on this instance."""
-        if compute_client is None:
+        if compute_client is None or instance_meta is None:
             return {}
 
-        instance_id, compartment_id = _get_instance_metadata()
+        instance_id = instance_meta.get("id")
+        compartment_id = instance_meta.get("compartmentId")
         if not instance_id or not compartment_id:
             return {}
 
@@ -287,8 +278,6 @@ data:
         for event in events:
             if event.lifecycle_state not in ACTIVE_MAINTENANCE_STATES:
                 continue
-            # Add fault code label
-            fault_id = event.display_name or event.maintenance_reason or "UNKNOWN"
             labels["oci.oraclecloud.com/host.maintenance.reason"] = event.maintenance_reason or "UNKNOWN"
             labels["oci.oraclecloud.com/host.maintenance.action"] = event.instance_action or "NONE"
             labels["oci.oraclecloud.com/host.maintenance.state"] = event.lifecycle_state
@@ -297,12 +286,13 @@ data:
         return labels
 
 
-    def maintenance_event_conditions(compute_client: oci.core.ComputeClient | None) -> list[dict]:
+    def maintenance_event_conditions(compute_client: oci.core.ComputeClient | None, instance_meta: dict | None = None) -> list[dict]:
         """Return node conditions for active maintenance events with fault details."""
-        if compute_client is None:
+        if compute_client is None or instance_meta is None:
             return []
 
-        instance_id, compartment_id = _get_instance_metadata()
+        instance_id = instance_meta.get("id")
+        compartment_id = instance_meta.get("compartmentId")
         if not instance_id or not compartment_id:
             return []
 
@@ -642,7 +632,6 @@ data:
         cached_maintenance_labels: dict[str, str] = {}
         cached_maintenance_conditions: list[dict] | None = None  # None = never polled
         host_labels_healthy = False
-        maintenance_healthy = False
         all_seen_mapping_keys: set[str] = set()  # Accumulates all keys ever seen from CSVs
 
         while True:
@@ -650,15 +639,17 @@ data:
 
             # Refresh compute host and maintenance labels on a separate, longer interval
             if now - last_host_check >= host_interval:
-                new_labels = compute_host_labels(compute_client)
+                instance_meta = _fetch_instance_metadata()
+
+                new_labels = compute_host_labels(compute_client, instance_meta)
                 if new_labels:
                     cached_host_labels = new_labels
                     host_labels_healthy = True
                 else:
                     host_labels_healthy = False
 
-                new_maint_labels = maintenance_event_labels(compute_client)
-                new_maint_conditions = maintenance_event_conditions(compute_client)
+                new_maint_labels = maintenance_event_labels(compute_client, instance_meta)
+                new_maint_conditions = maintenance_event_conditions(compute_client, instance_meta)
                 # Both functions return empty on failure AND no-events.
                 # Gate on host_labels_healthy as baseline (OCI API reachable),
                 # but also accept empty results when host API succeeded --
@@ -666,9 +657,6 @@ data:
                 if host_labels_healthy:
                     cached_maintenance_labels = new_maint_labels
                     cached_maintenance_conditions = new_maint_conditions
-                    maintenance_healthy = True
-                else:
-                    maintenance_healthy = False
 
                 last_host_check = now
 

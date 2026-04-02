@@ -10,6 +10,50 @@
 
 All three target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels).
 
+## Manual Installation
+
+The chart is normally deployed automatically by the Terraform stack. To install it manually on an existing cluster:
+
+```bash
+helm install oci-hpc-oke-utils ./terraform/files/oci-hpc-oke-utils \
+  --namespace kube-system
+```
+
+To customize values:
+
+```bash
+helm install oci-hpc-oke-utils ./terraform/files/oci-hpc-oke-utils \
+  --namespace kube-system \
+  --set prepuller.enabled=true \
+  --set hostexec.enabled=true
+```
+
+Or with a values file:
+
+```bash
+helm install oci-hpc-oke-utils ./terraform/files/oci-hpc-oke-utils \
+  --namespace kube-system \
+  -f my-values.yaml
+```
+
+To upgrade after changing values:
+
+```bash
+helm upgrade oci-hpc-oke-utils ./terraform/files/oci-hpc-oke-utils \
+  --namespace kube-system \
+  -f my-values.yaml
+```
+
+To uninstall:
+
+```bash
+helm uninstall oci-hpc-oke-utils --namespace kube-system
+```
+
+### Prerequisites
+
+- The labeler requires instance principals for OCI API access. Ensure the dynamic group and IAM policies created by the Terraform stack are in place, or create equivalent policies that allow the node instances to call `list_compute_hosts`, `get_compute_hosts`, `get_firmware_bundle`, and `list_instance_maintenance_events`.
+
 ---
 
 ## Labeler
@@ -194,9 +238,10 @@ labeler:
     gpu-fabric-racks.csv: |
       oci.oraclecloud.com/host.gpu_memory_fabric_id,oci.oraclecloud.com/host.internal_rack_id
       ...
-    network-block-zones.csv: |
-      oci.oraclecloud.com/rdma.network_block_id,oci.oraclecloud.com/host.zone
-      ...
+    second-mapping.csv: |
+      oci.oraclecloud.com/rdma.hpc_island_id,my-org/team,my-org/environment
+      aemd2gqsaja,team-alpha,production
+      tkj3zctga,team-beta,staging
 ```
 
 #### Cleanup
