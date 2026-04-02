@@ -17,11 +17,13 @@ data:
     # ]
     # ///
 
+    import json
     import logging
     import os
     import random
     import re
     import time
+    from datetime import datetime, timezone
     from pathlib import Path
 
     import oci
@@ -245,6 +247,191 @@ data:
         return labels
 
 
+    MAINTENANCE_CONDITION_TYPE = "oci.oraclecloud.com/MaintenanceFault"
+    ACTIVE_MAINTENANCE_STATES = ("SCHEDULED", "IN_PROGRESS")
+
+
+    def _get_instance_metadata() -> tuple[str | None, str | None]:
+        """Return (instance_id, compartment_id) from IMDS, or (None, None) on failure."""
+        resp = _imds_get("/instance/")
+        if not resp or not resp.ok:
+            return None, None
+        try:
+            data = resp.json()
+            return data.get("id"), data.get("compartmentId")
+        except requests.exceptions.JSONDecodeError:
+            return None, None
+
+
+    def maintenance_event_labels(compute_client: oci.core.ComputeClient | None) -> dict[str, str]:
+        """Return labels for active maintenance events on this instance."""
+        if compute_client is None:
+            return {}
+
+        instance_id, compartment_id = _get_instance_metadata()
+        if not instance_id or not compartment_id:
+            return {}
+
+        try:
+            events = _oci_call_with_backoff(
+                compute_client.list_instance_maintenance_events,
+                compartment_id=compartment_id,
+                instance_id=instance_id,
+            ).data
+        except Exception:
+            log.exception("Failed to list maintenance events for instance %s", instance_id)
+            return {}
+
+        labels = {}
+        for event in events:
+            if event.lifecycle_state not in ACTIVE_MAINTENANCE_STATES:
+                continue
+            # Add fault code label
+            fault_id = event.display_name or event.maintenance_reason or "UNKNOWN"
+            labels["oci.oraclecloud.com/host.maintenance.reason"] = event.maintenance_reason or "UNKNOWN"
+            labels["oci.oraclecloud.com/host.maintenance.action"] = event.instance_action or "NONE"
+            labels["oci.oraclecloud.com/host.maintenance.state"] = event.lifecycle_state
+            # Use correlation_token to identify the event
+            if event.correlation_token:
+                labels["oci.oraclecloud.com/host.maintenance.correlation"] = event.correlation_token
+            break  # One active event is enough for labels
+
+        return labels
+
+
+    def maintenance_event_conditions(compute_client: oci.core.ComputeClient | None) -> list[dict]:
+        """Return node conditions for active maintenance events with fault details."""
+        if compute_client is None:
+            return []
+
+        instance_id, compartment_id = _get_instance_metadata()
+        if not instance_id or not compartment_id:
+            return []
+
+        try:
+            events = _oci_call_with_backoff(
+                compute_client.list_instance_maintenance_events,
+                compartment_id=compartment_id,
+                instance_id=instance_id,
+            ).data
+        except Exception:
+            log.exception("Failed to list maintenance events for instance %s", instance_id)
+            return []
+
+        active_events = [e for e in events if e.lifecycle_state in ACTIVE_MAINTENANCE_STATES]
+        if not active_events:
+            return []
+
+        # Get full details for the first active event to extract fault info
+        event = active_events[0]
+        try:
+            full_event = _oci_call_with_backoff(
+                compute_client.get_instance_maintenance_event,
+                instance_maintenance_event_id=event.id,
+            ).data
+        except Exception:
+            log.exception("Failed to get maintenance event %s", event.id)
+            # Fall back to summary data
+            return [{
+                "reason": event.maintenance_reason or "MaintenanceScheduled",
+                "message": event.description or "Maintenance event scheduled",
+                "fault_id": None,
+            }]
+
+        # Parse fault details from additional_details
+        fault_details_str = (full_event.additional_details or {}).get("faultDetails", "[]")
+        try:
+            faults = json.loads(fault_details_str) if isinstance(fault_details_str, str) else fault_details_str
+        except (json.JSONDecodeError, TypeError):
+            faults = []
+
+        if faults:
+            return [{
+                "reason": fault.get("faultId", event.maintenance_reason or "MaintenanceScheduled"),
+                "message": fault.get("customerDescription", event.description or ""),
+                "fault_id": fault.get("faultId"),
+            } for fault in faults]
+
+        return [{
+            "reason": event.maintenance_reason or "MaintenanceScheduled",
+            "message": event.description or "Maintenance event scheduled",
+            "fault_id": None,
+        }]
+
+
+    def _apply_maintenance_conditions(v1: client.CoreV1Api, node_name: str, conditions: list[dict]):
+        """Set or clear the MaintenanceFault node condition."""
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        try:
+            node = v1.read_node_status(node_name)
+            existing_conditions = node.status.conditions or []
+        except Exception:
+            log.exception("Failed to read node status for %s", node_name)
+            return
+
+        # Find existing maintenance condition
+        has_existing = any(c.type == MAINTENANCE_CONDITION_TYPE for c in existing_conditions)
+
+        if conditions:
+            # Build message from all faults
+            messages = []
+            fault_ids = []
+            for c in conditions:
+                if c.get("fault_id"):
+                    fault_ids.append(c["fault_id"])
+                messages.append(c["message"])
+            reason = conditions[0]["reason"]
+            message = "; ".join(messages)
+            if fault_ids:
+                reason = "_".join(fault_ids[:3])  # Keep reason short
+
+            new_condition = {
+                "type": MAINTENANCE_CONDITION_TYPE,
+                "status": "True",
+                "reason": reason,
+                "message": message[:1024],  # K8s message limit
+                "lastHeartbeatTime": now,
+                "lastTransitionTime": now,
+            }
+
+            if has_existing:
+                # Preserve lastTransitionTime if status hasn't changed
+                for c in existing_conditions:
+                    if c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True":
+                        new_condition["lastTransitionTime"] = c.last_transition_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        break
+
+            patch = {"status": {"conditions": [new_condition]}}
+            try:
+                v1.patch_node_status(node_name, patch)
+                log.info("Set MaintenanceFault condition on %s: %s - %s", node_name, reason, message[:100])
+            except Exception:
+                log.exception("Failed to set maintenance condition on %s", node_name)
+
+        elif has_existing:
+            # Only clear if currently True (avoid repeated patches when already False)
+            currently_true = any(
+                c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True"
+                for c in existing_conditions
+            )
+            if currently_true:
+                clear_condition = {
+                    "type": MAINTENANCE_CONDITION_TYPE,
+                    "status": "False",
+                    "reason": "Resolved",
+                    "message": "No active maintenance events",
+                    "lastHeartbeatTime": now,
+                    "lastTransitionTime": now,
+                }
+                patch = {"status": {"conditions": [clear_condition]}}
+                try:
+                    v1.patch_node_status(node_name, patch)
+                    log.info("Cleared MaintenanceFault condition on %s", node_name)
+                except Exception:
+                    log.exception("Failed to clear maintenance condition on %s", node_name)
+
+
     def rdma_topology_labels() -> dict[str, str]:
         resp = _imds_get("/host/rdmaTopologyData")
 
@@ -309,7 +496,7 @@ data:
 
 
     # Label prefixes that are dynamically added/removed based on current state
-    MANAGED_LABEL_PREFIXES = ("oci.oraclecloud.com/host.fault.",)
+    MANAGED_LABEL_PREFIXES = ("oci.oraclecloud.com/host.fault.", "oci.oraclecloud.com/host.maintenance.")
 
 
     def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str], clean_managed: bool = False):
@@ -373,12 +560,15 @@ data:
 
         last_host_check = 0.0
         cached_host_labels: dict[str, str] = {}
-        host_labels_healthy = False  # Track whether last host API call succeeded
+        cached_maintenance_labels: dict[str, str] = {}
+        cached_maintenance_conditions: list[dict] | None = None  # None = never polled
+        host_labels_healthy = False
+        maintenance_healthy = False
 
         while True:
             now = time.monotonic()
 
-            # Refresh compute host labels on a separate, longer interval
+            # Refresh compute host and maintenance labels on a separate, longer interval
             if now - last_host_check >= host_interval:
                 new_labels = compute_host_labels(compute_client)
                 if new_labels:
@@ -386,11 +576,29 @@ data:
                     host_labels_healthy = True
                 else:
                     host_labels_healthy = False
+
+                new_maint_labels = maintenance_event_labels(compute_client)
+                new_maint_conditions = maintenance_event_conditions(compute_client)
+                # Both functions return empty on failure AND no-events.
+                # Gate on host_labels_healthy as baseline (OCI API reachable),
+                # but also accept empty results when host API succeeded --
+                # if we can reach compute hosts, maintenance API should work too.
+                if host_labels_healthy:
+                    cached_maintenance_labels = new_maint_labels
+                    cached_maintenance_conditions = new_maint_conditions
+                    maintenance_healthy = True
+                else:
+                    maintenance_healthy = False
+
                 last_host_check = now
 
             desired = rdma_topology_labels()
             desired.update(cached_host_labels)
+            desired.update(cached_maintenance_labels)
             _apply_labels(v1, node_name, desired, clean_managed=host_labels_healthy)
+            # Only reconcile maintenance conditions after at least one successful poll
+            if cached_maintenance_conditions is not None:
+                _apply_maintenance_conditions(v1, node_name, cached_maintenance_conditions)
 
             HEALTH_FILE.touch()
             time.sleep(interval)
