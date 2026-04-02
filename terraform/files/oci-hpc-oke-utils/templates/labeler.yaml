@@ -36,6 +36,7 @@ spec:
       automountServiceAccountToken: true  # Required for Kubernetes API access
       serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
       hostNetwork: true
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       priorityClassName: system-node-critical
       {{- with .Values.labeler.imagePullSecrets }}
@@ -69,34 +70,24 @@ spec:
         {{- end }}
         - name: gpu-info
           emptyDir: {}
-        - name: host-usr
-          hostPath:
-            path: /usr
-            type: Directory
-        - name: host-dev
-          hostPath:
-            path: /dev
-            type: Directory
       initContainers:
         - name: gpu-info
-          image: "{{ .Values.labeler.gpuInfoImage | default "docker.io/debian:bookworm-slim" }}"
+          image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
           command: ["/bin/sh", "-c"]
           args:
             - |
-              if [ -x /host/usr/bin/nvidia-smi ]; then
-                /host/usr/bin/nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ' > /tmp/gpu-info/tray_index
-                echo "GPU info: tray=$(cat /tmp/gpu-info/tray_index)"
+              nsenter --target 1 --mount -- nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ' > /tmp/gpu-info/tray_index
+              val=$(cat /tmp/gpu-info/tray_index)
+              if [ -n "$val" ]; then
+                echo "GPU info: tray=$val"
               else
-                echo "nvidia-smi not found on host, skipping GPU info"
+                echo "Tray index not available"
               fi
           volumeMounts:
             - name: gpu-info
               mountPath: /tmp/gpu-info
-            - name: host-usr
-              mountPath: /host/usr
-              readOnly: true
-            - name: host-dev
-              mountPath: /dev
+          securityContext:
+            privileged: true
           resources:
             requests:
               cpu: 10m
