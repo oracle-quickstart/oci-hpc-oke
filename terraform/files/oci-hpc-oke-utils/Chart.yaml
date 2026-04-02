@@ -1,6 +1,6 @@
 apiVersion: v2
 name: oci-hpc-oke-utils
-description: OKE node utility DaemonSet — RDMA topology labeling and image pre-pulling
+description: OKE node utility DaemonSets — node labeler (RDMA topology, compute host health, firmware, maintenance events), image prepuller, and hostexec
 version: 0.1.0
 appVersion: "0.1.0"
 type: application

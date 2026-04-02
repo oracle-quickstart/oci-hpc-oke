@@ -1873,7 +1873,7 @@ variables:
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils
-    description: Install the OCI HPC OKE Utils Helm chart (includes RDMA topology labeler and image prepuller).
+    description: Install the OCI HPC OKE Utils Helm chart (includes node labeler with RDMA topology, compute host health, firmware versions, and maintenance event tracking; image prepuller; and hostexec).
     type: boolean
     default: true
     visible: ${worker_rdma_enabled}
