@@ -304,6 +304,7 @@ NCCL version 2.25.1+cuda12.8
 - [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
 - [Replacing the boot volume of self-managed nodes using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
+- [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
 
 ## Contributing
 
