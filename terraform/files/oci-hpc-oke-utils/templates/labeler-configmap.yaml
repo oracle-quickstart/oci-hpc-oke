@@ -613,7 +613,7 @@ data:
         host_interval = int(os.environ.get("HOST_INTERVAL", "900"))
 
         # Stagger startup so nodes don't all hit the OCI API at the same time
-        startup_jitter = random.uniform(0, 120)
+        startup_jitter = random.uniform(0, 300)
         log.info("Node: %s | IMDS interval: %ds | Host API interval: %ds | Startup jitter: %.1fs",
                  node_name, interval, host_interval, startup_jitter)
         time.sleep(startup_jitter)

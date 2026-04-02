@@ -75,7 +75,7 @@ Labels are applied periodically and kept up to date. If a data source is tempora
 | `labeler.hostInterval` | `900` | Seconds between OCI API label refreshes |
 | `labeler.labelMappings` | `{}` | CSV-based label mappings (see [Label Mappings](#label-mappings)) |
 
-The labeler staggers startup by a random 0-120 second jitter per node to avoid thundering herd API calls during DaemonSet rollout.
+The labeler staggers startup by a random 0-300 second jitter per node to avoid thundering herd API calls during DaemonSet rollout.
 
 ### Labels
 
