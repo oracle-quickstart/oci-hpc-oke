@@ -8,5 +8,8 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes/status"]
     verbs: ["get", "patch"]
 {{- end }}

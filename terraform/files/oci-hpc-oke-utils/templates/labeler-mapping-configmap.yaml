@@ -1,0 +1,14 @@
+{{- if and .Values.labeler.enabled .Values.labeler.labelMappings }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler-mapping
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+data:
+  {{- range $filename, $content := .Values.labeler.labelMappings }}
+  {{ $filename }}: |
+{{ $content | indent 4 }}
+  {{- end }}
+{{- end }}

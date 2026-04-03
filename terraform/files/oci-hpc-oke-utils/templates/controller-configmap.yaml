@@ -1,0 +1,439 @@
+{{- if .Values.labeler.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-controller-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+data:
+  controller.py: |
+    # /// script
+    # requires-python = ">=3.12"
+    # dependencies = [
+    #     "kubernetes>=31.0.0",
+    #     "oci>=2.169.0",
+    # ]
+    # ///
+
+    import json
+    import logging
+    import os
+    import random
+    import re
+    import time
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    import oci
+    from kubernetes import client, config
+
+    HEALTH_FILE = Path("/tmp/health/alive")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    log = logging.getLogger("controller")
+
+    MAINTENANCE_CONDITION_TYPE = "oci.oraclecloud.com/MaintenanceFault"
+    ACTIVE_MAINTENANCE_STATES = ("SCHEDULED", "IN_PROGRESS")
+    FAULT_LABEL_PREFIX = "oci.oraclecloud.com/host.fault."
+    MAINTENANCE_LABEL_PREFIX = "oci.oraclecloud.com/host.maintenance."
+
+
+    def _is_throttled(exc: Exception) -> bool:
+        return isinstance(exc, oci.exceptions.ServiceError) and exc.status == 429
+
+
+    def _oci_call_with_backoff(func, *args, max_retries: int = 3, **kwargs):
+        for attempt in range(max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                if _is_throttled(exc) and attempt < max_retries:
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    log.warning("OCI API throttled (429), retrying in %.1fs (attempt %d/%d)", wait, attempt + 1, max_retries)
+                    time.sleep(wait)
+                    continue
+                raise
+
+
+    def _list_all_compute_hosts(compute_client: oci.core.ComputeClient, tenant_id: str) -> list:
+        """List all compute hosts in the tenancy, paginating through all results."""
+        all_hosts = []
+        page = None
+        while True:
+            kwargs = {"compartment_id": tenant_id, "limit": 100}
+            if page:
+                kwargs["page"] = page
+            result = _oci_call_with_backoff(compute_client.list_compute_hosts, **kwargs)
+            all_hosts.extend(result.data.items)
+            page = result.next_page
+            if not page:
+                break
+        return all_hosts
+
+
+    def _get_host_labels(host, has_impacted: bool | None) -> dict[str, str]:
+        """Extract labels from a full ComputeHost object."""
+        labels = {}
+        if host.platform:
+            labels["oci.oraclecloud.com/host.platform"] = host.platform
+        if host.health:
+            labels["oci.oraclecloud.com/host.health"] = host.health
+        if host.lifecycle_state:
+            labels["oci.oraclecloud.com/host.lifecycle_state"] = host.lifecycle_state
+        if has_impacted is not None:
+            labels["oci.oraclecloud.com/host.has_impacted_components"] = str(has_impacted).lower()
+        if host.capacity_reservation_id:
+            labels["oci.oraclecloud.com/host.capacity_reservation_id"] = host.capacity_reservation_id[-11:]
+        if host.compute_host_group_id:
+            labels["oci.oraclecloud.com/host.compute_host_group_id"] = host.compute_host_group_id[-11:]
+
+        # Active fault IDs
+        icd = host.impacted_component_details or {}
+        components = icd.get("impactedComponents", {}).get("v1", {}).get("components", [])
+        faults_by_type: dict[str, set[str]] = {}
+        for comp in components:
+            if comp.get("impacting") and comp.get("faultId"):
+                ct = comp.get("componentType", "unknown").lower()
+                faults_by_type.setdefault(ct, set()).add(comp["faultId"])
+        for ct, fault_ids in faults_by_type.items():
+            sorted_ids = sorted(fault_ids)
+            if len(sorted_ids) == 1:
+                value = sorted_ids[0]
+            else:
+                value = f"{len(sorted_ids)}x_{sorted_ids[0]}"
+            labels[f"oci.oraclecloud.com/host.fault.{ct}"] = value
+
+        recycle = host.recycle_details
+        if recycle and recycle.recycle_level:
+            labels["oci.oraclecloud.com/host.recycle_level"] = recycle.recycle_level
+
+        return labels
+
+
+    def _get_firmware_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str, fw_cache: dict) -> dict[str, str]:
+        """Get firmware labels, using a cache to avoid duplicate API calls for the same bundle."""
+        if firmware_bundle_id in fw_cache:
+            return fw_cache[firmware_bundle_id]
+
+        try:
+            bundle = _oci_call_with_backoff(compute_client.get_firmware_bundle, firmware_bundle_id=firmware_bundle_id).data
+        except Exception:
+            log.exception("Failed to get firmware bundle %s", firmware_bundle_id)
+            return {}  # Don't cache failures -- retry next cycle
+
+        labels = {}
+        if bundle.description:
+            m = re.search(r"update to (\S+)", bundle.description)
+            if m:
+                labels["oci.oraclecloud.com/host.fw.bundle_version"] = m.group(1).rstrip(";")
+
+        for platform_entry in bundle.platforms or []:
+            platform_name = platform_entry.platform or ""
+            is_switch = platform_name != host_platform
+            for cv in platform_entry.versions or []:
+                component = cv.component_type.lower()
+                if not cv.version:
+                    continue
+                version = "_".join(cv.version)
+                if is_switch:
+                    key = f"oci.oraclecloud.com/host.fw.switch.{component}"
+                else:
+                    key = f"oci.oraclecloud.com/host.fw.{component}"
+                labels[key] = version
+
+        fw_cache[firmware_bundle_id] = labels
+        return labels
+
+
+    def _get_maintenance_labels_and_conditions(compute_client: oci.core.ComputeClient, instance_id: str, compartment_id: str) -> tuple[dict[str, str], list[dict]] | None:
+        """Get maintenance labels and conditions for an instance. Returns None on API failure."""
+        try:
+            events = _oci_call_with_backoff(
+                compute_client.list_instance_maintenance_events,
+                compartment_id=compartment_id,
+                instance_id=instance_id,
+            ).data
+        except Exception:
+            log.exception("Failed to list maintenance events for instance %s", instance_id)
+            return None
+
+        labels = {}
+        conditions = []
+        active_events = [e for e in events if e.lifecycle_state in ACTIVE_MAINTENANCE_STATES]
+
+        if active_events:
+            event = active_events[0]
+            labels["oci.oraclecloud.com/host.maintenance.reason"] = event.maintenance_reason or "UNKNOWN"
+            labels["oci.oraclecloud.com/host.maintenance.action"] = event.instance_action or "NONE"
+            labels["oci.oraclecloud.com/host.maintenance.state"] = event.lifecycle_state
+
+            try:
+                full_event = _oci_call_with_backoff(
+                    compute_client.get_instance_maintenance_event,
+                    instance_maintenance_event_id=event.id,
+                ).data
+            except Exception:
+                log.exception("Failed to get maintenance event %s", event.id)
+                conditions = [{"reason": event.maintenance_reason or "MaintenanceScheduled",
+                               "message": event.description or "Maintenance event scheduled",
+                               "fault_id": None}]
+                return labels, conditions
+
+            fault_details_str = (full_event.additional_details or {}).get("faultDetails", "[]")
+            try:
+                faults = json.loads(fault_details_str) if isinstance(fault_details_str, str) else fault_details_str
+            except (json.JSONDecodeError, TypeError):
+                faults = []
+
+            if faults:
+                conditions = [{"reason": f.get("faultId", event.maintenance_reason or "MaintenanceScheduled"),
+                               "message": f.get("customerDescription", event.description or ""),
+                               "fault_id": f.get("faultId")} for f in faults]
+            else:
+                conditions = [{"reason": event.maintenance_reason or "MaintenanceScheduled",
+                               "message": event.description or "Maintenance event scheduled",
+                               "fault_id": None}]
+
+        return labels, conditions
+
+
+    def _apply_node_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str],
+                            existing: dict[str, str], clean_faults: bool = True, clean_maintenance: bool = False) -> bool:
+        """Patch labels on a node. Only updates changed labels. Returns True on success.
+        clean_faults: always safe (based on host data already fetched)
+        clean_maintenance: only when maintenance API succeeded"""
+        updates = {}
+        for k, v in desired.items():
+            if existing.get(k) != v:
+                updates[k] = v
+
+        if clean_faults:
+            for k in existing:
+                if k not in desired and k.startswith(FAULT_LABEL_PREFIX):
+                    updates[k] = None
+
+        if clean_maintenance:
+            for k in existing:
+                if k not in desired and k.startswith(MAINTENANCE_LABEL_PREFIX):
+                    updates[k] = None
+
+        if not updates:
+            return True
+
+        try:
+            v1.patch_node(node_name, {"metadata": {"labels": updates}})
+            real_updates = {k: v for k, v in updates.items() if v is not None}
+            removals = [k for k, v in updates.items() if v is None]
+            if real_updates:
+                log.info("Applied %d labels to %s", len(real_updates), node_name)
+            if removals:
+                log.info("Removed %d stale labels from %s", len(removals), node_name)
+            return True
+        except Exception:
+            log.exception("Failed to patch node %s", node_name)
+            return False
+
+
+    def _apply_maintenance_condition(v1: client.CoreV1Api, node_name: str, conditions: list[dict]):
+        """Set or clear the MaintenanceFault node condition."""
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        try:
+            node = v1.read_node_status(node_name)
+            existing_conditions = node.status.conditions or []
+        except Exception:
+            log.exception("Failed to read node status for %s", node_name)
+            return
+
+        has_existing = any(c.type == MAINTENANCE_CONDITION_TYPE for c in existing_conditions)
+
+        if conditions:
+            messages = []
+            fault_ids = []
+            for c in conditions:
+                if c.get("fault_id"):
+                    fault_ids.append(c["fault_id"])
+                messages.append(c["message"])
+            reason = conditions[0]["reason"]
+            message = "; ".join(messages)
+            if fault_ids:
+                reason = "_".join(fault_ids[:3])
+
+            new_condition = {
+                "type": MAINTENANCE_CONDITION_TYPE,
+                "status": "True",
+                "reason": reason,
+                "message": message[:1024],
+                "lastHeartbeatTime": now,
+                "lastTransitionTime": now,
+            }
+
+            if has_existing:
+                for c in existing_conditions:
+                    if c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True":
+                        new_condition["lastTransitionTime"] = c.last_transition_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        break
+
+            try:
+                v1.patch_node_status(node_name, {"status": {"conditions": [new_condition]}})
+            except Exception:
+                log.exception("Failed to set maintenance condition on %s", node_name)
+
+        elif has_existing:
+            currently_true = any(c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True" for c in existing_conditions)
+            if currently_true:
+                try:
+                    v1.patch_node_status(node_name, {"status": {"conditions": [{
+                        "type": MAINTENANCE_CONDITION_TYPE, "status": "False",
+                        "reason": "Resolved", "message": "No active maintenance events",
+                        "lastHeartbeatTime": now, "lastTransitionTime": now,
+                    }]}})
+                    log.info("Cleared MaintenanceFault condition on %s", node_name)
+                except Exception:
+                    log.exception("Failed to clear maintenance condition on %s", node_name)
+
+
+    def main():
+        config.load_incluster_config()
+        v1 = client.CoreV1Api()
+
+        interval = int(os.environ.get("CONTROLLER_INTERVAL", "900"))
+        node_selector = os.environ.get("NODE_SELECTOR", "")
+
+        try:
+            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+            compute_client = oci.core.ComputeClient(config={}, signer=signer)
+            tenant_id = signer.tenancy_id
+        except Exception:
+            log.exception("Failed to create OCI ComputeClient")
+            return
+
+        log.info("Controller started | Interval: %ds | Tenant: %s", interval, tenant_id[-11:])
+
+        # Track previous state to skip unchanged nodes
+        prev_state: dict[str, tuple] = {}
+        # Persist firmware cache across cycles (bundles don't change often)
+        fw_cache: dict[str, dict[str, str]] = {}
+        cycle_count = 0
+        FW_CACHE_TTL_CYCLES = 24  # Clear firmware cache every 24 cycles (~6 hours at 900s interval)
+
+        while True:
+            cycle_count += 1
+            if cycle_count % FW_CACHE_TTL_CYCLES == 0:
+                fw_cache.clear()
+                prev_state.clear()
+                log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
+            try:
+                # Get all GPU nodes
+                nodes = v1.list_node(label_selector=node_selector).items
+                node_map = {}  # node_name -> (instance_id, compartment_id, existing_labels)
+                for node in nodes:
+                    node_name = node.metadata.name
+                    # Instance ID from OKE provider ID (oci://<ocid> or bare <ocid>)
+                    provider_id = (node.spec.provider_id or "").removeprefix("oci://")
+                    compartment_id = (node.metadata.annotations or {}).get("oci.oraclecloud.com/compartment-id", "")
+                    if provider_id.startswith("ocid1.instance.") and compartment_id:
+                        existing_labels = node.metadata.labels or {}
+                        node_map[node_name] = (provider_id, compartment_id, existing_labels)
+
+                log.info("Found %d GPU nodes (%d with instance IDs)", len(nodes), len(node_map))
+
+                # List all compute hosts once
+                all_hosts = _list_all_compute_hosts(compute_client, tenant_id)
+                log.info("Listed %d compute hosts", len(all_hosts))
+
+                # Build instance_id -> host summary mapping
+                host_by_instance: dict[str, object] = {}
+                for h in all_hosts:
+                    if h.instance_id:
+                        host_by_instance[h.instance_id] = h
+
+                skipped = 0
+                processed = 0
+
+                # Process each node
+                for node_name, (instance_id, compartment_id, existing_labels) in node_map.items():
+                    host_summary = host_by_instance.get(instance_id)
+                    if not host_summary:
+                        continue
+
+                    # Check if this node's state changed since last cycle
+                    current_state = (
+                        host_summary.health,
+                        host_summary.lifecycle_state,
+                        host_summary.has_impacted_components,
+                    )
+                    has_host_labels = "oci.oraclecloud.com/host.platform" in existing_labels
+                    has_fw_labels = "oci.oraclecloud.com/host.fw.bundle_version" in existing_labels
+                    has_maint_labels = any(k.startswith("oci.oraclecloud.com/host.maintenance.") for k in existing_labels)
+
+                    # Skip expensive API calls if node is stable:
+                    # - State unchanged from last cycle
+                    # - Already has host and firmware labels
+                    # - No impacted components
+                    # - No active maintenance labels to clear
+                    prev = prev_state.get(node_name)
+                    if (prev == current_state
+                            and has_host_labels
+                            and has_fw_labels
+                            and not host_summary.has_impacted_components
+                            and not has_maint_labels):
+                        skipped += 1
+                        continue
+
+                    # Get full host details
+                    try:
+                        host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_summary.id).data
+                    except Exception:
+                        log.exception("Failed to get compute host for node %s", node_name)
+                        continue
+
+                    # Build labels
+                    labels = _get_host_labels(host, host_summary.has_impacted_components)
+
+                    # Firmware labels (cached per bundle ID)
+                    if host.firmware_bundle_id:
+                        fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
+                        labels.update(fw_labels)
+
+                    # Maintenance: only query if node has impacted components or existing maintenance labels
+                    maint_result = None  # None = not queried or API failed
+                    if host_summary.has_impacted_components or has_maint_labels:
+                        maint_result = _get_maintenance_labels_and_conditions(
+                            compute_client, instance_id, compartment_id)
+                        if maint_result is not None:
+                            maint_labels, maint_conditions = maint_result
+                            labels.update(maint_labels)
+
+                    # Always clean fault labels (based on host data already fetched)
+                    # Only clean maintenance labels when maintenance API succeeded
+                    patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
+                                                   clean_faults=True, clean_maintenance=maint_result is not None)
+
+                    # Only reconcile maintenance condition when we got a definitive answer
+                    if maint_result is not None:
+                        _apply_maintenance_condition(v1, node_name, maint_result[1])
+
+                    # Update cached state only after successful label patch
+                    if patch_ok:
+                        prev_state[node_name] = current_state
+                    processed += 1
+
+                log.info("Cycle complete: processed %d, skipped %d stable, %d firmware bundles cached",
+                         processed, skipped, len(fw_cache))
+
+            except Exception:
+                log.exception("Controller cycle failed")
+
+            HEALTH_FILE.touch()
+            time.sleep(interval)
+
+
+    if __name__ == "__main__":
+        main()
+{{- end }}

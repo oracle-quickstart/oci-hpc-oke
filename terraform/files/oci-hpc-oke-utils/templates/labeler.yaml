@@ -26,6 +26,9 @@ spec:
         {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/labeler-configmap.yaml") . | sha256sum }}
+        {{- if .Values.labeler.labelMappings }}
+        checksum/mapping: {{ include (print $.Template.BasePath "/labeler-mapping-configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- with .Values.labeler.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -33,6 +36,7 @@ spec:
       automountServiceAccountToken: true  # Required for Kubernetes API access
       serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
       hostNetwork: true
+      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       priorityClassName: system-node-critical
       {{- with .Values.labeler.imagePullSecrets }}
@@ -59,6 +63,38 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- if .Values.labeler.labelMappings }}
+        - name: label-mapping
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-labeler-mapping
+        {{- end }}
+        - name: gpu-info
+          emptyDir: {}
+      initContainers:
+        - name: gpu-info
+          image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              nsenter --target 1 --mount -- nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ' > /tmp/gpu-info/tray_index
+              val=$(cat /tmp/gpu-info/tray_index)
+              if [ -n "$val" ]; then
+                echo "GPU info: tray=$val"
+              else
+                echo "Tray index not available"
+              fi
+          volumeMounts:
+            - name: gpu-info
+              mountPath: /tmp/gpu-info
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         - name: labeler
           image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
@@ -72,6 +108,14 @@ spec:
               mountPath: /tmp/uv-cache
             - name: tmp
               mountPath: /tmp/health
+            {{- if .Values.labeler.labelMappings }}
+            - name: label-mapping
+              mountPath: /etc/label-mapping
+              readOnly: true
+            {{- end }}
+            - name: gpu-info
+              mountPath: /tmp/gpu-info
+              readOnly: true
           env:
             - name: UV_CACHE_DIR
               value: /tmp/uv-cache
@@ -81,10 +125,14 @@ spec:
                   fieldPath: spec.nodeName
             - name: INTERVAL
               value: {{ .Values.labeler.interval | quote }}
+            {{- if .Values.labeler.labelMappings }}
+            - name: LABEL_MAPPING_DIR
+              value: /etc/label-mapping
+            {{- end }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 120
             failureThreshold: 5
           resources:
