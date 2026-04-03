@@ -265,13 +265,14 @@ Allow dynamic-group instance_principal to read objectstorage-namespaces in tenan
 Allow dynamic-group instance_principal to manage object-family in compartment compartmentName
 ```
 
-In order for the AIStore cluster to work, add the below policies. Whether you are using Security List or Network Security Groups, add the ingress and egress rules at the appropriate place. 
+In order for the AIStore cluster to work, add the below policies. Whether you are using Security List or Network Security Groups, add the ingress and egress rules at the appropriate place.
+
 1. Allow all TCP traffic between operator (consumers) and workers
 2. Allow all TCP traffic between operator (consumers) and pods
 
 If you have deployed the OKE cluster using the Oracle Stack at https://github.com/oracle-quickstart/oci-hpc-oke, then add the below Security Rules in the following Network Security Groups (NSG).
 
-In workers NSG
+### In workers NSG
 
 Direction: Ingress
 Stateless: No
@@ -286,7 +287,7 @@ Type and Code:
 Allow: TCP traffic
 Description: AIStore
 
-In pods NSG
+### In pods NSG
 
 Direction: Ingress
 Stateless: No
@@ -301,7 +302,7 @@ Type and Code:
 Allow: TCP traffic
 Description: AIStore
 
-In operator NSG
+### In operator NSG
 
 Direction: Ingress
 Stateless: No
