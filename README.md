@@ -378,9 +378,11 @@ pod "imex-channel-injection" deleted
 
 ### RUN NCCL tests
 
-#### Install MPI Operator
+#### Install Kueue & MPI Operator
 ```
-kubectl create -f https://github.com/kubeflow/mpi-operator/releases/download/v0.7.0/mpi-operator.yaml
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
+
+kubectl create -f https://github.com/kubeflow/mpi-operator/releases/download/v0.8.0/mpi-operator.yaml
 ```
 
 Run the manifest that matches your shape.
