@@ -21,7 +21,6 @@ labeler:
   podAnnotations: {}
   podLabels: {}
   interval: 300
-  hostInterval: 900
   labelMappings: {}
   # Example:
   # labelMappings:
@@ -31,10 +30,23 @@ labeler:
   resources:
     requests:
       cpu: 10m
-      memory: 128Mi
+      memory: 64Mi
     limits:
       cpu: 100m
-      memory: 256Mi
+      memory: 128Mi
+  controller:
+    interval: 900
+    nodeSelectorLabel: ""
+    nodeSelector: {}
+    tolerations:
+      - operator: Exists
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
 
 prepuller:
   enabled: false

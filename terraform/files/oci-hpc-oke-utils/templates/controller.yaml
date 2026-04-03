@@ -1,0 +1,83 @@
+{{- if .Values.labeler.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/controller-configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
+      priorityClassName: system-cluster-critical
+      {{- with .Values.labeler.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.labeler.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.labeler.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-controller-script
+        - name: uv-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: controller
+          image: "{{ .Values.labeler.image.repository }}:{{ .Values.labeler.image.tag }}"
+          imagePullPolicy: {{ .Values.labeler.image.pullPolicy }}
+          command: ["uv", "run", "/scripts/controller.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: uv-cache
+              mountPath: /tmp/uv-cache
+            - name: tmp
+              mountPath: /tmp/health
+          env:
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: CONTROLLER_INTERVAL
+              value: {{ .Values.labeler.controller.interval | quote }}
+            - name: NODE_SELECTOR
+              value: {{ .Values.labeler.controller.nodeSelectorLabel | quote }}
+          livenessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/alive"]
+            initialDelaySeconds: 60
+            periodSeconds: 120
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.labeler.controller.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

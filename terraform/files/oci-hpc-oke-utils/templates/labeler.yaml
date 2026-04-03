@@ -125,8 +125,6 @@ spec:
                   fieldPath: spec.nodeName
             - name: INTERVAL
               value: {{ .Values.labeler.interval | quote }}
-            - name: HOST_INTERVAL
-              value: {{ .Values.labeler.hostInterval | quote }}
             {{- if .Values.labeler.labelMappings }}
             - name: LABEL_MAPPING_DIR
               value: /etc/label-mapping
@@ -134,7 +132,7 @@ spec:
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
-            initialDelaySeconds: 360
+            initialDelaySeconds: 60
             periodSeconds: 120
             failureThreshold: 5
           resources:

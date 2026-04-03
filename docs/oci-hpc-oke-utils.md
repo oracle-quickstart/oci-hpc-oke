@@ -70,12 +70,11 @@ Labels are applied periodically and kept up to date. If a data source is tempora
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `labeler.enabled` | `true` | Enable/disable the labeler DaemonSet |
-| `labeler.interval` | `300` | Seconds between IMDS label refreshes |
-| `labeler.hostInterval` | `900` | Seconds between OCI API label refreshes |
+| `labeler.enabled` | `true` | Enable/disable the labeler |
+| `labeler.interval` | `300` | Seconds between IMDS label refreshes (DaemonSet) |
 | `labeler.labelMappings` | `{}` | CSV-based label mappings (see [Label Mappings](#label-mappings)) |
-
-The labeler staggers startup by a random 0-300 second jitter per node to avoid thundering herd API calls during DaemonSet rollout.
+| `labeler.controller.interval` | `900` | Seconds between OCI API label refreshes (controller) |
+| `labeler.controller.nodeSelectorLabel` | `""` (all nodes) | Label selector for filtering which nodes the controller manages. Empty discovers all OCI nodes. |
 
 ### Labels
 
@@ -248,25 +247,40 @@ labeler:
 
 When a CSV row is removed or a mapping no longer matches, the corresponding labels are automatically removed from nodes. Updating `labelMappings` in the Helm values triggers a pod restart via the checksum annotation.
 
-### How It Works
+### Architecture
 
-The labeler runs as a DaemonSet pod on each GPU node with `hostNetwork: true` for IMDS access. It uses three data sources on independent refresh intervals:
+The labeler uses a centralized controller Deployment paired with a lightweight DaemonSet:
 
-**IMDS path (every 5 minutes):**
+**Controller (Deployment, 1 replica):**
+- Lists all compute hosts once per cycle (not per node)
+- Caches firmware bundles (1 API call per unique bundle, not per node)
+- Handles maintenance events for all nodes
+- Patches all node labels from a single location
+- Skips stable nodes on subsequent cycles (~3 API calls in steady state)
+- Tenancy OCID auto-discovered from instance principals
+
+**DaemonSet (per node, local only):**
+- IMDS topology labels (must run on each node)
+- nvidia-smi tray index via nsenter
+- CSV label mappings from ConfigMap
+- No OCI SDK dependency, lighter footprint
+
+#### How each data source works
+
+**IMDS path (DaemonSet, every 5 minutes):**
 1. Queries `http://169.254.169.254/opc/v2/host/rdmaTopologyData` for RDMA placement
 2. Queries `/instance/shape` to detect GPU memory fabric shapes
 3. For GB200/GB300, queries `/instance/` for GPU memory cluster tags
 
-**OCI API path (every 15 minutes):**
-1. Creates an OCI ComputeClient using instance principals
-2. Gets the instance OCID and tenancy OCID from IMDS
-3. Lists compute hosts in the tenancy (paginated, host ID cached after first lookup)
-4. Calls `get_compute_hosts` for full host details including firmware bundle ID
-5. Calls `get_firmware_bundle` for per-component firmware versions
-6. Lists maintenance events for the instance, sets labels and node conditions for active events
-7. All API calls use exponential backoff on 429 throttling (up to 3 retries)
+**OCI API path (Controller or DaemonSet, every 15 minutes):**
+1. Lists compute hosts in the tenancy (paginated)
+2. Gets full host details including firmware bundle ID
+3. Gets firmware bundle for per-component firmware versions (cached per unique bundle)
+4. Lists maintenance events, sets labels and node conditions for active events
+5. All API calls use exponential backoff on 429 throttling (up to 3 retries)
+6. In controller mode, skips nodes whose state hasn't changed since last cycle
 
-**Label mappings (every 5 minutes):**
+**Label mappings (DaemonSet, every 5 minutes):**
 1. Reads CSV files from the mounted ConfigMap
 2. For each CSV, checks if the node has the label specified in the header
 3. Suffix-matches the label value against CSV rows
