@@ -96,7 +96,7 @@ prepuller:
         - iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
 
 hostexec:
-  enabled: false
+  enabled: true
   imagePullSecrets: []
   hostRootPath: /
   interval: 30
@@ -108,8 +108,8 @@ hostexec:
   podAnnotations: {}
   podLabels: {}
   image:
-    repository: docker.io/debian
-    tag: bookworm-slim
+    repository: ghcr.io/astral-sh/uv
+    tag: "0.7.12-python3.12-bookworm-slim"
     pullPolicy: IfNotPresent
     resources:
       requests:
