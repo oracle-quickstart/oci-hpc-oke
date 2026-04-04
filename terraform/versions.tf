@@ -26,5 +26,9 @@ terraform {
       source  = "gavinbunney/kubectl" # https://github.com/hashicorp/terraform-provider-kubernetes/issues/1782#issuecomment-1687357821
       version = "~> 1.19"             # https://github.com/hashicorp/terraform-provider-kubernetes/issues/1391
     }
+    time = {
+      source  = "hashicorp/time"
+      version = ">= 0.13.1"
+    }
   }
 }
