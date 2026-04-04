@@ -137,19 +137,28 @@ resource "oci_identity_policy" "oke_quickstart_all" {
 
 resource "oci_identity_policy" "oke_quickstart_storage" {
   provider       = oci.home
-  count          = alltrue([var.create_policies, anytrue([var.create_fss, var.create_lustre])]) ? 1 : 0
+  count          = alltrue([var.create_policies, var.create_fss]) ? 1 : 0
   compartment_id = var.compartment_ocid
   name           = local.storage_group_name
-  description    = format("FSS and Lustre FS policies for OKE Terraform state %v", local.state_id)
-  statements = flatten([
-    var.create_fss ? [
-      "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-      "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-    ] : [],
-    var.create_lustre ? [
-      "Allow service lustrefs to use virtual-network-family in compartment id ${var.compartment_ocid}",
-    ] : [],
-  ])
+  description    = format("FSS policies for OKE Terraform state %v", local.state_id)
+  statements = [
+    "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+    "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+  ]
+  lifecycle {
+    ignore_changes = [defined_tags]
+  }
+}
+
+resource "oci_identity_policy" "lustre_service_network" {
+  provider       = oci.home
+  count          = alltrue([var.create_policies, var.create_lustre]) ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = format("lustre-service-network-%v", local.state_id)
+  description    = format("Allow Lustre service to manage network resources for OKE Terraform state %v", local.state_id)
+  statements = [
+    "Allow service lustrefs to use virtual-network-family in tenancy",
+  ]
   lifecycle {
     ignore_changes = [defined_tags]
   }
