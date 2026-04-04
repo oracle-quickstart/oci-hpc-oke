@@ -64,7 +64,7 @@ jobs:
     if: >-
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/ok-to-run-apply-tf') &&
+      startsWith(github.event.comment.body, '/ok-to-run-apply-tf') &&
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
     runs-on: ubuntu-latest
     outputs:
@@ -82,36 +82,41 @@ jobs:
               content: 'rocket'
             })
 
+      - name: Verify PR source is trusted
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const headRepo = pr.data.head.repo;
+            const baseRepo = pr.data.base.repo;
+            if (headRepo.full_name === baseRepo.full_name) {
+              console.log(`PR is from the same repo: ${headRepo.full_name}`);
+              return;
+            }
+            const trustedOwners = [baseRepo.owner.login];
+            if (trustedOwners.includes(headRepo.owner.login)) {
+              console.log(`PR fork owner ${headRepo.owner.login} is trusted`);
+              return;
+            }
+            core.setFailed(
+              `PR #${context.issue.number} is from untrusted fork ${headRepo.full_name}. ` +
+              `Refusing to run CI with secrets.`
+            );
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
       - name: Parse topology and overrides from comment
         id: parse
         env:
           COMMENT: ${{ github.event.comment.body }}
-        run: |
-          cmd_line=$(echo "$COMMENT" | grep -oP '/ok-to-run-apply-tf.*' | head -1 || true)
-          read -ra words <<< "$cmd_line"
-
-          topology="${words[1]:-public-fss-monitoring-tf}"
-
-          case "$topology" in
-            public-base-tf|public-bastion-operator-tf|public-fss-monitoring-tf|public-lustre-tf|private-base-tf|private-bastion-operator-tf|private-fss-monitoring-tf|private-lustre-tf)
-              ;;
-            *)
-              echo "Unsupported Terraform topology: $topology"
-              exit 1
-              ;;
-          esac
-
-          overrides='{}'
-          for word in "${words[@]:2}"; do
-            if [[ "$word" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.+$ ]]; then
-              key="${word%%=*}"
-              val="${word#*=}"
-              overrides=$(jq -n --argjson base "$overrides" --arg k "$key" --arg v "$val" '$base + {($k): $v}')
-            fi
-          done
-
-          echo "topology=$topology" >> "$GITHUB_OUTPUT"
-          echo "overrides=$overrides" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/parse-comment.sh "/ok-to-run-apply-tf" "public-base-tf|public-bastion-operator-tf|public-fss-monitoring-tf|public-lustre-tf|private-base-tf|private-bastion-operator-tf|private-fss-monitoring-tf|private-lustre-tf" "public-fss-monitoring-tf"
 
   # ---------------------------------------------------------------------------
   # Apply: init, apply, assert outputs, health checks, then always destroy.
@@ -155,16 +160,7 @@ jobs:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.oci
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
-            "$OCI_USER_OCID" \
-            "$OCI_API_KEY_FINGERPRINT" \
-            "$OCI_TENANCY_OCID" \
-            "$OCI_REGION" \
-            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
-          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+        run: .github/scripts/setup-oci-credentials.sh
 
       - name: Generate ephemeral SSH key for bastion tunnel
         if: startsWith(env.TOPOLOGY, 'private')
@@ -188,33 +184,7 @@ jobs:
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
-        run: |
-          TFVARS_FILE="test/tfvars/tf/${TOPOLOGY}.tfvars"
-          if [ ! -f "$TFVARS_FILE" ]; then
-            echo "Unknown topology: $TOPOLOGY (no file at $TFVARS_FILE)" && exit 1
-          fi
-
-          jq -n \
-            --arg tenancy_ocid               "$OCI_TENANCY_OCID" \
-            --arg region                     "$OCI_REGION" \
-            --arg compartment_ocid           "$OCI_COMPARTMENT_OCID" \
-            --arg current_user_ocid          "$OCI_USER_OCID" \
-            --arg worker_ops_ad              "$WORKER_OPS_AD" \
-            --arg worker_ops_image_custom_id "$WORKER_OPS_IMAGE_CUSTOM_ID" \
-            --arg ssh_public_key             "$SSH_PUBLIC_KEY" \
-            '{
-              tenancy_ocid:               $tenancy_ocid,
-              region:                     $region,
-              compartment_ocid:           $compartment_ocid,
-              current_user_ocid:          $current_user_ocid,
-              worker_ops_ad:              $worker_ops_ad,
-              worker_ops_image_custom_id: $worker_ops_image_custom_id,
-              ssh_public_key:             $ssh_public_key
-            }' > secrets.tfvars.json
-
-          echo "$OVERRIDES_JSON" > overrides.tfvars.json
-          echo "Variables for topology '$TOPOLOGY' (secrets redacted):"
-          jq 'del(.ssh_public_key, .tenancy_ocid, .compartment_ocid, .current_user_ocid)' secrets.tfvars.json
+        run: .github/scripts/build-variables-tf.sh
 
       - name: Terraform init
         run: terraform -chdir=terraform init
@@ -276,706 +246,41 @@ jobs:
         run: terraform -chdir=terraform output -json > state.json
 
       - name: Assert outputs
-        run: |
-          FAILED=0
-
-          check_ocid() {
-            local key=$1
-            local val
-            val=$(jq -r ".${key}.value // empty" state.json)
-            if [[ -z "$val" || "$val" == "null" ]]; then
-              echo "FAIL: $key is empty"
-              FAILED=1; return
-            fi
-            if [[ "$val" != ocid1.* ]] || [[ $(echo "$val" | tr -cd '.' | wc -c) -lt 4 ]]; then
-              echo "FAIL: $key is not a valid OCID: $val"
-              FAILED=1; return
-            fi
-            echo "OK:   $key = $val"
-          }
-
-          # Common checks for all topologies
-          check_ocid cluster_id
-          check_ocid vcn_id
-          check_ocid worker_subnet_id
-          check_ocid worker_nsg_id
-          check_ocid control_plane_subnet_id
-          check_ocid control_plane_nsg_id
-          check_ocid int_lb_subnet_id
-          check_ocid int_lb_nsg_id
-          check_ocid worker_ops_pool_id
-
-          PRIVATE_EP=$(jq -r '.cluster_private_endpoint.value // empty' state.json)
-          if [[ "$PRIVATE_EP" != https://* ]]; then
-            echo "FAIL: cluster_private_endpoint does not start with https://: $PRIVATE_EP"
-            FAILED=1
-          else
-            echo "OK:   cluster_private_endpoint = $PRIVATE_EP"
-          fi
-
-          # Public topology checks
-          if [[ "$TOPOLOGY" == public* ]]; then
-            PUBLIC_EP=$(jq -r '.cluster_public_endpoint.value // empty' state.json)
-            if [[ "$PUBLIC_EP" != https://* ]]; then
-              echo "FAIL: cluster_public_endpoint does not start with https://: $PUBLIC_EP"
-              FAILED=1
-            else
-              echo "OK:   cluster_public_endpoint = $PUBLIC_EP"
-            fi
-            check_ocid pub_lb_subnet_id
-            check_ocid pub_lb_nsg_id
-          fi
-
-          # Private topology checks
-          if [[ "$TOPOLOGY" == private* ]]; then
-            PUBLIC_EP=$(jq -r '.cluster_public_endpoint.value // empty' state.json)
-            if [ -n "$PUBLIC_EP" ]; then
-              echo "FAIL: cluster_public_endpoint should be empty for private topology: $PUBLIC_EP"
-              FAILED=1
-            else
-              echo "OK:   cluster_public_endpoint is empty (private topology)"
-            fi
-          fi
-
-          # FSS topology checks
-          if [[ "$TOPOLOGY" == *fss* ]]; then
-            check_ocid fss_file_system_id
-            check_ocid fss_nsg_id
-            check_ocid fss_subnet_id
-
-            FSS_MT_IP=$(jq -r '.fss_mount_target_ip.value // empty' state.json)
-            if [[ -z "$FSS_MT_IP" || ! "$FSS_MT_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-              echo "FAIL: fss_mount_target_ip is not a valid IPv4: $FSS_MT_IP"
-              FAILED=1
-            else
-              echo "OK:   fss_mount_target_ip = $FSS_MT_IP"
-            fi
-
-            FSS_EXPORT_PATH=$(jq -r '.fss_export_path.value // empty' state.json)
-            if [[ -z "$FSS_EXPORT_PATH" || "$FSS_EXPORT_PATH" != /oke-gpu-* ]]; then
-              echo "FAIL: fss_export_path has unexpected format: $FSS_EXPORT_PATH"
-              FAILED=1
-            else
-              echo "OK:   fss_export_path = $FSS_EXPORT_PATH"
-            fi
-          fi
-
-          # Lustre topology checks
-          if [[ "$TOPOLOGY" == *lustre* ]]; then
-            check_ocid lustre_subnet_id
-            check_ocid lustre_nsg_id
-            check_ocid lustre_file_system_id
-
-            LUSTRE_MGS=$(jq -r '.lustre_management_service_address.value // empty' state.json)
-            if [[ -z "$LUSTRE_MGS" || ! "$LUSTRE_MGS" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-              echo "FAIL: lustre_management_service_address is not a valid IPv4: $LUSTRE_MGS"
-              FAILED=1
-            else
-              echo "OK:   lustre_management_service_address = $LUSTRE_MGS"
-            fi
-          fi
-
-          # Monitoring topology checks
-          if [[ "$TOPOLOGY" == *monitoring* ]]; then
-            check_ocid pub_lb_subnet_id
-            check_ocid pub_lb_nsg_id
-
-            GRAFANA_URL=$(jq -r '.grafana_url.value // empty' state.json)
-            if [[ "$GRAFANA_URL" != http* ]]; then
-              echo "FAIL: grafana_url is not a valid URL: $GRAFANA_URL"
-              FAILED=1
-            else
-              echo "OK:   grafana_url = $GRAFANA_URL"
-            fi
-
-            GRAFANA_PASS=$(jq -r '.grafana_admin_password.value // empty' state.json)
-            if [ -z "$GRAFANA_PASS" ]; then
-              echo "FAIL: grafana_admin_password is empty"
-              FAILED=1
-            else
-              echo "OK:   grafana_admin_password is set"
-            fi
-          fi
-
-          [ "$FAILED" -eq 0 ] || exit 1
+        run: .github/scripts/assert-outputs.sh state.json ""
 
       - name: Generate kubeconfig
         env:
           OCI_REGION: ${{ vars.OCI_REGION }}
-        run: |
-          CLUSTER_ID=$(jq -r '.cluster_id.value' state.json)
-          mkdir -p "$HOME/.kube"
-
-          if [[ "$TOPOLOGY" == public* ]]; then
-            oci ce cluster create-kubeconfig \
-              --cluster-id "$CLUSTER_ID" \
-              --file "$HOME/.kube/config" \
-              --region "$OCI_REGION" \
-              --token-version 2.0.0 \
-              --kube-endpoint PUBLIC_ENDPOINT
-          else
-            BASTION_ID=$(jq -r '.bastion_service_id.value // empty' state.json)
-            ENDPOINT_IP=$(jq -r '.oke_private_endpoint_ip.value // empty' state.json)
-
-            if [ -z "$BASTION_ID" ] || [ -z "$ENDPOINT_IP" ]; then
-              echo "FAIL: bastion_service_id or oke_private_endpoint_ip is empty -- is create_oci_bastion_service enabled?"
-              exit 1
-            fi
-
-            ./files/oke-bastion-service-session.sh \
-              --bastion-ocid "$BASTION_ID" \
-              --cluster-ocid "$CLUSTER_ID" \
-              --oke-endpoint-ip "$ENDPOINT_IP" \
-              --region "$OCI_REGION" \
-              --ssh-key ~/.ssh/bastion_key \
-              --local-port 6443 \
-              --ttl-seconds 10800 \
-              --auto-tunnel \
-              --non-interactive
-
-            BASTION_KCFG="$HOME/.kube/oke-bastion/${CLUSTER_ID}.yaml"
-            if [ ! -f "$BASTION_KCFG" ]; then
-              echo "ERROR: bastion script did not produce kubeconfig at $BASTION_KCFG"
-              ls -la "$HOME/.kube/oke-bastion/" || true
-              exit 1
-            fi
-            cp "$BASTION_KCFG" "$HOME/.kube/config"
-            echo "Verifying tunnel connectivity..."
-            kubectl --kubeconfig "$HOME/.kube/config" cluster-info
-          fi
+        run: .github/scripts/generate-kubeconfig.sh state.json ""
 
       - name: Cluster health checks
-        run: |
-          echo "Health check: API server connectivity"
-          kubectl cluster-info
-
-          echo "Health check: waiting for nodes to be Ready"
-          kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-          NODE_COUNT=$(kubectl get nodes --no-headers | wc -l)
-          echo "  $NODE_COUNT node(s) ready"
-          [ "$NODE_COUNT" -ge 1 ] || { echo "FAIL: no nodes found"; exit 1; }
-
-          echo "Health check: node count matches expected pool sizes"
-          EXPECTED=0
-          for pool_key in worker_ops_pool_id worker_cpu_pool_id worker_gpu_pool_id; do
-            POOL_ID=$(jq -r ".${pool_key}.value // empty" state.json)
-            if [ -n "$POOL_ID" ] && [ "$POOL_ID" != "null" ]; then
-              SIZE=$(oci ce node-pool get --node-pool-id "$POOL_ID" --query 'data."node-config-details".size' --raw-output 2>/dev/null || echo "0")
-              echo "  $pool_key: size=$SIZE"
-              EXPECTED=$((EXPECTED + SIZE))
-            fi
-          done
-          echo "  expected=$EXPECTED"
-          MAX_POLLS=60
-          POLL=0
-          while true; do
-            ACTUAL=$(kubectl get nodes --no-headers | wc -l | tr -d ' ')
-            if [ "$ACTUAL" -eq "$EXPECTED" ]; then
-              echo "OK:   node count ($ACTUAL) matches expected ($EXPECTED)"
-              break
-            fi
-            POLL=$((POLL + 1))
-            if [ "$POLL" -gt "$MAX_POLLS" ]; then
-              echo "FAIL: node count ($ACTUAL) does not match expected ($EXPECTED) after 30 minutes"
-              exit 1
-            fi
-            echo "  [$POLL/$MAX_POLLS] actual=$ACTUAL expected=$EXPECTED, waiting 30s..."
-            sleep 30
-          done
-
-          kubectl wait --for=condition=Ready nodes --all --timeout=300s
-
-          kubectl wait --for=condition=Ready pods -l k8s-app=kube-dns -n kube-system --timeout=120s
-          kubectl wait --for=condition=Ready pods -l k8s-app=kube-proxy -n kube-system --timeout=120s
-
-          echo "Health check: all kube-system pods healthy"
-          for i in $(seq 1 20); do
-            BAD_PODS=$(kubectl get pods -n kube-system --no-headers | grep -v -E 'Running|Completed' || true)
-            if [ -z "$BAD_PODS" ]; then
-              echo "OK:   all kube-system pods are Running or Completed"
-              break
-            fi
-            if [ "$i" -eq 20 ]; then
-              echo "FAIL: unhealthy pods in kube-system after 5 minutes:"
-              echo "$BAD_PODS"
-              exit 1
-            fi
-            echo "  waiting for pods to be ready (attempt $i/20)..."
-            sleep 15
-          done
-
-          echo "Health check: all cluster health checks passed"
+        run: .github/scripts/check-cluster-health.sh state.json ""
 
       - name: Network health checks
-        run: |
-          echo "Health check: pod-to-pod connectivity"
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: net-server
-          spec:
-            restartPolicy: Never
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: server
-              image: busybox
-              command: ["sh", "-c", "echo 'net-check-ok' > /tmp/index.html && httpd -f -p 8080 -h /tmp"]
-          EOF
-
-          kubectl wait --for=condition=Ready pod/net-server --timeout=120s
-          SERVER_IP=$(kubectl get pod net-server -o jsonpath='{.status.podIP}')
-          echo "  server pod IP: $SERVER_IP"
-
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: net-client
-          spec:
-            restartPolicy: Never
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: client
-              image: busybox
-              command: ["sh", "-c", "for i in \$(seq 1 30); do RESULT=\$(wget -qO- -T 5 http://${SERVER_IP}:8080/index.html 2>/dev/null) && echo \"\$RESULT\" && exit 0; sleep 2; done; echo 'timeout'; exit 1"]
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/net-client --timeout=120s
-          CLIENT_OUTPUT=$(kubectl logs net-client)
-          if [[ "$CLIENT_OUTPUT" != *"net-check-ok"* ]]; then
-            echo "FAIL: pod-to-pod connectivity failed: $CLIENT_OUTPUT"
-            exit 1
-          fi
-          echo "OK:   pod-to-pod connectivity verified"
-
-          echo "Health check: DNS resolution"
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: dns-checker
-          spec:
-            restartPolicy: Never
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: dns
-              image: busybox
-              command: ["sh", "-c", "nslookup kubernetes.default.svc.cluster.local"]
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/dns-checker --timeout=120s
-          DNS_OUTPUT=$(kubectl logs dns-checker)
-          if echo "$DNS_OUTPUT" | grep -q 'NXDOMAIN'; then
-            echo "FAIL: DNS resolution failed: $DNS_OUTPUT"
-            exit 1
-          fi
-          echo "OK:   DNS resolution verified"
-          echo "Health check: all network health checks passed"
+        run: .github/scripts/check-network-health.sh state.json ""
 
       - name: GPU resource health checks
-        run: |
-          GPU_POOL_ID=$(jq -r '.worker_gpu_pool_id.value // empty' state.json)
-          RDMA_POOL_ID=$(jq -r '.worker_rdma_pool_id.value // empty' state.json)
-
-          if [ -z "$GPU_POOL_ID" ] && [ -z "$RDMA_POOL_ID" ]; then
-            echo "No GPU or RDMA pools enabled, skipping GPU resource check"
-            exit 0
-          fi
-
-          echo "Health check: GPU resources advertised on nodes"
-          GPU_NODES=$(kubectl get nodes -o json | jq -r '
-            .items[] |
-            select(
-              (.status.allocatable["nvidia.com/gpu"] // "0" | tonumber) > 0 or
-              (.status.allocatable["amd.com/gpu"] // "0" | tonumber) > 0
-            ) |
-            "\(.metadata.name) nvidia=\(.status.allocatable["nvidia.com/gpu"] // "0") amd=\(.status.allocatable["amd.com/gpu"] // "0")"
-          ')
-
-          if [ -z "$GPU_NODES" ]; then
-            echo "FAIL: GPU/RDMA pool(s) exist but no nodes advertise GPU resources"
-            kubectl get nodes -o custom-columns='NAME:.metadata.name,NVIDIA:.status.allocatable.nvidia\.com/gpu,AMD:.status.allocatable.amd\.com/gpu'
-            exit 1
-          fi
-
-          echo "  GPU nodes found:"
-          echo "$GPU_NODES" | while read -r line; do echo "    $line"; done
-          echo "OK:   GPU resources advertised on nodes"
+        run: .github/scripts/check-gpu-health.sh state.json ""
 
       - name: FSS health checks
         if: contains(env.TOPOLOGY, 'fss')
-        run: |
-          echo "Health check: PVC binding"
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: fss-test-pvc
-          spec:
-            accessModes:
-              - ReadWriteMany
-            storageClassName: ""
-            resources:
-              requests:
-                storage: 50Gi
-            volumeName: fss-pv
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Bound' pvc/fss-test-pvc --timeout=120s
-          echo "OK:   FSS PVC bound"
-
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: fss-writer
-            labels:
-              app.kubernetes.io/name: fss-test
-              app.kubernetes.io/component: writer
-          spec:
-            restartPolicy: Never
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: writer
-              image: busybox
-              command: ["sh", "-c", "echo 'fss-test-content' > /mnt/fss/testfile.txt"]
-              volumeMounts:
-              - name: fss
-                mountPath: /mnt/fss
-            volumes:
-            - name: fss
-              persistentVolumeClaim:
-                claimName: fss-test-pvc
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-writer --timeout=120s
-          FSS_WRITER_NODE=$(kubectl get pod fss-writer -o jsonpath='{.spec.nodeName}')
-          echo "  writer ran on node: $FSS_WRITER_NODE"
-
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: fss-reader
-            labels:
-              app.kubernetes.io/name: fss-test
-              app.kubernetes.io/component: reader
-          spec:
-            restartPolicy: Never
-            affinity:
-              podAntiAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchLabels:
-                      app.kubernetes.io/name: fss-test
-                      app.kubernetes.io/component: writer
-                  topologyKey: kubernetes.io/hostname
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: reader
-              image: busybox
-              command: ["sh", "-c", "cat /mnt/fss/testfile.txt"]
-              volumeMounts:
-              - name: fss
-                mountPath: /mnt/fss
-            volumes:
-            - name: fss
-              persistentVolumeClaim:
-                claimName: fss-test-pvc
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-reader --timeout=120s
-          CONTENT=$(kubectl logs fss-reader)
-          if [[ "$CONTENT" != *"fss-test-content"* ]]; then
-            echo "FAIL: reader pod output does not contain expected content: $CONTENT"
-            exit 1
-          fi
-          echo "OK:   FSS reader output: $CONTENT"
-
-          echo "Health check: FSS OS-level mount (hostPath)"
-          FSS_MOUNT_PATH=$(jq -r '.fss_mount_path.value // "/mnt/oci-fss"' state.json)
-          echo "  host mount path: $FSS_MOUNT_PATH"
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: fss-hostpath-reader
-          spec:
-            restartPolicy: Never
-            nodeName: ${FSS_WRITER_NODE}
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: reader
-              image: busybox
-              command: ["sh", "-c", "cat /mnt/fss-host/testfile.txt"]
-              volumeMounts:
-              - name: fss-host
-                mountPath: /mnt/fss-host
-            volumes:
-            - name: fss-host
-              hostPath:
-                path: ${FSS_MOUNT_PATH}
-                type: Directory
-          EOF
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-hostpath-reader --timeout=120s
-          HOST_CONTENT=$(kubectl logs fss-hostpath-reader)
-          if [[ "$HOST_CONTENT" != *"fss-test-content"* ]]; then
-            echo "FAIL: FSS hostPath reader output does not contain expected content: $HOST_CONTENT"
-            exit 1
-          fi
-          echo "OK:   FSS hostPath reader output: $HOST_CONTENT"
-          echo "Health check: all FSS health checks passed"
+        run: .github/scripts/check-fss-health.sh state.json ""
 
       - name: Lustre health checks
         if: contains(env.TOPOLOGY, 'lustre')
-        run: |
-          echo "Health check: PVC binding"
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: lustre-test-pvc
-          spec:
-            accessModes:
-              - ReadWriteMany
-            storageClassName: ""
-            resources:
-              requests:
-                storage: 50Gi
-            volumeName: lustre-pv
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Bound' pvc/lustre-test-pvc --timeout=120s
-          echo "OK:   Lustre PVC bound"
-
-          echo "Health check: Lustre write"
-          kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: lustre-writer
-            labels:
-              app.kubernetes.io/name: lustre-test
-              app.kubernetes.io/component: writer
-          spec:
-            restartPolicy: Never
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: writer
-              image: busybox
-              command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt && sync"]
-              volumeMounts:
-              - name: lustre
-                mountPath: /mnt/lustre
-            volumes:
-            - name: lustre
-              persistentVolumeClaim:
-                claimName: lustre-test-pvc
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-writer --timeout=120s
-          LUSTRE_WRITER_NODE=$(kubectl get pod lustre-writer -o jsonpath='{.spec.nodeName}')
-          echo "OK:   Lustre writer pod completed (node: $LUSTRE_WRITER_NODE)"
-
-          echo "Health check: Lustre read"
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: lustre-reader
-            labels:
-              app.kubernetes.io/name: lustre-test
-              app.kubernetes.io/component: reader
-          spec:
-            restartPolicy: Never
-            affinity:
-              podAntiAffinity:
-                requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchLabels:
-                      app.kubernetes.io/name: lustre-test
-                      app.kubernetes.io/component: writer
-                  topologyKey: kubernetes.io/hostname
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: reader
-              image: busybox
-              command: ["sh", "-c", "cat /mnt/lustre/testfile.txt"]
-              volumeMounts:
-              - name: lustre
-                mountPath: /mnt/lustre
-            volumes:
-            - name: lustre
-              persistentVolumeClaim:
-                claimName: lustre-test-pvc
-          EOF
-
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-reader --timeout=120s
-          CONTENT=$(kubectl logs lustre-reader)
-          if [[ "$CONTENT" != *"lustre-test-content"* ]]; then
-            echo "FAIL: reader pod output does not contain expected content: $CONTENT"
-            exit 1
-          fi
-          echo "OK:   Lustre reader output: $CONTENT"
-
-          echo "Health check: Lustre OS-level mount (hostPath write+read)"
-          LUSTRE_MOUNT_PATH=$(jq -r '.lustre_mount_path.value // "/mnt/oci-lustre"' state.json)
-          echo "  host mount path: $LUSTRE_MOUNT_PATH"
-          # Write and read via the host mount to verify it works end-to-end.
-          # No mount wait needed — kubelet runs in the host mount namespace and
-          # can see the cloud-init Lustre mount. Pods can't see it in their own
-          # /proc/mounts due to mount namespace isolation, but hostPath works.
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: lustre-hostpath-reader
-          spec:
-            restartPolicy: Never
-            nodeName: ${LUSTRE_WRITER_NODE}
-            tolerations:
-            - key: nvidia.com/gpu
-              operator: Exists
-            - key: amd.com/gpu
-              operator: Exists
-            containers:
-            - name: rw
-              image: busybox
-              command: ["sh", "-c", "echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
-              volumeMounts:
-              - name: lustre-host
-                mountPath: /mnt/lustre-host
-            volumes:
-            - name: lustre-host
-              hostPath:
-                path: ${LUSTRE_MOUNT_PATH}
-                type: Directory
-          EOF
-          kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-hostpath-reader --timeout=120s
-          HOST_CONTENT=$(kubectl logs lustre-hostpath-reader)
-          if [[ "$HOST_CONTENT" != *"hostpath-test-content"* ]]; then
-            echo "FAIL: Lustre hostPath output does not contain expected content: $HOST_CONTENT"
-            exit 1
-          fi
-          echo "OK:   Lustre hostPath output: $HOST_CONTENT"
-          echo "Health check: all Lustre health checks passed"
+        run: .github/scripts/check-lustre-health.sh state.json ""
 
       - name: Monitoring health checks
         if: contains(env.TOPOLOGY, 'monitoring')
-        run: |
-          GRAFANA_URL=$(jq -r '.grafana_url.value' state.json)
-          GRAFANA_PASS=$(jq -r '.grafana_admin_password.value' state.json)
-          for i in $(seq 1 60); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/org" --insecure || true)
-            if [ "$STATUS" = "200" ]; then
-              echo "OK:   Grafana API responded 200"
-              break
-            fi
-            echo "  attempt $i: status=$STATUS, retrying in 10s..."
-            sleep 10
-          done
-          [ "$STATUS" = "200" ] || { echo "FAIL: Grafana API did not respond 200 after 60 attempts"; exit 1; }
+        run: .github/scripts/check-monitoring-health.sh state.json ""
 
-          echo "Health check: Grafana dashboards"
-          DASH_COUNT=$(curl -s --insecure -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/search?type=dash-db" | jq 'length')
-          if [ "$DASH_COUNT" -gt 0 ] 2>/dev/null; then
-            echo "OK:   $DASH_COUNT dashboard(s) found"
-          else
-            echo "FAIL: no dashboards found"
-            exit 1
-          fi
-
-          echo "Health check: Grafana → Prometheus query"
-          QUERY_STATUS=$(curl -s --insecure -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" | jq -r '.status // empty')
-          if [ "$QUERY_STATUS" = "success" ]; then
-            echo "OK:   Prometheus query via Grafana returned success"
-          else
-            echo "FAIL: Prometheus query via Grafana returned: $QUERY_STATUS"
-            exit 1
-          fi
-
-          echo "Health check: node-exporter DaemonSet"
-          DS_DESIRED=$(kubectl get daemonset -n monitoring -l app.kubernetes.io/name=prometheus-node-exporter -o jsonpath='{.items[0].status.desiredNumberScheduled}')
-          DS_READY=$(kubectl get daemonset -n monitoring -l app.kubernetes.io/name=prometheus-node-exporter -o jsonpath='{.items[0].status.numberReady}')
-          echo "  desired=$DS_DESIRED ready=$DS_READY"
-          if [ "$DS_DESIRED" != "$DS_READY" ] || [ "$DS_DESIRED" -lt 1 ]; then
-            echo "FAIL: node-exporter DaemonSet desired ($DS_DESIRED) != ready ($DS_READY)"
-            exit 1
-          fi
-          echo "OK:   node-exporter DaemonSet $DS_READY/$DS_DESIRED pods ready"
-
-          echo "Health check: all monitoring health checks passed"
-
-      - name: Clean up network test resources
+      - name: Clean up test resources
         if: always()
-        run: |
-          if [ -f "$HOME/.kube/config" ]; then
-            kubectl delete pod net-server net-client dns-checker --ignore-not-found --wait=true --timeout=60s || true
-          fi
-
-      - name: Clean up FSS test resources
-        if: always() && contains(env.TOPOLOGY, 'fss')
-        run: |
-          if [ -f "$HOME/.kube/config" ]; then
-            kubectl delete pod fss-writer fss-reader fss-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
-            kubectl delete pvc fss-test-pvc --ignore-not-found --wait=true --timeout=120s || true
-          fi
-
-      - name: Clean up Lustre test resources
-        if: always() && contains(env.TOPOLOGY, 'lustre')
-        run: |
-          if [ -f "$HOME/.kube/config" ]; then
-            kubectl delete pod lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
-            kubectl delete pvc lustre-test-pvc --ignore-not-found --wait=true --timeout=120s || true
-          fi
+        run: .github/scripts/cleanup-test-resources.sh
 
       - name: Tear down bastion tunnel
         if: always() && startsWith(env.TOPOLOGY, 'private')
-        run: |
-          for pidfile in /tmp/oke-bastion-tunnel-*.pid; do
-            [ -f "$pidfile" ] || continue
-            PID=$(cat "$pidfile")
-            if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-              kill "$PID" 2>/dev/null || true
-              echo "Killed SSH tunnel (PID: $PID)"
-            fi
-            rm -f "$pidfile"
-          done
-          rm -f "$HOME/.kube/config" "$HOME/.kube/oke-bastion/"*.yaml 2>/dev/null || true
+        run: .github/scripts/teardown-bastion-tunnel.sh
 
       - name: Destroy
         if: always()

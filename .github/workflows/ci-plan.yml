@@ -12,8 +12,8 @@ concurrency:
   group: >-
     ${{
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/ok-to-run-plan') &&
-      !contains(github.event.comment.body, '/ok-to-run-plan-') &&
+      startsWith(github.event.comment.body, '/ok-to-run-plan') &&
+      !startsWith(github.event.comment.body, '/ok-to-run-plan-') &&
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login) &&
       format('ci-plan-{0}', github.event.issue.number) ||
       github.run_id
@@ -37,8 +37,8 @@ jobs:
     name: Check changed files
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/ok-to-run-plan') &&
-      !contains(github.event.comment.body, '/ok-to-run-plan-') &&
+      startsWith(github.event.comment.body, '/ok-to-run-plan') &&
+      !startsWith(github.event.comment.body, '/ok-to-run-plan-') &&
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
     runs-on: ubuntu-latest
     outputs:
@@ -55,6 +55,31 @@ jobs:
               content: 'rocket'
             })
 
+      - name: Verify PR source is trusted
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const headRepo = pr.data.head.repo;
+            const baseRepo = pr.data.base.repo;
+            if (headRepo.full_name === baseRepo.full_name) {
+              console.log(`PR is from the same repo: ${headRepo.full_name}`);
+              return;
+            }
+            const trustedOwners = [baseRepo.owner.login];
+            if (trustedOwners.includes(headRepo.owner.login)) {
+              console.log(`PR fork owner ${headRepo.owner.login} is trusted`);
+              return;
+            }
+            core.setFailed(
+              `PR #${context.issue.number} is from untrusted fork ${headRepo.full_name}. ` +
+              `Refusing to run CI with secrets.`
+            );
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
@@ -67,7 +92,7 @@ jobs:
         id: filter
         run: |
           CHANGED=$(git diff --name-only origin/main...HEAD -- \
-            'terraform/' 'test/' 'files/' 'manifests/' '.github/workflows/' || true)
+            'terraform/' 'test/' 'files/' 'manifests/' '.github/workflows/' '.github/scripts/' || true)
           if [ -n "$CHANGED" ]; then
             echo "infra=true" >> "$GITHUB_OUTPUT"
           else
@@ -116,16 +141,7 @@ jobs:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.oci
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
-            "$OCI_USER_OCID" \
-            "$OCI_API_KEY_FINGERPRINT" \
-            "$OCI_TENANCY_OCID" \
-            "$OCI_REGION" \
-            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
-          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+        run: .github/scripts/setup-oci-credentials.sh
 
       - name: Run validation tests
         working-directory: test
@@ -204,16 +220,7 @@ jobs:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.oci
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
-            "$OCI_USER_OCID" \
-            "$OCI_API_KEY_FINGERPRINT" \
-            "$OCI_TENANCY_OCID" \
-            "$OCI_REGION" \
-            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
-          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+        run: .github/scripts/setup-oci-credentials.sh
 
       - name: Run Terraform plan test
         working-directory: test
@@ -267,16 +274,7 @@ jobs:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.oci
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
-            "$OCI_USER_OCID" \
-            "$OCI_API_KEY_FINGERPRINT" \
-            "$OCI_TENANCY_OCID" \
-            "$OCI_REGION" \
-            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
-          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+        run: .github/scripts/setup-oci-credentials.sh
 
       - name: Build variables JSON
         env:
@@ -287,31 +285,8 @@ jobs:
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
-        run: |
-          TFVARS_FILE="test/tfvars/orm/${TOPOLOGY}.json"
-          if [ ! -f "$TFVARS_FILE" ]; then
-            echo "Unknown topology: $TOPOLOGY (no file at $TFVARS_FILE)" && exit 1
-          fi
-
-          jq -n \
-            --arg tenancy_ocid               "$OCI_TENANCY_OCID" \
-            --arg region                     "$OCI_REGION" \
-            --arg compartment_ocid           "$OCI_COMPARTMENT_OCID" \
-            --arg current_user_ocid          "$OCI_USER_OCID" \
-            --arg worker_ops_ad              "$WORKER_OPS_AD" \
-            --arg worker_ops_image_custom_id "$WORKER_OPS_IMAGE_CUSTOM_ID" \
-            --arg ssh_public_key             "$SSH_PUBLIC_KEY" \
-            '{
-              tenancy_ocid:               $tenancy_ocid,
-              region:                     $region,
-              compartment_ocid:           $compartment_ocid,
-              current_user_ocid:          $current_user_ocid,
-              worker_ops_ad:              $worker_ops_ad,
-              worker_ops_image_custom_id: $worker_ops_image_custom_id,
-              ssh_public_key:             $ssh_public_key
-            }' > secrets.json
-
-          jq -s '.[0] * .[1]' "$TFVARS_FILE" secrets.json > variables.json
+          OVERRIDES_JSON: '{}'
+        run: .github/scripts/build-variables-orm.sh
 
       - name: Zip Terraform directory
         run: |
@@ -319,43 +294,11 @@ jobs:
           zip -r ../stack.zip . -x "*.terraform/*" -x "*.tfstate*"
 
       - name: Create ORM stack
-        shell: python3 {0}
         env:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-        run: |
-          import oci, base64, json, os
-
-          config = oci.config.from_file()
-          client = oci.resource_manager.ResourceManagerClient(config)
-
-          with open('stack.zip', 'rb') as f:
-              zip_b64 = base64.b64encode(f.read()).decode()
-
-          with open('variables.json') as f:
-              variables = json.load(f)
-
-          details = oci.resource_manager.models.CreateStackDetails(
-              compartment_id=os.environ['OCI_COMPARTMENT_OCID'],
-              display_name='ci-orm-plan-{}-{}'.format(
-                  os.environ['GITHUB_RUN_ID'],
-                  os.environ['TOPOLOGY']
-              ),
-              config_source=oci.resource_manager.models.CreateZipUploadConfigSourceDetails(
-                  config_source_type='ZIP_UPLOAD',
-                  zip_file_base64_encoded=zip_b64
-              ),
-              variables=variables,
-              terraform_version='1.5.x'
-          )
-
-          response = client.create_stack(details)
-          stack_id = response.data.id
-
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write('STACK_ID={}\n'.format(stack_id))
-
-          print('Created stack: {}'.format(stack_id))
+          STACK_NAME_PREFIX: ci-plan-orm
+        run: .github/scripts/create-orm-stack.sh
 
       - name: Plan stack
         run: |
@@ -367,32 +310,7 @@ jobs:
           echo "Plan job: $PLAN_JOB_ID"
 
       - name: Wait for plan to complete
-        run: |
-          echo "Waiting for plan job $PLAN_JOB_ID..."
-          MAX_POLLS=40  # 40 x 30s = 20 minutes
-          POLL=0
-          while true; do
-            POLL=$((POLL + 1))
-            if [ "$POLL" -gt "$MAX_POLLS" ]; then
-              echo "Timed out waiting for plan job after $MAX_POLLS polls"
-              exit 1
-            fi
-            STATUS=$(oci resource-manager job get \
-              --job-id "$PLAN_JOB_ID" \
-              --query 'data."lifecycle-state"' \
-              --raw-output)
-            echo "  [$POLL/$MAX_POLLS] Status: $STATUS"
-            case "$STATUS" in
-              SUCCEEDED) echo "Plan succeeded."; break ;;
-              FAILED|CANCELING|CANCELED)
-                oci resource-manager job get-job-logs \
-                  --job-id "$PLAN_JOB_ID" \
-                  --query 'data[*].message' --raw-output 2>/dev/null | tail -50 || true
-                echo "Plan job failed with status: $STATUS"
-                exit 1 ;;
-            esac
-            sleep 30
-          done
+        run: .github/scripts/wait-for-orm-job.sh "$PLAN_JOB_ID" 40 30
 
       - name: Delete stack
         if: always() && env.STACK_ID != ''
@@ -465,16 +383,7 @@ jobs:
           OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
           OCI_REGION: ${{ vars.OCI_REGION }}
           OCI_API_KEY_PRIVATE_KEY: ${{ secrets.OCI_API_KEY_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.oci
-          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=%s\nkey_file=%s\n' \
-            "$OCI_USER_OCID" \
-            "$OCI_API_KEY_FINGERPRINT" \
-            "$OCI_TENANCY_OCID" \
-            "$OCI_REGION" \
-            "$HOME/.oci/oci_api_key.pem" > ~/.oci/config
-          printf '%s' "$OCI_API_KEY_PRIVATE_KEY" > ~/.oci/oci_api_key.pem
-          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+        run: .github/scripts/setup-oci-credentials.sh
 
       - name: Run Terraform plan test
         working-directory: test

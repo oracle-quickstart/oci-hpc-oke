@@ -1,5 +1,7 @@
 name: CI - Release (All Topologies)
-# Triggered on pre-release: runs all ORM and Terraform apply topologies in parallel.
+# Triggered on pre-release: runs all ORM and Terraform apply topologies.
+# Runs 4 at a time, with at most 2 Lustre topologies per batch
+# (Lustre capacity is limited in each region).
 
 on:
   release:
@@ -7,7 +9,7 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # ORM apply — all topologies
+  # Batch 1 — 2 non-Lustre + 2 Lustre
   # ---------------------------------------------------------------------------
   orm-public-base:
     name: ORM / public-base-orm
@@ -16,11 +18,11 @@ jobs:
       topology: public-base-orm
     secrets: inherit
 
-  orm-public-fss-monitoring:
-    name: ORM / public-fss-monitoring-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
+  tf-public-base:
+    name: TF / public-base-tf
+    uses: ./.github/workflows/ci-apply-tf.yml
     with:
-      topology: public-fss-monitoring-orm
+      topology: public-base-tf
     secrets: inherit
 
   orm-public-lustre:
@@ -30,65 +32,6 @@ jobs:
       topology: public-lustre-orm
     secrets: inherit
 
-  orm-private-base:
-    name: ORM / private-base-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
-    with:
-      topology: private-base-orm
-    secrets: inherit
-
-  orm-private-fss-monitoring:
-    name: ORM / private-fss-monitoring-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
-    with:
-      topology: private-fss-monitoring-orm
-    secrets: inherit
-
-  orm-private-lustre:
-    name: ORM / private-lustre-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
-    with:
-      topology: private-lustre-orm
-    secrets: inherit
-
-  orm-public-fss-lustre-monitoring:
-    name: ORM / public-fss-lustre-monitoring-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
-    with:
-      topology: public-fss-lustre-monitoring-orm
-    secrets: inherit
-
-  orm-private-fss-lustre-monitoring:
-    name: ORM / private-fss-lustre-monitoring-orm
-    uses: ./.github/workflows/ci-apply-orm.yml
-    with:
-      topology: private-fss-lustre-monitoring-orm
-    secrets: inherit
-
-  # ---------------------------------------------------------------------------
-  # Terraform apply — all topologies
-  # ---------------------------------------------------------------------------
-  tf-public-base:
-    name: TF / public-base-tf
-    uses: ./.github/workflows/ci-apply-tf.yml
-    with:
-      topology: public-base-tf
-    secrets: inherit
-
-  tf-public-bastion-operator:
-    name: TF / public-bastion-operator-tf
-    uses: ./.github/workflows/ci-apply-tf.yml
-    with:
-      topology: public-bastion-operator-tf
-    secrets: inherit
-
-  tf-public-fss-monitoring:
-    name: TF / public-fss-monitoring-tf
-    uses: ./.github/workflows/ci-apply-tf.yml
-    with:
-      topology: public-fss-monitoring-tf
-    secrets: inherit
-
   tf-public-lustre:
     name: TF / public-lustre-tf
     uses: ./.github/workflows/ci-apply-tf.yml
@@ -96,8 +39,100 @@ jobs:
       topology: public-lustre-tf
     secrets: inherit
 
+  # ---------------------------------------------------------------------------
+  # Batch 2 — 2 non-Lustre + 2 Lustre
+  # ---------------------------------------------------------------------------
+  orm-public-fss-monitoring:
+    name: ORM / public-fss-monitoring-orm
+    if: always()
+    needs: [orm-public-base, tf-public-base, orm-public-lustre, tf-public-lustre]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: public-fss-monitoring-orm
+    secrets: inherit
+
+  tf-public-bastion-operator:
+    name: TF / public-bastion-operator-tf
+    if: always()
+    needs: [orm-public-base, tf-public-base, orm-public-lustre, tf-public-lustre]
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-bastion-operator-tf
+    secrets: inherit
+
+  orm-private-lustre:
+    name: ORM / private-lustre-orm
+    if: always()
+    needs: [orm-public-base, tf-public-base, orm-public-lustre, tf-public-lustre]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: private-lustre-orm
+    secrets: inherit
+
+  tf-private-lustre:
+    name: TF / private-lustre-tf
+    if: always()
+    needs: [orm-public-base, tf-public-base, orm-public-lustre, tf-public-lustre]
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-lustre-tf
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Batch 3 — 2 non-Lustre + 2 Lustre (fss-lustre-monitoring)
+  # ---------------------------------------------------------------------------
+  orm-private-base:
+    name: ORM / private-base-orm
+    if: always()
+    needs: [orm-public-fss-monitoring, tf-public-bastion-operator, orm-private-lustre, tf-private-lustre]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: private-base-orm
+    secrets: inherit
+
+  tf-public-fss-monitoring:
+    name: TF / public-fss-monitoring-tf
+    if: always()
+    needs: [orm-public-fss-monitoring, tf-public-bastion-operator, orm-private-lustre, tf-private-lustre]
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-fss-monitoring-tf
+    secrets: inherit
+
+  orm-public-fss-lustre-monitoring:
+    name: ORM / public-fss-lustre-monitoring-orm
+    if: always()
+    needs: [orm-public-fss-monitoring, tf-public-bastion-operator, orm-private-lustre, tf-private-lustre]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: public-fss-lustre-monitoring-orm
+    secrets: inherit
+
+  orm-private-fss-lustre-monitoring:
+    name: ORM / private-fss-lustre-monitoring-orm
+    if: always()
+    needs: [orm-public-fss-monitoring, tf-public-bastion-operator, orm-private-lustre, tf-private-lustre]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: private-fss-lustre-monitoring-orm
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Batch 4 — remaining 4 non-Lustre
+  # ---------------------------------------------------------------------------
+  orm-private-fss-monitoring:
+    name: ORM / private-fss-monitoring-orm
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
+    uses: ./.github/workflows/ci-apply-orm.yml
+    with:
+      topology: private-fss-monitoring-orm
+    secrets: inherit
+
   tf-private-base:
     name: TF / private-base-tf
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
     uses: ./.github/workflows/ci-apply-tf.yml
     with:
       topology: private-base-tf
@@ -105,6 +140,8 @@ jobs:
 
   tf-private-bastion-operator:
     name: TF / private-bastion-operator-tf
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
     uses: ./.github/workflows/ci-apply-tf.yml
     with:
       topology: private-bastion-operator-tf
@@ -112,14 +149,9 @@ jobs:
 
   tf-private-fss-monitoring:
     name: TF / private-fss-monitoring-tf
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
     uses: ./.github/workflows/ci-apply-tf.yml
     with:
       topology: private-fss-monitoring-tf
-    secrets: inherit
-
-  tf-private-lustre:
-    name: TF / private-lustre-tf
-    uses: ./.github/workflows/ci-apply-tf.yml
-    with:
-      topology: private-lustre-tf
     secrets: inherit
