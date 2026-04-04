@@ -272,7 +272,7 @@ resource "time_sleep" "wait_for_lustre_prerequisites" {
     oci_identity_policy.lustre_service_network,
   ]
 
-  create_duration = "60s"
+  create_duration = "75s"
 }
 
 resource "oci_lustre_file_storage_lustre_file_system" "lustre" {
