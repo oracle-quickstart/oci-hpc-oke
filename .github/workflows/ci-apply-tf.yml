@@ -793,7 +793,7 @@ jobs:
             containers:
             - name: writer
               image: busybox
-              command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt"]
+              command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt && sync"]
               volumeMounts:
               - name: lustre
                 mountPath: /mnt/lustre
@@ -852,9 +852,34 @@ jobs:
           fi
           echo "OK:   Lustre reader output: $CONTENT"
 
-          echo "Health check: Lustre OS-level mount (hostPath)"
+          echo "Health check: Lustre OS-level mount (hostPath write+read)"
           LUSTRE_MOUNT_PATH=$(jq -r '.lustre_mount_path.value // "/mnt/oci-lustre"' state.json)
           echo "  host mount path: $LUSTRE_MOUNT_PATH"
+          # Wait for the host mount to appear. Cloud-init may still be running
+          # the Lustre mount script shortly after the node pool is created.
+          MOUNT_READY=false
+          for attempt in $(seq 1 12); do
+            kubectl run lustre-mount-wait --image=busybox --restart=Never \
+              --overrides="{\"spec\":{\"nodeName\":\"${LUSTRE_WRITER_NODE}\",\"tolerations\":[{\"key\":\"nvidia.com/gpu\",\"operator\":\"Exists\"},{\"key\":\"amd.com/gpu\",\"operator\":\"Exists\"}],\"volumes\":[{\"name\":\"hp\",\"hostPath\":{\"path\":\"/proc\"}}],\"containers\":[{\"name\":\"c\",\"image\":\"busybox\",\"command\":[\"sh\",\"-c\",\"grep -q ' ${LUSTRE_MOUNT_PATH} lustre ' /hp/mounts && echo READY || echo WAITING\"],\"volumeMounts\":[{\"name\":\"hp\",\"mountPath\":\"/hp\",\"readOnly\":true}]}]}}" \
+              2>/dev/null
+            kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-mount-wait --timeout=30s 2>/dev/null || true
+            MOUNT_RESULT=$(kubectl logs lustre-mount-wait 2>/dev/null)
+            kubectl delete pod lustre-mount-wait --ignore-not-found --wait=false 2>/dev/null
+            if [[ "$MOUNT_RESULT" == *"READY"* ]]; then
+              echo "  host mount ready (attempt $attempt)"
+              MOUNT_READY=true
+              break
+            fi
+            echo "  waiting for host mount (attempt $attempt/12)..."
+            sleep 10
+          done
+
+          if [[ "$MOUNT_READY" != "true" ]]; then
+            echo "FAIL: Lustre host mount at $LUSTRE_MOUNT_PATH did not appear within 2 minutes"
+            exit 1
+          fi
+
+          # Write and read via the host mount to verify it works end-to-end.
           kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Pod
@@ -869,9 +894,9 @@ jobs:
             - key: amd.com/gpu
               operator: Exists
             containers:
-            - name: reader
+            - name: rw
               image: busybox
-              command: ["sh", "-c", "for i in \$(seq 1 20); do content=\$(cat /mnt/lustre-host/testfile.txt 2>/dev/null); if [ -n \"\$content\" ]; then echo \"\$content\"; exit 0; fi; sleep 3; done; echo 'file not found after 60s'; exit 1"]
+              command: ["sh", "-c", "echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
               volumeMounts:
               - name: lustre-host
                 mountPath: /mnt/lustre-host
@@ -883,11 +908,11 @@ jobs:
           EOF
           kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-hostpath-reader --timeout=120s
           HOST_CONTENT=$(kubectl logs lustre-hostpath-reader)
-          if [[ "$HOST_CONTENT" != *"lustre-test-content"* ]]; then
-            echo "FAIL: Lustre hostPath reader output does not contain expected content: $HOST_CONTENT"
+          if [[ "$HOST_CONTENT" != *"hostpath-test-content"* ]]; then
+            echo "FAIL: Lustre hostPath output does not contain expected content: $HOST_CONTENT"
             exit 1
           fi
-          echo "OK:   Lustre hostPath reader output: $HOST_CONTENT"
+          echo "OK:   Lustre hostPath output: $HOST_CONTENT"
           echo "Health check: all Lustre health checks passed"
 
       - name: Monitoring health checks
@@ -955,7 +980,7 @@ jobs:
         if: always() && contains(env.TOPOLOGY, 'lustre')
         run: |
           if [ -f "$HOME/.kube/config" ]; then
-            kubectl delete pod lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
+            kubectl delete pod lustre-writer lustre-reader lustre-hostpath-reader lustre-mount-wait --ignore-not-found --wait=true --timeout=60s || true
             kubectl delete pvc lustre-test-pvc --ignore-not-found --wait=true --timeout=120s || true
           fi
 
