@@ -80,9 +80,7 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform core), 
 | `tfvars/tf/public-lustre-tf.tfvars` | TF public cluster with Lustre |
 | `tfvars/tf/public-fss-lustre-monitoring-tf.tfvars` | TF public cluster with FSS, Lustre, and monitoring |
 | `tfvars/tf/private-base-tf.tfvars` | TF private cluster with bastion service |
-| `tfvars/tf/private-bastion-operator-tf.tfvars` | TF private cluster with bastion VM, operator, and bastion service |
 | `tfvars/tf/private-fss-monitoring-tf.tfvars` | TF private cluster with FSS, monitoring, and bastion service |
-| `tfvars/tf/private-lustre-tf.tfvars` | TF private cluster with Lustre and bastion service |
 | `tfvars/tf/private-fss-lustre-monitoring-tf.tfvars` | TF private cluster with FSS, Lustre, monitoring, and bastion service |
 | `tfvars/orm/public-base-orm.json` | ORM public cluster, base topology |
 | `tfvars/orm/public-fss-monitoring-orm.json` | ORM public cluster with FSS and monitoring |

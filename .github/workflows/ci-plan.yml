@@ -322,7 +322,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Terraform plan smoke tests: run terraform plan (no apply) for each of the
-  # 10 Terraform topology tfvars files to catch regressions before apply.
+  # 8 Terraform topology tfvars files to catch regressions before apply.
   # ---------------------------------------------------------------------------
   plan-tf:
     name: TF Plan / ${{ matrix.name }}
@@ -345,12 +345,8 @@ jobs:
             tfvars: tfvars/tf/public-fss-lustre-monitoring-tf.tfvars
           - name: private-base-tf
             tfvars: tfvars/tf/private-base-tf.tfvars
-          - name: private-bastion-operator-tf
-            tfvars: tfvars/tf/private-bastion-operator-tf.tfvars
           - name: private-fss-monitoring-tf
             tfvars: tfvars/tf/private-fss-monitoring-tf.tfvars
-          - name: private-lustre-tf
-            tfvars: tfvars/tf/private-lustre-tf.tfvars
           - name: private-fss-lustre-monitoring-tf
             tfvars: tfvars/tf/private-fss-lustre-monitoring-tf.tfvars
 

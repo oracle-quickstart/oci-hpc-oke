@@ -15,9 +15,7 @@ on:
           - public-lustre-tf
           - public-fss-lustre-monitoring-tf
           - private-base-tf
-          - private-bastion-operator-tf
           - private-fss-monitoring-tf
-          - private-lustre-tf
           - private-fss-lustre-monitoring-tf
       overrides:
         description: 'Extra variable overrides as JSON (e.g. {"worker_gpu_enabled":"true"})'
@@ -115,7 +113,7 @@ jobs:
         id: parse
         env:
           COMMENT: ${{ github.event.comment.body }}
-        run: .github/scripts/parse-comment.sh "/ok-to-run-apply-tf" "public-base-tf|public-bastion-operator-tf|public-fss-monitoring-tf|public-lustre-tf|public-fss-lustre-monitoring-tf|private-base-tf|private-bastion-operator-tf|private-fss-monitoring-tf|private-lustre-tf|private-fss-lustre-monitoring-tf" "public-fss-monitoring-tf"
+        run: .github/scripts/parse-comment.sh "/ok-to-run-apply-tf" "public-base-tf|public-bastion-operator-tf|public-fss-monitoring-tf|public-lustre-tf|public-fss-lustre-monitoring-tf|private-base-tf|private-fss-monitoring-tf|private-fss-lustre-monitoring-tf" "public-fss-monitoring-tf"
 
   # ---------------------------------------------------------------------------
   # Apply: init, apply, assert outputs, health checks, then always destroy.
