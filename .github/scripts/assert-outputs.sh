@@ -69,6 +69,18 @@ if [[ "$TOPOLOGY" == private* ]]; then
   fi
 fi
 
+# Determine if this topology can create PVs (used by FSS and Lustre checks).
+# ORM deployments always have kubectl access (ORM manages the private endpoint).
+# TF public topologies have kubectl access via the Kubernetes provider.
+# TF private topologies need an operator node for PV creation.
+CAN_CREATE_PV=true
+if [[ -z "$PREFIX" && "$TOPOLOGY" == private* ]]; then
+  OPERATOR_ID=$(jq -r ".operator_id.value // empty" "$STATE_FILE")
+  if [[ -z "$OPERATOR_ID" ]]; then
+    CAN_CREATE_PV=false
+  fi
+fi
+
 # FSS topology checks
 if [[ "$TOPOLOGY" == *fss* ]]; then
   check_ocid fss_file_system_id
@@ -91,15 +103,30 @@ if [[ "$TOPOLOGY" == *fss* ]]; then
     echo "OK:   fss_export_path = $FSS_EXPORT_PATH"
   fi
 
-  # ORM state includes resource-level checks
-  if [[ -n "$PREFIX" ]]; then
-    PV_COUNT=$(jq '[.resources[] | select(.type == "kubernetes_persistent_volume_v1" and .name == "fss")] | length' "$STATE_FILE")
-    if [[ "$PV_COUNT" -lt 1 ]]; then
-      echo "FAIL: kubernetes_persistent_volume_v1.fss not found in state"
+  # Verify FSS PV exists in state.
+  if [[ "$CAN_CREATE_PV" == "true" ]]; then
+    FSS_PV_FOUND=false
+    if [[ -n "$PREFIX" ]]; then
+      PV_COUNT=$(jq '[.resources[] | select(
+        (.type == "kubernetes_persistent_volume_v1" and .name == "fss") or
+        (.type == "null_resource" and .name == "fss_pv_via_operator")
+      )] | length' "$STATE_FILE")
+      [[ "$PV_COUNT" -ge 1 ]] && FSS_PV_FOUND=true
+    else
+      TF_STATE=$(terraform -chdir=terraform state list 2>/dev/null || true)
+      if echo "$TF_STATE" | grep -q 'kubernetes_persistent_volume_v1.fss' ||
+         echo "$TF_STATE" | grep -q 'null_resource.fss_pv_via_operator'; then
+        FSS_PV_FOUND=true
+      fi
+    fi
+    if [[ "$FSS_PV_FOUND" != "true" ]]; then
+      echo "FAIL: FSS PersistentVolume not found in state"
       FAILED=1
     else
       echo "OK:   FSS PersistentVolume resource found in state"
     fi
+  else
+    echo "SKIP: private topology without operator, FSS PV not expected"
   fi
 fi
 
@@ -117,15 +144,30 @@ if [[ "$TOPOLOGY" == *lustre* ]]; then
     echo "OK:   lustre_management_service_address = $LUSTRE_MGS"
   fi
 
-  # ORM state includes resource-level checks
-  if [[ -n "$PREFIX" ]]; then
-    PV_COUNT=$(jq '[.resources[] | select(.type == "kubectl_manifest" and .name == "lustre_pv")] | length' "$STATE_FILE")
-    if [[ "$PV_COUNT" -lt 1 ]]; then
-      echo "FAIL: kubectl_manifest.lustre_pv not found in state"
+  # Verify Lustre PV exists in state (same CAN_CREATE_PV logic as FSS above).
+  if [[ "$CAN_CREATE_PV" == "true" ]]; then
+    LUSTRE_PV_FOUND=false
+    if [[ -n "$PREFIX" ]]; then
+      PV_COUNT=$(jq '[.resources[] | select(
+        (.type == "kubectl_manifest" and .name == "lustre_pv") or
+        (.type == "null_resource" and .name == "lustre_pv_via_operator")
+      )] | length' "$STATE_FILE")
+      [[ "$PV_COUNT" -ge 1 ]] && LUSTRE_PV_FOUND=true
+    else
+      TF_STATE=${TF_STATE:-$(terraform -chdir=terraform state list 2>/dev/null || true)}
+      if echo "$TF_STATE" | grep -q 'kubectl_manifest.lustre_pv' ||
+         echo "$TF_STATE" | grep -q 'null_resource.lustre_pv_via_operator'; then
+        LUSTRE_PV_FOUND=true
+      fi
+    fi
+    if [[ "$LUSTRE_PV_FOUND" != "true" ]]; then
+      echo "FAIL: Lustre PersistentVolume not found in state"
       FAILED=1
     else
       echo "OK:   Lustre PersistentVolume resource found in state"
     fi
+  else
+    echo "SKIP: private topology without operator, Lustre PV not expected"
   fi
 fi
 

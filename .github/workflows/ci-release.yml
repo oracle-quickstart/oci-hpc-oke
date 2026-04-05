@@ -79,7 +79,7 @@ jobs:
     secrets: inherit
 
   # ---------------------------------------------------------------------------
-  # Batch 3 — 2 non-Lustre + 2 Lustre (fss-lustre-monitoring)
+  # Batch 3 — 2 non-Lustre + 2 Lustre (fss-lustre-monitoring ORM)
   # ---------------------------------------------------------------------------
   orm-private-base:
     name: ORM / private-base-orm
@@ -118,7 +118,7 @@ jobs:
     secrets: inherit
 
   # ---------------------------------------------------------------------------
-  # Batch 4 — remaining 4 non-Lustre
+  # Batch 4 — 2 non-Lustre + 2 Lustre (fss-lustre-monitoring TF)
   # ---------------------------------------------------------------------------
   orm-private-fss-monitoring:
     name: ORM / private-fss-monitoring-orm
@@ -138,10 +138,31 @@ jobs:
       topology: private-base-tf
     secrets: inherit
 
+  tf-public-fss-lustre-monitoring:
+    name: TF / public-fss-lustre-monitoring-tf
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: public-fss-lustre-monitoring-tf
+    secrets: inherit
+
+  tf-private-fss-lustre-monitoring:
+    name: TF / private-fss-lustre-monitoring-tf
+    if: always()
+    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
+    uses: ./.github/workflows/ci-apply-tf.yml
+    with:
+      topology: private-fss-lustre-monitoring-tf
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Batch 5 — remaining 2 non-Lustre
+  # ---------------------------------------------------------------------------
   tf-private-bastion-operator:
     name: TF / private-bastion-operator-tf
     if: always()
-    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
+    needs: [orm-private-fss-monitoring, tf-private-base, tf-public-fss-lustre-monitoring, tf-private-fss-lustre-monitoring]
     uses: ./.github/workflows/ci-apply-tf.yml
     with:
       topology: private-bastion-operator-tf
@@ -150,7 +171,7 @@ jobs:
   tf-private-fss-monitoring:
     name: TF / private-fss-monitoring-tf
     if: always()
-    needs: [orm-private-base, tf-public-fss-monitoring, orm-public-fss-lustre-monitoring, orm-private-fss-lustre-monitoring]
+    needs: [orm-private-fss-monitoring, tf-private-base, tf-public-fss-lustre-monitoring, tf-private-fss-lustre-monitoring]
     uses: ./.github/workflows/ci-apply-tf.yml
     with:
       topology: private-fss-monitoring-tf
