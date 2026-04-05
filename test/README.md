@@ -78,10 +78,12 @@ Pre-built topology configs are available under `tfvars/core/` (Terraform core), 
 | `tfvars/tf/public-bastion-operator-tf.tfvars` | TF public cluster with bastion and operator |
 | `tfvars/tf/public-fss-monitoring-tf.tfvars` | TF public cluster with FSS and monitoring |
 | `tfvars/tf/public-lustre-tf.tfvars` | TF public cluster with Lustre |
+| `tfvars/tf/public-fss-lustre-monitoring-tf.tfvars` | TF public cluster with FSS, Lustre, and monitoring |
 | `tfvars/tf/private-base-tf.tfvars` | TF private cluster with bastion service |
 | `tfvars/tf/private-bastion-operator-tf.tfvars` | TF private cluster with bastion VM, operator, and bastion service |
 | `tfvars/tf/private-fss-monitoring-tf.tfvars` | TF private cluster with FSS, monitoring, and bastion service |
 | `tfvars/tf/private-lustre-tf.tfvars` | TF private cluster with Lustre and bastion service |
+| `tfvars/tf/private-fss-lustre-monitoring-tf.tfvars` | TF private cluster with FSS, Lustre, monitoring, and bastion service |
 | `tfvars/orm/public-base-orm.json` | ORM public cluster, base topology |
 | `tfvars/orm/public-fss-monitoring-orm.json` | ORM public cluster with FSS and monitoring |
 | `tfvars/orm/public-lustre-orm.json` | ORM public cluster with Lustre |
@@ -109,7 +111,7 @@ RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 
 ## CI health checks and assertions
 
-The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health checks run for all topologies. Public topologies connect to the API server directly; private topologies tunnel through OCI Bastion Service using an ephemeral SSH keypair generated at runtime. Output assertions also run for all topologies.
+The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health check logic lives in reusable scripts under `.github/scripts/` (not inline in the workflow YAML), so changes can be tested from PR branches via comment triggers. Public topologies connect to the API server directly; private topologies tunnel through OCI Bastion Service using an ephemeral SSH keypair generated at runtime.
 
 ### Output assertions
 
@@ -130,12 +132,12 @@ The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following
 - `fss_file_system_id`, `fss_nsg_id`, `fss_subnet_id` are valid OCIDs
 - `fss_mount_target_ip` is a valid IPv4
 - `fss_export_path` matches `/oke-gpu-*`
-- FSS PersistentVolume resource exists in state (ORM: `kubernetes_persistent_volume_v1.fss`)
+- FSS PersistentVolume resource exists in state (provider: `kubernetes_persistent_volume_v1.fss`, operator: `null_resource.fss_pv_via_operator`; skipped for TF private topologies without operator)
 
 **Lustre topologies (`*lustre*`):**
 - `lustre_subnet_id`, `lustre_nsg_id`, `lustre_file_system_id` are valid OCIDs
 - `lustre_management_service_address` is a valid IPv4
-- Lustre PersistentVolume resource exists in state (ORM: `kubectl_manifest.lustre_pv`)
+- Lustre PersistentVolume resource exists in state (provider: `kubectl_manifest.lustre_pv`, operator: `null_resource.lustre_pv_via_operator`; skipped for TF private topologies without operator)
 
 **Monitoring topologies (`*monitoring*`):**
 - `pub_lb_subnet_id`, `pub_lb_nsg_id` are valid OCIDs
@@ -166,12 +168,12 @@ The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following
 
 **Lustre** (`*lustre*` topologies only)**:**
 - PVC binds to `lustre-pv`
-- CSI write: writer pod writes file via PVC
-- CSI read: reader pod reads back on same node
-- OS-level mount: hostPath reader verifies cloud-init Lustre mount (60s retry loop for cache coherency)
+- CSI write: writer pod writes file via PVC with `sync`
+- CSI read: reader pod reads back on a different node (anti-affinity)
+- OS-level mount: hostPath pod writes and reads via the cloud-init Lustre mount (avoids cross-mount cache coherency issues between CSI and host mounts)
 
 **Monitoring** (`*monitoring*` topologies only)**:**
-- Grafana API responds 200 (up to 30 retries in ORM, 60 in TF)
+- Grafana API responds 200 (up to 60 retries)
 - Dashboards exist (count > 0)
 - Prometheus queryable via Grafana (`up` query returns `success`)
 - node-exporter DaemonSet desired == ready
