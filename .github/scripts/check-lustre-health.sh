@@ -124,7 +124,7 @@ spec:
   containers:
   - name: rw
     image: busybox
-    command: ["sh", "-c", "FS_TYPE=\$(stat -f -c %T /mnt/lustre-host 2>/dev/null || echo unknown); echo \"fs_type=\$FS_TYPE\"; if [ \"\$FS_TYPE\" != \"lustre\" ]; then echo \"FAIL: expected lustre filesystem, got \$FS_TYPE\"; exit 1; fi; echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
+    command: ["sh", "-c", "FS_TYPE=\$(df -T /mnt/lustre-host 2>/dev/null | tail -1 | awk '{print \$2}'); echo \"fs_type=\${FS_TYPE:-none}\"; if [ \"\$FS_TYPE\" != \"lustre\" ]; then echo \"FAIL: expected lustre filesystem, got \${FS_TYPE:-none}\"; exit 1; fi; echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
     volumeMounts:
     - name: lustre-host
       mountPath: /mnt/lustre-host
