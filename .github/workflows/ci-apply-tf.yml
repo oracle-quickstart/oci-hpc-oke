@@ -123,7 +123,7 @@ jobs:
   apply-tf:
     name: Terraform / ${{ inputs.topology || needs.check-tf-trigger.outputs.topology || 'public-fss-monitoring-tf' }}
     needs: [check-tf-trigger]
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-tf-trigger.result == 'success')
+    if: always() && (github.event_name != 'issue_comment' || needs.check-tf-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
 

@@ -124,7 +124,7 @@ jobs:
   apply-orm:
     name: ORM provisioning / ${{ inputs.topology || needs.check-orm-trigger.outputs.topology || 'public-fss-monitoring-orm' }}
     needs: [check-orm-trigger]
-    if: always() && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || needs.check-orm-trigger.result == 'success')
+    if: always() && (github.event_name != 'issue_comment' || needs.check-orm-trigger.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
