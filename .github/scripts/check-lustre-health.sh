@@ -101,10 +101,10 @@ if [[ "$CONTENT" != *"lustre-test-content"* ]]; then
 fi
 echo "OK:   Lustre reader output: $CONTENT"
 
-echo "Health check: Lustre OS-level mount (hostPath write+read)"
+echo "Health check: Lustre OS-level mount (fs type + hostPath write+read)"
 LUSTRE_MOUNT_PATH=$(jq -r ".${PREFIX}lustre_mount_path.value // \"/mnt/oci-lustre\"" "$STATE_FILE")
 echo "  host mount path: $LUSTRE_MOUNT_PATH"
-# Write and read via the host mount to verify it works end-to-end.
+# Verify the path is actually a Lustre mount, then write and read via it.
 # No mount wait needed -- kubelet runs in the host mount namespace and
 # can see the cloud-init Lustre mount. Pods can't see it in their own
 # /proc/mounts due to mount namespace isolation, but hostPath works.
@@ -124,7 +124,7 @@ spec:
   containers:
   - name: rw
     image: busybox
-    command: ["sh", "-c", "echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
+    command: ["sh", "-c", "FS_TYPE=\$(stat -f -c %T /mnt/lustre-host 2>/dev/null || echo unknown); echo \"fs_type=\$FS_TYPE\"; if [ \"\$FS_TYPE\" != \"lustre\" ]; then echo \"FAIL: expected lustre filesystem, got \$FS_TYPE\"; exit 1; fi; echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
     volumeMounts:
     - name: lustre-host
       mountPath: /mnt/lustre-host
@@ -136,9 +136,14 @@ spec:
 EOF
 kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-hostpath-reader --timeout=120s
 HOST_CONTENT=$(kubectl logs lustre-hostpath-reader)
+if [[ "$HOST_CONTENT" != *"fs_type=lustre"* ]]; then
+  echo "FAIL: hostPath is not backed by Lustre filesystem:"
+  echo "$HOST_CONTENT"
+  exit 1
+fi
 if [[ "$HOST_CONTENT" != *"hostpath-test-content"* ]]; then
   echo "FAIL: Lustre hostPath output does not contain expected content: $HOST_CONTENT"
   exit 1
 fi
-echo "OK:   Lustre hostPath output: $HOST_CONTENT"
+echo "OK:   Lustre hostPath filesystem type verified and content correct"
 echo "Health check: all Lustre health checks passed"

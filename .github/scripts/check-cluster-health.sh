@@ -16,7 +16,7 @@ echo "  $NODE_COUNT node(s) ready"
 
 echo "Health check: node count matches expected pool sizes"
 EXPECTED=0
-for pool_key in worker_ops_pool_id worker_cpu_pool_id worker_gpu_pool_id; do
+for pool_key in worker_ops_pool_id worker_cpu_pool_id worker_gpu_pool_id worker_rdma_pool_id; do
   POOL_ID=$(jq -r ".${PREFIX}${pool_key}.value // empty" "$STATE_FILE")
   if [ -n "$POOL_ID" ] && [ "$POOL_ID" != "null" ]; then
     SIZE=$(oci ce node-pool get --node-pool-id "$POOL_ID" --query 'data."node-config-details".size' --raw-output 2>/dev/null || echo "0")
