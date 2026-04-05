@@ -127,14 +127,14 @@ spec:
     command: ["sh", "-c"]
     args:
     - |
-      FS_TYPE_NAME="$(df -T /mnt/lustre-host 2>/dev/null | tail -1 | awk '{print $2}')"
-      FS_TYPE_HEX_RAW="$(stat -f -c %t /mnt/lustre-host 2>/dev/null || echo unknown)"
-      FS_TYPE_HEX="${FS_TYPE_HEX_RAW#0x}"
-      FS_TYPE_HEX="${FS_TYPE_HEX#0X}"
-      echo "fs_type=${FS_TYPE_NAME:-none}"
-      echo "fs_magic=0x${FS_TYPE_HEX}"
-      if [ "${FS_TYPE_NAME:-none}" != "lustre" ] && [ "${FS_TYPE_HEX}" != "0bd00bd0" ] && [ "${FS_TYPE_HEX}" != "0BD00BD0" ]; then
-        echo "FAIL: expected Lustre filesystem (type=lustre or magic=0x0bd00bd0), got type=${FS_TYPE_NAME:-none} magic=0x${FS_TYPE_HEX}"
+      FS_TYPE_NAME="\$(df -T /mnt/lustre-host 2>/dev/null | tail -1 | awk '{print \$2}')"
+      FS_TYPE_HEX_RAW="\$(stat -f -c %t /mnt/lustre-host 2>/dev/null || echo unknown)"
+      FS_TYPE_HEX="\${FS_TYPE_HEX_RAW#0x}"
+      FS_TYPE_HEX="\${FS_TYPE_HEX#0X}"
+      echo "fs_type=\${FS_TYPE_NAME:-none}"
+      echo "fs_magic=0x\${FS_TYPE_HEX}"
+      if [ "\${FS_TYPE_NAME:-none}" != "lustre" ] && [ "\${FS_TYPE_HEX}" != "0bd00bd0" ] && [ "\${FS_TYPE_HEX}" != "0BD00BD0" ]; then
+        echo "FAIL: expected Lustre filesystem (type=lustre or magic=0x0bd00bd0), got type=\${FS_TYPE_NAME:-none} magic=0x\${FS_TYPE_HEX}"
         exit 1
       fi
       echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt
