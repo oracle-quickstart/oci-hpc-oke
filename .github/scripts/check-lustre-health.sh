@@ -124,7 +124,22 @@ spec:
   containers:
   - name: rw
     image: busybox
-    command: ["sh", "-c", "FS_TYPE=\$(df -T /mnt/lustre-host 2>/dev/null | tail -1 | awk '{print \$2}'); echo \"fs_type=\${FS_TYPE:-none}\"; if [ \"\$FS_TYPE\" != \"lustre\" ]; then echo \"FAIL: expected lustre filesystem, got \${FS_TYPE:-none}\"; exit 1; fi; echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt && sync && cat /mnt/lustre-host/hostpath-testfile.txt"]
+    command: ["sh", "-c"]
+    args:
+    - |
+      FS_TYPE_NAME="$(df -T /mnt/lustre-host 2>/dev/null | tail -1 | awk '{print $2}')"
+      FS_TYPE_HEX_RAW="$(stat -f -c %t /mnt/lustre-host 2>/dev/null || echo unknown)"
+      FS_TYPE_HEX="${FS_TYPE_HEX_RAW#0x}"
+      FS_TYPE_HEX="${FS_TYPE_HEX#0X}"
+      echo "fs_type=${FS_TYPE_NAME:-none}"
+      echo "fs_magic=0x${FS_TYPE_HEX}"
+      if [ "${FS_TYPE_NAME:-none}" != "lustre" ] && [ "${FS_TYPE_HEX}" != "0bd00bd0" ] && [ "${FS_TYPE_HEX}" != "0BD00BD0" ]; then
+        echo "FAIL: expected Lustre filesystem (type=lustre or magic=0x0bd00bd0), got type=${FS_TYPE_NAME:-none} magic=0x${FS_TYPE_HEX}"
+        exit 1
+      fi
+      echo 'hostpath-test-content' > /mnt/lustre-host/hostpath-testfile.txt
+      sync
+      cat /mnt/lustre-host/hostpath-testfile.txt
     volumeMounts:
     - name: lustre-host
       mountPath: /mnt/lustre-host
@@ -134,9 +149,15 @@ spec:
       path: ${LUSTRE_MOUNT_PATH}
       type: Directory
 EOF
-kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-hostpath-reader --timeout=120s
+if ! kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/lustre-hostpath-reader --timeout=120s; then
+  echo "FAIL: timed out waiting for pod/lustre-hostpath-reader to reach Succeeded"
+  kubectl get pod lustre-hostpath-reader -o wide || true
+  kubectl describe pod lustre-hostpath-reader || true
+  kubectl logs lustre-hostpath-reader || true
+  exit 1
+fi
 HOST_CONTENT=$(kubectl logs lustre-hostpath-reader)
-if [[ "$HOST_CONTENT" != *"fs_type=lustre"* ]]; then
+if [[ "$HOST_CONTENT" != *"fs_type=lustre"* && "$HOST_CONTENT" != *"fs_magic=0x0bd00bd0"* && "$HOST_CONTENT" != *"fs_magic=0x0BD00BD0"* ]]; then
   echo "FAIL: hostPath is not backed by Lustre filesystem:"
   echo "$HOST_CONTENT"
   exit 1
