@@ -67,6 +67,16 @@ if [[ "$TOPOLOGY" == private* ]]; then
   else
     echo "OK:   cluster_public_endpoint is empty (private topology)"
   fi
+
+  check_ocid bastion_service_id
+
+  OKE_PRIV_IP=$(jq -r ".${PREFIX}oke_private_endpoint_ip.value // empty" "$STATE_FILE")
+  if [[ -z "$OKE_PRIV_IP" || ! "$OKE_PRIV_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo "FAIL: oke_private_endpoint_ip is not a valid IPv4: $OKE_PRIV_IP"
+    FAILED=1
+  else
+    echo "OK:   oke_private_endpoint_ip = $OKE_PRIV_IP"
+  fi
 fi
 
 # Determine if this topology can create PVs (used by FSS and Lustre checks).
