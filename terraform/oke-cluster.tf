@@ -256,20 +256,7 @@ module "oke" {
         remove_addon_resources_on_delete = true
         override_existing                = true
         version                          = var.nvidia_gpu_operator_addon_version
-        configurations = [
-          {
-            key   = "disableNvidiaGpuPlugin"
-            value = tostring(var.nvidia_gpu_operator_disable_plugin)
-          },
-          {
-            key   = "cdi.enabled"
-            value = tostring(var.nvidia_gpu_operator_cdi_enabled)
-          },
-          {
-            key   = "toolkit.enabled"
-            value = tostring(var.nvidia_gpu_operator_toolkit_enabled)
-          }
-        ]
+        configurations                   = [for k, v in local.nvidia_gpu_operator_all_configurations : { key = k, value = v }]
       }
     } : {},
     local.total_worker_nodes > 50 ? {

@@ -435,6 +435,59 @@ variable "nvidia_gpu_operator_toolkit_enabled" {
   description = "Enable the NVIDIA container toolkit in the GPU Operator addon."
 }
 
+variable "nvidia_gpu_operator_skip_nfd_dependency_check" {
+  type        = bool
+  default     = true
+  description = "Skip the NodeFeatureDiscovery dependency check in the GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_mig_manager_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable the NVIDIA MIG Manager in the GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_mig_strategy" {
+  type        = string
+  default     = "single"
+  description = "MIG strategy for GFD and Device Plugin (none, single, mixed)."
+}
+
+variable "nvidia_gpu_operator_configuration" {
+  type = map(string)
+  default = {
+    "cdi.default"                                = "false"
+    "daemonsets.rollingUpdate.maxUnavailable"    = "1"
+    "dcgm.enabled"                               = "false"
+    "dcgmExporter.enabled"                       = "true"
+    "dcgmExporter.service.internalTrafficPolicy" = "Cluster"
+    "dcgmExporter.serviceMonitor.enabled"        = "false"
+    "dcgmExporter.serviceMonitor.interval"       = "15s"
+    "dcgmExporter.serviceMonitor.honorLabels"    = "false"
+    "devicePlugin.enabled"                       = "true"
+    "devicePlugin.mps.root"                      = "/run/nvidia/mps"
+    "toolkit.installDir"                         = "/usr/local/nvidia"
+    "operator.logging.level"                     = "info"
+    "hostPaths.rootFS"                           = "/"
+    "hostPaths.driverInstallDir"                 = "/run/nvidia/driver"
+  }
+  description = "Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon. These are merged with the individual variables above, which take precedence."
+}
+
+locals {
+  nvidia_gpu_operator_all_configurations = merge(
+    var.nvidia_gpu_operator_configuration,
+    {
+      disableNvidiaGpuPlugin                  = tostring(var.nvidia_gpu_operator_disable_plugin)
+      "cdi.enabled"                           = tostring(var.nvidia_gpu_operator_cdi_enabled)
+      "toolkit.enabled"                       = tostring(var.nvidia_gpu_operator_toolkit_enabled)
+      skipNodeFeatureDiscoveryDependencyCheck = tostring(var.nvidia_gpu_operator_skip_nfd_dependency_check)
+      "migManager.enabled"                    = tostring(var.nvidia_gpu_operator_mig_manager_enabled)
+      "mig.strategy"                          = var.nvidia_gpu_operator_mig_strategy
+    }
+  )
+}
+
 variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string

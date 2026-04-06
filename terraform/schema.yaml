@@ -84,6 +84,9 @@ variableGroups:
       - nvidia_gpu_operator_disable_plugin
       - nvidia_gpu_operator_cdi_enabled
       - nvidia_gpu_operator_toolkit_enabled
+      - nvidia_gpu_operator_skip_nfd_dependency_check
+      - nvidia_gpu_operator_mig_manager_enabled
+      - nvidia_gpu_operator_mig_strategy
 
   - title: "Identity"
     variables:
@@ -1312,6 +1315,25 @@ variables:
     type: boolean
     description: Enable the NVIDIA container toolkit in the GPU Operator addon.
     default: false
+  nvidia_gpu_operator_skip_nfd_dependency_check:
+    title: Skip NFD dependency check in GPU Operator
+    type: boolean
+    description: Skip the NodeFeatureDiscovery dependency check in the GPU Operator addon.
+    default: true
+  nvidia_gpu_operator_mig_manager_enabled:
+    title: Enable MIG Manager in GPU Operator
+    type: boolean
+    description: Enable the NVIDIA MIG Manager in the GPU Operator addon.
+    default: false
+  nvidia_gpu_operator_mig_strategy:
+    title: MIG strategy
+    type: enum
+    description: MIG strategy for GFD and Device Plugin.
+    default: single
+    enum:
+      - none
+      - single
+      - mixed
 
   # Workers - System pool
   worker_ops_ad:
