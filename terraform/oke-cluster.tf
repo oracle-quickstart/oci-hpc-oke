@@ -233,18 +233,6 @@ module "oke" {
   cluster_name = local.cluster_name
   cluster_type = "enhanced"
   cluster_addons = merge(
-    {
-      "NvidiaGpuPlugin" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-        configurations = [
-          {
-            key   = "isDcgmExporterDisabled"
-            value = "true"
-          }
-        ]
-      }
-    },
     var.deploy_node_feature_discovery ? {
       "NodeFeatureDiscovery" = {
         remove_addon_resources_on_delete = true
@@ -256,7 +244,14 @@ module "oke" {
         remove_addon_resources_on_delete = true
         override_existing                = true
         version                          = var.nvidia_gpu_operator_addon_version
-        configurations                   = [for k, v in local.nvidia_gpu_operator_all_configurations : { key = k, value = v }]
+        configurations = [for k, v in merge(var.nvidia_gpu_operator_configuration, {
+          disableNvidiaGpuPlugin                  = tostring(var.nvidia_gpu_operator_disable_plugin)
+          "cdi.enabled"                           = tostring(var.nvidia_gpu_operator_cdi_enabled)
+          "toolkit.enabled"                       = tostring(var.nvidia_gpu_operator_toolkit_enabled)
+          skipNodeFeatureDiscoveryDependencyCheck = tostring(var.nvidia_gpu_operator_skip_nfd_dependency_check)
+          "migManager.enabled"                    = tostring(var.nvidia_gpu_operator_mig_manager_enabled)
+          "mig.strategy"                          = var.nvidia_gpu_operator_mig_strategy
+        }) : { key = k, value = v }]
       }
     } : {},
     local.total_worker_nodes > 50 ? {

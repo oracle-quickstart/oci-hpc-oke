@@ -458,7 +458,7 @@ variable "nvidia_gpu_operator_configuration" {
   default = {
     "cdi.default"                                = "false"
     "daemonsets.rollingUpdate.maxUnavailable"    = "1"
-    "dcgm.enabled"                               = "false"
+    "dcgm.enabled"                               = "true"
     "dcgmExporter.enabled"                       = "true"
     "dcgmExporter.service.internalTrafficPolicy" = "Cluster"
     "dcgmExporter.serviceMonitor.enabled"        = "false"
@@ -472,20 +472,6 @@ variable "nvidia_gpu_operator_configuration" {
     "hostPaths.driverInstallDir"                 = "/run/nvidia/driver"
   }
   description = "Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon. These are merged with the individual variables above, which take precedence."
-}
-
-locals {
-  nvidia_gpu_operator_all_configurations = merge(
-    var.nvidia_gpu_operator_configuration,
-    {
-      disableNvidiaGpuPlugin                  = tostring(var.nvidia_gpu_operator_disable_plugin)
-      "cdi.enabled"                           = tostring(var.nvidia_gpu_operator_cdi_enabled)
-      "toolkit.enabled"                       = tostring(var.nvidia_gpu_operator_toolkit_enabled)
-      skipNodeFeatureDiscoveryDependencyCheck = tostring(var.nvidia_gpu_operator_skip_nfd_dependency_check)
-      "migManager.enabled"                    = tostring(var.nvidia_gpu_operator_mig_manager_enabled)
-      "mig.strategy"                          = var.nvidia_gpu_operator_mig_strategy
-    }
-  )
 }
 
 variable "kubeproxy_mode" { default = "ipvs" }
