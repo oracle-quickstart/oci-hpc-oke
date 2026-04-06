@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: gpu-operator
+  labels:
+    release: kube-prometheus-stack
+spec:
+  attachMetadata:
+    node: true
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  namespaceSelector:
+    matchNames:
+      - gpu-operator
+  endpoints:
+    - port: "metrics"
+      path: "/metrics"
+      interval: "30s"
+      scrapeTimeout: "30s"
+      honorLabels: false
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: hostname
+        - sourceLabels: [__meta_kubernetes_node_label_node_kubernetes_io_instance_type]
+          targetLabel: instance_shape
+        - sourceLabels: [__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number]
+          targetLabel: host_serial_number
+        - sourceLabels: [__meta_kubernetes_node_label_displayName]
+          targetLabel: oci_name

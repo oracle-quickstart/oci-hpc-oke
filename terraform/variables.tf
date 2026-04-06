@@ -277,11 +277,6 @@ variable "install_grafana_dashboards" {
   type    = bool
 }
 
-variable "install_nvidia_dcgm_exporter" {
-  default = true
-  type    = bool
-}
-
 variable "install_amd_device_metrics_exporter" {
   default = false
   type    = bool
@@ -308,10 +303,6 @@ variable "prometheus_stack_chart_version" {
   type    = string
 }
 
-variable "dcgm_exporter_chart_version" {
-  default = "4.8.1"
-  type    = string
-}
 
 variable "amd_device_metrics_exporter_chart_version" {
   default = "v1.4.1"

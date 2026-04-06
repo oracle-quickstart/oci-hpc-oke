@@ -268,8 +268,6 @@ variableGroups:
     - monitoring_advanced_options
     - monitoring_namespace
     - install_node_problem_detector_kube_prometheus_stack
-    - install_nvidia_dcgm_exporter
-    - dcgm_exporter_chart_version
     - install_amd_device_metrics_exporter     
     - amd_device_metrics_exporter_chart_version 
     - node_problem_detector_chart_version
@@ -1071,25 +1069,6 @@ variables:
       and:
       - install_monitoring
       - monitoring_advanced_options
-  install_nvidia_dcgm_exporter:
-    title: DCGM Exporter
-    description: Install NVIDIA DCGM Exporter
-    type: boolean
-    required: true
-    default: ${install_monitoring}
-    visible:
-      and:
-      - install_monitoring
-      - monitoring_advanced_options
-  dcgm_exporter_chart_version:
-    title: DCGM Exporter chart version
-    type: string
-    required: true
-    default: "4.0.4"
-    visible: false
-      # and:
-      # - monitoring_advanced_options
-      # - install_nvidia_dcgm_exporter
   install_amd_device_metrics_exporter:
     title: Install AMD Device Exporter
     type: boolean

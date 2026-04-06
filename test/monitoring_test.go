@@ -21,7 +21,6 @@ func TestMonitoring(t *testing.T) {
 		"install_node_problem_detector_kube_prometheus_stack": true,
 		"install_grafana":                                     true,
 		"install_grafana_dashboards":                          true,
-		"install_nvidia_dcgm_exporter":                        false,
 		"install_amd_device_metrics_exporter":                 false,
 		"preferred_kubernetes_services":                       "internal",
 		"setup_alerting":                                      false,

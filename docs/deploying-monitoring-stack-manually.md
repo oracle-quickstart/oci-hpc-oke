@@ -10,7 +10,7 @@ This guide provides step-by-step instructions to deploy the same Prometheus and 
 - [Prerequisites](#prerequisites)
 - [Step 1: Prepare Your Environment](#step-1-prepare-your-environment)
 - [Step 2: Deploy kube-prometheus-stack](#step-2-deploy-kube-prometheus-stack)
-- [Step 3: Deploy NVIDIA DCGM Exporter](#step-3-deploy-nvidia-dcgm-exporter)
+- [Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor](#step-3-deploy-nvidia-dcgm-exporter-servicemonitor)
 - [Step 3b: Deploy AMD Device Metrics Exporter (Alternative for AMD GPUs)](#step-3b-deploy-amd-device-metrics-exporter-alternative-for-amd-gpus)
 - [Step 4: Deploy Node Problem Detector](#step-4-deploy-node-problem-detector)
 - [Step 5: Deploy Custom Grafana Dashboards](#step-5-deploy-custom-grafana-dashboards)
@@ -137,7 +137,6 @@ kubectl get pods -n ${MONITORING_NAMESPACE}
 
 # Example output
 NAME                                                        READY   STATUS    RESTARTS   AGE
-dcgm-exporter-bsdgd                                         1/1     Running   0          125m
 gpu-rdma-node-problem-detector-8hxcv                        1/1     Running   0          121m
 kube-prometheus-stack-grafana-0                             4/4     Running   0          128m
 kube-prometheus-stack-kube-state-metrics-557fd457c6-nqskx   1/1     Running   0          128m
@@ -149,40 +148,28 @@ oke-ons-webhook-789cb49d9f-jjr8q                            1/1     Running   0 
 prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          128m
 ```
 
-## Step 3: Deploy NVIDIA DCGM Exporter
+## Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor
 
-**Note**: This step is only required if you have NVIDIA GPU nodes in your cluster.
+**Note**: This step is only required if you have NVIDIA GPU nodes in your cluster with the NvidiaGpuOperator OKE addon enabled. The GPU Operator addon deploys the DCGM exporter DaemonSet automatically in the `gpu-operator` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
 
-### 3.1 Locate DCGM Exporter Chart
+### 3.1 Locate the ServiceMonitor Manifest
 
-The DCGM exporter chart is available in the repository at `terraform/files/nvidia-dcgm-exporter/`.
+The ServiceMonitor manifest is available at `terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml`.
 
-### 3.2 Review and Customize Values
-
-The values file is located at `terraform/files/nvidia-dcgm-exporter/oke-values.yaml`. Key configurations:
-
-- **ServiceMonitor**: Enabled with relabelings for OCI-specific labels
-- **NodeSelector**: Targets nodes with `nvidia.com/gpu: "true"`
-- **Tolerations**: Configured to run on GPU nodes with taints
-- **Custom Metrics**: Configured to collect GPU health metrics
-
-### 3.3 Install DCGM Exporter
+### 3.2 Apply the ServiceMonitor
 
 ```bash
-helm upgrade --install dcgm-exporter terraform/files/nvidia-dcgm-exporter \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/nvidia-dcgm-exporter/oke-values.yaml \
-  --wait
+kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml
 ```
 
-### 3.4 Verify DCGM Exporter
+### 3.3 Verify the ServiceMonitor
 
 ```bash
-# Check if DCGM exporter pods are running on GPU nodes
-kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=dcgm-exporter
-
 # Verify ServiceMonitor is created
-kubectl get servicemonitor -n ${MONITORING_NAMESPACE} dcgm-exporter
+kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
+
+# Check DCGM exporter pods are running (deployed by GPU Operator)
+kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ```
 
 ## Step 3b: Deploy AMD Device Metrics Exporter (Alternative for AMD GPUs)
@@ -586,7 +573,7 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
 2. Open http://localhost:9090/targets and verify all targets are UP:
    - node-exporter
-   - dcgm-exporter (if NVIDIA GPUs)
+   - nvidia-dcgm-exporter (if NVIDIA GPUs, in gpu-operator namespace)
    - device-metrics-exporter (if AMD GPUs)
    - node-problem-detector
    - kubelet
@@ -633,13 +620,12 @@ If the stack was originally deployed via Terraform, be aware that manually upgra
 
 You have two options:
 
-1. **Update via Terraform (recommended)**: Modify Terraform variables (e.g., `prometheus_stack_chart_version`, `dcgm_exporter_chart_version`) and re-run `terraform apply`.
+1. **Update via Terraform (recommended)**: Modify Terraform variables (e.g., `prometheus_stack_chart_version`) and re-run `terraform apply`.
 
 2. **Switch to manual management**: Remove the Helm releases from Terraform state before managing them manually:
    ```bash
    # Remove monitoring resources from Terraform state
    terraform state rm 'helm_release.prometheus[0]'
-   terraform state rm 'helm_release.nvidia_dcgm_exporter[0]'
    terraform state rm 'helm_release.amd_device_metrics_exporter[0]'
    terraform state rm 'helm_release.node-problem_detector[0]'
    terraform state rm 'helm_release.oke-ons-webhook[0]'
@@ -693,24 +679,12 @@ helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
   --wait
 ```
 
-### Update NVIDIA DCGM Exporter
+### Update NVIDIA DCGM Exporter ServiceMonitor
+
+The DCGM exporter DaemonSet is managed by the NvidiaGpuOperator OKE addon. To update the ServiceMonitor:
 
 ```bash
-helm upgrade dcgm-exporter terraform/files/nvidia-dcgm-exporter \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/nvidia-dcgm-exporter/oke-values.yaml \
-  --wait
-```
-
-**Note on upgrade speed**: The DCGM exporter runs as a DaemonSet on every GPU node with `hostNetwork: true`. During a rolling update, each pod must fully terminate before its replacement can start (to release the host port), and each new pod waits 45 seconds before passing its readiness probe. By default, `oke-values.yaml` sets `rollingUpdate.maxUnavailable` to `25%` to update multiple nodes in parallel. On very large clusters, you can speed this up further:
-
-```bash
-# Update all pods simultaneously (brief gap in metrics collection)
-helm upgrade dcgm-exporter terraform/files/nvidia-dcgm-exporter \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/nvidia-dcgm-exporter/oke-values.yaml \
-  --set rollingUpdate.maxUnavailable="100%" \
-  --wait
+kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml
 ```
 
 ### Update AMD Device Metrics Exporter
@@ -812,7 +786,7 @@ helm rollback kube-prometheus-stack -n monitoring
 helm rollback kube-prometheus-stack 1 -n monitoring
 ```
 
-The same `helm history` and `helm rollback` commands work for all Helm-managed components (`dcgm-exporter`, `gpu-rdma-node-problem-detector`, `oke-ons-webhook`, `amd-device-metrics-exporter`).
+The same `helm history` and `helm rollback` commands work for all Helm-managed components (`gpu-rdma-node-problem-detector`, `oke-ons-webhook`, `amd-device-metrics-exporter`).
 
 ### Verify the Update
 
@@ -867,14 +841,14 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 **Issue**: NVIDIA GPU metrics are not showing in Prometheus
 
 **Solution**:
-1. Verify DCGM exporter pods are running on GPU nodes:
+1. Verify DCGM exporter pods are running (deployed by GPU Operator):
    ```bash
-   kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=dcgm-exporter -o wide
+   kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter -o wide
    ```
 
 2. Check if ServiceMonitor exists:
    ```bash
-   kubectl get servicemonitor -n ${MONITORING_NAMESPACE} dcgm-exporter
+   kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
    ```
 
 3. Verify GPU nodes have the label:
@@ -1014,8 +988,8 @@ kubectl delete configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 # Uninstall Node Problem Detector
 helm uninstall gpu-rdma-node-problem-detector -n ${MONITORING_NAMESPACE}
 
-# Uninstall DCGM Exporter (if deployed)
-helm uninstall dcgm-exporter -n ${MONITORING_NAMESPACE}
+# Delete DCGM Exporter ServiceMonitor (if deployed)
+kubectl delete servicemonitor nvidia-dcgm-exporter -n gpu-operator --ignore-not-found
 
 # Uninstall AMD Device Metrics Exporter (if deployed)
 helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}

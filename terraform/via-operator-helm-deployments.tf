@@ -182,32 +182,66 @@ module "node_problem_detector" {
 }
 
 
-module "nvidia_dcgm_exporter" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_nvidia_dcgm_exporter]) ? 1 : 0
-  source = "./helm-module"
+resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
+  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true"]) ? 1 : 0
 
-  bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
-  operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
-  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+  triggers = {
+    manifest_md5    = md5(file("${path.module}/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml"))
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = var.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = var.operator_user
+  }
 
-  deployment_name    = "dcgm-exporter"
-  namespace          = var.monitoring_namespace
-  helm_chart_path    = "${path.module}/files/nvidia-dcgm-exporter"
-  helm_chart_version = var.dcgm_exporter_chart_version
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
 
-  pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
-  ]
-  deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
-  post_deployment_commands = []
+  provisioner "file" {
+    source      = "${path.module}/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml"
+    destination = "/tmp/nvidia-dcgm-exporter-service-monitor.yaml"
+  }
 
-  helm_template_values_override = file("${path.module}/files/nvidia-dcgm-exporter/oke-values.yaml")
-  helm_user_values_override     = ""
+  provisioner "remote-exec" {
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
+      "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
+      "kubectl apply -f /tmp/nvidia-dcgm-exporter-service-monitor.yaml",
+      "rm -f /tmp/nvidia-dcgm-exporter-service-monitor.yaml"
+    ]
+  }
 
-  depends_on = [module.kube_prometheus_stack]
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl delete servicemonitor nvidia-dcgm-exporter -n gpu-operator --ignore-not-found"
+    ]
+    on_failure = continue
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"]
+    ]
+  }
+
+  depends_on = [module.oke, module.kube_prometheus_stack]
 }
 
 
