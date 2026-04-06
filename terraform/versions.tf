@@ -23,8 +23,8 @@ terraform {
       version = "~> 3.0.1"
     }
     kubectl = {
-      source  = "gavinbunney/kubectl" # https://github.com/hashicorp/terraform-provider-kubernetes/issues/1782#issuecomment-1687357821
-      version = "~> 1.19"             # https://github.com/hashicorp/terraform-provider-kubernetes/issues/1391
+      source  = "alekc/kubectl"
+      version = "~> 2.1"
     }
     time = {
       source  = "hashicorp/time"
