@@ -168,6 +168,10 @@ jobs:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          WORKER_CPU_AD: ${{ vars.WORKER_CPU_AD }}
+          WORKER_CPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_CPU_IMAGE_CUSTOM_ID }}
+          WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
+          WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
         run: .github/scripts/build-variables-orm.sh
 

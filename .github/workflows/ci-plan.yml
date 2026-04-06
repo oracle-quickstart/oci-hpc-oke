@@ -151,6 +151,10 @@ jobs:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          WORKER_CPU_AD: ${{ vars.WORKER_CPU_AD }}
+          WORKER_CPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_CPU_IMAGE_CUSTOM_ID }}
+          WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
+          WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
         run: go test -v -count=1 -run TestValidation -timeout 30m ./...
 
@@ -230,6 +234,10 @@ jobs:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          WORKER_CPU_AD: ${{ vars.WORKER_CPU_AD }}
+          WORKER_CPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_CPU_IMAGE_CUSTOM_ID }}
+          WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
+          WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
           TFVARS_FILE: ${{ matrix.tfvars }}
         run: go test -v -count=1 -run TestPlanSmoke -timeout 15m ./...
@@ -284,6 +292,10 @@ jobs:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          WORKER_CPU_AD: ${{ vars.WORKER_CPU_AD }}
+          WORKER_CPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_CPU_IMAGE_CUSTOM_ID }}
+          WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
+          WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
           OVERRIDES_JSON: '{}'
         run: .github/scripts/build-variables-orm.sh
@@ -393,6 +405,10 @@ jobs:
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           WORKER_OPS_AD: ${{ vars.WORKER_OPS_AD }}
           WORKER_OPS_IMAGE_CUSTOM_ID: ${{ vars.WORKER_OPS_IMAGE_CUSTOM_ID }}
+          WORKER_CPU_AD: ${{ vars.WORKER_CPU_AD }}
+          WORKER_CPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_CPU_IMAGE_CUSTOM_ID }}
+          WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
+          WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
           TFVARS_FILE: ${{ matrix.tfvars }}
         run: go test -v -count=1 -run TestPlanSmoke -timeout 15m ./...
