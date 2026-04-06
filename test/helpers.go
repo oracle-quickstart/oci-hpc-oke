@@ -48,7 +48,6 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	workerOpsImageID := required("WORKER_OPS_IMAGE_ID", "WORKER_OPS_IMAGE_CUSTOM_ID", "OCI_WORKER_OPS_IMAGE_ID", "TF_VAR_worker_ops_image_custom_id")
 	sshPublicKey := loadSSHPublicKey(t, !opts.allowMissingRequired)
 
-	// var userOCID string
 	var profile string
 	switch auth {
 	case "api_key":
@@ -64,12 +63,14 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	setIfNotEmpty(vars, "tenancy_ocid", tenancyOCID)
 	setIfNotEmpty(vars, "region", region)
 	setIfNotEmpty(vars, "compartment_ocid", compartmentOCID)
-	// setIfNotEmpty(vars, "current_user_ocid", userOCID)
 	setIfNotEmpty(vars, "oci_profile", profile)
 	setIfNotEmpty(vars, "ssh_public_key", sshPublicKey)
 	setIfNotEmpty(vars, "worker_ops_ad", workerOpsAD)
 	setIfNotEmpty(vars, "worker_ops_image_custom_id", workerOpsImageID)
-
+	setIfNotEmpty(vars, "worker_cpu_ad", envOrDefault([]string{"WORKER_CPU_AD", "TF_VAR_worker_cpu_ad"}, ""))
+	setIfNotEmpty(vars, "worker_cpu_image_custom_id", envOrDefault([]string{"WORKER_CPU_IMAGE_CUSTOM_ID", "TF_VAR_worker_cpu_image_custom_id"}, ""))
+	setIfNotEmpty(vars, "worker_gpu_ad", envOrDefault([]string{"WORKER_GPU_AD", "TF_VAR_worker_gpu_ad"}, ""))
+	setIfNotEmpty(vars, "worker_gpu_image_custom_id", envOrDefault([]string{"WORKER_GPU_IMAGE_CUSTOM_ID", "TF_VAR_worker_gpu_image_custom_id"}, ""))
 	if opts.includeDefaults {
 		vars["create_bastion"] = false
 		vars["create_fss"] = false
@@ -205,7 +206,7 @@ func skipUnlessEnv(t *testing.T, key string) {
 	t.Helper()
 	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
 	if value != "1" && value != "true" && value != "yes" {
-		t.Fatalf("missing required flag %s=1 to run this test", key)
+		t.Skipf("missing required flag %s=1 to run this test", key)
 	}
 }
 

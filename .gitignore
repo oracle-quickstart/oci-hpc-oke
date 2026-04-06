@@ -6,4 +6,4 @@
 test/tfvars/base/base.tfvars
 .idea*
 .oca*
-vars.tfvars
+vars.tfvars__pycache__/

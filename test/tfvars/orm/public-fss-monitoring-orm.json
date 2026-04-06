@@ -20,8 +20,8 @@
   "install_rdma_labeler": "false",
   "setup_alerting": "false",
   "use_lets_encrypt_prod_endpoint": "false",
-  "worker_cpu_enabled": "false",
-  "worker_gpu_enabled": "false",
+  "worker_cpu_enabled": "true",
+  "worker_gpu_enabled": "true",
   "worker_rdma_enabled": "false",
   "create_policies": "true",
   "create_dynamic_group": "true"

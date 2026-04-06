@@ -16,6 +16,12 @@ worker_ops_image_custom_id = "<IMAGE_OCID>"     # ocid1.image.oc1...
 # Optional: pool size (defaults to 1)
 # worker_ops_pool_size = 1
 
+# Optional: CPU pool
+# worker_cpu_enabled         = true
+# worker_cpu_ad              = "<AD_NAME>"
+# worker_cpu_pool_size       = 1
+# worker_cpu_image_custom_id = "<IMAGE_OCID>"
+
 # Optional: GPU pool
 # worker_gpu_enabled         = true
 # worker_gpu_ad              = "<AD_NAME>"

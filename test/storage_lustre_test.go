@@ -109,7 +109,7 @@ spec:
   containers:
   - name: writer
     image: busybox
-    command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt"]
+    command: ["sh", "-c", "echo 'lustre-test-content' > /mnt/lustre/testfile.txt && sync"]
     volumeMounts:
     - name: lustre
       mountPath: /mnt/lustre
