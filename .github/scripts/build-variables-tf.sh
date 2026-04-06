@@ -13,6 +13,10 @@ jq -n \
   --arg current_user_ocid          "$OCI_USER_OCID" \
   --arg worker_ops_ad              "$WORKER_OPS_AD" \
   --arg worker_ops_image_custom_id "$WORKER_OPS_IMAGE_CUSTOM_ID" \
+  --arg worker_cpu_ad              "${WORKER_CPU_AD:-}" \
+  --arg worker_cpu_image_custom_id "${WORKER_CPU_IMAGE_CUSTOM_ID:-}" \
+  --arg worker_gpu_ad              "${WORKER_GPU_AD:-}" \
+  --arg worker_gpu_image_custom_id "${WORKER_GPU_IMAGE_CUSTOM_ID:-}" \
   --arg ssh_public_key             "$SSH_PUBLIC_KEY" \
   '{
     tenancy_ocid:               $tenancy_ocid,
@@ -21,6 +25,10 @@ jq -n \
     current_user_ocid:          $current_user_ocid,
     worker_ops_ad:              $worker_ops_ad,
     worker_ops_image_custom_id: $worker_ops_image_custom_id,
+    worker_cpu_ad:              $worker_cpu_ad,
+    worker_cpu_image_custom_id: $worker_cpu_image_custom_id,
+    worker_gpu_ad:              $worker_gpu_ad,
+    worker_gpu_image_custom_id: $worker_gpu_image_custom_id,
     ssh_public_key:             $ssh_public_key
   }' > secrets.tfvars.json
 
