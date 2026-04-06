@@ -1069,6 +1069,11 @@ variables:
       and:
       - install_monitoring
       - monitoring_advanced_options
+  nvidia_gpu_operator_configuration:
+    title: GPU Operator addon advanced configurations
+    type: map(string)
+    description: Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon.
+    visible: false
   install_amd_device_metrics_exporter:
     title: Install AMD Device Exporter
     type: boolean
