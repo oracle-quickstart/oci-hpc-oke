@@ -20,6 +20,12 @@ API key auth (default) also requires:
 - `OCI_USER_OCID`
 - `OCI_FINGERPRINT`
 
+Optional CPU/GPU pool env vars (if unset, `worker_cpu_enabled` and `worker_gpu_enabled` are forced to `false`):
+- `WORKER_CPU_AD`
+- `WORKER_CPU_IMAGE_CUSTOM_ID`
+- `WORKER_GPU_AD`
+- `WORKER_GPU_IMAGE_CUSTOM_ID`
+
 More info about configuring the OCI Terraform provider: https://docs.oracle.com/en-us/iaas/Content/dev/terraform/configuring.htm
 
 `TF_VAR_*` equivalents are also accepted for the required Terraform inputs. If `TFVARS_FILE` is set, required inputs can come from the var file instead of env. Missing required inputs will fail the test run.
