@@ -15,7 +15,7 @@ spec:
     matchNames:
       - gpu-operator
   endpoints:
-    - port: "metrics"
+    - port: "gpu-metrics"
       path: "/metrics"
       interval: "30s"
       scrapeTimeout: "30s"
