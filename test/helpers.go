@@ -67,6 +67,10 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 	setIfNotEmpty(vars, "ssh_public_key", sshPublicKey)
 	setIfNotEmpty(vars, "worker_ops_ad", workerOpsAD)
 	setIfNotEmpty(vars, "worker_ops_image_custom_id", workerOpsImageID)
+	setIfNotEmpty(vars, "worker_cpu_ad", envOrDefault([]string{"WORKER_CPU_AD", "TF_VAR_worker_cpu_ad"}, ""))
+	setIfNotEmpty(vars, "worker_cpu_image_custom_id", envOrDefault([]string{"WORKER_CPU_IMAGE_CUSTOM_ID", "TF_VAR_worker_cpu_image_custom_id"}, ""))
+	setIfNotEmpty(vars, "worker_gpu_ad", envOrDefault([]string{"WORKER_GPU_AD", "TF_VAR_worker_gpu_ad"}, ""))
+	setIfNotEmpty(vars, "worker_gpu_image_custom_id", envOrDefault([]string{"WORKER_GPU_IMAGE_CUSTOM_ID", "TF_VAR_worker_gpu_image_custom_id"}, ""))
 	if opts.includeDefaults {
 		vars["create_bastion"] = false
 		vars["create_fss"] = false
