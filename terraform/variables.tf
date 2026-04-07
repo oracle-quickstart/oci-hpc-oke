@@ -448,7 +448,7 @@ variable "nvidia_gpu_operator_configuration" {
   type = map(string)
   default = {
     "cdi.default"                                = "false"
-    "daemonsets.rollingUpdate.maxUnavailable"    = "1"
+    "daemonsets.rollingUpdate.maxUnavailable"    = "10%"
     "dcgm.enabled"                               = "true"
     "dcgmExporter.enabled"                       = "true"
     "dcgmExporter.service.internalTrafficPolicy" = "Cluster"
