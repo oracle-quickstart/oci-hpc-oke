@@ -165,8 +165,15 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
-      - setup_credential_provider_for_ocir
+
+  - title: Cluster Components
+    variables:
+      - deploy_node_feature_discovery
       - deploy_nvidia_gpu_operator
+      - setup_credential_provider_for_ocir
+      - install_oci_hpc_oke_utils
+      - install_kueue
+      - install_mpi_operator
 
   - title: "Workers: System"
     variables:
@@ -241,8 +248,6 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
-      - install_kueue
-      - install_oci_hpc_oke_utils
 
   - title: "SSH Access"
     variables:
@@ -1255,7 +1260,7 @@ variables:
     title: Setup OKE credential-provider for OCIR
     description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If "Create policies" box is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
     type: boolean
-    default: false
+    default: true
 
 # OKE Cluster Setup - Advanced Options
   override_hostnames:
@@ -1268,15 +1273,16 @@ variables:
     type: boolean
     description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
     default: false
+    visible: false
   deploy_node_feature_discovery:
-    title: Deploy NodeFeatureDiscovery addon
+    title: Deploy Node Feature Discovery addon
     type: boolean
-    description: Deploy the NodeFeatureDiscovery OKE addon.
+    description: Deploy the Node Feature Discovery OKE addon.
     default: true
   deploy_nvidia_gpu_operator:
     title: Deploy GPU Operator addon
     type: boolean
-    description: Deploy the NvidiaGpuOperator OKE addon.
+    description: Deploy the Nvidia GPU Operator OKE addon.
     default: true
   nvidia_gpu_operator_addon_version:
     title: GPU Operator addon version
@@ -1892,7 +1898,6 @@ variables:
     description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the GPU + RDMA worker pool."
     type: boolean
     default: true
-    visible: ${worker_rdma_enabled}
   install_rdma_labeler:
     title: Install RDMA Topology Labeler
     visible: false
@@ -1914,13 +1919,19 @@ variables:
         - ${worker_rdma_enabled}
         - ${install_kueue}
 
+  # MPI Operator
+  install_mpi_operator:
+    title: Install MPI Operator
+    description: Install MPI Operator for running MPIJob workloads.
+    type: boolean
+    default: true
+
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils
     description: Install the OCI HPC OKE Utils Helm chart (includes node labeler with RDMA topology, compute host health, firmware versions, and maintenance event tracking; image prepuller; and hostexec).
     type: boolean
     default: true
-    visible: ${worker_rdma_enabled}
 
   # SSH access to the nodes
   ssh_public_key:

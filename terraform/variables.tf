@@ -379,7 +379,7 @@ variable "preferred_kubernetes_services" {
 }
 variable "setup_credential_provider_for_ocir" {
   type        = bool
-  default     = false
+  default     = true
   description = "Setup the OKE credential provider for OCIR."
 }
 
