@@ -1277,7 +1277,7 @@ variables:
   deploy_node_feature_discovery:
     title: Deploy Node Feature Discovery addon
     type: boolean
-    description: Deploy the Node Feature Discovery OKE addon.
+    description: Deploy the Node Feature Discovery OKE addon. This is a prerequisite for GPU Operator and Network Operator.
     default: true
   deploy_nvidia_gpu_operator:
     title: Deploy GPU Operator addon
