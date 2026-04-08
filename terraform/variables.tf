@@ -303,7 +303,6 @@ variable "prometheus_stack_chart_version" {
   type    = string
 }
 
-
 variable "amd_device_metrics_exporter_chart_version" {
   default = "v1.4.1"
   type    = string

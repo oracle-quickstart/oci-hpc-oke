@@ -42,8 +42,6 @@ variableGroups:
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
       - cert_manager_chart_version
-      # MPI Operator
-      - install_mpi_operator
       # Kueue
       - kueue_chart_version
       - kueue_local_queue_default_namespace
@@ -79,7 +77,6 @@ variableGroups:
       - legacy_imds_endpoints_disabled
       - disable_gpu_device_plugin
       # GPU Operator addon
-      - deploy_node_feature_discovery
       - nvidia_gpu_operator_addon_version
       - nvidia_gpu_operator_disable_plugin
       - nvidia_gpu_operator_cdi_enabled
@@ -166,7 +163,7 @@ variableGroups:
       - max_pods_per_node
       - preferred_kubernetes_services
 
-  - title: Cluster Components
+  - title: "Cluster Components"
     variables:
       - deploy_node_feature_discovery
       - deploy_nvidia_gpu_operator

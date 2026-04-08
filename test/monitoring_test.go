@@ -36,6 +36,9 @@ func TestMonitoring(t *testing.T) {
 	requireStateHasPrefix(t, resources, "helm_release.node-problem_detector")
 	requireStateHasPrefix(t, resources, "helm_release.grafana")
 
+	// Verify NVIDIA DCGM Exporter ServiceMonitor
+	requireStateHasPrefix(t, resources, "kubectl_manifest.nvidia_dcgm_exporter_service_monitor")
+
 	// Verify Grafana dashboards ConfigMaps
 	requireStateHasPrefix(t, resources, "kubernetes_config_map_v1.grafana_dashboard")
 
