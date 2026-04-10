@@ -403,7 +403,7 @@ variable "deploy_nvidia_gpu_operator" {
 
 variable "nvidia_gpu_operator_addon_version" {
   type        = string
-  default     = "v25.3.4"
+  default     = "v25.10.1"
   description = "Version of the NvidiaGpuOperator OKE addon."
 }
 
@@ -421,7 +421,7 @@ variable "nvidia_gpu_operator_cdi_enabled" {
 
 variable "nvidia_gpu_operator_toolkit_enabled" {
   type        = bool
-  default     = false
+  default     = true
   description = "Enable the NVIDIA container toolkit in the GPU Operator addon."
 }
 
