@@ -82,7 +82,7 @@ spec:
             echo "$latest" | tee "$homepath"/.ssh/authorized_keys
           fi
           while :; do [[ "$exit" -gt 0 ]] && break; sleep 1; done
-        image: oraclelinux:9
+        image: ghcr.io/oracle/oraclelinux:9
         name: authorized-ssh-keys
         resources:
           requests:
