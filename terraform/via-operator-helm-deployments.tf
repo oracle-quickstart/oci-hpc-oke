@@ -53,6 +53,7 @@ module "ingress" {
     "export OCI_CLI_AUTH=instance_principal"
   ]
   post_deployment_commands = flatten([
+    "sleep 15", #wait for cert-manager webhook to be ready before applying ClusterIssuer
     "cat <<'EOF' | kubectl apply -f -",
     (var.use_lets_encrypt_prod_endpoint == true ?
       split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-prod.yaml", { state = local.state_id })) :
