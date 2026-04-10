@@ -45,7 +45,7 @@ jobs:
       run-tests: ${{ steps.filter.outputs.infra }}
     steps:
       - name: React to trigger comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -56,7 +56,7 @@ jobs:
             })
 
       - name: Verify PR source is trusted
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -424,7 +424,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post result comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           VALIDATE_RESULT: ${{ needs.validate.result }}
           PLAN_TF_RESULT: ${{ needs.plan-terraform.result }}

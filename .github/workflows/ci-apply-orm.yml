@@ -75,7 +75,7 @@ jobs:
       overrides: ${{ steps.parse.outputs.overrides }}
     steps:
       - name: React to trigger comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -86,7 +86,7 @@ jobs:
             })
 
       - name: Verify PR source is trusted
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -322,7 +322,7 @@ jobs:
 
       - name: Post result comment
         if: always() && (github.event_name == 'issue_comment' || (github.event_name == 'workflow_call' && inputs.pr_number != 0))
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
