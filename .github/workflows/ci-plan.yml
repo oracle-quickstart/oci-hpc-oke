@@ -2,6 +2,13 @@ name: CI - Plan (Both)
 # Runs validation, Terraform plan, and ORM plan jobs on /ok-to-run-plan
 
 on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to test"
+        required: true
+        type: number
+
   issue_comment:
     types: [created]
 
@@ -16,6 +23,8 @@ concurrency:
       !startsWith(github.event.comment.body, '/ok-to-run-plan-') &&
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login) &&
       format('ci-plan-{0}', github.event.issue.number) ||
+      github.event_name == 'workflow_dispatch' &&
+      format('ci-plan-{0}', github.event.inputs.pr_number) ||
       github.run_id
     }}
   cancel-in-progress: true
@@ -36,15 +45,20 @@ jobs:
   check-changes:
     name: Check changed files
     if: >-
-      github.event.issue.pull_request &&
+      (github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/ok-to-run-plan') &&
       !startsWith(github.event.comment.body, '/ok-to-run-plan-') &&
-      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       run-tests: ${{ steps.filter.outputs.infra }}
+      pr_number: ${{ steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number }}
+      pr_head_sha: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha }}
+      base_ref: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref }}
     steps:
       - name: React to trigger comment
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -55,43 +69,70 @@ jobs:
               content: 'rocket'
             })
 
-      - name: Verify PR source is trusted
+      - name: Resolve PR context from comment
+        id: pr-comment
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
         with:
           script: |
+            const prNumber = Number(process.env.PR_NUMBER);
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
+              pull_number: prNumber,
             });
-            const headRepo = pr.data.head.repo;
-            const baseRepo = pr.data.base.repo;
-            if (headRepo.full_name === baseRepo.full_name) {
-              console.log(`PR is from the same repo: ${headRepo.full_name}`);
-              return;
-            }
-            const trustedOwners = [baseRepo.owner.login];
-            if (trustedOwners.includes(headRepo.owner.login)) {
-              console.log(`PR fork owner ${headRepo.owner.login} is trusted`);
-              return;
-            }
-            core.setFailed(
-              `PR #${context.issue.number} is from untrusted fork ${headRepo.full_name}. ` +
-              `Refusing to run CI with secrets.`
-            );
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('base_ref', pr.data.base.ref);
+
+      - name: Resolve PR context from workflow input
+        id: pr-dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('base_ref', pr.data.base.ref);
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number }}/head
           fetch-depth: 0
 
+      - name: Verify checked-out PR SHA
+        env:
+          EXPECTED_SHA: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
+
       - name: Fetch base branch for diff
-        run: git fetch origin main
+        env:
+          BASE_REF: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref }}
+        run: git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Check for infra-relevant changes
         id: filter
+        env:
+          BASE_REF: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref }}
+          HEAD_SHA: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha }}
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD -- \
+          CHANGED=$(git diff --name-only "origin/${BASE_REF}...${HEAD_SHA}" -- \
             'terraform/' 'test/' 'files/' 'manifests/' '.github/workflows/' '.github/scripts/' || true)
           if [ -n "$CHANGED" ]; then
             echo "infra=true" >> "$GITHUB_OUTPUT"
@@ -111,7 +152,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+
+      - name: Verify checked-out PR SHA
+        env:
+          EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -194,7 +246,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+
+      - name: Verify checked-out PR SHA
+        env:
+          EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -270,7 +333,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+
+      - name: Verify checked-out PR SHA
+        env:
+          EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
 
       - name: Install OCI CLI
         run: pip install oci-cli --quiet
@@ -365,7 +439,18 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ github.event.issue.number }}/head
+          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+
+      - name: Verify checked-out PR SHA
+        env:
+          EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -431,6 +516,7 @@ jobs:
           PLAN_TF_TOPOLOGIES_RESULT: ${{ needs.plan-tf.result }}
           PLAN_ORM_RESULT: ${{ needs.plan-orm.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ needs.check-changes.outputs.pr_number }}
         with:
           script: |
             const icon = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌'
@@ -439,6 +525,7 @@ jobs:
             const planTfTop   = process.env.PLAN_TF_TOPOLOGIES_RESULT
             const planOrm     = process.env.PLAN_ORM_RESULT
             const runUrl      = process.env.RUN_URL
+            const prNumber    = Number(process.env.PR_NUMBER)
             const ok = (r) => r === 'success' || r === 'skipped'
             const overall = ok(validate) && ok(planTf) && ok(planTfTop) && ok(planOrm)
             const body = [
@@ -456,6 +543,6 @@ jobs:
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
+              issue_number: prNumber,
               body,
             })
