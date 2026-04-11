@@ -3,6 +3,10 @@ name: CI - Apply (Terraform)
 on:
   workflow_dispatch:
     inputs:
+      pr_number:
+        description: "Pull request number to test"
+        required: true
+        type: number
       topology:
         description: "Terraform topology to test"
         required: true
@@ -42,7 +46,8 @@ concurrency:
   group: >-
     ${{
       github.event_name == 'issue_comment' && format('ci-apply-tf-pr-{0}', github.event.issue.number) ||
-      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-tf-pr-{0}-{1}', inputs.pr_number, inputs.topology) ||
+      github.event_name == 'workflow_dispatch' && format('ci-apply-tf-pr-{0}', github.event.inputs.pr_number) ||
+      github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-tf-pr-{0}', inputs.pr_number) ||
       format('ci-apply-tf-{0}', inputs.topology || github.run_id)
     }}
   cancel-in-progress: false
@@ -57,21 +62,27 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Gate: verify /ok-to-run-apply-tf comment is authorized.
+  # Resolve PR context for PR-linked runs and verify /ok-to-run-apply-tf
+  # comments are authorized.
   # ---------------------------------------------------------------------------
   check-tf-trigger:
     name: Check TF trigger
     if: >-
-      github.event_name == 'issue_comment' &&
+      (github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/ok-to-run-apply-tf') &&
-      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)
+      contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login)) ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_call' && inputs.pr_number != 0)
     runs-on: ubuntu-latest
     outputs:
-      topology: ${{ steps.parse.outputs.topology }}
-      overrides: ${{ steps.parse.outputs.overrides }}
+      topology: ${{ steps.parse.outputs.topology || steps.manual.outputs.topology }}
+      overrides: ${{ steps.parse.outputs.overrides || steps.manual.outputs.overrides }}
+      pr_number: ${{ steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number || steps.pr-call.outputs.pr_number }}
+      pr_head_sha: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha || steps.pr-call.outputs.head_sha }}
     steps:
       - name: React to trigger comment
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -82,38 +93,73 @@ jobs:
               content: 'rocket'
             })
 
-      - name: Verify PR source is trusted
+      - name: Resolve PR context from comment
+        id: pr-comment
+        if: github.event_name == 'issue_comment'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
         with:
           script: |
+            const prNumber = Number(process.env.PR_NUMBER);
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
+              pull_number: prNumber,
             });
-            const headRepo = pr.data.head.repo;
-            const baseRepo = pr.data.base.repo;
-            if (headRepo.full_name === baseRepo.full_name) {
-              console.log(`PR is from the same repo: ${headRepo.full_name}`);
-              return;
-            }
-            const trustedOwners = [baseRepo.owner.login];
-            if (trustedOwners.includes(headRepo.owner.login)) {
-              console.log(`PR fork owner ${headRepo.owner.login} is trusted`);
-              return;
-            }
-            core.setFailed(
-              `PR #${context.issue.number} is from untrusted fork ${headRepo.full_name}. ` +
-              `Refusing to run CI with secrets.`
-            );
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.data.head.sha);
+
+      - name: Resolve PR context from workflow dispatch
+        id: pr-dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.data.head.sha);
+
+      - name: Resolve PR context from workflow call
+        id: pr-call
+        if: github.event_name == 'workflow_call'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('head_sha', pr.data.head.sha);
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        if: github.event_name == 'issue_comment'
 
       - name: Parse topology and overrides from comment
         id: parse
+        if: github.event_name == 'issue_comment'
         env:
           COMMENT: ${{ github.event.comment.body }}
         run: .github/scripts/parse-comment.sh "/ok-to-run-apply-tf" "public-base-tf|public-bastion-operator-tf|public-fss-monitoring-tf|public-lustre-tf|public-fss-lustre-monitoring-tf|private-base-tf|private-fss-monitoring-tf|private-fss-lustre-monitoring-tf" "public-fss-monitoring-tf"
+
+      - name: Use workflow inputs
+        id: manual
+        if: github.event_name != 'issue_comment'
+        run: |
+          echo "topology=${{ inputs.topology }}" >> "$GITHUB_OUTPUT"
+          echo "overrides=${{ inputs.overrides }}" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
   # Apply: init, apply, assert outputs, health checks, then always destroy.
@@ -121,7 +167,11 @@ jobs:
   apply-tf:
     name: Terraform / ${{ inputs.topology || needs.check-tf-trigger.outputs.topology || 'public-fss-monitoring-tf' }}
     needs: [check-tf-trigger]
-    if: always() && (github.event_name != 'issue_comment' || needs.check-tf-trigger.result == 'success')
+    if: >-
+      always() && (
+        (github.event_name == 'workflow_call' && inputs.pr_number == 0) ||
+        needs.check-tf-trigger.result == 'success'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
@@ -134,10 +184,21 @@ jobs:
         with:
           ref: >-
             ${{
-              github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) ||
-              github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('refs/pull/{0}/head', inputs.pr_number) ||
+              needs.check-tf-trigger.outputs.pr_number != '' && format('refs/pull/{0}/head', needs.check-tf-trigger.outputs.pr_number) ||
               github.ref
             }}
+
+      - name: Verify checked-out PR SHA
+        if: needs.check-tf-trigger.outputs.pr_head_sha != ''
+        env:
+          EXPECTED_SHA: ${{ needs.check-tf-trigger.outputs.pr_head_sha }}
+        run: |
+          ACTUAL_SHA=$(git rev-parse HEAD)
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Expected PR head SHA $EXPECTED_SHA but checked out $ACTUAL_SHA."
+            echo "The PR changed after this run started. Re-run against the latest commit."
+            exit 1
+          fi
 
       - name: Install Terraform
         run: |
@@ -300,12 +361,12 @@ jobs:
         run: terraform -chdir=terraform show 2>/dev/null | tail -50 || true
 
       - name: Post result comment
-        if: always() && (github.event_name == 'issue_comment' || (github.event_name == 'workflow_call' && inputs.pr_number != 0))
+        if: always() && needs.check-tf-trigger.outputs.pr_number != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PR_NUMBER: ${{ github.event_name == 'workflow_call' && inputs.pr_number != 0 && inputs.pr_number || github.event.issue.number }}
+          PR_NUMBER: ${{ needs.check-tf-trigger.outputs.pr_number }}
           OVERRIDES_JSON: ${{ env.OVERRIDES_JSON }}
         with:
           script: |
