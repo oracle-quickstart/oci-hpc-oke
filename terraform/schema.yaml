@@ -50,7 +50,6 @@ variableGroups:
       - install_hostexec
       # Monitoring
       - wildcard_dns_domain
-      - monitoring_advanced_options
       # Cluster setup
       - kubeproxy_mode
       - oke_pre_bootstrap_script
@@ -76,14 +75,6 @@ variableGroups:
       # Workers
       - legacy_imds_endpoints_disabled
       - disable_gpu_device_plugin
-      # GPU Operator addon
-      - nvidia_gpu_operator_addon_version
-      - nvidia_gpu_operator_disable_plugin
-      - nvidia_gpu_operator_cdi_enabled
-      - nvidia_gpu_operator_toolkit_enabled
-      - nvidia_gpu_operator_skip_nfd_dependency_check
-      - nvidia_gpu_operator_mig_manager_enabled
-      - nvidia_gpu_operator_mig_strategy
 
   - title: "Identity"
     variables:
@@ -131,6 +122,7 @@ variableGroups:
 
   - title: Cluster Access
     variables:
+      - ssh_public_key
       - create_bastion
       - bastion_is_public
       - bastion_allowed_cidrs
@@ -162,15 +154,6 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
-
-  - title: "Cluster Components"
-    variables:
-      - deploy_node_feature_discovery
-      - deploy_nvidia_gpu_operator
-      - setup_credential_provider_for_ocir
-      - install_oci_hpc_oke_utils
-      - install_kueue
-      - install_mpi_operator
 
   - title: "Workers: System"
     variables:
@@ -246,10 +229,6 @@ variableGroups:
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
 
-  - title: "SSH Access"
-    variables:
-    - ssh_public_key
-
   - title: "Storage"
     variables:
     - nvme_raid_enabled
@@ -263,6 +242,26 @@ variableGroups:
     - lustre_size_in_tb
     - lustre_performance_tier
     - lustre_mount_path
+
+  - title: "OKE Add-ons"
+    variables:
+      - deploy_node_feature_discovery
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+      - nvidia_gpu_operator_addon_version
+      - nvidia_gpu_operator_disable_plugin
+      - nvidia_gpu_operator_cdi_enabled
+      - nvidia_gpu_operator_toolkit_enabled
+      - nvidia_gpu_operator_skip_nfd_dependency_check
+      - nvidia_gpu_operator_mig_manager_enabled
+      - nvidia_gpu_operator_mig_strategy
+
+  - title: "Cluster Components"
+    variables:
+      - setup_credential_provider_for_ocir
+      - install_oci_hpc_oke_utils
+      - install_kueue
+      - install_mpi_operator
 
   - title: "Monitoring & Observability"
     variables:
@@ -992,7 +991,7 @@ variables:
     required: true
     visible: nvme_raid_enabled
   create_lustre:
-    title: Create Lustre FS
+    title: Create a File Storage with Lustre file system
     description: Provision a shared Lustre file system and a PV backed by the Lustre file system. The OS images used for the worker nodes must have the Lustre client installed.
     type: boolean
     default: false
@@ -1072,7 +1071,7 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
   nvidia_gpu_operator_configuration:
-    title: GPU Operator addon advanced configurations
+    title: NVIDIA GPU Operator addon advanced configurations
     type: map(string)
     description: Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon.
     visible: false
@@ -1268,50 +1267,87 @@ variables:
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
-    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
+    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
     default: false
     visible: false
   deploy_node_feature_discovery:
     title: Deploy Node Feature Discovery addon
     type: boolean
-    description: Deploy the Node Feature Discovery OKE addon. This is a prerequisite for GPU Operator and Network Operator.
+    description: Deploy the Node Feature Discovery OKE addon. This is a prerequisite for NVIDIA GPU Operator and Network Operator.
     default: true
   deploy_nvidia_gpu_operator:
-    title: Deploy GPU Operator addon
+    title: Deploy NVIDIA GPU Operator addon
     type: boolean
-    description: Deploy the Nvidia GPU Operator OKE addon.
+    description: Deploy the NVIDIA GPU Operator OKE addon. Requires the Node Feature Discovery addon.
     default: true
+    visible:
+      - deploy_node_feature_discovery
+  nvidia_gpu_operator_advanced_options:
+    title: NVIDIA GPU Operator advanced options
+    type: boolean
+    description: Show advanced NVIDIA GPU Operator configuration options.
+    default: false
+    required: false
+    visible:
+      - deploy_nvidia_gpu_operator
   nvidia_gpu_operator_addon_version:
-    title: GPU Operator addon version
-    type: string
+    title: NVIDIA GPU Operator addon version
+    type: enum
     description: Version of the NvidiaGpuOperator OKE addon.
-    default: "v25.3.4"
+    default: "v25.10.1"
     required: true
+    enum:
+      - "v25.10.1"
+      - "v25.3.4"
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
   nvidia_gpu_operator_disable_plugin:
-    title: Disable NvidiaGpuPlugin in GPU Operator
+    title: Disable NvidiaGpuPlugin in NVIDIA GPU Operator
     type: boolean
-    description: Disable the NvidiaGpuPlugin when using the GPU Operator addon.
+    description: Disable the NvidiaGpuPlugin when using the NVIDIA GPU Operator addon.
     default: true
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
   nvidia_gpu_operator_cdi_enabled:
-    title: Enable CDI in GPU Operator
+    title: Enable CDI in NVIDIA GPU Operator
     type: boolean
-    description: Enable CDI (Container Device Interface) in the GPU Operator addon.
+    description: Enable CDI (Container Device Interface) in the NVIDIA GPU Operator addon.
     default: true
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
   nvidia_gpu_operator_toolkit_enabled:
-    title: Enable NVIDIA toolkit in GPU Operator
+    title: Enable NVIDIA toolkit in NVIDIA GPU Operator
     type: boolean
-    description: Enable the NVIDIA container toolkit in the GPU Operator addon.
-    default: false
-  nvidia_gpu_operator_skip_nfd_dependency_check:
-    title: Skip NFD dependency check in GPU Operator
-    type: boolean
-    description: Skip the NodeFeatureDiscovery dependency check in the GPU Operator addon.
+    description: Enable the NVIDIA container toolkit in the NVIDIA GPU Operator addon.
     default: true
-  nvidia_gpu_operator_mig_manager_enabled:
-    title: Enable MIG Manager in GPU Operator
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+  nvidia_gpu_operator_skip_nfd_dependency_check:
+    title: Skip NFD dependency check in NVIDIA GPU Operator
     type: boolean
-    description: Enable the NVIDIA MIG Manager in the GPU Operator addon.
+    description: Skip the NodeFeatureDiscovery dependency check in the NVIDIA GPU Operator addon.
+    default: true
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+  nvidia_gpu_operator_mig_manager_enabled:
+    title: Enable MIG Manager in NVIDIA GPU Operator
+    type: boolean
+    description: Enable the NVIDIA MIG Manager in the NVIDIA GPU Operator addon.
     default: false
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
   nvidia_gpu_operator_mig_strategy:
     title: MIG strategy
     type: enum
@@ -1321,6 +1357,11 @@ variables:
       - none
       - single
       - mixed
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+      - nvidia_gpu_operator_mig_manager_enabled
 
   # Workers - System pool
   worker_ops_ad:
@@ -1933,7 +1974,7 @@ variables:
   # SSH access to the nodes
   ssh_public_key:
     title: SSH public key
-    description: The SSH public key to access the bastion, operator, and worker nodes.
+    description: "The SSH public key to access the bastion, operator, and worker nodes. Warning: if omitted, you will have no SSH access to any node (kubectl will still work)."
     type: oci:core:ssh:publickey
     pattern: "((^(ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)(,((ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)*$"
     required: false

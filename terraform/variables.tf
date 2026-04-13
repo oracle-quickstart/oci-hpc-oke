@@ -401,6 +401,12 @@ variable "deploy_nvidia_gpu_operator" {
   description = "Deploy the NvidiaGpuOperator OKE addon."
 }
 
+variable "nvidia_gpu_operator_advanced_options" {
+  type        = bool
+  default     = false
+  description = "Show advanced NVIDIA GPU Operator configuration options in the ORM UI."
+}
+
 variable "nvidia_gpu_operator_addon_version" {
   type        = string
   default     = "v25.10.1"
@@ -410,31 +416,31 @@ variable "nvidia_gpu_operator_addon_version" {
 variable "nvidia_gpu_operator_disable_plugin" {
   type        = bool
   default     = true
-  description = "Disable the NvidiaGpuPlugin when using the GPU Operator addon."
+  description = "Disable the NvidiaGpuPlugin when using the NVIDIA GPU Operator addon."
 }
 
 variable "nvidia_gpu_operator_cdi_enabled" {
   type        = bool
   default     = true
-  description = "Enable CDI (Container Device Interface) in the GPU Operator addon."
+  description = "Enable CDI (Container Device Interface) in the NVIDIA GPU Operator addon."
 }
 
 variable "nvidia_gpu_operator_toolkit_enabled" {
   type        = bool
   default     = true
-  description = "Enable the NVIDIA container toolkit in the GPU Operator addon."
+  description = "Enable the NVIDIA container toolkit in the NVIDIA GPU Operator addon."
 }
 
 variable "nvidia_gpu_operator_skip_nfd_dependency_check" {
   type        = bool
   default     = true
-  description = "Skip the NodeFeatureDiscovery dependency check in the GPU Operator addon."
+  description = "Skip the NodeFeatureDiscovery dependency check in the NVIDIA GPU Operator addon."
 }
 
 variable "nvidia_gpu_operator_mig_manager_enabled" {
   type        = bool
   default     = false
-  description = "Enable the NVIDIA MIG Manager in the GPU Operator addon."
+  description = "Enable the NVIDIA MIG Manager in the NVIDIA GPU Operator addon."
 }
 
 variable "nvidia_gpu_operator_mig_strategy" {

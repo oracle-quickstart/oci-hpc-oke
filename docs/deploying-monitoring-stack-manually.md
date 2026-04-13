@@ -150,7 +150,7 @@ prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0 
 
 ## Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor
 
-**Note**: This step is only required if you have NVIDIA GPU nodes in your cluster with the NvidiaGpuOperator OKE addon enabled. The GPU Operator addon deploys the DCGM exporter DaemonSet automatically in the `gpu-operator` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
+**Note**: This step is only required if you have NVIDIA GPU nodes in your cluster with the NvidiaGpuOperator OKE addon enabled. The NVIDIA GPU Operator addon deploys the DCGM exporter DaemonSet automatically in the `gpu-operator` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
 
 ### 3.1 Locate the ServiceMonitor Manifest
 
@@ -168,7 +168,7 @@ kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-mo
 # Verify ServiceMonitor is created
 kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
 
-# Check DCGM exporter pods are running (deployed by GPU Operator)
+# Check DCGM exporter pods are running (deployed by NVIDIA GPU Operator)
 kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ```
 
@@ -841,7 +841,7 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 **Issue**: NVIDIA GPU metrics are not showing in Prometheus
 
 **Solution**:
-1. Verify DCGM exporter pods are running (deployed by GPU Operator):
+1. Verify DCGM exporter pods are running (deployed by NVIDIA GPU Operator):
    ```bash
    kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter -o wide
    ```
