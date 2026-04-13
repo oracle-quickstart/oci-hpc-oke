@@ -6,13 +6,31 @@
 
 ### Required policies (any-user can be replaced by the group launching the cluster)
 
-```python
-Allow any-user to use compute-hpc-islands in tenancy
-Allow any-user to use compute-network-blocks in tenancy
-Allow any-user to use compute-local-blocks in tenancy
-Allow any-user to use compute-bare-metal-hosts in tenancy
-Allow any-user to use compute-gpu-memory-fabrics in tenancy
+```bash
+# Grant HPC administrators full control of HPC resources in the HPC compartment
+Allow group HPCAdmins to manage compute-hpc-islands in compartment HPC-Cluster
+Allow group HPCAdmins to manage compute-network-blocks in compartment HPC-Cluster
+Allow group HPCAdmins to manage compute-local-blocks in compartment HPC-Cluster
+Allow group HPCAdmins to manage compute-bare-metal-hosts in compartment HPC-Cluster
+Allow group HPCAdmins to manage compute-gpu-memory-fabrics in compartment HPC-Cluster
+
+# Grant HPC users permission to use (but not manage) HPC resources
+Allow group HPCUsers to use compute-hpc-islands in compartment HPC-Cluster
+Allow group HPCUsers to use compute-network-blocks in compartment HPC-Cluster
+Allow group HPCUsers to use compute-local-blocks in compartment HPC-Cluster
+Allow group HPCUsers to use compute-bare-metal-hosts in compartment HPC-Cluster
+Allow group HPCUsers to use compute-gpu-memory-fabrics in compartment HPC-Cluster
 ```
+
+### Deploy an OKE Cluster
+Currently, we don't support deploying GB200 & GB300 shapes to be deployed directly with the stack. The way it works is:
+
+- Deploy an OKE cluster with the stack
+- Add the GB200 & GB300 following the instructions in this readme.
+
+Deploy the cluster using the button below. Do not use the templates in this branch as they are not being updated.
+
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
 
 ### Create a Compute Cluster
 
