@@ -305,6 +305,7 @@ NCCL version 2.25.1+cuda12.8
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
 - [Replacing the boot volume of self-managed nodes using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
 - [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
+- [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./docs/using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md)
 
 ## Contributing
 
