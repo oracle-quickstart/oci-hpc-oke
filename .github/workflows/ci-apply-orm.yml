@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "Pull request number to test"
-        required: true
+        description: "Pull request number to test (leave empty to use current branch)"
+        required: false
         type: number
       topology:
         description: "ORM topology to test"
@@ -48,7 +48,7 @@ concurrency:
   group: >-
     ${{
       github.event_name == 'issue_comment' && format('ci-apply-orm-pr-{0}', github.event.issue.number) ||
-      github.event_name == 'workflow_dispatch' && format('ci-apply-orm-pr-{0}', github.event.inputs.pr_number) ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '' && format('ci-apply-orm-pr-{0}', github.event.inputs.pr_number) ||
       github.event_name == 'workflow_call' && inputs.pr_number != 0 && format('ci-apply-orm-pr-{0}', inputs.pr_number) ||
       format('ci-apply-orm-{0}', inputs.topology || github.run_id)
     }}
@@ -114,7 +114,7 @@ jobs:
 
       - name: Resolve PR context from workflow dispatch
         id: pr-dispatch
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           PR_NUMBER: ${{ github.event.inputs.pr_number }}

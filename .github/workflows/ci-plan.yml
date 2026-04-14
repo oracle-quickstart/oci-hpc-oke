@@ -5,8 +5,8 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "Pull request number to test"
-        required: true
+        description: "Pull request number to test (leave empty to use current branch)"
+        required: false
         type: number
 
   issue_comment:
@@ -24,6 +24,7 @@ concurrency:
       contains(fromJSON('["OguzPastirmaci","arnaudfroidmont","robo-cap"]'), github.event.comment.user.login) &&
       format('ci-plan-{0}', github.event.issue.number) ||
       github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.pr_number != '' &&
       format('ci-plan-{0}', github.event.inputs.pr_number) ||
       github.run_id
     }}
@@ -89,7 +90,7 @@ jobs:
 
       - name: Resolve PR context from workflow input
         id: pr-dispatch
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           PR_NUMBER: ${{ github.event.inputs.pr_number }}
@@ -107,10 +108,16 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number }}/head
+          ref: >-
+            ${{
+              (steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number) &&
+              format('refs/pull/{0}/head', steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number) ||
+              github.ref
+            }}
           fetch-depth: 0
 
       - name: Verify checked-out PR SHA
+        if: steps.pr-comment.outputs.head_sha != '' || steps.pr-dispatch.outputs.head_sha != ''
         env:
           EXPECTED_SHA: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha }}
         run: |
@@ -122,6 +129,7 @@ jobs:
           fi
 
       - name: Fetch base branch for diff
+        if: steps.pr-comment.outputs.base_ref != '' || steps.pr-dispatch.outputs.base_ref != ''
         env:
           BASE_REF: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref }}
         run: git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
@@ -132,6 +140,11 @@ jobs:
           BASE_REF: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref }}
           HEAD_SHA: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha }}
         run: |
+          if [ -z "$BASE_REF" ] || [ -z "$HEAD_SHA" ]; then
+            echo "No PR context; running all tests."
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           CHANGED=$(git diff --name-only "origin/${BASE_REF}...${HEAD_SHA}" -- \
             'terraform/' 'test/' 'files/' 'manifests/' '.github/workflows/' '.github/scripts/' || true)
           if [ -n "$CHANGED" ]; then
@@ -152,9 +165,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+          ref: >-
+            ${{
+              needs.check-changes.outputs.pr_number != '' &&
+              format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
+              github.ref
+            }}
 
       - name: Verify checked-out PR SHA
+        if: needs.check-changes.outputs.pr_head_sha != ''
         env:
           EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
         run: |
@@ -246,9 +265,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+          ref: >-
+            ${{
+              needs.check-changes.outputs.pr_number != '' &&
+              format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
+              github.ref
+            }}
 
       - name: Verify checked-out PR SHA
+        if: needs.check-changes.outputs.pr_head_sha != ''
         env:
           EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
         run: |
@@ -333,9 +358,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+          ref: >-
+            ${{
+              needs.check-changes.outputs.pr_number != '' &&
+              format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
+              github.ref
+            }}
 
       - name: Verify checked-out PR SHA
+        if: needs.check-changes.outputs.pr_head_sha != ''
         env:
           EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
         run: |
@@ -439,9 +470,15 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: refs/pull/${{ needs.check-changes.outputs.pr_number }}/head
+          ref: >-
+            ${{
+              needs.check-changes.outputs.pr_number != '' &&
+              format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
+              github.ref
+            }}
 
       - name: Verify checked-out PR SHA
+        if: needs.check-changes.outputs.pr_head_sha != ''
         env:
           EXPECTED_SHA: ${{ needs.check-changes.outputs.pr_head_sha }}
         run: |
@@ -505,7 +542,7 @@ jobs:
   summarize:
     name: Post results
     needs: [check-changes, validate, plan-terraform, plan-tf, plan-orm]
-    if: always() && needs.check-changes.result == 'success'
+    if: always() && needs.check-changes.result == 'success' && needs.check-changes.outputs.pr_number != ''
     runs-on: ubuntu-latest
     steps:
       - name: Post result comment
