@@ -5,7 +5,7 @@ echo "=== Rebooting all cluster nodes ==="
 
 # Snapshot every node and its backing OCI instance up front. Done in a single
 # pre-reboot kubectl call so that a transient API failure here aborts before
-# we send any SOFTRESETs, and so the later NotReady-polling loop has a
+# we send any RESETs, and so the later NotReady-polling loop has a
 # reliable list of node names to watch (an empty list would vacuously pass).
 # Provider ID format in OCI: oci://<instance-ocid>
 NODE_SNAPSHOT=""
@@ -49,17 +49,17 @@ if [ "$PRE_REBOOT_GPU_NODES" -gt 0 ]; then
   echo "  $PRE_REBOOT_GPU_NODES node(s) currently advertising GPU resources"
 fi
 
-# Send SOFTRESET (graceful reboot) to each instance.
+# Send RESET (immediate power cycle) to each instance.
 for instance_id in "${INSTANCE_IDS[@]}"; do
-  echo "  Sending SOFTRESET to instance: $instance_id"
-  oci compute instance action --instance-id "$instance_id" --action SOFTRESET > /dev/null
+  echo "  Sending RESET to instance: $instance_id"
+  oci compute instance action --instance-id "$instance_id" --action RESET > /dev/null
 done
 
 echo "  All reboot commands sent. Waiting for every node to go NotReady..."
 
 # NODE_NAMES and SEEN_NOT_READY were populated from the pre-reboot snapshot
 # above. Tracking each node individually here (rather than re-querying the
-# API after SOFTRESETs land) guarantees we have a non-empty list to poll
+# API after RESETs land) guarantees we have a non-empty list to poll
 # against. A node is only considered rebooted once it has been observed as
 # NotReady, which prevents a race where early nodes come back Ready before
 # late nodes have even started rebooting.
