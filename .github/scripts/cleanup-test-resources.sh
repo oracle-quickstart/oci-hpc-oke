@@ -22,4 +22,9 @@ fi
 if [[ "$TOPOLOGY" == *lustre* ]]; then
   kubectl delete pod lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
   kubectl delete pvc lustre-test-pvc --ignore-not-found --wait=true --timeout=120s || true
+  # PV uses Retain reclaim policy, so clear claimRef to return it to Available
+  # and let subsequent PVCs bind to it (e.g. the post-reboot health check).
+  if kubectl get pv lustre-pv >/dev/null 2>&1; then
+    kubectl patch pv lustre-pv --type=merge -p '{"spec":{"claimRef":null}}' || true
+  fi
 fi
