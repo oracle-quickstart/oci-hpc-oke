@@ -3,24 +3,21 @@ set -euo pipefail
 
 echo "=== Rebooting all cluster nodes ==="
 
-# Snapshot every node and its backing OCI instance up front. Done in a single
-# pre-reboot kubectl call so that a transient API failure here aborts before
-# we send any RESETs, and so the later NotReady-polling loop has a
-# reliable list of node names to watch (an empty list would vacuously pass).
-# Provider ID format in OCI: oci://<instance-ocid>
+# Snapshot nodes up front so we have the list of names, instance IDs, and
+# baseline bootIDs before any RESETs go out. If this call fails we abort
+# before rebooting anything. Provider ID format: oci://<instance-ocid>.
 NODE_SNAPSHOT=""
-# Let kubectl write any warnings/errors to stderr (surfaced in the workflow
-# log). Only stdout is captured here so deprecation warnings and similar
-# messages cannot be parsed as node rows below.
-if ! NODE_SNAPSHOT=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.providerID}{"\n"}{end}'); then
+# Only capture stdout so kubectl warnings on stderr don't get parsed as rows.
+if ! NODE_SNAPSHOT=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.providerID}{"\t"}{.status.nodeInfo.bootID}{"\n"}{end}'); then
   echo "FAIL: could not read cluster nodes (kubectl error shown above)"
   exit 1
 fi
 
 INSTANCE_IDS=()
 NODE_NAMES=()
-declare -A SEEN_NOT_READY
-while IFS=$'\t' read -r node_name provider_id; do
+declare -A PRE_REBOOT_BOOT_ID
+declare -A SEEN_REBOOTED
+while IFS=$'\t' read -r node_name provider_id boot_id; do
   if [ -z "$node_name" ] && [ -z "$provider_id" ]; then
     continue
   fi
@@ -29,9 +26,14 @@ while IFS=$'\t' read -r node_name provider_id; do
     echo "FAIL: node $node_name has no OCI provider ID; cannot reboot"
     exit 1
   fi
+  if [ -z "$boot_id" ]; then
+    echo "FAIL: node $node_name has no bootID in status.nodeInfo; cannot track reboot"
+    exit 1
+  fi
   INSTANCE_IDS+=("$instance_id")
   NODE_NAMES+=("$node_name")
-  SEEN_NOT_READY["$node_name"]=false
+  PRE_REBOOT_BOOT_ID["$node_name"]="$boot_id"
+  SEEN_REBOOTED["$node_name"]=false
 done <<< "$NODE_SNAPSHOT"
 
 NODE_COUNT=${#INSTANCE_IDS[@]}
@@ -42,8 +44,7 @@ if [ "$NODE_COUNT" -eq 0 ]; then
   exit 1
 fi
 
-# Snapshot pre-reboot GPU node count so we can verify GPU resources reappear
-# after device plugins re-register with kubelet.
+# Snapshot GPU node count so we can confirm it's back after the reboot.
 PRE_REBOOT_GPU_NODES=$(kubectl get nodes -o json | jq '[.items[] | select((.status.allocatable["nvidia.com/gpu"] // "0" | tonumber) > 0 or (.status.allocatable["amd.com/gpu"] // "0" | tonumber) > 0)] | length')
 if [ "$PRE_REBOOT_GPU_NODES" -gt 0 ]; then
   echo "  $PRE_REBOOT_GPU_NODES node(s) currently advertising GPU resources"
@@ -55,36 +56,40 @@ for instance_id in "${INSTANCE_IDS[@]}"; do
   oci compute instance action --instance-id "$instance_id" --action RESET > /dev/null
 done
 
-echo "  All reboot commands sent. Waiting for every node to go NotReady..."
+echo "  All reboot commands sent. Waiting for every node's bootID to change..."
 
-# NODE_NAMES and SEEN_NOT_READY were populated from the pre-reboot snapshot
-# above. Tracking each node individually here (rather than re-querying the
-# API after RESETs land) guarantees we have a non-empty list to poll
-# against. A node is only considered rebooted once it has been observed as
-# NotReady, which prevents a race where early nodes come back Ready before
-# late nodes have even started rebooting.
+# bootID comes from the kernel and changes on every reboot, so a changed
+# bootID proves the node actually rebooted, even if the reboot was too fast
+# for the node to ever be marked NotReady.
 MAX_POLLS=60
 POLL=0
 while true; do
-  while IFS= read -r line; do
-    name=$(echo "$line" | awk '{print $1}')
-    status=$(echo "$line" | awk '{print $2}')
-    if [[ "$status" == *"NotReady"* ]] && [ "${SEEN_NOT_READY[$name]:-}" = "false" ]; then
-      SEEN_NOT_READY["$name"]=true
-      echo "  Node $name observed NotReady"
-    fi
-  done < <(kubectl get nodes --no-headers)
+  if CURRENT_SNAPSHOT=$(kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.bootID}{"\n"}{end}'); then
+    while IFS=$'\t' read -r name current_boot_id; do
+      if [ -z "$name" ]; then
+        continue
+      fi
+      if [ -n "$current_boot_id" ] \
+        && [ "$current_boot_id" != "${PRE_REBOOT_BOOT_ID[$name]:-}" ] \
+        && [ "${SEEN_REBOOTED[$name]:-}" = "false" ]; then
+        SEEN_REBOOTED["$name"]=true
+        echo "  Node $name rebooted (bootID changed)"
+      fi
+    done <<< "$CURRENT_SNAPSHOT"
+  else
+    echo "    kubectl get nodes failed (API may be unavailable; error shown above); treating as not yet rebooted"
+  fi
 
   ALL_SEEN=true
   for name in "${NODE_NAMES[@]}"; do
-    if [ "${SEEN_NOT_READY[$name]}" = "false" ]; then
+    if [ "${SEEN_REBOOTED[$name]}" = "false" ]; then
       ALL_SEEN=false
       break
     fi
   done
 
   if $ALL_SEEN; then
-    echo "  All $NODE_COUNT node(s) have been observed NotReady"
+    echo "  All $NODE_COUNT node(s) have rebooted (bootID changed)"
     break
   fi
 
@@ -92,11 +97,11 @@ while true; do
   if [ "$POLL" -gt "$MAX_POLLS" ]; then
     MISSING=()
     for name in "${NODE_NAMES[@]}"; do
-      if [ "${SEEN_NOT_READY[$name]}" = "false" ]; then
+      if [ "${SEEN_REBOOTED[$name]}" = "false" ]; then
         MISSING+=("$name")
       fi
     done
-    echo "FAIL: nodes never became NotReady after $MAX_POLLS polls: ${MISSING[*]}"
+    echo "FAIL: nodes' bootIDs never changed after $MAX_POLLS polls: ${MISSING[*]}"
     exit 1
   fi
   echo "  [$POLL/$MAX_POLLS] Waiting for all nodes to reboot..."
@@ -107,20 +112,14 @@ echo "  Waiting for all nodes to become Ready again..."
 kubectl wait --for=condition=Ready nodes --all --timeout=900s
 echo "  All $NODE_COUNT node(s) are Ready after reboot"
 
-# Wait for all DaemonSets across all namespaces to have their full complement
-# of ready pods. This covers GPU device plugins (which must re-register with
-# kubelet before allocatable GPU resources reappear) and monitoring DaemonSets
-# like prometheus-node-exporter.
+# Wait for every DaemonSet to have all pods ready. Covers GPU device plugins
+# (needed for GPU resources to reappear) and node-level monitoring.
 echo "  Waiting for all DaemonSets to become ready..."
 for i in $(seq 1 40); do
   ALL_DS_READY=true
   DS_OUTPUT=""
-  # Treat any kubectl failure or empty response as "not ready" rather than
-  # letting the inner loop produce zero iterations and vacuously pass. The
-  # API can be briefly unreachable right after a reboot while the bastion
-  # tunnel or webhook endpoints are still catching up.
-  # Capture only stdout. Warnings on stderr pass through to the workflow
-  # log and must not be parsed as DaemonSet rows.
+  # Treat kubectl failures or empty output as "not ready" so we retry.
+  # The API can be briefly unreachable right after a reboot.
   if ! DS_OUTPUT=$(kubectl get daemonsets --all-namespaces --no-headers); then
     ALL_DS_READY=false
     echo "    kubectl get daemonsets failed (API may be unavailable; error shown above)"
@@ -156,16 +155,13 @@ for i in $(seq 1 40); do
   sleep 15
 done
 
-# DaemonSet readiness does not guarantee that device plugins have re-registered
-# extended resources with kubelet. Wait for the same number of GPU nodes that
-# existed before the reboot to re-advertise allocatable GPU resources.
+# DaemonSet readiness doesn't guarantee device plugins have re-advertised GPU
+# resources to kubelet, so check the GPU node count separately.
 if [ "$PRE_REBOOT_GPU_NODES" -gt 0 ]; then
   echo "  Waiting for GPU resources to be re-advertised on $PRE_REBOOT_GPU_NODES node(s)..."
   for i in $(seq 1 40); do
-    # Split kubectl and jq so a transient API failure (or a jq parse error
-    # on empty input) is treated as "not yet ready" and the loop retries,
-    # matching how the DaemonSet poll above handles kubectl failures. A
-    # piped `kubectl | jq` under `set -o pipefail` would abort the script.
+    # Run kubectl and jq separately so a transient failure just retries.
+    # A piped `kubectl | jq` under `set -o pipefail` would abort the script.
     CURRENT_GPU_NODES=0
     if NODES_JSON=$(kubectl get nodes -o json); then
       if COUNT=$(jq '[.items[] | select((.status.allocatable["nvidia.com/gpu"] // "0" | tonumber) > 0 or (.status.allocatable["amd.com/gpu"] // "0" | tonumber) > 0)] | length' <<< "$NODES_JSON"); then
