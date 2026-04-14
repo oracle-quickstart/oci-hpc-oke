@@ -359,6 +359,50 @@ jobs:
         if: contains(env.TOPOLOGY, 'monitoring')
         run: .github/scripts/check-monitoring-health.sh state.json "outputs."
 
+      - name: Clean up test resources (pre-reboot)
+        run: .github/scripts/cleanup-test-resources.sh
+
+      - name: Verify test resources deleted
+        run: |
+          for i in $(seq 1 24); do
+            REMAINING=$(kubectl get pods net-server net-client dns-checker fss-writer fss-reader fss-hostpath-reader lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            PVC_REMAINING=$(kubectl get pvc fss-test-pvc lustre-test-pvc --ignore-not-found --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$REMAINING" -eq 0 ] && [ "$PVC_REMAINING" -eq 0 ]; then
+              echo "All test resources verified deleted"
+              break
+            fi
+            if [ "$i" -eq 24 ]; then
+              echo "FAIL: test resources still present after 2 minutes"
+              exit 1
+            fi
+            echo "  [$i/24] Waiting for test resources to be fully deleted..."
+            sleep 5
+          done
+
+      - name: Reboot nodes
+        run: .github/scripts/reboot-nodes.sh
+
+      - name: Cluster health checks (post-reboot)
+        run: .github/scripts/check-cluster-health.sh state.json "outputs."
+
+      - name: Network health checks (post-reboot)
+        run: .github/scripts/check-network-health.sh state.json "outputs."
+
+      - name: GPU resource health checks (post-reboot)
+        run: .github/scripts/check-gpu-health.sh state.json "outputs."
+
+      - name: FSS health checks (post-reboot)
+        if: contains(env.TOPOLOGY, 'fss')
+        run: .github/scripts/check-fss-health.sh state.json "outputs."
+
+      - name: Lustre health checks (post-reboot)
+        if: contains(env.TOPOLOGY, 'lustre')
+        run: .github/scripts/check-lustre-health.sh state.json "outputs."
+
+      - name: Monitoring health checks (post-reboot)
+        if: contains(env.TOPOLOGY, 'monitoring')
+        run: .github/scripts/check-monitoring-health.sh state.json "outputs."
+
       - name: Clean up test resources
         if: always()
         run: .github/scripts/cleanup-test-resources.sh

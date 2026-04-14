@@ -20,6 +20,33 @@ if ! modinfo lnet >/dev/null 2>&1; then
   exit 0
 fi
 
+LNET_IFACE=$(ip -o route get "$LUSTRE_IP" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+if [ -z "$LNET_IFACE" ]; then
+  LNET_IFACE=$(ip route show default | awk '/default/ {print $5; exit}')
+fi
+if [ -z "$LNET_IFACE" ]; then
+  echo "Error: unable to determine TCP interface for LNet" >&2
+  exit 1
+fi
+
+case "$LNET_IFACE" in
+  rdma*|ib*|mlx*)
+    echo "Error: resolved interface '$LNET_IFACE' looks like an RDMA device; refusing to bind LNet TCP to it" >&2
+    exit 1
+    ;;
+esac
+
+MODPROBE_CONF="/etc/modprobe.d/oke-lustre-lnet.conf"
+MODPROBE_LINE="options lnet networks=\"tcp(${LNET_IFACE})\""
+if [ ! -f "$MODPROBE_CONF" ] || ! grep -qxF "$MODPROBE_LINE" "$MODPROBE_CONF"; then
+  echo "# Managed by oke-lustre-mount.sh. Do not edit." > "$MODPROBE_CONF"
+  echo "$MODPROBE_LINE" >> "$MODPROBE_CONF"
+  echo "Wrote LNet interface preference to $MODPROBE_CONF"
+  if grep -q '^lnet ' /proc/modules 2>/dev/null; then
+    echo "LNet already loaded; new interface setting will take effect on next reboot or manual module reload."
+  fi
+fi
+
 if ! grep -q '^lnet ' /proc/modules 2>/dev/null; then
   echo "LNet not loaded, loading..."
   modprobe lnet
@@ -29,8 +56,7 @@ lnet_output="$(lnetctl net show 2>&1 || true)"
 
 if printf '%s\n' "$lnet_output" | grep -q "LNet stack down"; then
   lnetctl lnet configure
-  DEFAULT_IFACE=$(ip route show default | awk '/default/ {print $5}')
-  lnetctl net add --net tcp --if "$DEFAULT_IFACE" --peer-timeout 180 --peer-credits 120 --credits 1024
+  lnetctl net add --net tcp --if "$LNET_IFACE" --peer-timeout 180 --peer-credits 120 --credits 1024
   echo "LNet configured successfully"
 fi
 
