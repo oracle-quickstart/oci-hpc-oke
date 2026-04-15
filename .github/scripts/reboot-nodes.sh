@@ -155,6 +155,24 @@ for i in $(seq 1 40); do
   sleep 15
 done
 
+# After an unplanned reboot, iscsid auto-logs into persisted iSCSI node records
+# before kubelet reschedules pods. The OCI Block Volume CSI driver then
+# unconditionally runs `iscsiadm --login` during NodeStageVolume, which returns
+# exit 15 (ISCSI_ERR_SESS_EXISTS) and is treated as a hard failure, leaving
+# StatefulSet pods stuck in PodInitializing. Force logout on each node so the
+# CSI driver can re-login cleanly on the next NodeStageVolume call.
+echo "  Clearing stale iSCSI sessions on each node..."
+CSI_PODS=$(kubectl get pod -n kube-system -l app=csi-oci-node \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}')
+while IFS=$'\t' read -r csi_pod node_name; do
+  [ -z "$csi_pod" ] && continue
+  if kubectl exec -n kube-system "$csi_pod" -- iscsiadm -m node -u >/dev/null 2>&1; then
+    echo "    $node_name: iSCSI sessions logged out"
+  else
+    echo "    $node_name: no active iSCSI sessions"
+  fi
+done <<< "$CSI_PODS"
+
 # DaemonSet readiness doesn't guarantee device plugins have re-advertised GPU
 # resources to kubelet, so check the GPU node count separately.
 if [ "$PRE_REBOOT_GPU_NODES" -gt 0 ]; then
