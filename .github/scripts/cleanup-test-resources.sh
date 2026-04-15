@@ -16,6 +16,11 @@ kubectl delete pod net-server net-client dns-checker --ignore-not-found --wait=t
 if [[ "$TOPOLOGY" == *fss* ]]; then
   kubectl delete pod fss-writer fss-reader fss-hostpath-reader --ignore-not-found --wait=true --timeout=60s || true
   kubectl delete pvc fss-test-pvc --ignore-not-found --wait=true --timeout=120s || true
+  # PV uses Retain reclaim policy, so clear claimRef to return it to Available
+  # and let subsequent PVCs bind to it (e.g. the post-reboot health check).
+  if kubectl get pv fss-pv >/dev/null 2>&1; then
+    kubectl patch pv fss-pv --type=merge -p '{"spec":{"claimRef":null}}' || true
+  fi
 fi
 
 # Lustre test resources
