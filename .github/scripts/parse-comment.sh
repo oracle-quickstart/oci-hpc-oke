@@ -21,7 +21,7 @@ for word in "${words[@]:2}"; do
   if [[ "$word" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.+$ ]]; then
     key="${word%%=*}"
     val="${word#*=}"
-    overrides=$(jq -n --argjson base "$overrides" --arg k "$key" --arg v "$val" '$base + {($k): $v}')
+    overrides=$(jq -cn --argjson base "$overrides" --arg k "$key" --arg v "$val" '$base + {($k): $v}')
   fi
 done
 
