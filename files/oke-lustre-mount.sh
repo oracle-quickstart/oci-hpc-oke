@@ -21,6 +21,9 @@ if ! modinfo lnet >/dev/null 2>&1; then
 fi
 
 LNET_IFACE=$(ip -o route get "$LUSTRE_IP" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+if [ -z "$LNET_IFACE" ] && ip link show eth0 >/dev/null 2>&1; then
+  LNET_IFACE=eth0
+fi
 if [ -z "$LNET_IFACE" ]; then
   LNET_IFACE=$(ip route show default | awk '/default/ {print $5; exit}')
 fi
@@ -36,7 +39,7 @@ case "$LNET_IFACE" in
     ;;
 esac
 
-MODPROBE_CONF="/etc/modprobe.d/oke-lustre-lnet.conf"
+MODPROBE_CONF="/etc/modprobe.d/lustre-client.conf"
 MODPROBE_LINE="options lnet networks=\"tcp(${LNET_IFACE})\""
 if [ ! -f "$MODPROBE_CONF" ] || ! grep -qxF "$MODPROBE_LINE" "$MODPROBE_CONF"; then
   echo "# Managed by oke-lustre-mount.sh. Do not edit." > "$MODPROBE_CONF"
