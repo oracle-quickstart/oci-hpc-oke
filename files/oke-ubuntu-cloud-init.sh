@@ -178,6 +178,13 @@ EOF
         ;;
     ol)
         echo "Detected Oracle Linux"
+
+        if command -v selinuxenabled &>/dev/null && selinuxenabled; then
+            setenforce 0
+            sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
+            echo "SELinux set to permissive mode."
+        fi
+
         if command -v oke >/dev/null 2>&1; then
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
             
