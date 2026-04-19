@@ -28,7 +28,7 @@ run_with_retry() {
             echo "oke bootstrap succeeded on attempt $attempt"
             return 0
         fi
-        
+
         if [[ $attempt -lt $max_attempts ]]; then
             echo "oke bootstrap failed, retrying in ${interval} seconds..."
             sleep $interval
@@ -69,15 +69,15 @@ download_oke_credential_provider_for_ocir() {
         return 1
         ;;
     esac
-    
+
     wget --tries=5 --waitretry=3 --retry-connrefused -O /usr/local/bin/credential-provider-oke \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/oke-credential-provider-for-ocir-linux-$ARCH && \
         chmod +x /usr/local/bin/credential-provider-oke || true
-    
+
     mkdir -p /etc/kubernetes/
     wget --tries=5 --waitretry=3 --retry-connrefused -P /etc/kubernetes/ \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/credential-provider-config.yaml || true
-    
+
     if [[ -f /usr/local/bin/credential-provider-oke && -f /etc/kubernetes/credential-provider-config.yaml ]]; then
         return 0
     else
@@ -187,7 +187,7 @@ EOF
 
         if command -v oke >/dev/null 2>&1; then
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
-            
+
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
                 run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
@@ -207,7 +207,7 @@ EOF
             else
                 run_with_retry bash /var/run/oke-init.sh
             fi
-            
+
         fi
         ;;
     *)
@@ -228,4 +228,3 @@ if [[ -n "$b64_post_bootstrap_script" ]]; then
     else
         echo "Failed to decode post-bootstrap script" >&2
     fi
-fi
