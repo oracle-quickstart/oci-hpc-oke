@@ -28,7 +28,7 @@ run_with_retry() {
             echo "oke bootstrap succeeded on attempt $attempt"
             return 0
         fi
-
+        
         if [[ $attempt -lt $max_attempts ]]; then
             echo "oke bootstrap failed, retrying in ${interval} seconds..."
             sleep $interval
@@ -69,15 +69,15 @@ download_oke_credential_provider_for_ocir() {
         return 1
         ;;
     esac
-
+    
     wget --tries=5 --waitretry=3 --retry-connrefused -O /usr/local/bin/credential-provider-oke \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/oke-credential-provider-for-ocir-linux-$ARCH && \
         chmod +x /usr/local/bin/credential-provider-oke || true
-
+    
     mkdir -p /etc/kubernetes/
     wget --tries=5 --waitretry=3 --retry-connrefused -P /etc/kubernetes/ \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/credential-provider-config.yaml || true
-
+    
     if [[ -f /usr/local/bin/credential-provider-oke && -f /etc/kubernetes/credential-provider-config.yaml ]]; then
         return 0
     else
@@ -139,33 +139,46 @@ case "$ID" in
             oke_package_repo_version="${oke_package_version:0:4}"
             oke_package_name="oci-oke-node-all-$oke_package_version"
 
-            # Check for local repository first, fall back to remote
             LOCAL_REPO_PATH="/opt/oke-node-client-packages/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
-            if [[ -d "$LOCAL_REPO_PATH/dists" ]]; then
-                echo "[Ubuntu] Using local repository at $LOCAL_REPO_PATH"
-                oke_package_repo="file://$LOCAL_REPO_PATH"
-            else
-                echo "[Ubuntu] Local repo not found, using remote repository"
-                oke_package_repo="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
-            fi
+            REMOTE_REPO_URL="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
 
-            tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
+            write_oke_apt_source() {
+                tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
 Enabled: yes
 Types: deb
-URIs: $oke_package_repo
+URIs: $1
 Suites: stable
 Components: main
 Signed-By:
 Trusted: yes
 EOF
-            # Wait for apt lock and install the package
-            while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
-                echo "Waiting for dpkg/apt lock"
-                sleep 1
-            done
+            }
 
-            apt-get -y update
-            apt-get -y install "$oke_package_name"
+            install_oke_package() {
+                while fuser /var/{lib/{dpkg/{lock,lock-frontend},apt/lists},cache/apt/archives}/lock >/dev/null 2>&1; do
+                    echo "Waiting for dpkg/apt lock"
+                    sleep 1
+                done
+                apt-get -y update && apt-get -y install "$oke_package_name"
+            }
+
+            use_remote_repo=1
+            if [[ -d "$LOCAL_REPO_PATH/dists" ]]; then
+                echo "[Ubuntu] Trying local repository at $LOCAL_REPO_PATH"
+                write_oke_apt_source "file://$LOCAL_REPO_PATH"
+                if install_oke_package; then
+                    use_remote_repo=0
+                else
+                    echo "[Ubuntu] Local repo install failed, falling back to remote repository" >&2
+                fi
+            else
+                echo "[Ubuntu] Local repo not found, using remote repository"
+            fi
+
+            if [[ "$use_remote_repo" -eq 1 ]]; then
+                write_oke_apt_source "$REMOTE_REPO_URL"
+                install_oke_package
+            fi
 
             echo "[Ubuntu] Running bootstrap"
             configure_crio_defaults "$kubernetes_version"
@@ -178,16 +191,9 @@ EOF
         ;;
     ol)
         echo "Detected Oracle Linux"
-
-        if command -v selinuxenabled &>/dev/null && selinuxenabled; then
-            setenforce 0
-            sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
-            echo "SELinux set to permissive mode."
-        fi
-
         if command -v oke >/dev/null 2>&1; then
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
-
+            
             configure_crio_defaults "$kubernetes_version"
             if [[ "$credential_provider_done" -eq 0 ]]; then
                 run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
@@ -207,7 +213,7 @@ EOF
             else
                 run_with_retry bash /var/run/oke-init.sh
             fi
-
+            
         fi
         ;;
     *)
@@ -228,3 +234,4 @@ if [[ -n "$b64_post_bootstrap_script" ]]; then
     else
         echo "Failed to decode post-bootstrap script" >&2
     fi
+fi
