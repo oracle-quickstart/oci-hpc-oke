@@ -104,7 +104,7 @@ spec:
                         -x NCCL_MNNVL_ENABLE=1 \
                         -x NCCL_NET_PLUGIN=none \
                         -x LD_LIBRARY_PATH \
-                        /workspace/nccl-tests/build/all_reduce_perf -b 512KB -e 8G -f 2 -g 1 -n 50
+                        /workspace/nccl-tests/build/all_reduce_perf -b 512KB -e 16G -f 2 -g 1 -n 50
     Worker:
       replicas: 16
       template:
