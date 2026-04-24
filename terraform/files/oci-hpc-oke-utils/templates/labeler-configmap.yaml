@@ -101,6 +101,10 @@ data:
 
     def gpu_info_labels() -> dict[str, str]:
         labels = {}
+        shape_resp = _imds_get("/instance/shape")
+        shape = shape_resp.text.strip() if shape_resp and shape_resp.ok else ""
+        if not any(s in shape for s in GPU_MEMORY_FABRIC_SHAPES):
+            return labels
         try:
             value = Path("/tmp/gpu-info/tray_index").read_text().strip()
             if value:

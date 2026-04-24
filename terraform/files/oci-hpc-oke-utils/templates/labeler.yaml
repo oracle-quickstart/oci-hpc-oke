@@ -76,9 +76,9 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              nsenter --target 1 --mount -- nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ' > /tmp/gpu-info/tray_index
-              val=$(cat /tmp/gpu-info/tray_index)
-              if [ -n "$val" ]; then
+              val=$(nsenter --target 1 --mount -- nvidia-smi -q 2>/dev/null | grep -m1 'Tray Index' | awk -F': ' '{print $2}' | tr -d ' ')
+              if [ -n "$val" ] && [ "$val" != "N/A" ]; then
+                printf '%s' "$val" > /tmp/gpu-info/tray_index
                 echo "GPU info: tray=$val"
               else
                 echo "Tray index not available"

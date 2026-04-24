@@ -122,7 +122,7 @@ On NVIDIA GPU nodes, the labeler reads the compute tray position from `nvidia-sm
 |-------|-------------|---------|
 | `oci.oraclecloud.com/host.tray_index` | Compute tray position within the rack (0-17 for NVL72) | `13` |
 
-This label is only set on nodes where `nvidia-smi` is available on the host. It is read once at pod startup and does not change.
+This label is only set on GB200/GB300 nodes where `nvidia-smi` reports a valid tray index. It is read once at pod startup and does not change.
 
 #### Fault Labels
 
