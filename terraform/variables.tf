@@ -433,7 +433,7 @@ variable "nvidia_gpu_operator_toolkit_enabled" {
 
 variable "nvidia_gpu_operator_skip_nfd_dependency_check" {
   type        = bool
-  default     = true
+  default     = false
   description = "Skip the NodeFeatureDiscovery dependency check in the NVIDIA GPU Operator addon."
 }
 
