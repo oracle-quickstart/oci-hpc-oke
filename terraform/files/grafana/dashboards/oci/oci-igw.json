@@ -1,0 +1,277 @@
+{
+   "description": "Internet Gateway\n",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:bytes_from_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bytes From Internet Gateway",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 2,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:bytes_to_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bytes To Internet Gateway",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+         },
+         "id": 3,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:packets_from_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets From Internet Gateway",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+         },
+         "id": 4,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:packets_to_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets To Internet Gateway",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+         },
+         "id": 5,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:packet_drops_from_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packet Drops From Internet Gateway",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+         },
+         "id": 6,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_internet_gateway:packet_drops_to_igw_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packet Drops To Internet Gateway",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "hide": 1,
+            "name": "PROMETHEUS_DS",
+            "query": "prometheus",
+            "type": "datasource"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-5m",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "Internet Gateway",
+   "uid": "oci-igw"
+}

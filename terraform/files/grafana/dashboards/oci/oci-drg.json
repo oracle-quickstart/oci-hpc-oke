@@ -1,0 +1,277 @@
+{
+   "description": "Dynamic Routing Gateway\n",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:bytes_from_drg_attachment_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bytes From DRG Atchmnt",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 2,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:bytes_to_drg_attachment_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bytes To DRG Atchmnt",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+         },
+         "id": 3,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:packets_from_drg_attachment_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets From DRG Atchmnt",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+         },
+         "id": 4,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:packets_to_drg_attachment_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets To DRG Atchmnt",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+         },
+         "id": 5,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:packet_drops_from_drg_attachment_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Pkt Drops From DRG Atchmnt",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+         },
+         "id": 6,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_dynamic_routing_gateway:packet_drops_to_drg_attachment_count",
+               "legendFormat": "{{drop_type}}"
+            }
+         ],
+         "title": "Pkt Drops To DRG Atchmnt",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "hide": 1,
+            "name": "PROMETHEUS_DS",
+            "query": "prometheus",
+            "type": "datasource"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-5m",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "Dynamic Routing Gateway",
+   "uid": "oci-drg"
+}

@@ -1,0 +1,319 @@
+{
+   "description": "Fast Connect\n",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:bits_received_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bits Received",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 2,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:bits_sent_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Bits Sent",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+         },
+         "id": 3,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:packets_received_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets Received",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+         },
+         "id": 4,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:packets_sent_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets Sent",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+         },
+         "id": 5,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:packets_discarded_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets Discarded",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+         },
+         "id": 6,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_fastconnect:packets_error_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Packets Error",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+         },
+         "id": 7,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_fastconnect:connection_state_count)",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "Connection State",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "hide": 1,
+            "name": "PROMETHEUS_DS",
+            "query": "prometheus",
+            "type": "datasource"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-5m",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "Fast Connect",
+   "uid": "oci-fastconnet"
+}

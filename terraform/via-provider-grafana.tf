@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 
@@ -59,6 +59,27 @@ resource "kubernetes_config_map_v1" "grafana_amd_dashboards" {
     namespace = var.monitoring_namespace
     annotations = {
       grafana_dashboard_folder = "GPU Nodes"
+    }
+    labels = {
+      grafana_dashboard = "1"
+    }
+  }
+
+  data = {
+    (each.key) = each.value
+  }
+}
+
+resource "kubernetes_config_map_v1" "grafana_oci_dashboards" {
+  for_each = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_oci_dashboards : {}
+
+  depends_on = [helm_release.prometheus]
+
+  metadata {
+    name      = format("dashboard-%s", trimsuffix(each.key, ".json"))
+    namespace = var.monitoring_namespace
+    annotations = {
+      grafana_dashboard_folder = "OCI Metrics"
     }
     labels = {
       grafana_dashboard = "1"

@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oci-metrics-exporter.fullname" . }}
+  labels:
+    {{- include "oci-metrics-exporter.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oci-metrics-exporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "oci-metrics-exporter.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "oci-metrics-exporter.fullname" . }}
+            defaultMode: 0755
+        - name: uv-bin
+          emptyDir: {}
+      {{- with .Values.telegraf.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: copy-uv
+          image: "{{ .Values.telegraf.uvImage.repository }}:{{ .Values.telegraf.uvImage.tag }}"
+          command: ["/bin/sh", "-c"]
+          args: ["cp /usr/local/bin/uv /uv-bin/uv"]
+          volumeMounts:
+            - name: uv-bin
+              mountPath: /uv-bin
+      containers:
+        - name: telegraf
+          image: "{{ .Values.telegraf.image.repository }}:{{ .Values.telegraf.image.tag }}"
+          imagePullPolicy: {{ .Values.telegraf.image.pullPolicy }}
+          command:
+            - telegraf
+            - --config
+            - /etc/telegraf/telegraf.conf
+            - --config-directory
+            - /etc/telegraf/telegraf.d
+          env:
+            - name: PATH
+              value: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/uv-bin"
+            - name: STREAM_OCID
+              value: {{ .Values.telegraf.streamOcid | quote }}
+            {{- with .Values.telegraf.env }}
+            {{- range $key, $value := . }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: prometheus
+              containerPort: {{ .Values.telegraf.prometheus_port }}
+              protocol: TCP
+          volumeMounts:
+            - name: scripts
+              mountPath: /etc/telegraf/telegraf.conf
+              subPath: telegraf.conf
+            - name: scripts
+              mountPath: /etc/telegraf/telegraf.d/input.conf
+              subPath: input.conf
+            - name: scripts
+              mountPath: /etc/telegraf/telegraf.d/output.conf
+              subPath: output.conf
+            - name: scripts
+              mountPath: /etc/telegraf/telegraf.d/filter.conf
+              subPath: filter.conf
+            - name: scripts
+              mountPath: /scripts
+            - name: uv-bin
+              mountPath: /uv-bin
+          {{- with .Values.telegraf.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.telegraf.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.telegraf.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.telegraf.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
