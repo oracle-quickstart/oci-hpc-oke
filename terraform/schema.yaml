@@ -242,6 +242,10 @@ variableGroups:
       - worker_gmc_boot_volume_vpus_per_gb
       - worker_gmc_kubernetes_version
       - worker_gmc_image_id
+      - worker_gmc_advanced_options
+      - worker_gmc_scale_target_size
+      - worker_gmc_scale_is_upsize_enabled
+      - worker_gmc_scale_is_downsize_enabled
 
   - title: "Storage"
     variables:
@@ -515,7 +519,7 @@ variables:
       - custom_subnet_ids
       - networking_advanced_options
   fss_sn_id:
-    title: Existing subnet to use for the fss
+    title: Existing subnet to use for the FSS
     type: oci:core:subnet:id
     required: false
     dependsOn:
@@ -659,8 +663,8 @@ variables:
         - create_vcn
         - networking_advanced_options
   fss_sn_cidr:
-    title: Subnet CIDR for the fss subnet
-    description: CIDR subnet to use for the pods subnet. If not provided a dynamic subnet will be created if required.
+    title: Subnet CIDR for the FSS subnet
+    description: CIDR subnet to use for the FSS subnet. If not provided a dynamic subnet will be created if required.
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
     required: false
@@ -675,7 +679,7 @@ variables:
         - networking_advanced_options
   lustre_sn_cidr:
     title: Subnet CIDR for the Lustre subnet
-    description: CIDR subnet to use for the pods subnet. If not provided a dynamic subnet will be created if required.
+    description: CIDR subnet to use for the Lustre subnet. If not provided a dynamic subnet will be created if required.
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
     required: false
@@ -722,7 +726,7 @@ variables:
     visible: ${create_vcn}
   create_public_subnets:
     title: Create public subnets
-    description: Whether to create public subnets to host Internet addresable resources
+    description: Whether to create public subnets to host Internet-addressable resources.
     type: boolean
     default: true
     visible: ${create_vcn}
@@ -740,7 +744,7 @@ variables:
     visible: false
   bastion_allowed_cidrs:
     title: Bastion allowed CIDRs
-    description: List of CIDR ranges for allowed SSH communication to bastion instance.
+    description: List of CIDR ranges for allowed SSH communication to the bastion instance.
     required: false
     type: array
     items:
@@ -752,7 +756,7 @@ variables:
       and:
       - create_bastion
   bastion_shape_config:
-    title: Configure the bastion shape
+    title: Configure bastion instance shape
     type: boolean
     default: false
     required: false
@@ -852,7 +856,7 @@ variables:
     required: false
     visible: true
   operator_shape_config:
-    title: Configure operator shape
+    title: Configure operator instance shape
     type: boolean
     default: false
     required: false
@@ -984,7 +988,7 @@ variables:
     visible: ${create_fss}
   nvme_raid_enabled:
     type: boolean
-    title: Create a RAID array using local NVMe drives 
+    title: Create a RAID array using local NVMe drives
     description: If the instance has local NVMe drives, create a RAID 10 or 0 array with bind mounts for container runtime (/var/lib/containers), Kubelet ephemeral storage (/var/lib/kubelet), and logs (/var/log/pods).
     default: true
   nvme_raid_level:
@@ -1056,7 +1060,7 @@ variables:
     visible: true
   monitoring_namespace:
     title: Monitoring namespace
-    description: The Kubernetes namespace where to deploy resources associated with the cluster monitoring.
+    description: The Kubernetes namespace for cluster monitoring resources.
     default: "monitoring"
     type: string
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
@@ -1094,7 +1098,7 @@ variables:
       # - monitoring_advanced_options
       # - install_nvidia_dcgm_exporter
   install_amd_device_metrics_exporter:
-    title: Install AMD Device Exporter
+    title: Install AMD Device Metrics Exporter
     type: boolean
     required: true
     default: ${install_monitoring}
@@ -1163,7 +1167,7 @@ variables:
       - install_grafana
   setup_oci_metrics_exporter:
     title: Install OCI Metrics Exporter
-    description: Deploy OCI Metrics Exporter to enable ingestion of OCI metrics into Prometheus
+    description: Deploy OCI Metrics Exporter to enable ingestion of OCI metrics into Prometheus.
     type: boolean
     required: true
     default: ${install_monitoring}
@@ -1175,7 +1179,7 @@ variables:
       - install_grafana
   use_lets_encrypt_prod_endpoint:
     title: Use Let's Encrypt production endpoint
-    description:  Use Let's Encrypt production endpoint instead of staging.
+    description: Use Let's Encrypt production endpoint instead of staging.
     type: boolean
     default: true
     required: false
@@ -1188,7 +1192,7 @@ variables:
       - create_public_subnets
   setup_alerting:
     title: Enable Grafana Alerting
-    description: Configure Grafana to send notifications to an OCI Notification Topic
+    description: Configure Grafana to send notifications to an OCI Notification Topic.
     type: boolean
     required: true
     default: ${install_monitoring}
@@ -1230,13 +1234,16 @@ variables:
     description: The Container Engine for Kubernetes cluster name.
     required: true
   kubernetes_version:
-    type: oci:kubernetes:versions:id
+    type: enum
     title: Kubernetes version
     description: The Kubernetes version for the created OKE cluster and managed nodes.
     required: true
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    default: "v1.35.2"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
   control_plane_allowed_cidrs:
     title: Kubernetes endpoint allowed CIDRs
     description: List of CIDR ranges for allowed Kubernetes endpoint communication.
@@ -1249,7 +1256,7 @@ variables:
     minItems: 0
   cni_type:
     title: CNI to use for pod networking
-    description: CNI plugin to be used for pod communication on worker nodes in clusters
+    description: CNI plugin to be used for pod communication on worker nodes.
     required: true
     type: enum
     enum:
@@ -1263,7 +1270,7 @@ variables:
     visible: true
   max_pods_per_node:
     title: Maximum number of pods per node
-    description: The default maximum number of pods to deploy per node when unspecified on a pool
+    description: The default maximum number of pods to deploy per node when unspecified on a pool.
     type: number
     visible: false
   services_cidr:
@@ -1280,7 +1287,7 @@ variables:
     - public
     default: public
     title: Preferred Load Balancer kind
-    description: The kind of load balancers which should be provisioned by default for the services of type Load Balancer.
+    description: The kind of load balancers that should be provisioned by default for services of type Load Balancer.
     required: true
   setup_credential_provider_for_ocir:
     title: Setup OKE credential-provider for OCIR
@@ -1297,7 +1304,7 @@ variables:
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
-    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
+    description: Disable NVIDIA GPU Device Plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
     default: false
     visible: false
 
@@ -1426,12 +1433,14 @@ variables:
   worker_ops_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the system worker pool. Defaults to the cluster version.
-    type: oci:kubernetes:versions:id
+    type: enum
     required: false
     default: ${kubernetes_version}
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
 
   # Workers - CPU pool
   worker_cpu_enabled:
@@ -1618,13 +1627,15 @@ variables:
   worker_cpu_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the CPU worker pool. Defaults to the cluster version.
-    type: oci:kubernetes:versions:id
+    type: enum
     required: false
     default: ${kubernetes_version}
     visible: ${worker_cpu_enabled}
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
 
   # Workers - GPU node-pool
   worker_gpu_enabled:
@@ -1736,19 +1747,21 @@ variables:
   worker_gpu_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the GPU worker pool. Defaults to the cluster version.
-    type: oci:kubernetes:versions:id
+    type: enum
     required: false
     default: ${kubernetes_version}
     visible: ${worker_gpu_enabled}
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
 
   # Workers - GPU Cluster-network
   worker_rdma_enabled:
     title: Create GPU + RDMA pool
     type: boolean
-    description: Create a worker pool with Cluster Network placement for RDMA networking
+    description: Create a worker pool with Cluster Network placement for RDMA networking.
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
@@ -1860,13 +1873,15 @@ variables:
   worker_rdma_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the GPU + RDMA worker pool. Defaults to the cluster version.
-    type: oci:kubernetes:versions:id
+    type: enum
     required: false
     default: ${kubernetes_version}
     visible: ${worker_rdma_enabled}
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
 
   # Workers - GPU Memory Cluster
   worker_gmc_enabled:
@@ -1911,13 +1926,15 @@ variables:
   worker_gmc_kubernetes_version:
     title: Kubernetes version
     description: Kubernetes version for the GPU Memory Cluster worker pool. Defaults to the cluster version.
-    type: oci:kubernetes:versions:id
+    type: enum
     required: false
     default: ${kubernetes_version}
     visible: ${worker_gmc_enabled}
-    dependsOn:
-      compartmentId: ${compartment_ocid}
-      clusterOptionId: "all"
+    enum:
+      - "v1.35.2"
+      - "v1.34.2"
+      - "v1.34.1"
+      - "v1.33.1"
   worker_gmc_image_id:
     title: Image
     description: Custom image OCID for the GPU Memory Cluster worker pool.
@@ -1926,6 +1943,43 @@ variables:
     visible: ${worker_gmc_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
+  worker_gmc_advanced_options:
+    title: GPU Memory Cluster advanced options
+    description: Show advanced GPU Memory Cluster scaling options.
+    type: boolean
+    default: false
+    required: false
+    visible: ${worker_gmc_enabled}
+  worker_gmc_scale_target_size:
+    title: Target size
+    description: Target size for the GPU Memory Cluster scale config (number of nodes per GPU Memory Cluster).
+    type: number
+    default: 18
+    required: true
+    visible:
+      and:
+        - ${worker_gmc_enabled}
+        - ${worker_gmc_advanced_options}
+  worker_gmc_scale_is_upsize_enabled:
+    title: Enable upsizing
+    description: Allow the OCI control plane to upsize the GPU Memory Cluster.
+    type: boolean
+    default: true
+    required: false
+    visible:
+      and:
+        - ${worker_gmc_enabled}
+        - ${worker_gmc_advanced_options}
+  worker_gmc_scale_is_downsize_enabled:
+    title: Enable downsizing
+    description: Allow the OCI control plane to downsize the GPU Memory Cluster.
+    type: boolean
+    default: true
+    required: false
+    visible:
+      and:
+        - ${worker_gmc_enabled}
+        - ${worker_gmc_advanced_options}
 
   # Kueue
   install_kueue:

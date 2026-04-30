@@ -689,6 +689,21 @@ variable "worker_gmc_gpu_memory_fabric_ids" {
   description = "List of GPU Memory Fabric OCIDs to fan out into one GPU Memory Cluster per fabric."
   type        = list(string)
 }
+variable "worker_gmc_scale_target_size" {
+  default     = 18
+  description = "Target size for the GPU Memory Cluster scale config (number of nodes per fabric)."
+  type        = number
+}
+variable "worker_gmc_scale_is_upsize_enabled" {
+  default     = true
+  description = "Allow the OCI control plane to upsize the GPU Memory Cluster."
+  type        = bool
+}
+variable "worker_gmc_scale_is_downsize_enabled" {
+  default     = true
+  description = "Allow the OCI control plane to downsize the GPU Memory Cluster."
+  type        = bool
+}
 
 # Kueue
 variable "install_kueue" {
