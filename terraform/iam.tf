@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 data "oci_identity_availability_domains" "all" {
@@ -57,25 +57,33 @@ locals {
   compartment_matches = format("instance.compartment.id = '%v'", var.compartment_ocid)
   compartment_rule    = format("ANY {%v}", join(", ", [local.compartment_matches]))
 
-  rule_templates = compact([
-    "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
-    "Allow dynamic-group %v to manage cluster-family in compartment id %v",
-    "Allow dynamic-group %v to manage file-family in compartment id %v",
-    "Allow dynamic-group %v to manage compute-management-family in compartment id %v",
-    "Allow dynamic-group %v to manage instance-family in compartment id %v",
-    "Allow dynamic-group %v to manage volume-family in compartment id %v",
-    "Allow dynamic-group %v to use ons-topics in compartment id %v",
-    "Allow dynamic-group %v to use subnets in compartment id %v",
-    "Allow dynamic-group %v to use virtual-network-family in compartment id %v",
-    "Allow dynamic-group %v to use vnics in compartment id %v",
-    "Allow dynamic-group %v to use network-security-groups in compartment id %v",
-    "Allow dynamic-group %v to inspect compartments in compartment id %v",
-    "Allow dynamic-group %v to {CLUSTER_JOIN} in compartment id %v",
-    "Allow dynamic-group %v to read metrics in compartment id %v",
-    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='gpu_infrastructure_health'",
-    "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='rdma_infrastructure_health'",
-    var.setup_credential_provider_for_ocir ? "Allow dynamic-group %v to read repos in compartment id %v" : ""
-  ])
+  rule_templates = compact(concat(
+    [
+      "Allow dynamic-group %v to manage cluster-node-pools in compartment id %v",
+      "Allow dynamic-group %v to manage cluster-family in compartment id %v",
+      "Allow dynamic-group %v to manage file-family in compartment id %v",
+      "Allow dynamic-group %v to manage compute-management-family in compartment id %v",
+      "Allow dynamic-group %v to manage instance-family in compartment id %v",
+      "Allow dynamic-group %v to manage volume-family in compartment id %v",
+      "Allow dynamic-group %v to use ons-topics in compartment id %v",
+      "Allow dynamic-group %v to use subnets in compartment id %v",
+      "Allow dynamic-group %v to use virtual-network-family in compartment id %v",
+      "Allow dynamic-group %v to use vnics in compartment id %v",
+      "Allow dynamic-group %v to use network-security-groups in compartment id %v",
+      "Allow dynamic-group %v to inspect compartments in compartment id %v",
+      "Allow dynamic-group %v to {CLUSTER_JOIN} in compartment id %v",
+      "Allow dynamic-group %v to read metrics in compartment id %v",
+      "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='gpu_infrastructure_health'",
+      "Allow dynamic-group %v to use metrics in compartment id %v where target.metrics.namespace='rdma_infrastructure_health'",
+    ],
+    var.setup_credential_provider_for_ocir ? [
+      "Allow dynamic-group %v to read repos in compartment id %v"
+    ] : [],
+    var.setup_oci_metrics_exporter ? [
+      "Allow dynamic-group %v to read all-resources in compartment id %v",
+      "Allow dynamic-group %v to use stream-family in compartment id %v"
+    ] : []
+  ))
 
   wris_template = [
     "request.principal.type = 'workload'",
@@ -135,16 +143,19 @@ resource "oci_identity_policy" "oke_quickstart_all" {
   }
 }
 
-resource "oci_identity_policy" "oke_quickstart_storage" {
+resource "oci_identity_policy" "services_policies" {
   provider       = oci.home
   count          = alltrue([var.create_policies, var.create_fss]) ? 1 : 0
   compartment_id = var.compartment_ocid
-  name           = local.storage_group_name
-  description    = format("FSS policies for OKE Terraform state %v", local.state_id)
-  statements = [
-    "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-    "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
-  ]
+  name           = format("oke-service-policies-%v", local.state_id)
+  description    = format("OKE service policies for OKE Terraform state %v", local.state_id)
+  statements = compact(concat(
+    var.create_fss ? [
+      "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+      "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+    ] : [],
+    []
+  ))
   lifecycle {
     ignore_changes = [defined_tags]
   }
@@ -152,13 +163,19 @@ resource "oci_identity_policy" "oke_quickstart_storage" {
 
 resource "oci_identity_policy" "lustre_service_network" {
   provider       = oci.home
-  count          = alltrue([var.create_policies, var.create_lustre]) ? 1 : 0
+  count          = alltrue([var.create_policies, anytrue([var.create_lustre, var.setup_oci_metrics_exporter])]) ? 1 : 0
   compartment_id = var.tenancy_ocid
-  name           = format("lustre-service-network-%v", local.state_id)
-  description    = format("Allow Lustre service to manage network resources for OKE Terraform state %v", local.state_id)
-  statements = [
-    "Allow service lustrefs to use virtual-network-family in tenancy",
-  ]
+  name           = format("oci-services-policies-%v", local.state_id)
+  description    = format("OCI services policies for OKE Terraform state %v", local.state_id)
+  statements = compact(concat(
+    var.create_lustre ? [
+      "Allow service lustrefs to use virtual-network-family in tenancy",
+    ] : [],
+    var.setup_oci_metrics_exporter ? [
+      "Allow any-user to read metrics in tenancy where all {request.principal.type = 'serviceconnector', request.principal.compartment.id = '${var.compartment_ocid}'}",
+      "Allow any-user to use stream-push in compartment id ${var.compartment_ocid} where all {request.principal.type='serviceconnector', request.principal.compartment.id='${var.compartment_ocid}'}"
+    ] : []
+  ))
   lifecycle {
     ignore_changes = [defined_tags]
   }

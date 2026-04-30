@@ -1,0 +1,24 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: {{ .Values.serviceMonitor.apiVersion }}
+kind: ServiceMonitor
+metadata:
+  name: {{ include "oci-metrics-exporter.fullname" . }}
+  labels:
+    {{- include "oci-metrics-exporter.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "oci-metrics-exporter.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  endpoints:
+    - port: prometheus
+      path: {{ .Values.serviceMonitor.path }}
+      interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      honorTimestamps: {{ .Values.serviceMonitor.honorTimestamps }}
+{{- end }}

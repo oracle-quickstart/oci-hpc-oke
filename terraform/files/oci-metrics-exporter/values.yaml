@@ -1,0 +1,42 @@
+nameOverride: ""
+fullnameOverride: ""
+
+telegraf:
+  image:
+    repository: docker.io/telegraf
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  uvImage:
+    repository: docker.io/astral/uv
+    tag: "alpine"
+
+  streamOcid: ""
+  prometheus_port: 9273
+
+  env: {}
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  imagePullSecrets: []
+
+serviceMonitor:
+  enabled: true
+  apiVersion: monitoring.coreos.com/v1
+  interval: 60s
+  scrapeTimeout: 10s
+  path: /metrics
+  honorTimestamps: true
+  labels:
+    release: kube-prometheus-stack
+
+podLabels: {}

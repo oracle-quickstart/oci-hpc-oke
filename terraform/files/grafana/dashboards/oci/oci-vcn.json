@@ -1,0 +1,469 @@
+{
+   "description": "Virtual Cloud Network\n",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_from_network_bytes_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC Ingress Bytes Top 10",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 2,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_to_network_bytes_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC Egress Bytes Top 10",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+         },
+         "id": 3,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_ingress_drops_throttle_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC Ingress Drops",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "pps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+         },
+         "id": 4,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_egress_drops_throttle_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC Egress Drops",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+         },
+         "id": 5,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_conntrack_util_percent_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC ConnTrack Util",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+         },
+         "id": 6,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_conntrack_is_full_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC ConnTrack Is Full",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 24
+         },
+         "id": 7,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_to_network_packet_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC To Network Packets",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+         },
+         "id": 8,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:vnic_from_network_packet_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "VNIC From Network Packets",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 32
+         },
+         "id": 9,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:smart_nic_buffer_drops_from_host_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "Smart NIC Buffer Drops From Host",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 32
+         },
+         "id": 10,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "topk(10, oci_vcn:smart_nic_buffer_drops_to_host_count)",
+               "legendFormat": "{{display_name}}:{{hostname}}"
+            }
+         ],
+         "title": "Smart NIC Buffer Drops To Host",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "hide": 1,
+            "name": "PROMETHEUS_DS",
+            "query": "prometheus",
+            "type": "datasource"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${PROMETHEUS_DS}"
+            },
+            "includeAll": true,
+            "multi": true,
+            "name": "hostname",
+            "query": "label_values(up, hostname)",
+            "refresh": 1,
+            "type": "query"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${PROMETHEUS_DS}"
+            },
+            "includeAll": true,
+            "multi": true,
+            "name": "oci_name",
+            "query": "label_values(up, oci_name)",
+            "refresh": 1,
+            "type": "query"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-5m",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "Virtual Cloud Network",
+   "uid": "oci-vcn"
+}

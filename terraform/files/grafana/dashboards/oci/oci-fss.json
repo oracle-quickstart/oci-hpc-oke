@@ -1,0 +1,343 @@
+{
+   "description": "File Storage Service\n",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:file_system_read_throughput_count)",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "FileSystem Read Throughput",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 2,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:file_system_write_throughput_count)",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "FileSystem Write Throughput",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 8
+         },
+         "id": 3,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:mount_target_read_throughput_count)",
+               "legendFormat": "{{display_name}}:{{current_throughput}}Gbps"
+            }
+         ],
+         "title": "MountTarget Read Throughput",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 8
+         },
+         "id": 4,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:mount_target_write_throughput_count)",
+               "legendFormat": "{{display_name}}:{{current_throughput}}Gbps"
+            }
+         ],
+         "title": "MountTarget Write Throughput",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "iops"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 16
+         },
+         "id": 5,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:metadata_iops_count)",
+               "legendFormat": "{{display_name}}:{{operation}}"
+            }
+         ],
+         "title": "Metadata IOPS",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "none"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 16
+         },
+         "id": 6,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "oci_filestorage:mount_target_connections_count",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "MountTarget Connections",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 24
+         },
+         "id": 7,
+         "options": {
+            "legend": {
+               "calcs": [
+                  "p99",
+                  "p95",
+                  "p90"
+               ],
+               "displayMode": "table",
+               "placement": "right"
+            }
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$PROMETHEUS_DS"
+               },
+               "expr": "avg(oci_filestorage:mount_target_health_count)",
+               "legendFormat": "{{display_name}}"
+            }
+         ],
+         "title": "MountTarget Health",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "hide": 1,
+            "name": "PROMETHEUS_DS",
+            "query": "prometheus",
+            "type": "datasource"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${PROMETHEUS_DS}"
+            },
+            "includeAll": true,
+            "multi": true,
+            "name": "hostname",
+            "query": "label_values(up, hostname)",
+            "refresh": 1,
+            "type": "query"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${PROMETHEUS_DS}"
+            },
+            "includeAll": true,
+            "multi": true,
+            "name": "oci_name",
+            "query": "label_values(up, oci_name)",
+            "refresh": 1,
+            "type": "query"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-5m",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "File Storage Service",
+   "uid": "oci-fss"
+}

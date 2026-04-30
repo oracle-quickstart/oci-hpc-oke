@@ -1,5 +1,5 @@
 
-# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 module "certmanager" {
   count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
@@ -97,6 +97,7 @@ module "kube_prometheus_stack" {
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal",
+    "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
     "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
   ]
 
@@ -271,6 +272,39 @@ module "oke-ons-webhook" {
         GRAFANA_INITIAL_PASSWORD = base64encode(random_password.grafana_admin_password.result)
         GRAFANA_SERVICE_URL      = "http://kube-prometheus-stack-grafana"
       }
+    }
+  })
+
+  depends_on = [module.kube_prometheus_stack]
+}
+
+
+module "oci_metrics_exporter" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = var.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = var.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name    = "oci-metrics-exporter"
+  namespace          = var.monitoring_namespace
+  helm_chart_path    = "${path.module}/files/oci-metrics-exporter"
+  helm_chart_version = var.oci_metrics_exporter_chart_version
+
+  pre_deployment_commands = [
+    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal"
+  ]
+  deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
+  post_deployment_commands = []
+
+  helm_template_values_override = ""
+  helm_user_values_override = yamlencode({
+    telegraf = {
+      streamOcid = try(oci_streaming_stream.oci_metrics_exporter[0].id, "")
     }
   })
 

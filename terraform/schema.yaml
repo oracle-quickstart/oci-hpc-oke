@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 title: "OKE GPU/RDMA Quickstart"
@@ -41,6 +41,7 @@ variableGroups:
       - worker_gpu_max_pods_per_node
       - worker_rdma_max_pods_per_node
       - oke_ons_webhook_chart_version
+      - oci_metrics_exporter_chart_version
       - cert_manager_chart_version
       # MPI Operator
       - install_mpi_operator
@@ -267,6 +268,7 @@ variableGroups:
     - ingress_chart_version
     - install_grafana
     - install_grafana_dashboards
+    - setup_oci_metrics_exporter
     - use_lets_encrypt_prod_endpoint
     - setup_alerting
 
@@ -1139,6 +1141,18 @@ variables:
   install_grafana_dashboards:
     title: Grafana dashboards
     description: Install Grafana dashboards
+    type: boolean
+    required: true
+    default: ${install_monitoring}
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+      - install_grafana
+  setup_oci_metrics_exporter:
+    title: Install OCI Metrics Exporter
+    description: Deploy OCI Metrics Exporter to enable ingestion of OCI metrics into Prometheus
     type: boolean
     required: true
     default: ${install_monitoring}

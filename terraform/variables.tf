@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Oracle Corporation and/or its affiliates.
+# Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 # Provider auth
@@ -329,6 +329,16 @@ variable "ingress_chart_version" {
 }
 
 variable "oke_ons_webhook_chart_version" {
+  default = "0.1.0"
+  type    = string
+}
+
+variable "setup_oci_metrics_exporter" {
+  default = true
+  type    = bool
+}
+
+variable "oci_metrics_exporter_chart_version" {
   default = "0.1.0"
   type    = string
 }

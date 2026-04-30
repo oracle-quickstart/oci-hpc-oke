@@ -16,8 +16,9 @@ This guide provides step-by-step instructions to deploy the same Prometheus and 
 - [Step 5: Deploy Custom Grafana Dashboards](#step-5-deploy-custom-grafana-dashboards)
 - [Step 6: Deploy Grafana Alert Rules](#step-6-deploy-grafana-alert-rules)
 - [Step 7: Deploy OKE ONS Webhook (Optional)](#step-7-deploy-oke-ons-webhook-optional)
-- [Step 8: Access Grafana](#step-8-access-grafana)
-- [Step 9: Verify the Deployment](#step-9-verify-the-deployment)
+- [Step 8: Deploy OCI Metrics Exporter (Optional)](#step-8-deploy-oci-metrics-exporter-optional)
+- [Step 9: Access Grafana](#step-9-access-grafana)
+- [Step 10: Verify the Deployment](#step-10-verify-the-deployment)
 - [Updating an Existing Deployment](#updating-an-existing-deployment)
 - [Troubleshooting](#troubleshooting)
 - [Cleanup](#cleanup)
@@ -496,7 +497,133 @@ Check if notification is received:
 - Verify message appears in OCI Notifications topic
 - Confirm notification delivery to subscribed endpoints
 
-## Step 8: Access Grafana
+## Step 8: Deploy OCI Metrics Exporter (Optional)
+
+The OCI Metrics Exporter enables ingestion of OCI Metrics into Grafana.
+
+Prerequisites:
+- [OCI Stream](https://docs.oracle.com/en-us/iaas/Content/Streaming/Concepts/streamingoverview.htm)
+- [Service Connector Hub connection](https://docs.oracle.com/en-us/iaas/Content/connector-hub/managingconnectors.htm) configured to export OCI Metrics for the namespaces (`oci_blockstore`, `oci_fastconnect`, `oci_filestorage`, `oci_internet_gateway`, `oci_lustrefilesystem`, `oci_nat_gateway`, `oci_service_gateway`, `oci_vcn`, `oci_dynamic_routing_gateway`) to the created OCI Stream.
+- IAM permissions:
+  - to allow the OKE instances to use OCI Streaming in the compartment
+  - to allow the OKE instances to read all the resources in the compartment
+  - to allow the OCI Service Connector Hub to read from OCI Metrics
+  - to allow the OCI Service Connector Hub to push to OCI Streaming
+
+**Note**: This step is optional and only applicable if you're running on Oracle Cloud Infrastructure and want to configure Prometheus to scrape the OCI Metrics.
+
+### 8.1 Prerequisites for OCI Metrics Exporter
+
+1. **OCI Stream**: Create an OCI Stream
+   - Navigate to **Analytics & AI → Messaging** → **Streaming** in OCI Console
+   - Create a new stream (e.g., `oci-metrics-stream`)
+   - Configure the stream to use the existing stream pool (`DefaultPool`)
+   - Set appropiate retention period (1h) and number of partitions (1)
+   - Note the `Stream OCID`
+
+2. **Required Permissions**: 
+
+  The dynamic group containing your OKE nodes needs permissions to read all the resources from the compartment:
+    
+    ```
+    Allow dynamic-group <your-dynamic-group> to use stream-family in compartment <compartment-name>
+    Allow dynamic-group <your-dynamic-group> to read all-resources in compartment <compartment-name>
+    ```
+
+  The permissions required for OCI Service Connector Hub connection to push OCI Metrics to OCI Streaming:
+
+    ```
+    Allow any-user to read metrics in tenancy where all {request.principal.type = 'serviceconnector', request.principal.compartment.id = '<compartment_OCID>'}
+    Allow any-user to use stream-push in compartment id <target_stream_compartment_OCID> where all {request.principal.type='serviceconnector', request.principal.compartment.id='<compartment_OCID>'}
+    ```
+
+3. **Service Connector Hub Connection**: Ensure SCH Connection is configured to pull metrics from OCI metrics and push them to OCI Streaming
+   - Navigate to **Analytics & AI → Messaging** → **Connectors** in OCI Console.
+   - Create a new connector (e.g., `oci-metrics-connector`).
+   - Set the connector source as `Monitoring`.
+   - Configure the Monitoring source compartment and namespaces: `oci_blockstore`, `oci_fastconnect`, `oci_filestorage`, `oci_internet_gateway`, `oci_lustrefilesystem`, `oci_nat_gateway`, `oci_service_gateway`, `oci_vcn`, `oci_dynamic_routing_gateway`.
+   - Set the connector target as `Streaming`. 
+   - Configure the created Stream as the target stream.
+   - Click `Create`.
+   - Ensure the connector is active and there is no error at source.
+
+### 8.2 Install the OCI Metrics Exporter
+
+The OCI Metrics Exporter chart is available at `terraform/files/oci-metrics-exporter/`.
+
+**Set required environment variables:**
+
+```bash
+# Set your OCI Streaming OCID
+export STREAM_OCID="ocid1.stream.oc1.region.xxxxx"  # Replace with your actual OCI Streaming OCID
+```
+
+**Install the OCI Metrics Exporter:**
+
+```bash
+helm upgrade --install oci-metrics-exporter terraform/files/oci-metrics-exporter \
+  --namespace ${MONITORING_NAMESPACE} \
+  --set telegraf.streamOcid="${STREAM_OCID}" \
+  --wait
+```
+
+### 8.3 Verify OCI Metrics Exporter
+
+```bash
+# Check if the oci metrics exporter pod is running
+kubectl get pods -n ${MONITORING_NAMESPACE} -l  app.kubernetes.io/name=oci-metrics-exporter
+
+# Check exporter logs
+kubectl logs -n ${MONITORING_NAMESPACE} -l  app.kubernetes.io/name=oci-metrics-exporter
+
+# Check the metrics
+kubectl port-forward -n ${MONITORING_NAMESPACE} deploy/oci-metrics-exporter 9273:9273
+curl localhost:9273/metrics
+```
+
+### 8.4 Create the Grafana Dashboards for the OCI Metrics
+
+```bash
+# Deploy each OCI metrics dashboards as a ConfigMap
+for dashboard in ${DASHBOARD_PATH}/oci/*.json; do
+  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
+    --from-file="$(basename $dashboard)=${dashboard}" \
+    --namespace ${MONITORING_NAMESPACE} \
+    --dry-run=client -o yaml | \
+  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
+  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="OCI Metrics" | \
+  kubectl apply -f -
+done
+```
+
+### 8.5 How OCI Metrics Exporter Works
+
+The `oci-metrics-exporter` chart deploys a Telegraf-based pod that converts OCI-native metrics into Prometheus metrics for Prometheus and Grafana.
+
+The end-to-end flow is:
+
+1. **OCI services publish metrics into OCI Monitoring**
+   OCI services such as Block Volume, File Storage, VCN, DRG, and FastConnect first publish their native metrics to the OCI Monitoring service.
+
+2. **Service Connector Hub forwards selected namespaces to OCI Streaming**
+   The Service Connector Hub (SCH) connector is configured with `Monitoring` as the source and `Streaming` as the target. It continuously copies the OCI Monitoring metrics for the selected namespaces into the OCI Stream you created earlier.
+
+3. **The exporter consumes the OCI Stream**
+   Inside the pod, Telegraf runs a custom `streaming` input that reads from the configured `STREAM_OCID` using instance principal authentication. The input script decodes the streamed payloads, groups samples into short time windows, and applies the appropriate aggregation for each metric before passing the results to Telegraf.
+
+4. **The exporter also polls OCI Monitoring directly**
+   A second custom Telegraf input queries the OCI Monitoring API directly for metrics that are collected as API queries instead of being supplied through SCH streaming (for the metrics with a high sampling frequency). In this chart, that includes the configured Object Storage metrics such as request rates, latency, object count, and stored bytes.
+
+5. **Telegraf filters and enriches the metrics**
+   The collected metrics are filtered down to the metric names supported by this chart, then enriched with OCI resource metadata and freeform tags. This enrichment step can add useful labels such as OCI display names, cluster/controller tags, and resolved hostnames for attached compute resources.
+
+6. **Prometheus scrapes the exporter**
+   Telegraf exposes the final metrics through its Prometheus endpoint on port `9273`. The chart creates a Kubernetes `Service` and `ServiceMonitor`, so Prometheus scrapes `/metrics` and stores the OCI metrics together with the rest of the cluster telemetry.
+
+In short: OCI Monitoring is the source of truth for the cloud-service metrics, Service Connector Hub moves selected metrics into OCI Streaming, and `oci-metrics-exporter` consumes, normalizes, enriches, and exposes them in Prometheus format.
+
+
+## Step 9: Access Grafana
 
 ### Option 1: Port Forward (Quick Access)
 
@@ -575,9 +702,9 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
 7. Access Grafana at `https://grafana.${INGRESS_IP}.endpoint.oci-hpc.ai`
 
-## Step 9: Verify the Deployment
+## Step 10: Verify the Deployment
 
-### 9.1 Check Prometheus Targets
+### 10.1 Check Prometheus Targets
 
 1. Port-forward Prometheus:
    ```bash
@@ -592,7 +719,7 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    - kubelet
    - kube-state-metrics
 
-### 9.2 Verify Dashboards in Grafana
+### 10.2 Verify Dashboards in Grafana
 
 1. Log into Grafana
 2. Navigate to **Dashboards**
@@ -601,13 +728,13 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
    - **GPU Nodes** (with GPU-specific dashboards)
 4. Open a dashboard and verify data is displayed
 
-### 9.3 Verify Alerts in Grafana
+### 10.3 Verify Alerts in Grafana
 
 1. In Grafana, go to **Alerting** → **Alert rules**
 2. Verify alert rules are loaded from the ConfigMaps
 3. Check that alerts are in the **Alerts** folder
 
-### 9.4 Test Metrics Collection
+### 10.4 Test Metrics Collection
 
 ```bash
 # Query Prometheus for NVIDIA GPU metrics (if DCGM is deployed)
@@ -1022,6 +1149,9 @@ helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}
 
 # Uninstall OKE ONS Webhook (if deployed)
 helm uninstall oke-ons-webhook -n ${MONITORING_NAMESPACE}
+
+# Uninstall the OKE Metrics Exporter (if deployed)
+helm uninstall oci-metrics-exporter -n ${MONITORING_NAMESPACE}
 
 # Uninstall kube-prometheus-stack
 helm uninstall kube-prometheus-stack -n ${MONITORING_NAMESPACE}

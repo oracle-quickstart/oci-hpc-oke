@@ -58,6 +58,23 @@ locals {
           }
         }
       ] : [],
+      var.setup_oci_metrics_exporter ?
+      [for cdk, cdv in local.grafana_oci_dashboards :
+        {
+          name      = "dashboard-${trimsuffix(cdk, ".json")}",
+          namespace = var.monitoring_namespace,
+          files     = [join("/", ["/home/${var.operator_user}/grafana/dashboards/oci", cdk])]
+          options = {
+            labels = {
+              grafana_dashboard = "1"
+            }
+            annotations = {
+              grafana_dashboard_folder = "OCI Metrics"
+            }
+            disableNameSuffixHash = true
+          }
+        }
+      ] : [],
       [for cak, cav in local.grafana_alerts :
         {
           name      = "alert-${trimsuffix(cak, ".yaml")}",
@@ -79,7 +96,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
-    manifest_md5    = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_amd_dashboard_files_path, local.grafana_nvidia_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
+    manifest_md5    = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_amd_dashboard_files_path, local.grafana_nvidia_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
     namespace       = var.monitoring_namespace
     bastion_host    = module.oke.bastion_public_ip
     bastion_user    = var.bastion_user
@@ -105,6 +122,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/common",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/amd",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/nvidia",
+      "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/oci",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/alerts",
     ]))
   }
@@ -122,6 +140,11 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   provisioner "file" {
     source      = "${local.grafana_nvidia_dashboard_dir}/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/nvidia"
+  }
+
+  provisioner "file" {
+    source      = "${local.grafana_oci_dashboard_dir}/"
+    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/oci"
   }
 
   provisioner "file" {
