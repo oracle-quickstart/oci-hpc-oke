@@ -206,12 +206,17 @@ locals {
       }
     },
     "oke-gmc" = {
-      create                         = local.create_workers && var.worker_gmc_enabled
-      description                    = "OKE self-managed GPU Memory Cluster"
-      mode                           = "gpu-memory-cluster"
-      placement_ads                  = [substr(var.worker_gmc_ad, -1, 0)]
-      shape                          = var.worker_gmc_shape
-      gpu_memory_fabric_ids          = var.worker_gmc_gpu_memory_fabric_ids
+      create                = local.create_workers && var.worker_gmc_enabled
+      description           = "OKE self-managed GPU Memory Cluster"
+      mode                  = "gpu-memory-cluster"
+      placement_ads         = [substr(var.worker_gmc_ad, -1, 0)]
+      shape                 = var.worker_gmc_shape
+      gpu_memory_fabric_ids = var.worker_gmc_gpu_memory_fabric_ids
+      gpu_memory_cluster_scale_config = {
+        target_size         = var.worker_gmc_scale_target_size
+        is_upsize_enabled   = var.worker_gmc_scale_is_upsize_enabled
+        is_downsize_enabled = var.worker_gmc_scale_is_downsize_enabled
+      }
       boot_volume_size               = var.worker_gmc_boot_volume_size
       boot_volume_vpus_per_gb        = var.worker_gmc_boot_volume_vpus_per_gb
       image_type                     = "custom"
