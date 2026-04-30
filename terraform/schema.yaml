@@ -44,8 +44,6 @@ variableGroups:
       - oke_ons_webhook_chart_version
       - oci_metrics_exporter_chart_version
       - cert_manager_chart_version
-      # MPI Operator
-      - install_mpi_operator
       # Kueue
       - kueue_chart_version
       - kueue_local_queue_default_namespace
@@ -54,7 +52,6 @@ variableGroups:
       - install_hostexec
       # Monitoring
       - wildcard_dns_domain
-      - monitoring_advanced_options
       # Cluster setup
       - kubeproxy_mode
       - oke_pre_bootstrap_script
@@ -80,6 +77,7 @@ variableGroups:
       - enable_ipv6
       # Workers
       - legacy_imds_endpoints_disabled
+      - disable_gpu_device_plugin
 
   - title: "Identity"
     variables:
@@ -127,6 +125,7 @@ variableGroups:
 
   - title: Cluster Access
     variables:
+      - ssh_public_key
       - create_bastion
       - bastion_is_public
       - bastion_allowed_cidrs
@@ -158,8 +157,6 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
-      - disable_gpu_device_plugin
-      - setup_credential_provider_for_ocir
 
   - title: "Workers: System"
     variables:
@@ -234,8 +231,6 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
-      - install_kueue
-      - install_oci_hpc_oke_utils
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -247,10 +242,6 @@ variableGroups:
       - worker_gmc_boot_volume_vpus_per_gb
       - worker_gmc_kubernetes_version
       - worker_gmc_image_id
-
-  - title: "SSH Access"
-    variables:
-    - ssh_public_key
 
   - title: "Storage"
     variables:
@@ -265,6 +256,13 @@ variableGroups:
     - lustre_size_in_tb
     - lustre_performance_tier
     - lustre_mount_path
+
+  - title: "Cluster Components"
+    variables:
+      - setup_credential_provider_for_ocir
+      - install_oci_hpc_oke_utils
+      - install_kueue
+      - install_mpi_operator
 
   - title: "Monitoring & Observability"
     variables:
@@ -997,7 +995,7 @@ variables:
     required: true
     visible: nvme_raid_enabled
   create_lustre:
-    title: Create Lustre FS
+    title: Create a File Storage with Lustre file system
     description: Provision a shared Lustre file system and a PV backed by the Lustre file system. The OS images used for the worker nodes must have the Lustre client installed.
     type: boolean
     default: false
@@ -1288,7 +1286,7 @@ variables:
     title: Setup OKE credential-provider for OCIR
     description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If "Create policies" box is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
     type: boolean
-    default: false
+    default: true
 
 # OKE Cluster Setup - Advanced Options
   override_hostnames:
@@ -1299,8 +1297,9 @@ variables:
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
-    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the GPU Operator to deploy the GPU device plugin.
+    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
     default: false
+    visible: false
 
   # Workers - System pool
   worker_ops_ad:
@@ -1934,7 +1933,6 @@ variables:
     description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the GPU + RDMA worker pool."
     type: boolean
     default: true
-    visible: ${worker_rdma_enabled}
   install_rdma_labeler:
     title: Install RDMA Topology Labeler
     visible: false
@@ -1956,18 +1954,24 @@ variables:
         - ${worker_rdma_enabled}
         - ${install_kueue}
 
+  # MPI Operator
+  install_mpi_operator:
+    title: Install MPI Operator
+    description: Install MPI Operator for running MPIJob workloads.
+    type: boolean
+    default: true
+
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils
     description: Install the OCI HPC OKE Utils Helm chart (includes node labeler with RDMA topology, compute host health, firmware versions, and maintenance event tracking; image prepuller; and hostexec).
     type: boolean
     default: true
-    visible: ${worker_rdma_enabled}
 
   # SSH access to the nodes
   ssh_public_key:
     title: SSH public key
-    description: The SSH public key to access the bastion, operator, and worker nodes.
+    description: "The SSH public key to access the bastion, operator, and worker nodes. Warning: if omitted, you will have no SSH access to any node (kubectl will still work)."
     type: oci:core:ssh:publickey
     pattern: "((^(ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)(,((ssh-rsa AAAAB3NzaC1yc2|ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT|ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzOD|ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1Mj|ssh-ed25519 AAAAC3NzaC1lZDI1NTE5|ssh-dss AAAAB3NzaC1kc3)[0-9A-Za-z+\/]+[=]{0,3})( [^,]*)?)*$"
     required: false
