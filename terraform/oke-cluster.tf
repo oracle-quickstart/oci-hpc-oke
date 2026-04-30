@@ -198,8 +198,7 @@ locals {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.4.2"
+  source = "git::https://github.com/oracle-terraform-modules/terraform-oci-oke.git//?ref=25ef9a02ada3fc3bf7c43f200503682e79f58f03"
 
   providers = { oci.home = oci.home }
 
@@ -290,6 +289,7 @@ module "oke" {
   create_iam_tag_namespace           = false
   create_operator                    = var.create_operator
   create_vcn                         = var.create_vcn
+  enable_ipv6                        = var.enable_ipv6
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true

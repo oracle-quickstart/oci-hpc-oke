@@ -62,6 +62,7 @@ variable "ssh_public_key" {
 
 # Network
 variable "create_vcn" { default = true }
+variable "enable_ipv6" { default = false }
 
 variable "vcn_compartment_ocid" {
   default = null
@@ -640,6 +641,53 @@ variable "worker_rdma_kubernetes_version" {
   default     = null
   description = "Kubernetes version for the RDMA worker pool. Defaults to cluster version if not specified."
   type        = string
+}
+
+# Workers - GPU Memory Cluster
+variable "worker_gmc_enabled" {
+  default     = false
+  description = "Whether to create the GPU Memory Cluster worker pool."
+  type        = bool
+}
+variable "worker_gmc_ad" {
+  default     = ""
+  description = "Availability domain for the GMC worker pool (e.g. 'ZHZP:AP-SYDNEY-1-AD-1'). Only the trailing AD number is used."
+  type        = string
+}
+variable "worker_gmc_shape" {
+  default     = "BM.GPU.GB200-v3.4"
+  description = "Shape for the GMC worker pool."
+  type        = string
+}
+variable "worker_gmc_image_id" {
+  default     = null
+  description = "Custom image OCID for the GMC worker pool. Must be a GMC/RDMA-compatible image for the chosen shape."
+  type        = string
+}
+variable "worker_gmc_boot_volume_size" {
+  default     = 512
+  description = "Boot volume size in GB for the GMC worker pool."
+  type        = number
+}
+variable "worker_gmc_boot_volume_vpus_per_gb" {
+  default     = 10
+  description = "Boot volume VPUs/GB for the GMC worker pool."
+  type        = number
+}
+variable "worker_gmc_max_pods_per_node" {
+  default     = 64
+  description = "Maximum number of pods per node for the GMC worker pool. Max is 110."
+  type        = number
+}
+variable "worker_gmc_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the GMC worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
+variable "worker_gmc_gpu_memory_fabric_ids" {
+  default     = []
+  description = "List of GPU Memory Fabric OCIDs to fan out into one GPU Memory Cluster per fabric."
+  type        = list(string)
 }
 
 # Kueue

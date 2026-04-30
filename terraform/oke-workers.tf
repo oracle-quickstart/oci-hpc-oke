@@ -205,5 +205,41 @@ locals {
         }
       }
     },
+    "oke-gmc" = {
+      create                         = local.create_workers && var.worker_gmc_enabled
+      description                    = "OKE self-managed GPU Memory Cluster"
+      mode                           = "gpu-memory-cluster"
+      placement_ads                  = [substr(var.worker_gmc_ad, -1, 0)]
+      shape                          = var.worker_gmc_shape
+      gpu_memory_fabric_ids          = var.worker_gmc_gpu_memory_fabric_ids
+      boot_volume_size               = var.worker_gmc_boot_volume_size
+      boot_volume_vpus_per_gb        = var.worker_gmc_boot_volume_vpus_per_gb
+      image_type                     = "custom"
+      image_id                       = var.worker_gmc_image_id
+      max_pods_per_node              = var.worker_gmc_max_pods_per_node
+      kubernetes_version             = coalesce(var.worker_gmc_kubernetes_version, var.kubernetes_version)
+      legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
+      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                  = local.node_metadata
+      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      agent_config = {
+        are_all_plugins_disabled = false
+        is_management_disabled   = false
+        is_monitoring_disabled   = false
+        plugins_config = {
+          "Bastion"                             = "DISABLED"
+          "Block Volume Management"             = "DISABLED"
+          "Compute HPC RDMA Authentication"     = "ENABLED"
+          "Compute HPC RDMA Auto-Configuration" = "ENABLED"
+          "Compute Instance Monitoring"         = "ENABLED"
+          "Compute Instance Run Command"        = "ENABLED"
+          "Compute RDMA GPU Monitoring"         = "ENABLED"
+          "Custom Logs Monitoring"              = "ENABLED"
+          "Management Agent"                    = "ENABLED"
+          "Oracle Autonomous Linux"             = "DISABLED"
+          "OS Management Service Agent"         = "DISABLED"
+        }
+      }
+    },
   }
 }

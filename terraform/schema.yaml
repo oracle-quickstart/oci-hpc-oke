@@ -40,6 +40,7 @@ variableGroups:
       - worker_cpu_max_pods_per_node
       - worker_gpu_max_pods_per_node
       - worker_rdma_max_pods_per_node
+      - worker_gmc_max_pods_per_node
       - oke_ons_webhook_chart_version
       - oci_metrics_exporter_chart_version
       - cert_manager_chart_version
@@ -234,6 +235,17 @@ variableGroups:
       - worker_rdma_image_custom_id
       - install_kueue
       - install_oci_hpc_oke_utils
+
+  - title: "Workers: GPU Memory Cluster"
+    variables:
+      - worker_gmc_enabled
+      - worker_gmc_ad
+      - worker_gmc_shape
+      - worker_gmc_gpu_memory_fabric_ids
+      - worker_gmc_boot_volume_size
+      - worker_gmc_boot_volume_vpus_per_gb
+      - worker_gmc_kubernetes_version
+      - worker_gmc_image_id
 
   - title: "SSH Access"
     variables:
@@ -1855,6 +1867,65 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
       clusterOptionId: "all"
+
+  # Workers - GPU Memory Cluster
+  worker_gmc_enabled:
+    title: Create GPU Memory Cluster pool
+    type: boolean
+    description: Create a self-managed GPU Memory Cluster worker pool.
+  worker_gmc_ad:
+    title: Availability domain
+    type: oci:identity:availabilitydomain:name
+    required: true
+    default: worker_ops_ad
+    visible: ${worker_gmc_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  worker_gmc_shape:
+    title: Shape
+    type: oci:core:instanceshape:name
+    pattern: "^BM\\.GPU\\.GB(200|300).*$"
+    required: true
+    visible: ${worker_gmc_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+  worker_gmc_gpu_memory_fabric_ids:
+    title: GPU Memory Fabric OCIDs
+    description: List of GPU Memory Fabric OCIDs. One GPU Memory Cluster is created for each fabric.
+    type: array
+    items:
+      type: string
+      pattern: "^ocid1\\..*"
+    unique_items: true
+    minItems: 1
+    required: true
+    visible: ${worker_gmc_enabled}
+  worker_gmc_boot_volume_size:
+    title: Boot volume size (GB)
+    type: integer
+    visible: ${worker_gmc_enabled}
+  worker_gmc_boot_volume_vpus_per_gb:
+    title: Boot volume performance (VPUs/GB)
+    type: integer
+    visible: false
+  worker_gmc_kubernetes_version:
+    title: Kubernetes version
+    description: Kubernetes version for the GPU Memory Cluster worker pool. Defaults to the cluster version.
+    type: oci:kubernetes:versions:id
+    required: false
+    default: ${kubernetes_version}
+    visible: ${worker_gmc_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      clusterOptionId: "all"
+  worker_gmc_image_id:
+    title: Image
+    description: Custom image OCID for the GPU Memory Cluster worker pool.
+    type: oci:core:image:id
+    required: true
+    visible: ${worker_gmc_enabled}
+    dependsOn:
+      compartmentId: ${compartment_ocid}
 
   # Kueue
   install_kueue:
