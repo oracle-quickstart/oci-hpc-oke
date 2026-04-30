@@ -198,8 +198,7 @@ locals {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.4.2"
+  source = "git::https://github.com/OguzPastirmaci/terraform-oci-oke.git//?ref=nfd-as-primary-addon"
 
   providers = { oci.home = oci.home }
 
