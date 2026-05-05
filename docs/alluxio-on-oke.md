@@ -1,6 +1,6 @@
 # Alluxio on OKE — Quickstart
 
-Deploy Alluxio Enterprise on an existing OKE cluster with workers, local NVMe pagestore, and OCI Object Storage (S3-compatible API) as UFS. 
+Deploy Alluxio Enterprise on an existing OKE cluster with workers (shapes having local NVMe drives), local NVMe pagestore, and OCI Object Storage (S3-compatible API) as UFS. 
 
 > Replace all placeholder values before use.
 
@@ -391,7 +391,6 @@ EOF
 Install operator:
 
 ```bash
-kubectl create namespace alx-ns --dry-run=client -o yaml | kubectl apply -f -
 helm -n alluxio-operator install operator -f alluxio-operator-values.yaml --create-namespace ./alluxio-operator
 ```
 
@@ -404,6 +403,10 @@ kubectl -n alluxio-operator get pods
 ---
 
 ## 6. Deploy Alluxio Cluster
+
+```bash
+kubectl create namespace alx-ns
+```
 
 Create cluster manifest (adjust resources/counts/sizes):
 
@@ -562,7 +565,8 @@ Check current workers:
 kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio info nodes
 kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- sh -c 'alluxio info nodes | grep -c ONLINE'
 ```
-Once the node is available in the OKE cluster, make sure you follow the steps 1 to 3 outlined above.
+
+Once the node is available in OKE, complete Sections 1–3 for that node before increasing worker count.
 Increase worker count in `AlluxioCluster.spec.worker.count` and re-apply:
 
 ```bash
@@ -575,38 +579,38 @@ kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio info nodes
 
 ## 10. Remove Worker Capacity (Scale In)
 
-We will be removing a particular node.
-kubectl cordon <node-name>
-kubectl -n alx-ns get pods -o wide | grep alluxio-cluster-worker
-kubectl apply -f alluxio-cluster.yaml   # with lower worker.count
-kubectl -n alx-ns delete pod <worker-pod-on-that-node>
-kubectl -n alx-ns get pods -o wide | grep alluxio-cluster-worker
-1. Cordon the node that you want to remove from the alluxio cluster. 
+10.1 Cordon the node you want to remove from the Alluxio cluster.
+
 ```bash
 kubectl cordon <node-name>
 ```
 
-2. Get the woker pod name on the particular node that you want to remove.
+10.2 Get the worker pod running on the node you want to remove.
+
 ```bash
 kubectl -n alx-ns get pods -o wide | grep alluxio-cluster-worker
 ```
 
-3. Delete the pod on that node.
+10.3 Delete the pod on that node.
+
 ```bash
 kubectl -n alx-ns delete pod <worker-pod-on-that-node>
 ```
 
-4. Decrease the worker.count in the alluxio-cluster and apply. 
+10.4 Decrease `worker.count` in `alluxio-cluster` and apply.
+
 ```bash
 kubectl apply -f alluxio-cluster.yaml
 ```
 
-5. Check again if the pod is now deleted on the node. 
+10.5 Verify the worker pod is no longer running on the cordoned node.
+
 ```bash
-kubectl -n alx-ns delete pod <worker-pod-on-that-node>
+kubectl -n alx-ns get pods -o wide | grep alluxio-cluster-worker
 ```
 
-6. Deregister the worker from etcd. First, retrieve the UUID of the stopped worker from the output of alluxio info nodes (the WorkerId column for the OFFLINE entry). Then remove it:
+10.6 Deregister the worker from etcd. First, retrieve the UUID of the stopped worker from the output of alluxio info nodes (the WorkerId column for the OFFLINE entry). Then remove it:
+
 ```bash
 kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio info nodes
 ```
@@ -642,7 +646,227 @@ kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio mount list
 
 ---
 
+## 12. Monitor Alluxio with a Standalone Grafana Dashboard (Outside OCI-HPC-OKE Stack)
+
+This section sets up a standalone Grafana instance and connects it to the in-cluster Alluxio Prometheus endpoint.
+
+> This flow is intentionally **independent** of OCI HPC OKE stack-integrated monitoring.
+
+---
+
+### 12.1 Prerequisites
+
+- Alluxio cluster is running and exposing Prometheus metrics.
+- In-cluster Prometheus is deployed (default port `9090`).
+- Host for Grafana has Docker or Podman installed and outbound image pull access.
+- SSH access to bastion and operator hosts for tunneling.
+
+```bash
+kubectl -n alx-ns get pods
+kubectl get svc -A | grep -i prometheus
+docker --version || podman --version
+```
+
+---
+
+### 12.2 Create Grafana Prometheus Datasource Provisioning
+
+```bash
+mkdir -p /home/ubuntu/monitoring/grafana/provisioning/datasources
+cat > /home/ubuntu/monitoring/grafana/provisioning/datasources/prometheus.yml << 'EOF'
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    url: http://localhost:9090
+    isDefault: true
+    access: proxy
+    editable: true
+EOF
+```
+
+---
+
+### 12.3 Start Grafana Container
+
+Use either Podman or Docker:
+
+```bash
+podman run -d --net=host --name=grafana \
+  -v /home/ubuntu/monitoring/grafana/provisioning:/etc/grafana/provisioning \
+  -e GF_SECURITY_ADMIN_USER=admin \
+  -e GF_SECURITY_ADMIN_PASSWORD=<GRAFANA_ADMIN_PASSWORD> \
+  docker.io/grafana/grafana
+```
+
+```bash
+docker run -d --net=host --name=grafana \
+  -v /home/ubuntu/monitoring/grafana/provisioning:/etc/grafana/provisioning \
+  -e GF_SECURITY_ADMIN_USER=admin \
+  -e GF_SECURITY_ADMIN_PASSWORD=<GRAFANA_ADMIN_PASSWORD> \
+  docker.io/grafana/grafana
+```
+
+Verify:
+
+```bash
+docker ps -a
+```
+
+---
+
+### 12.4 Verify In-Cluster Prometheus Health
+
+```bash
+kubectl -n alx-ns port-forward svc/alluxio-cluster-prometheus 9091:9090 &
+sleep 2
+curl -s http://localhost:9091/api/v1/targets \
+  | python3 -m json.tool \
+  | grep -E '"health"|scrapeUrl' \
+  | head -40
+```
+
+Expected: targets report `"health": "up"`.
+
+Cleanup:
+
+```bash
+pkill -f "port-forward.*9091"
+```
+
+---
+
+### 12.5 Expose Prometheus via NodePort
+
+```bash
+cat > prom-nodeport.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: alluxio-prometheus-nodeport
+  namespace: alx-ns
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: alluxio-cluster
+    app.kubernetes.io/name: alluxio
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+      nodePort: 30909
+EOF
+
+kubectl apply -f prom-nodeport.yaml
+kubectl -n alx-ns get svc alluxio-prometheus-nodeport
+```
+
+---
+
+### 12.6 Open Required NSG Paths
+
+Allow traffic from bastion NSG to operator NSG for:
+
+#### Operator NSG ingress
+
+- Source NSG: bastion NSG → TCP `3000`
+- Source NSG: bastion NSG → TCP `9090`
+
+#### Workers NSG ingress
+
+- Source NSG: bastion NSG → TCP `30909` (Grafana access)
+- Source NSG: operator NSG → TCP `30909` (operator-origin checks)
+
+If bastion NSG uses restricted egress, add matching egress to bastion NSG for the same ports.
+
+#### Bastion NSG egress
+
+- Destination NSG: operator NSG → TCP `3000`
+- Destination NSG: operator NSG → TCP `9090`
+- Destination NSG: workers NSG → TCP `30909`
+
+---
+
+### 12.7 Verify End-to-End Connectivity
+
+Traffic path:
+
+- Laptop → SSH tunnel to bastion → operator:3000
+- Laptop → SSH tunnel to bastion → operator:9090
+- Laptop → SSH tunnel to bastion → operator:30909
+
+Create SSH tunnel from laptop:
+
+```bash
+ssh -i <PRIVATE_KEY> \
+  -L 3000:<OPERATOR_PRIVATE_IP>:3000 \
+  -L 9090:<OPERATOR_PRIVATE_IP>:9090 \
+  -L 30909:<OPERATOR_PRIVATE_IP>:30909 \
+  ubuntu@<BASTION_PUBLIC_IP>
+```
+
+If tunnel still fails with `No route to host`, operator host firewall is likely blocking non-22 ports.
+
+Find bastion private IP on bastion:
+
+```bash
+hostname -I
+ip -4 addr
+```
+
+On operator, allow bastion IP to 3000 and 9090 if host firewall blocks access. 
+Note: Allow 30909 if that is blocked too.
+
+```bash
+sudo iptables -I INPUT 4 -p tcp -s <BASTION_PRIVATE_IP>/32 --dport 3000 -j ACCEPT
+sudo iptables -I INPUT 4 -p tcp -s <BASTION_PRIVATE_IP>/32 --dport 9090 -j ACCEPT
+```
+
+Test from bastion:
+
+```bash
+nc -vz <OPERATOR_PRIVATE_IP> 3000
+curl -I http://<OPERATOR_PRIVATE_IP>:3000
+```
+
+Persist firewall rules:
+
+```bash
+sudo apt update
+sudo apt install -y iptables-persistent
+sudo netfilter-persistent save
+```
+
+From bastion, test worker NodePort:
+
+```bash
+curl -sI http://<WORKER_NODE_PRIVATE_IP>:30909/-/ready
+```
+
+Expected: `HTTP/1.1 200 OK`
+
+---
+
+### 12.8 Import Alluxio Dashboard into Grafana
+
+Download dashboard template:
+
+```bash
+wget -O /tmp/alluxio-dashboard.json \
+  https://alluxio-binaries.s3.amazonaws.com/artifactsBundle/ee/AI-3.8-15.1.0/alluxio-ai-dashboard-template.json
+```
+
+In Grafana (`http://localhost:3000`):
+
+1. Login with admin credentials.
+2. If Grafana runs on operator host without local Prometheus, update datasource URL to `http://<WORKER_NODE_PRIVATE_IP>:30909`.
+3. Import `/tmp/alluxio-dashboard.json`.
+4. Set time range to __Last 15 minutes__ and refresh.
+
+---
+
 ## Notes
 
 - Running Alluxio at scale was not tested. 
-- The Object Storage data that is cached and stored is abstracted by Alluxio.
+- Alluxio abstracts Object Storage data while caching.
