@@ -565,8 +565,7 @@ Check current workers:
 kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio info nodes
 kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- sh -c 'alluxio info nodes | grep -c ONLINE'
 ```
-
-Once the node is available in OKE, complete Sections 1–3 for that node before increasing worker count.
+Once the node is available in the OKE cluster, make sure you follow the steps 1 to 3 outlined above.
 Increase worker count in `AlluxioCluster.spec.worker.count` and re-apply:
 
 ```bash
@@ -579,14 +578,12 @@ kubectl -n alx-ns exec -i alluxio-cluster-coordinator-0 -- alluxio info nodes
 
 ## 10. Remove Worker Capacity (Scale In)
 
-10.1 Cordon the node you want to remove from the Alluxio cluster.
-
+10.1 Cordon the node that you want to remove from the alluxio cluster. 
 ```bash
 kubectl cordon <node-name>
 ```
 
-10.2 Get the worker pod running on the node you want to remove.
-
+10.2 Get the woker pod name on the particular node that you want to remove.
 ```bash
 kubectl -n alx-ns get pods -o wide | grep alluxio-cluster-worker
 ```
@@ -726,7 +723,7 @@ curl -s http://localhost:9091/api/v1/targets \
   | head -40
 ```
 
-Expected: targets report `"health": "up"`.
+Expected: coordinator + workers + etcd + Prometheus self-scrape, all report `"health": "up"`.
 
 Cleanup:
 
