@@ -332,7 +332,7 @@ Description: AIStore
 
 ## 7. Create secret
 
-We are using the aisnode image that authenticates with OCI Object Storage using Instance Principal. Please make sure you have a dynamic group and its related policies created as mentioned above. We need to still create an empty secret as below and use it. 
+We are using the aisnode image that authenticates with OCI Object Storage using Instance Principal. The requirement is that the AIStore version needs to be v1.4.4 or higher. Please make sure you have a dynamic group and its related policies created as mentioned above. We need to still create an empty secret as below and use it. 
 
 ```bash
 kubectl create secret generic oci-inst-prncpl -n ais --from-literal=config=config
@@ -685,3 +685,55 @@ done
 # Cleanup
 kubectl delete ds ais-bench-read -n ais
 ```
+
+## 12. Access objects from multiple regions
+
+Even if your AIStore cluster is set up in one particular region, you can access objects from other regions as well. There is no limit to the number of regions you can access. 
+
+IMPORTANT: To use this feature, the AIStore version needs to be v1.4.4 or higher. 
+
+In the below example, we will be listing objects from three different regions. Kindly note, the AIStore cluster is in a different region than the regions below. 
+
+Register existing OCI Buckets.
+
+BUCKET_PHX=aistore-phx
+BUCKET_YYZ=aistore-yyz
+BUCKET_FRA=aistore-fra
+
+```bash
+ais create oc://#phx/$BUCKET_PHX --props='extra.oci.region=us-phoenix-1'
+ais bucket props show oc://#phx/$BUCKET_PHX extra
+ais create oc://#yyz/$BUCKET_YYZ --props='extra.oci.region=ca-toronto-1'
+ais bucket props show oc://#yyz/$BUCKET_YYZ extra
+ais create oc://#fra/$BUCKET_FRA --props='extra.oci.region=eu-frankfurt-1'
+ais bucket props show oc://#fra/$BUCKET_FRA extra
+```
+
+List the Buckets:
+
+```bash
+ais ls oc://#phx/$BUCKET_PHX
+ais ls oc://#yyz/$BUCKET_YYZ
+ais ls oc://#fra/$BUCKET_FRA
+```
+
+Upload objects:
+
+```bash
+ais put ./file.txt oc://#phx/$BUCKET_PHX/file.txt
+```
+
+Similarly, you can upload objects to other regions. 
+
+Download specific objects:
+
+```bash
+# Discards the client-side output
+ais get oc://#fra/$BUCKET_FRA/obj /dev/null
+
+# Save the retrieved bytes
+ais get oc://#fra/$BUCKET_FRA/obj /tmp/obj
+```
+
+Similarly, you can download objects from buckets in other regions. 
+
