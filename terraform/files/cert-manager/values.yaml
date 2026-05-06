@@ -1,3 +1,6 @@
 crds:
   enabled: true
   keep: false
+
+startupapicheck:
+  enabled: false

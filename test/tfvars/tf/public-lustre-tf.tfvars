@@ -15,7 +15,6 @@ install_monitoring                                  = false
 install_node_problem_detector_kube_prometheus_stack = false
 install_grafana                                     = false
 install_grafana_dashboards                          = false
-install_nvidia_dcgm_exporter                        = false
 install_amd_device_metrics_exporter                 = false
 install_mpi_operator                                = false
 install_kueue                                       = false
