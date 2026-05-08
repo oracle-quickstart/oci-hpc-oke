@@ -24,16 +24,16 @@ dpkg -s kmod | grep Version
 #### Upgrade the kmod package
 
 ```bash
+# Upgrade kmod:
+sudo apt update && sudo apt install --only-upgrade kmod
+
 # Check if the module is loaded:
 grep -qE '^algif_aead ' /proc/modules && echo "Affected module is loaded" || echo "Affected module is NOT loaded"
 
-# Unload the kernel module:
+# Unload the kernel module to apply the fix without rebooting:
 sudo rmmod algif_aead 2>/dev/null || echo "Failed to unload the module. It may be in use."
 
-# If it doesn't work, it may be in use. Try to stop the application which is using it or reboot the system.
-
-# Upgrade kmod:
-sudo apt update && sudo apt install --only-upgrade kmod
+# If unloading fails, the module may be in use. Stop the application using it or reboot the system.
 ```
 
 #### Switch to patched Ubuntu HPC images
@@ -169,11 +169,16 @@ Get the latest published images using the command below:
 # Update the region with the desired region
 
 oci compute image list \
-  -c ocid1.compartment.oc1..111 \
-  --operating-system "Canonical Ubuntu" \
-  --sort-by TIMECREATED \
-  --sort-order DESC \
-  --region us-ashburn-1 | grep 2026.04.30-1 -A2
+    -c ocid1.compartment.oc1..abcdef \
+    --operating-system "Canonical Ubuntu" \
+    --sort-by TIMECREATED \
+    --sort-order DESC \
+    --region us-ashburn-1 \
+  | jq -r '.data[]
+    | select((."time-created" | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) >= ("2026-05-05T00:00:00Z" |
+  fromdateiso8601))
+    | [."display-name", ."time-created", .id]
+    | @tsv'
 
 # Look for images created starting 2026-05-05 (build 2026.04.30-1 or later)
 ```
@@ -181,6 +186,9 @@ oci compute image list \
 ### Mitigation
 
 ```bash
+# Prevent the kernel module from loading
+echo "install algif_aead /bin/false" | sudo tee /etc/modprobe.d/manual-disable-algif_aead.conf
+
 # Check if the module is loaded:
 grep -qE '^algif_aead ' /proc/modules && echo "Affected module is loaded" || echo "Affected module is NOT loaded"
 
@@ -188,9 +196,6 @@ grep -qE '^algif_aead ' /proc/modules && echo "Affected module is loaded" || ech
 sudo rmmod algif_aead 2>/dev/null || echo "Failed to unload the module. It may be in use."
 
 # If it doesn't work, it may be in use. Try to stop the application which is using it or reboot the system.
-
-# Prevent the kernel module from loading
-echo "install algif_aead /bin/false" | sudo tee /etc/modprobe.d/manual-disable-algif_aead.conf
 ```
 
 ### References
@@ -199,15 +204,15 @@ echo "install algif_aead /bin/false" | sudo tee /etc/modprobe.d/manual-disable-a
 
 ## Oracle Linux
 
-Oracle Linux has shipped an urgent fix for the CVE-2026-31431. Fixed kernel versions:
+Oracle Linux has shipped an urgent fix for the CVE-2026-31431. Fixed UEK kernel versions:
 
-- UEK8: 6.12.0-201.74.2.2
-- UEK7: 5.15.0-319.201.4.4
-- UEK6: 5.4.17-2136.354.4.2
+| Kernel stream | Oracle Linux releases | Fixed kernel version |
+| --- | --- | --- |
+| UEK8 | OL9, OL10 | 6.12.0-201.74.2.2 |
+| UEK7 | OL8, OL9 | 5.15.0-319.201.4.4 |
+| UEK6 | OL7, OL8 | 5.4.17-2136.354.4.2 |
 
 The OKE team is working on updating the OKE node images to use the patched kernels.
-
-We are currently working on shipping kernel updates for customer environments using RHCK (see also the mitigation section below).
 
 ### Fix
 
@@ -229,28 +234,191 @@ Get the latest published images using the command below:
 # Update the region with the desired region
 
 oci compute image list \
-  -c ocid1.compartment.oc1..111 \
-  --operating-system "Oracle Linux" \
-  --sort-by TIMECREATED \
-  --sort-order DESC \
-  --region us-ashburn-1 | grep 2026.04.30-1 -A2
+    -c ocid1.compartment.oc1..abcdef \
+    --operating-system "Oracle Linux" \
+    --sort-by TIMECREATED \
+    --sort-order DESC \
+    --region us-ashburn-1 \
+  | jq -r '.data[]
+    | select((."time-created" | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) >= ("2026-05-05T00:00:00Z" |
+  fromdateiso8601))
+    | [."display-name", ."time-created", .id]
+    | @tsv'
 
 # Look for images created starting 2026-05-05 (build 2026.04.30-1 or later)
 ```
 
 ### Mitigation
 
-Block the vulnerable module from loading using kernel parameters:
+Block the vulnerable module from loading using kernel parameters and reboot the node:
 
 ```bash
 sudo grubby --update-kernel=ALL --args="initcall_blacklist=algif_aead_init"
 sudo reboot
 ```
 
-### References
+## Oracle Linux (RHCK)
+
+The patched RHCK kernel versions:
+
+| Oracle Linux release | Fixed RHCK kernel version |
+| --- | --- |
+| OL8 | 4.18.0-553.123.1.el8_10 |
+| OL9 | 5.14.0-611.54.1.el9_7 |
+| OL10 | 6.12.0-124.55.1.el10_1 |
+
+### Fix
+
+#### Upgrade the kernel
+
+```bash
+# Check the current kernel version
+uname -r
+
+# Check the available versions for kernel upgrade
+sudo dnf check-update kernel
+
+# Confirm the version
+# kernel.x86_64                          5.14.0-611.54.1.el9_7
+
+# Upgrade the kernel to the patched version
+# sudo dnf install -y kernel-5.14.0-611.54.1.el9_7
+KERNEL_VERSION=5.14.0-611.54.1.el9_7
+sudo dnf install -y "kernel-${KERNEL_VERSION}"
+
+
+# Confirm which kernel will boot by default
+sudo grubby --default-kernel
+
+# Set a specific kernel as default
+# sudo grubby --set-default /boot/vmlinuz-5.14.0-611.54.1.el9_7.x86_64
+sudo grubby --set-default "/boot/vmlinuz-${KERNEL_VERSION}.x86_64"
+
+# Reboot the node
+sudo reboot
+```
+
+### Mitigation
+
+Block the vulnerable module from loading using kernel parameters and reboot the node:
+
+```bash
+sudo grubby --update-kernel=ALL --args="initcall_blacklist=algif_aead_init"
+sudo reboot
+```
+
+## Recommended approach to patch nodes in the Slurm clusters.
+
+### Setting up ansible (optional)
+
+If `ansible` is not available on the controller, you can execute the following commands:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+uv tool install ansible-core
+```
+
+### Slurm clusters (v2)
+
+To patch the nodes currently running in the slurm cluster, the recommended approach is to:
+- upgrade the kmod package to the patched version (for nodes running Ubuntu)
+- upgrade the kernel version to the patched version and reboot (for nodes running Oracle Linux)
+
+```bash
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel.yml
+ansible-playbook -i /etc/ansible/hosts \
+  upgrade-kmod-or-kernel.yml
+```
+
+To ensure the new nodes spun up by the cluster-network resource use the patched image, update the instance-configuration.
+
+```bash
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/create-instance-config.py
+# replace ocid1.compartment.oc1.....abcdef with the compartment id where existing instance configuration is placed
+uv run create-instance-config.py --compartment-id ocid1.compartment.oc1.....abcdef
+```
+
+### Slurm clusters (v3)
+
+To patch the nodes **currently running** in the slurm cluster, the recommended approach is to:
+- upgrade the kmod package to the patched version (for nodes running Ubuntu)
+- upgrade the kernel version to the patched version and reboot (for nodes running Oracle Linux)
+
+```bash
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel.yml -O /config/playbooks/upgrade-kmod-or-kernel.yml
+# use the command below to get the cluster names
+mgmt clusters list
+# use the command below to patch the nodes in each cluster
+CLUSTER_NAME="cluster-name"
+mgmt nodes reconfigure --fields cluster_name=$CLUSTER_NAME --action ansible --playbook upgrade-kmod-or-kernel
+```
+
+To ensure the new nodes spun up by the cluster-network resource use the patched image, update the instance-configuration.
+
+```bash
+# use the command below to get the cluster names
+mgmt clusters list
+# use the command below to patch the nodes in each cluster
+CLUSTER_NAME="cluster-name"
+mgmt clusters update-instance-config --cluster-name $CLUSTER_NAME --image-id <new_image_ocid>
+```
+
+
+## Recommended approach to patch nodes in the OKE clusters.
+
+To patch the **existing nodes** of the OKE cluster, the recommended approach is to apply the daemonset below:
+
+This daemonset will run an ansible playbook on each of the node to upgrade the kernel or kmod package as needed.
+
+  ```bash
+  # download the daemonset manifest
+  wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel-daemonset.yaml
+
+  # apply the daemonset
+  kubectl apply -f upgrade-kmod-or-kernel-daemonset.yaml
+
+  # wait for the rollout of the daemonset
+  kubectl -n kube-system rollout status ds/upgrade-kmod-or-kernel --timeout=300s
+
+  # confirm the pods are scheduled on all the nodes
+  kubectl -n kube-system get pods -l app.kubernetes.io/name=upgrade-kmod-or-kernel -o wide
+
+  # get nodes that are currently patched:
+  kubectl -n kube-system logs -l app.kubernetes.io/name=upgrade-kmod-or-kernel --all-containers --tail=-1 | grep '^PATCH_APPLIED_NODE='
+
+  # get nodes that require a reboot before they are patched:
+  kubectl -n kube-system logs -l app.kubernetes.io/name=upgrade-kmod-or-kernel --all-containers --tail=-1 | grep '^PATCH_REBOOT_REQUIRED_NODE='
+
+  # remove the daemonset once all the nodes have been upgraded:
+  kubectl delete -f upgrade-kmod-or-kernel-daemonset.yaml
+  ```
+
+**Note:** Oracle Linux nodes listed under PATCH_REBOOT_REQUIRED_NODE require a reboot to apply the kernel update.
+
+
+To ensure the **new nodes** use the patched image:
+- for the managed nodepools, [update the nodepool configuration to use the patched image](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/update-node-pool.htm)
+- for the self-managed nodes (the GPU nodes which are part of cluster-networks), use the script below to update the image_id used by the ClusterNetwork resource:
+
+```bash
+# download uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
+
+# download the script
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/create-instance-config.py
+
+# replace ocid1.compartment.oc1.....abcdef with the compartment id of the existing instance configuration
+uv run create-instance-config.py --compartment-id ocid1.compartment.oc1.....abcdef
+```
+
+## References
 
 - [OCI CLI image list command][oci-cli-image-list]
+- [Oracle Linux CVE-2026-31431 page][oracle-cve-page]
 
 [copy-fail]: https://copy.fail/
 [ubuntu-copy-fail]: https://ubuntu.com/blog/copy-fail-vulnerability-fixes-available
 [oci-cli-image-list]: https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/compute/image/list.html
+[oracle-cve-page]: https://linux.oracle.com/cve/CVE-2026-31431.html

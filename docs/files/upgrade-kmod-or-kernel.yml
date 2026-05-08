@@ -1,0 +1,211 @@
+---
+# Upgrade kmod on Ubuntu, or installed Oracle Linux kernel packages, without rebooting.
+#
+# Usage:
+#   ansible-playbook -i inventory upgrade-kmod-or-kernel.yml
+#
+# Notes:
+#   - Ubuntu: upgrades the kmod package, then unloads algif_aead when loaded.
+#   - Oracle Linux: detects the currently running kernel with uname -r:
+#       * upgrades kernel-uek when the running kernel contains "uek"
+#       * upgrades kernel when the running kernel is RHCK
+#   - This play intentionally does not reboot hosts.
+
+- name: Upgrade kmod on Ubuntu or kernels on Oracle Linux
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    ubuntu_kmod_package: kmod
+    oracle_linux_distribution_names:
+      - OracleLinux
+      - Oracle Linux
+
+  tasks:
+    - name: Validate supported operating system
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_distribution == "Ubuntu"
+            or ansible_distribution in oracle_linux_distribution_names
+        fail_msg: >-
+          Unsupported distribution {{ ansible_distribution }}.
+          This play supports Ubuntu and Oracle Linux only.
+
+    - name: Upgrade kmod on Ubuntu
+      when: ansible_distribution == "Ubuntu"
+      block:
+        - name: Refresh apt package cache
+          ansible.builtin.apt:
+            update_cache: true
+            cache_valid_time: 3600
+
+        - name: Upgrade Ubuntu kmod package
+          ansible.builtin.apt:
+            name: "{{ ubuntu_kmod_package }}"
+            state: latest
+            only_upgrade: true
+          register: ubuntu_kmod_upgrade
+
+        - name: Check whether vulnerable algif_aead module is loaded
+          ansible.builtin.command: grep -qE '^algif_aead ' /proc/modules
+          register: ubuntu_algif_aead_loaded
+          changed_when: false
+          failed_when: false
+
+        - name: Unload vulnerable algif_aead module on Ubuntu
+          ansible.builtin.command: rmmod algif_aead
+          register: ubuntu_algif_aead_unload
+          when: ubuntu_algif_aead_loaded.rc == 0
+
+        - name: Verify vulnerable algif_aead module is not loaded
+          ansible.builtin.command: grep -qE '^algif_aead ' /proc/modules
+          register: ubuntu_algif_aead_verify
+          changed_when: false
+          failed_when: ubuntu_algif_aead_verify.rc != 1
+
+        - name: Check whether Ubuntu reports a reboot is required
+          ansible.builtin.stat:
+            path: /var/run/reboot-required
+          register: ubuntu_reboot_required
+
+    - name: Upgrade installed Oracle Linux kernel packages
+      when: ansible_distribution in oracle_linux_distribution_names
+      block:
+        - name: Detect currently running Oracle Linux kernel
+          ansible.builtin.command: uname -r
+          register: oracle_linux_current_kernel
+          changed_when: false
+
+        - name: Detect Oracle Linux kernel flavor
+          ansible.builtin.set_fact:
+            oracle_linux_kernel_flavor: >-
+              {{
+                'uek'
+                if oracle_linux_current_kernel.stdout is search('uek')
+                else 'rhck'
+              }}
+            oracle_linux_kernel_package: >-
+              {{
+                'kernel-uek'
+                if oracle_linux_current_kernel.stdout is search('uek')
+                else 'kernel'
+              }}
+
+        - name: Check whether selected Oracle Linux kernel package is installed
+          ansible.builtin.command: "rpm -q {{ oracle_linux_kernel_package }}"
+          register: oracle_linux_kernel_query
+          changed_when: false
+          failed_when: false
+
+        - name: Require selected Oracle Linux kernel package to be installed
+          ansible.builtin.assert:
+            that:
+              - oracle_linux_kernel_query.rc == 0
+            fail_msg: >-
+              Running kernel {{ oracle_linux_current_kernel.stdout }} was detected as
+              {{ oracle_linux_kernel_flavor }}, but package {{ oracle_linux_kernel_package }}
+              is not installed.
+
+        - name: Upgrade selected Oracle Linux kernel package
+          ansible.builtin.package:
+            name: "{{ oracle_linux_kernel_package }}"
+            state: latest
+          register: oracle_linux_kernel_upgrade
+
+        - name: Find latest installed Oracle Linux kernel image
+          ansible.builtin.shell: |
+            set -o pipefail
+            rpm -q --last {{ oracle_linux_kernel_package }} | awk 'NR == 1 {sub(/^{{ oracle_linux_kernel_package }}-/, "", $1); print "/boot/vmlinuz-" $1}'
+          args:
+            executable: /bin/bash
+          register: oracle_linux_latest_kernel_image
+          changed_when: false
+
+        - name: Check latest installed Oracle Linux kernel image exists
+          ansible.builtin.stat:
+            path: "{{ oracle_linux_latest_kernel_image.stdout }}"
+          register: oracle_linux_latest_kernel_image_stat
+
+        - name: Require latest installed Oracle Linux kernel image to exist
+          ansible.builtin.assert:
+            that:
+              - oracle_linux_latest_kernel_image.stdout | length > 0
+              - oracle_linux_latest_kernel_image_stat.stat.exists
+            fail_msg: >-
+              Could not find latest installed Oracle Linux kernel image for
+              {{ oracle_linux_kernel_package }}. Candidate path:
+              {{ oracle_linux_latest_kernel_image.stdout | default('') }}
+
+        - name: Check default Oracle Linux boot kernel before update
+          ansible.builtin.command: grubby --default-kernel
+          register: oracle_linux_default_kernel_before
+          changed_when: false
+
+        - name: Set latest RHCK kernel as default boot kernel
+          ansible.builtin.command: "grubby --set-default {{ oracle_linux_latest_kernel_image.stdout }}"
+          when:
+            - oracle_linux_kernel_flavor == "rhck"
+            - oracle_linux_default_kernel_before.stdout != oracle_linux_latest_kernel_image.stdout
+
+        - name: Determine Oracle Linux patch status
+          ansible.builtin.set_fact:
+            oracle_linux_latest_kernel_version: "{{ oracle_linux_latest_kernel_image.stdout | regex_replace('^/boot/vmlinuz-', '') }}"
+            oracle_linux_node_patched: "{{ oracle_linux_latest_kernel_image.stdout == '/boot/vmlinuz-' ~ ansible_kernel }}"
+            oracle_linux_reboot_required: "{{ oracle_linux_latest_kernel_image.stdout != '/boot/vmlinuz-' ~ ansible_kernel }}"
+
+    - name: Report Ubuntu upgrade result
+      ansible.builtin.debug:
+        msg:
+          - "Node patched: Yes"
+          - "algif_aead module was loaded: {{ ubuntu_algif_aead_loaded.rc == 0 }}"
+          - "algif_aead module unloaded: {{ ubuntu_algif_aead_unload.changed | default(false) }}"
+          - "Upgraded package: {{ ubuntu_kmod_package }}"
+          - "Reboot required: No"
+          - "Running kernel remains: {{ ansible_kernel }}"
+          - "Reboot required by OS: {{ ubuntu_reboot_required.stat.exists }}"
+      when:
+        - ansible_distribution == "Ubuntu"
+        - ubuntu_kmod_upgrade.changed | default(false)
+
+    - name: Report Ubuntu upgrade result
+      ansible.builtin.debug:
+        msg:
+          - "Node patched: Yes"
+          - "algif_aead module was loaded: {{ ubuntu_algif_aead_loaded.rc == 0 }}"
+          - "algif_aead module unloaded: {{ ubuntu_algif_aead_unload.changed | default(false) }}"
+          - "Latest available package already installed: {{ ubuntu_kmod_package }}"
+          - "Running kernel remains: {{ ansible_kernel }}"
+          - "Reboot required by OS: {{ ubuntu_reboot_required.stat.exists }}"
+      when:
+        - ansible_distribution == "Ubuntu"
+        - not (ubuntu_kmod_upgrade.changed | default(false))
+
+    - name: Report Oracle Linux upgrade result
+      ansible.builtin.debug:
+        msg:
+          - "Node patched: {{ oracle_linux_node_patched }}"
+          - "Detected running kernel: {{ oracle_linux_current_kernel.stdout }}"
+          - "Detected Oracle Linux kernel flavor: {{ oracle_linux_kernel_flavor }}"
+          - "Latest available kernel version: {{ oracle_linux_latest_kernel_version }}"
+          - "Upgraded kernel package: {{ oracle_linux_kernel_package }}"
+          - "Reboot required: {{ oracle_linux_reboot_required }}"
+          - "Running kernel remains until reboot: {{ ansible_kernel }}"
+      when:
+        - ansible_distribution in oracle_linux_distribution_names
+        - oracle_linux_kernel_upgrade.changed | default(false)
+
+    - name: Report Oracle Linux upgrade result
+      ansible.builtin.debug:
+        msg:
+          - "Node patched: {{ oracle_linux_node_patched }}"
+          - "Detected running kernel: {{ oracle_linux_current_kernel.stdout }}"
+          - "Detected Oracle Linux kernel flavor: {{ oracle_linux_kernel_flavor }}"
+          - "Latest available kernel version: {{ oracle_linux_latest_kernel_version }}"
+          - "Latest available kernel package already installed: {{ oracle_linux_kernel_package }}"
+          - "Reboot required: {{ oracle_linux_reboot_required }}"
+          - "Running kernel remains: {{ ansible_kernel }}"
+      when:
+        - ansible_distribution in oracle_linux_distribution_names
+        - not (oracle_linux_kernel_upgrade.changed | default(false))
