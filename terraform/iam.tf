@@ -11,7 +11,7 @@ data "oci_identity_dynamic_groups" "all" {
 }
 
 data "oci_identity_domains" "default" {
-  count          = local.lookup_identity_domain && var.identity_domain_id == null ? 1 : 0
+  count          = local.lookup_default_identity_domain ? 1 : 0
   compartment_id = var.tenancy_ocid
   display_name   = "Default"
   type           = "DEFAULT"
@@ -19,8 +19,8 @@ data "oci_identity_domains" "default" {
 }
 
 data "oci_identity_domain" "selected" {
-  count     = local.lookup_identity_domain ? 1 : 0
-  domain_id = coalesce(var.identity_domain_id, try(one(data.oci_identity_domains.default[0].domains[*].id), null))
+  count     = local.lookup_identity_domain_id ? 1 : 0
+  domain_id = local.selected_identity_domain_id
 }
 
 resource "random_string" "state_id" {
@@ -33,16 +33,29 @@ resource "random_string" "state_id" {
 
 
 locals {
-  dynamic_groups_list    = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
-  state_id               = random_string.state_id.id
-  service_account_name   = format("oke-%s-svcacct", local.state_id)
-  existing_dg_id         = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
-  should_create_dg       = var.create_dynamic_group && !var.use_existing_dynamic_group && local.existing_dg_id == null
-  lookup_identity_domain = var.create_policies || local.should_create_dg
-  use_identity_domain    = local.lookup_identity_domain
-  idcs_endpoint          = one(data.oci_identity_domain.selected[*].url)
+  dynamic_groups_list            = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
+  state_id                       = random_string.state_id.id
+  service_account_name           = format("oke-%s-svcacct", local.state_id)
+  existing_dg_id                 = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
+  should_create_dg               = var.create_dynamic_group && !var.use_existing_dynamic_group && local.existing_dg_id == null
+  lookup_identity_domain         = var.create_policies || local.should_create_dg
+  lookup_default_identity_domain = local.lookup_identity_domain && (var.use_default_identity_domain || var.identity_domain_id == null)
+  selected_identity_domain_id = try(
+    var.identity_domain_id != null ? var.identity_domain_id : one(data.oci_identity_domains.default[0].domains[*].id),
+    null
+  )
+  lookup_identity_domain_id = local.lookup_identity_domain && local.selected_identity_domain_id != null
+  idcs_endpoint = try(coalesce(
+    try(one(data.oci_identity_domain.selected[*].url), null),
+    try(one(data.oci_identity_domains.default[0].domains[*].url), null),
+  ), null)
 
-  domain_name = one(data.oci_identity_domain.selected[*].display_name)
+  # Some Oracle tenancies do not expose a default identity domain, or do not
+  # expose an IDCS endpoint for it. Fall back to the classic tenancy
+  # dynamic-group path in those cases.
+  use_identity_domain = local.lookup_identity_domain_id && local.idcs_endpoint != null
+
+  domain_name = try(one(data.oci_identity_domain.selected[*].display_name), null)
 
   group_name = coalesce(
     try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == local.existing_dg_id]), null),
