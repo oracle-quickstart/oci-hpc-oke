@@ -9,6 +9,7 @@ resource "kubectl_manifest" "nvidia_dcgm_exporter_service_monitor" {
   depends_on = [
     module.oke,
     helm_release.prometheus,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    data.oci_resourcemanager_private_endpoint_reachable_ip.oke,
+    oci_containerengine_addon.nvidia_gpu_operator,
   ]
 }
