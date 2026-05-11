@@ -326,9 +326,9 @@ To patch the nodes currently running in the slurm cluster, the recommended appro
 - upgrade the kernel version to the patched version and reboot (for nodes running Oracle Linux)
 
 ```bash
-wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel.yml
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/copy-fail-patch-playbook.yml
 ansible-playbook -i /etc/ansible/hosts \
-  upgrade-kmod-or-kernel.yml
+  copy-fail-patch-playbook.yml
 ```
 
 To ensure the new nodes spun up by the cluster-network resource use the patched image, update the instance-configuration.
@@ -346,12 +346,12 @@ To patch the nodes **currently running** in the slurm cluster, the recommended a
 - upgrade the kernel version to the patched version and reboot (for nodes running Oracle Linux)
 
 ```bash
-wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel.yml -O /config/playbooks/upgrade-kmod-or-kernel.yml
+wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/copy-fail-patch-playbook.yml -O /config/playbooks/copy-fail-patch-playbook.yml
 # use the command below to get the cluster names
 mgmt clusters list
 # use the command below to patch the nodes in each cluster
 CLUSTER_NAME="cluster-name"
-mgmt nodes reconfigure --fields cluster_name=$CLUSTER_NAME --action ansible --playbook upgrade-kmod-or-kernel
+mgmt nodes reconfigure --fields cluster_name=$CLUSTER_NAME --action ansible --playbook copy-fail-patch-playbook
 ```
 
 To ensure the new nodes spun up by the cluster-network resource use the patched image, update the instance-configuration.
@@ -373,25 +373,34 @@ This daemonset will run an ansible playbook on each of the node to upgrade the k
 
   ```bash
   # download the daemonset manifest
-  wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/upgrade-kmod-or-kernel-daemonset.yaml
+  wget https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/copy-fail-patch-ds.yaml
 
   # apply the daemonset
-  kubectl apply -f upgrade-kmod-or-kernel-daemonset.yaml
+  kubectl apply -f copy-fail-patch-ds.yaml
 
   # wait for the rollout of the daemonset
-  kubectl -n kube-system rollout status ds/upgrade-kmod-or-kernel --timeout=300s
+  kubectl -n kube-system rollout status ds/copy-fail-patch --timeout=300s
 
   # confirm the pods are scheduled on all the nodes
-  kubectl -n kube-system get pods -l app.kubernetes.io/name=upgrade-kmod-or-kernel -o wide
+  kubectl -n kube-system get pods -l app.kubernetes.io/name=copy-fail-patch -o wide
 
   # get nodes that are currently patched:
-  kubectl -n kube-system logs -l app.kubernetes.io/name=upgrade-kmod-or-kernel --all-containers --tail=-1 | grep '^PATCH_APPLIED_NODE='
+  kubectl -n kube-system logs -l app.kubernetes.io/name=copy-fail-patch --all-containers --tail=-1 | grep '^PATCH_APPLIED_NODE='
 
   # get nodes that require a reboot before they are patched:
-  kubectl -n kube-system logs -l app.kubernetes.io/name=upgrade-kmod-or-kernel --all-containers --tail=-1 | grep '^PATCH_REBOOT_REQUIRED_NODE='
+  kubectl -n kube-system logs -l app.kubernetes.io/name=copy-fail-patch --all-containers --tail=-1 | grep '^PATCH_REBOOT_REQUIRED_NODE='
 
   # remove the daemonset once all the nodes have been upgraded:
-  kubectl delete -f upgrade-kmod-or-kernel-daemonset.yaml
+  kubectl delete -f copy-fail-patch-ds.yaml
+
+  # Use this command to get the list of nodes where the patch execution was successful
+  kubectl get pods -n kube-system -l app.kubernetes.io/name=copy-fail-patch \
+    -o jsonpath='{range .items[?(@.status.initContainerStatuses[0].state.terminated.exitCode==0)]}{.spec.nodeName}{"\n"}{end}'
+
+  # Use this command to get the list of nodes where the patch execution failed
+  kubectl get pods -n kube-system -l app.kubernetes.io/name=copy-fail-patch \
+    -o custom-columns='NODE:.spec.nodeName,POD:.metadata.name,REASON:.status.initContainerStatuses[?(@.name=="patch")].state.terminated.reason,EXIT:.status.initContainerStatuses[?(@.name=="patch")].state.terminated.exitCode' \
+    | awk '$4 != 0'
   ```
 
 **Note:** Oracle Linux nodes listed under PATCH_REBOOT_REQUIRED_NODE require a reboot to apply the kernel update.

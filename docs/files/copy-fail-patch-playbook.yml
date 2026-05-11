@@ -1,8 +1,8 @@
 ---
-# Upgrade kmod on Ubuntu, or installed Oracle Linux kernel packages, without rebooting.
+# Copy fail patch playbook for Ubuntu and Oracle Linux.
 #
 # Usage:
-#   ansible-playbook -i inventory upgrade-kmod-or-kernel.yml
+#   ansible-playbook -i inventory copy-fail-patch-playbook.yml
 #
 # Notes:
 #   - Ubuntu: upgrades the kmod package, then unloads algif_aead when loaded.
@@ -11,7 +11,7 @@
 #       * upgrades kernel when the running kernel is RHCK
 #   - This play intentionally does not reboot hosts.
 
-- name: Upgrade kmod on Ubuntu or kernels on Oracle Linux
+- name: Copy fail patch for Ubuntu or Oracle Linux
   hosts: all
   become: true
   gather_facts: true

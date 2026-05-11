@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: upgrade-kmod-or-kernel
+  name: copy-fail-patch
   namespace: kube-system
 data:
   nsenter-shell: |
@@ -23,7 +23,7 @@ data:
     export ANSIBLE_LOCAL_TEMP="/tmp/ansible-local-${POD_NAME}"
     export ANSIBLE_REMOTE_TEMP="/tmp/ansible-remote-${POD_NAME}"
     export ANSIBLE_HOST_KEY_CHECKING=False
-    export PATCH_STATUS_FILE="/tmp/upgrade-kmod-or-kernel-${POD_NAME}.status"
+    export PATCH_STATUS_FILE="/tmp/copy-fail-patch-${POD_NAME}.status"
 
     command -v ansible-playbook >/dev/null
     command -v nsenter >/dev/null
@@ -42,26 +42,31 @@ data:
     if [[ "${host_os_id}" != "ubuntu" && "${host_os_name}" != "Ubuntu" && "${host_os_id}" != "ol" && "${host_os_name}" != Oracle\ Linux* ]]; then
       echo "no patch available"
       echo "Skipping node ${NODE_NAME}; host OS is ${host_os_name} (${host_os_id}), not Ubuntu or Oracle Linux."
-      sleep infinity
     fi
 
     cat > /tmp/inventory <<EOF
     localhost ansible_connection=local ansible_shell_executable=/runner/nsenter-shell ansible_python_interpreter=/usr/bin/python3 ansible_remote_tmp=${ANSIBLE_REMOTE_TEMP}
     EOF
 
-    ansible-playbook -i /tmp/inventory /runner/upgrade-kmod-or-kernel.yml
+    if ! ansible-playbook -i /tmp/inventory /runner/copy-fail-patch-playbook.yml; then
+      if [[ -s "${PATCH_STATUS_FILE}" ]]; then
+        cat "${PATCH_STATUS_FILE}"
+      fi
+      echo "Patch failed on ${NODE_NAME}; exiting with status 1."
+      exit 1
+    fi
+
     if [[ -s "${PATCH_STATUS_FILE}" ]]; then
       cat "${PATCH_STATUS_FILE}"
     fi
     echo "Patch completed successfully on ${NODE_NAME}; keeping pod running."
-    sleep infinity
 
-  upgrade-kmod-or-kernel.yml: |
+  copy-fail-patch-playbook.yml: |
     ---
     # Upgrade kmod on Ubuntu, or installed Oracle Linux kernel packages, without rebooting.
     #
     # Usage:
-    #   ansible-playbook -i inventory upgrade-kmod-or-kernel.yml
+    #   ansible-playbook -i inventory copy-fail-patch-playbook.yml
     #
     # Notes:
     #   - Ubuntu: upgrades the kmod package, then unloads algif_aead when loaded.
@@ -328,14 +333,14 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: upgrade-kmod-or-kernel
+  name: copy-fail-patch
   namespace: kube-system
   labels:
-    app.kubernetes.io/name: upgrade-kmod-or-kernel
+    app.kubernetes.io/name: copy-fail-patch
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: upgrade-kmod-or-kernel
+      app.kubernetes.io/name: copy-fail-patch
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -343,7 +348,7 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: upgrade-kmod-or-kernel
+        app.kubernetes.io/name: copy-fail-patch
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -358,14 +363,14 @@ spec:
       volumes:
         - name: runner
           configMap:
-            name: upgrade-kmod-or-kernel
+            name: copy-fail-patch
             defaultMode: 0755
         - name: host-tmp
           hostPath:
             path: /tmp
             type: Directory
-      containers:
-        - name: upgrade-kmod-or-kernel
+      initContainers:
+        - name: patch
           image: quay.io/ansible/ansible-runner:latest
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "/runner/runner.sh"]
@@ -387,3 +392,6 @@ spec:
               readOnly: true
             - name: host-tmp
               mountPath: /tmp
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10

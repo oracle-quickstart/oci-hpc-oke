@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dirty-frag-patch
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: dirty-frag-patch
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  template:
+    metadata:
+      labels:
+        app: dirty-frag-patch
+    spec:
+      automountServiceAccountToken: false
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - operator: Exists
+      initContainers:
+        - name: patch
+          image: docker.io/busybox:latest
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              printf 'install esp4 /bin/false\ninstall esp6 /bin/false\ninstall rxrpc /bin/false\n' > /host/etc/modprobe.d/dirtyfrag.conf
+              rmmod esp4 esp6 rxrpc || { echo "Vulnerable Kernel modules can't be unloaded" ; exit 1; }
+              echo 3 > /proc/sys/vm/drop_caches
+              echo "Dirty-frag mitigation applied"
+          volumeMounts:
+            - name: host-modprobed
+              mountPath: /host/etc/modprobe.d
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+      volumes:
+        - name: host-modprobed
+          hostPath:
+            path: /etc/modprobe.d
+            type: DirectoryOrCreate
+
