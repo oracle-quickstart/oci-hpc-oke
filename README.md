@@ -166,6 +166,30 @@ Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
 > [!NOTE]
 > Starting with stack v26.3.0, Kueue and MPI Operator are deployed by default.
 
+## Optional: Deploy Slurm Operator Full Suite
+
+The Terraform stack can also deploy a Slurm-on-OKE environment with Slinky:
+
+- Slinky Slurm Operator and a Slurm cluster
+- HA OpenLDAP in Kubernetes with one writable primary and read-only replicas
+- SSSD/NSS integration for the controller, login pod, and worker pods
+- FSS-backed `/home` through the `fss-pv` PersistentVolume
+- MariaDB-backed Slurm accounting
+- A LoadBalancer-backed login pod
+- A shape-specific worker nodeset using `AutoDetect=rsmi` for AMD GPU shapes and `AutoDetect=nvml` for NVIDIA GPU shapes
+
+Enable it with:
+
+```hcl
+create_bastion       = true
+create_operator      = true
+create_fss           = true
+worker_rdma_enabled  = true
+install_slinky       = true
+```
+
+The full-suite deployment currently runs from the operator host so it can perform the ordered Helm, Kubernetes, and LDAP post-configuration steps. For non-disposable deployments, override the OpenLDAP passwords before applying. Create Slurm users, home directories, SSH keys, and accounting associations manually after deployment.
+
 ### Deploy MPI Operator and Kueue
 
 ```sh

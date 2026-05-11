@@ -52,10 +52,25 @@ locals {
 
   # FSS PV cannot be created when all deploy paths are inactive (private endpoint, no operator, no ORM)
   fss_pv_unreachable = alltrue([
-    var.create_fss,
+    local.create_fss_effective,
     !local.deploy_from_local,
     !local.deploy_from_orm,
     !local.deploy_from_operator,
+  ])
+
+  invalid_slinky_deploy_path = alltrue([
+    var.install_slinky,
+    !local.slinky_deploy_from_operator,
+  ])
+  invalid_slinky_workers = alltrue([
+    var.install_slinky,
+    !var.worker_rdma_enabled,
+    !var.worker_gpu_enabled,
+  ])
+  invalid_slinky_openldap_topology = alltrue([
+    var.install_slinky,
+    var.slinky_identity_enabled,
+    var.slinky_openldap_primary_replicas != 1,
   ])
 
   # Check if the ssh_public_key has comment
@@ -208,6 +223,39 @@ resource "null_resource" "warn_fss_pv_unreachable" {
     precondition {
       condition     = !local.fss_pv_unreachable
       error_message = "create_fss=true but the Kubernetes API server is unreachable from this context (private endpoint, no operator, no ORM private endpoint). The FSS PersistentVolume will not be created. To resolve: enable the operator (create_operator=true with create_bastion=true), use a public control plane endpoint, or enable deploy_to_oke_from_orm=true when deploying via ORM."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_deploy_path" {
+  count = local.invalid_slinky_deploy_path ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_deploy_path
+      error_message = "install_slinky=true currently deploys the full Slurm suite from the operator host. Please set create_bastion=true, create_operator=true, and deploy_to_oke_from_orm=false."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_workers" {
+  count = local.invalid_slinky_workers ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_workers
+      error_message = "install_slinky=true requires either worker_rdma_enabled=true or worker_gpu_enabled=true so the stack can create a shape-specific Slurm worker nodeset."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_openldap_topology" {
+  count = local.invalid_slinky_openldap_topology ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_openldap_topology
+      error_message = "The bundled HA OpenLDAP topology supports exactly one writable primary plus read replicas. Keep slinky_openldap_primary_replicas=1."
     }
   }
 }

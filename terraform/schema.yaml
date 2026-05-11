@@ -273,6 +273,48 @@ variableGroups:
       - worker_gmc_scale_is_upsize_enabled
       - worker_gmc_scale_is_downsize_enabled
 
+  - title: "Slurm Operator"
+    variables:
+      - install_slinky
+      - slinky_advanced_options
+      - slinky_install_slurm_cluster
+      - slinky_identity_enabled
+      - slinky_home_enabled
+      - slinky_home_pv_name
+      - slinky_home_pvc_size
+      - slinky_accounting_enabled
+      - slinky_openldap_namespace
+      - slinky_openldap_domain
+      - slinky_openldap_base_dn
+      - slinky_slurm_namespace
+      - slinky_operator_namespace
+      - slinky_login_enabled
+      - slinky_worker_host_network
+      - slinky_worker_mount_infiniband
+      - slinky_worker_ssh_enabled
+      - slinky_worker_replicas
+      - slinky_gpus_per_node
+      - slinky_gpu_autodetect
+      - slinky_worker_image_repository
+      - slinky_worker_image_tag
+      - slinky_operator_chart_version
+      - slinky_slurm_chart_version
+      - slinky_operator_cert_manager_enabled
+      - slinky_operator_values_override
+      - slinky_slurm_values_override
+      - slinky_openldap_chart_version
+      - slinky_openldap_admin_password
+      - slinky_openldap_config_password
+      - slinky_openldap_primary_replicas
+      - slinky_openldap_readonly_replicas
+      - slinky_openldap_storage_size
+      - slinky_mariadb_storage_size
+      - slinky_controller_image_repository
+      - slinky_controller_image_tag
+      - slinky_sssd_image_repository
+      - slinky_sssd_image_tag
+      - slinky_nodeset_name
+
   - title: "Storage"
     variables:
     - nvme_raid_enabled
@@ -1159,7 +1201,7 @@ variables:
   # Storage
   create_fss:
     title: Create a File Storage Service (FSS) file system
-    description: Provision a shared File Storage Service (FSS) file system, mount target, and a Persistent Volume.
+    description: Provision a shared File Storage Service (FSS) file system, mount target, and PersistentVolume. This is also enabled automatically when Slurm Operator full suite uses the default FSS-backed home directory.
     type: boolean
     default: false
     required: true
@@ -2308,6 +2350,345 @@ variables:
     default: "0.4.0"
     visible: false
 
+  # Slinky / Slurm Operator
+  install_slinky:
+    title: Install Slurm Operator full suite
+    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, login service, and a shape-specific GPU worker nodeset."
+    type: boolean
+    default: false
+    visible:
+      or:
+        - ${worker_rdma_enabled}
+        - ${worker_gpu_enabled}
+  slinky_advanced_options:
+    title: Advanced options
+    type: boolean
+    default: false
+    required: false
+    visible: ${install_slinky}
+  slinky_install_slurm_cluster:
+    title: Install Slurm cluster
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_identity_enabled:
+    title: Enable HA OpenLDAP and SSSD
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_home_enabled:
+    title: Enable FSS-backed Slurm home directories
+    description: "Creates a slurm-home PVC bound to the PersistentVolume named by slinky_home_pv_name. Enable create_fss to let the stack create fss-pv."
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_home_pv_name:
+    title: Slurm home PersistentVolume name
+    type: string
+    default: "fss-pv"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_home_enabled}
+  slinky_home_pvc_size:
+    title: Slurm home PVC size
+    type: string
+    default: "50Gi"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_home_enabled}
+  slinky_accounting_enabled:
+    title: Enable Slurm accounting
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_openldap_namespace:
+    title: OpenLDAP namespace
+    type: string
+    default: "identity"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_domain:
+    title: LDAP domain
+    type: string
+    default: "example.org"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_base_dn:
+    title: LDAP base DN
+    type: string
+    default: "dc=example,dc=org"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_slurm_namespace:
+    title: Slurm namespace
+    type: string
+    default: "slurm"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_operator_namespace:
+    title: Slinky operator namespace
+    type: string
+    default: "slinky"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_login_enabled:
+    title: Enable Slurm login service
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_host_network:
+    title: Run Slurm workers with hostNetwork
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_mount_infiniband:
+    title: Mount /dev/infiniband into Slurm workers
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_ssh_enabled:
+    title: Enable SSH on Slurm workers
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_replicas:
+    title: Slurm worker replicas
+    description: "Defaults to the selected GPU/RDMA worker pool size."
+    type: integer
+    required: false
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_gpus_per_node:
+    title: GPUs per Slurm worker
+    description: "Defaults to the final numeric component of the selected GPU shape."
+    type: integer
+    required: false
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_gpu_autodetect:
+    title: Slurm GPU AutoDetect
+    description: "Use auto to select rsmi for AMD shapes and nvml for NVIDIA shapes."
+    type: enum
+    enum:
+      - auto
+      - rsmi
+      - nvml
+      - nvidia
+      - off
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_image_repository:
+    title: Slurm worker image repository
+    type: string
+    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_worker_image_tag:
+    title: Slurm worker image tag
+    description: "Use auto to select the tested NVIDIA NCCL or AMD RCCL image for the selected worker shape."
+    type: string
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_operator_chart_version:
+    title: Slinky operator chart version
+    type: string
+    default: "1.1.0"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_slurm_chart_version:
+    title: Slinky Slurm chart version
+    type: string
+    default: "1.1.0"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_operator_cert_manager_enabled:
+    title: Use cert-manager for Slinky webhook certificate
+    type: boolean
+    default: false
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_operator_values_override:
+    title: Slinky operator values override
+    type: string
+    multiline: true
+    default: ""
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_slurm_values_override:
+    title: Slinky Slurm values override
+    type: string
+    multiline: true
+    default: ""
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_openldap_chart_version:
+    title: OpenLDAP chart version
+    type: string
+    default: "4.3.3"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_admin_password:
+    title: OpenLDAP admin password
+    type: password
+    default: "adminpassword"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_config_password:
+    title: OpenLDAP config password
+    type: password
+    default: "configpassword"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_primary_replicas:
+    title: OpenLDAP writable primary replicas
+    type: integer
+    default: 1
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_readonly_replicas:
+    title: OpenLDAP read-only replicas
+    type: integer
+    default: 2
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_openldap_storage_size:
+    title: OpenLDAP storage size
+    type: string
+    default: "8Gi"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_mariadb_storage_size:
+    title: MariaDB storage size
+    type: string
+    default: "16Gi"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_accounting_enabled}
+  slinky_controller_image_repository:
+    title: Slurm controller image repository
+    type: string
+    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_controller_image_tag:
+    title: Slurm controller image tag
+    type: string
+    default: "slurmctld-pmix-sssd-nss-25.11-ubuntu24.04"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_sssd_image_repository:
+    title: SSSD sidecar image repository
+    type: string
+    default: "ghcr.io/slinkyproject/login"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_sssd_image_tag:
+    title: SSSD sidecar image tag
+    type: string
+    default: "25.11-ubuntu24.04"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_identity_enabled}
+  slinky_nodeset_name:
+    title: Slurm worker nodeset name
+    type: string
+    default: "gpu"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils

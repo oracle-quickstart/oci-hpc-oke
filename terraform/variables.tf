@@ -885,6 +885,243 @@ variable "kueue_local_queue_default_namespace" {
   description = "The namespace where the Kueue LocalQueue will be created."
 }
 
+# Slinky / Slurm Operator
+variable "install_slinky" {
+  default     = false
+  type        = bool
+  description = "Install Slinky Slurm Operator and, by default, a Slurm cluster targeting the GPU worker pool."
+}
+
+variable "slinky_advanced_options" {
+  default     = false
+  type        = bool
+  description = "Show advanced Slinky Slurm Operator configuration fields in OCI Resource Manager."
+}
+
+variable "slinky_install_slurm_cluster" {
+  default     = true
+  type        = bool
+  description = "Install the Slinky Slurm Helm chart after the Slinky operator is ready."
+}
+
+variable "slinky_operator_namespace" {
+  default     = "slinky"
+  type        = string
+  description = "Kubernetes namespace for the Slinky operator and webhook."
+}
+
+variable "slinky_slurm_namespace" {
+  default     = "slurm"
+  type        = string
+  description = "Kubernetes namespace for the Slurm cluster resources."
+}
+
+variable "slinky_operator_chart_version" {
+  default     = "1.1.0"
+  type        = string
+  description = "Slinky slurm-operator Helm chart version."
+}
+
+variable "slinky_slurm_chart_version" {
+  default     = "1.1.0"
+  type        = string
+  description = "Slinky slurm Helm chart version."
+}
+
+variable "slinky_operator_cert_manager_enabled" {
+  default     = false
+  type        = bool
+  description = "Use cert-manager to issue the Slinky webhook certificate. When false, the Slinky chart generates a self-signed webhook certificate."
+}
+
+variable "slinky_operator_values_override" {
+  default     = ""
+  type        = string
+  description = "Additional YAML values merged into the Slinky operator Helm release after the generated values."
+}
+
+variable "slinky_slurm_values_override" {
+  default     = ""
+  type        = string
+  description = "Additional YAML values merged into the Slinky Slurm Helm release after the generated OKE values."
+}
+
+variable "slinky_login_enabled" {
+  default     = true
+  type        = bool
+  description = "Enable a Slinky LoginSet with a LoadBalancer service. The stack SSH public key is used for root access when provided."
+}
+
+variable "slinky_worker_host_network" {
+  default     = true
+  type        = bool
+  description = "Run Slinky slurmd pods with hostNetwork. This is the default for OKE bare-metal GPU/RDMA shapes."
+}
+
+variable "slinky_worker_mount_infiniband" {
+  default     = true
+  type        = bool
+  description = "Mount /dev/infiniband into Slinky slurmd pods."
+}
+
+variable "slinky_worker_ssh_enabled" {
+  default     = true
+  type        = bool
+  description = "Enable sshd in Slinky slurmd pods. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
+}
+
+variable "slinky_worker_replicas" {
+  default     = null
+  type        = number
+  description = "Number of Slinky slurmd replicas. Defaults to the enabled GPU/RDMA worker pool size."
+}
+
+variable "slinky_gpus_per_node" {
+  default     = null
+  type        = number
+  description = "GPUs per Slinky slurmd pod. Defaults to the final numeric component of the selected GPU worker shape."
+}
+
+variable "slinky_worker_image_repository" {
+  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  type        = string
+  description = "Container image repository for Slinky slurmd pods."
+}
+
+variable "slinky_worker_image_tag" {
+  default     = "auto"
+  type        = string
+  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested NVIDIA NCCL or AMD RCCL image for the selected worker shape."
+}
+
+variable "slinky_gpu_autodetect" {
+  default     = "auto"
+  type        = string
+  description = "Slurm gres.conf AutoDetect value. Use auto to select rsmi for AMD GPU shapes and nvml for NVIDIA GPU shapes."
+}
+
+variable "slinky_identity_enabled" {
+  default     = true
+  type        = bool
+  description = "Deploy in-cluster HA OpenLDAP and configure SSSD/NSS integration for Slurm controller, login, and worker pods."
+}
+
+variable "slinky_home_enabled" {
+  default     = true
+  type        = bool
+  description = "Create a Slurm /home PVC bound to an FSS PersistentVolume and mount it into login and worker pods."
+}
+
+variable "slinky_home_pv_name" {
+  default     = "fss-pv"
+  type        = string
+  description = "PersistentVolume name used by the Slurm home PVC. The stack creates fss-pv when create_fss=true."
+}
+
+variable "slinky_home_pvc_size" {
+  default     = "50Gi"
+  type        = string
+  description = "Requested size for the Slurm home PVC."
+}
+
+variable "slinky_accounting_enabled" {
+  default     = true
+  type        = bool
+  description = "Deploy MariaDB Operator and a MariaDB instance for SlurmDBD accounting."
+}
+
+variable "slinky_openldap_namespace" {
+  default     = "identity"
+  type        = string
+  description = "Kubernetes namespace for HA OpenLDAP."
+}
+
+variable "slinky_openldap_chart_version" {
+  default     = "4.3.3"
+  type        = string
+  description = "helm-openldap/openldap-stack-ha chart version."
+}
+
+variable "slinky_openldap_domain" {
+  default     = "example.org"
+  type        = string
+  description = "LDAP DNS domain used by the bundled OpenLDAP deployment."
+}
+
+variable "slinky_openldap_base_dn" {
+  default     = "dc=example,dc=org"
+  type        = string
+  description = "LDAP base DN used by SSSD and the bundled OpenLDAP deployment."
+}
+
+variable "slinky_openldap_admin_password" {
+  default     = "adminpassword"
+  type        = string
+  description = "OpenLDAP admin password. Override this for non-disposable deployments."
+  sensitive   = true
+}
+
+variable "slinky_openldap_config_password" {
+  default     = "configpassword"
+  type        = string
+  description = "OpenLDAP cn=config admin password. Override this for non-disposable deployments."
+  sensitive   = true
+}
+
+variable "slinky_openldap_primary_replicas" {
+  default     = 1
+  type        = number
+  description = "Number of writable OpenLDAP primary replicas. Keep this at 1 for single writable primary topology."
+}
+
+variable "slinky_openldap_readonly_replicas" {
+  default     = 2
+  type        = number
+  description = "Number of read-only OpenLDAP replicas."
+}
+
+variable "slinky_openldap_storage_size" {
+  default     = "8Gi"
+  type        = string
+  description = "Persistent storage size for each OpenLDAP pod."
+}
+
+variable "slinky_mariadb_storage_size" {
+  default     = "16Gi"
+  type        = string
+  description = "Persistent storage size for the Slurm accounting MariaDB instance."
+}
+
+variable "slinky_controller_image_repository" {
+  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  type        = string
+  description = "Container image repository for the Slurm controller pod."
+}
+
+variable "slinky_controller_image_tag" {
+  default     = "slurmctld-pmix-sssd-nss-25.11-ubuntu24.04"
+  type        = string
+  description = "Container image tag for the Slurm controller pod. The full-suite default includes SSSD/NSS support."
+}
+
+variable "slinky_sssd_image_repository" {
+  default     = "ghcr.io/slinkyproject/login"
+  type        = string
+  description = "Container image repository used for the SSSD sidecar."
+}
+
+variable "slinky_sssd_image_tag" {
+  default     = "25.11-ubuntu24.04"
+  type        = string
+  description = "Container image tag used for the SSSD sidecar."
+}
+
+variable "slinky_nodeset_name" {
+  default     = "gpu"
+  type        = string
+  description = "Slinky nodeset name used for the shape-specific Slurm worker pool."
+}
+
 # OCI HPC OKE Utils
 variable "install_oci_hpc_oke_utils" {
   default     = true

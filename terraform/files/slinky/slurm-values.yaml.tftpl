@@ -1,0 +1,311 @@
+clusterName: ${cluster_name}
+
+%{ if identity_enabled ~}
+sssd:
+  secretRef:
+    name: site-sssd-ha-ldap-conf
+    key: sssd.conf
+
+%{ endif ~}
+controller:
+%{ if identity_enabled ~}
+  slurmctld:
+    image:
+      repository: ${controller_image_repository}
+      tag: ${controller_image_tag}
+    volumeMounts:
+      - name: sssd-state
+        mountPath: /var/lib/sss
+      - name: sssd-run
+        mountPath: /run/sssd
+%{ endif ~}
+  persistence:
+    enabled: true
+    storageClassName: oci-bv
+    resources:
+      requests:
+        storage: 10Gi
+  extraConfMap:
+    GresTypes: gpu
+    SelectType: select/cons_tres
+    SelectTypeParameters: CR_CORE_MEMORY
+    PropagateResourceLimitsExcept: MEMLOCK
+%{ if accounting_enabled ~}
+    AccountingStorageEnforce: associations,limits,qos
+    AccountingStorageTRES: gres/gpu
+%{ endif ~}
+  podSpec:
+    nodeSelector:
+      node.kubernetes.io/instance-type: ${system_node_shape}
+%{ if identity_enabled ~}
+    securityContext:
+      runAsNonRoot: false
+      fsGroup: 401
+    volumes:
+      - name: sssd-conf
+        secret:
+          secretName: site-sssd-ha-ldap-conf
+          defaultMode: 0600
+          items:
+            - key: sssd.conf
+              path: sssd.conf
+              mode: 0600
+      - name: ldap-ca
+        secret:
+          secretName: openldap-ca
+          items:
+            - key: ca.crt
+              path: ca.crt
+      - name: sssd-state
+        emptyDir: {}
+      - name: sssd-run
+        emptyDir: {}
+      - name: sssd-log
+        emptyDir: {}
+    containers:
+      - name: sssd
+        image: ${sssd_image_repository}:${sssd_image_tag}
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/bash
+          - -lc
+        args:
+          - |
+            set -euo pipefail
+            install -d -m 0700 /etc/sssd
+            install -o root -g root -m 0600 /etc/sssd-secret/sssd.conf /etc/sssd/sssd.conf
+            install -d -m 0755 /var/lib/sss
+            install -d -m 0700 /var/lib/sss/db /var/lib/sss/keytabs /var/lib/sss/secrets
+            install -d -m 0751 /var/lib/sss/deskprofile
+            install -d -m 0755 /var/lib/sss/gpo_cache /var/lib/sss/pipes /var/lib/sss/pubconf /var/lib/sss/pubconf/krb5.include.d /run/sssd
+            install -d -m 0750 /var/lib/sss/pipes/private /var/log/sssd
+            install -d -m 0775 /var/lib/sss/mc
+            chown -R root:root /var/lib/sss /run/sssd /var/log/sssd
+            chmod 0755 /var/lib/sss /var/lib/sss/gpo_cache /var/lib/sss/pipes /var/lib/sss/pubconf /var/lib/sss/pubconf/krb5.include.d /run/sssd
+            chmod 0700 /var/lib/sss/db /var/lib/sss/keytabs /var/lib/sss/secrets
+            chmod 0751 /var/lib/sss/deskprofile
+            chmod 0750 /var/lib/sss/pipes/private /var/log/sssd
+            chmod 0775 /var/lib/sss/mc
+            rm -f /var/lib/sss/pipes/nss /var/lib/sss/pipes/pam /var/lib/sss/pipes/ssh
+            rm -f /var/lib/sss/pipes/private/* /run/sssd.pid /run/sssd/*.pid
+            exec /usr/sbin/sssd -i
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: false
+        volumeMounts:
+          - name: sssd-conf
+            mountPath: /etc/sssd-secret
+            readOnly: true
+          - name: ldap-ca
+            mountPath: /etc/sssd/ca
+            readOnly: true
+          - name: sssd-state
+            mountPath: /var/lib/sss
+          - name: sssd-run
+            mountPath: /run/sssd
+          - name: sssd-log
+            mountPath: /var/log/sssd
+%{ endif ~}
+
+configFiles:
+  gres.conf: |
+    AutoDetect=${gpu_autodetect}
+  cgroup.conf: |
+    CgroupPlugin=cgroup/v2
+    IgnoreSystemd=yes
+    ConstrainCores=yes
+    ConstrainRAMSpace=no
+    ConstrainDevices=yes
+    ConstrainSwapSpace=no
+
+restapi:
+  replicas: 1
+  podSpec:
+    nodeSelector:
+      node.kubernetes.io/instance-type: ${system_node_shape}
+
+loginsets:
+  slinky:
+    enabled: ${login_enabled}
+    replicas: 1
+    rootSshAuthorizedKeys: ${login_root_ssh_authorized_keys}
+%{ if identity_enabled ~}
+    extraSshdConfig: |
+      AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+      AuthorizedKeysCommandUser nobody
+      AuthorizedKeysFile none
+      PasswordAuthentication no
+%{ endif ~}
+    login:
+      volumeMounts:
+%{ if home_enabled ~}
+        - name: home
+          mountPath: /home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          mountPath: /etc/sssd/ca
+          readOnly: true
+%{ endif ~}
+    podSpec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: ${system_node_shape}
+      volumes:
+%{ if home_enabled ~}
+        - name: home
+          persistentVolumeClaim:
+            claimName: slurm-home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          secret:
+            secretName: openldap-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+%{ endif ~}
+    service:
+      spec:
+        type: LoadBalancer
+
+nodesets:
+  slinky:
+    enabled: false
+
+  ${nodeset_name}:
+    enabled: true
+    scalingMode: StatefulSet
+    replicas: ${worker_replicas}
+    useResourceLimits: false
+    slurmd:
+      image:
+        repository: ${worker_image_repository}
+        tag: ${worker_image_tag}
+      args:
+        - -N
+        - $(KUBE_NODE_NAME)
+      env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+      resources:
+        limits:
+          ${gpu_resource}: ${gpus_per_node}
+        requests:
+          ${gpu_resource}: ${gpus_per_node}
+      volumeMounts:
+%{ if mount_infiniband ~}
+        - name: devinf
+          mountPath: /dev/infiniband
+%{ endif ~}
+        - name: shm
+          mountPath: /dev/shm
+%{ if home_enabled ~}
+        - name: home
+          mountPath: /home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          mountPath: /etc/sssd/ca
+          readOnly: true
+%{ endif ~}
+    logfile:
+      image:
+        repository: docker.io/library/alpine
+        tag: latest
+    ssh:
+      enabled: ${worker_ssh_enabled}
+%{ if worker_host_network ~}
+      extraSshdConfig: |
+        Port 2222
+%{ endif ~}
+    extraConfMap:
+      Gres:
+        - gpu:${gpus_per_node}
+      Features:
+${worker_features_yaml}
+      Weight: 1
+    partition:
+      enabled: true
+      configMap:
+        State: UP
+        Default: "YES"
+        MaxTime: UNLIMITED
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 25%
+    podSpec:
+%{ if worker_host_network ~}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+%{ endif ~}
+      nodeSelector:
+        node.kubernetes.io/instance-type: ${worker_shape}
+      tolerations:
+        - key: ${gpu_resource}
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+%{ if mount_infiniband ~}
+        - name: devinf
+          hostPath:
+            path: /dev/infiniband
+%{ endif ~}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi
+%{ if home_enabled ~}
+        - name: home
+          persistentVolumeClaim:
+            claimName: slurm-home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          secret:
+            secretName: openldap-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+%{ endif ~}
+
+partitions:
+  all:
+    enabled: true
+    nodesets:
+      - ALL
+    configMap:
+      State: UP
+      MaxTime: UNLIMITED
+
+accounting:
+  enabled: ${accounting_enabled}
+%{ if accounting_enabled ~}
+  storageConfig:
+    host: mariadb
+    port: 3306
+    database: slurm_acct_db
+    username: slurm
+    passwordKeyRef:
+      name: mariadb-password
+      key: password
+  podSpec:
+    nodeSelector:
+      node.kubernetes.io/instance-type: ${system_node_shape}
+%{ endif ~}
+
+vendor:
+  nvidia:
+    dcgm:
+      enabled: false

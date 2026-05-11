@@ -158,6 +158,10 @@ output "grafana_admin_username" {
   value = "admin"
 }
 
+output "slinky_login_fetch_ip_command" {
+  value = var.install_slinky ? format("kubectl -n %s get svc slurm-login-slinky -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", var.slinky_slurm_namespace) : "N/A"
+}
+
 output "prom_server_port_forward" {
   value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
 }

@@ -37,7 +37,7 @@ locals {
     var.nvme_raid_level,
   ) : ""
 
-  runcmd_fss_mount = var.create_fss && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
+  runcmd_fss_mount = local.create_fss_effective && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
     "curl -sL -o /var/run/oke-fss-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-fss-mount.sh && (bash /var/run/oke-fss-mount.sh '%v' '%v' '%v' || echo 'Error mounting FSS' >&2)",
     local.fss_export_path, var.fss_mount_path, local.fss_mount_ip
   ) : ""

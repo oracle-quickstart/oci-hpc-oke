@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH=/home/${operator_user}/bin:/usr/local/bin:$PATH
+export OCI_CLI_AUTH=instance_principal
+
+WORKDIR="$(cd "$(dirname "$0")" && pwd)"
+
+IDENTITY_ENABLED="${identity_enabled}"
+HOME_ENABLED="${home_enabled}"
+ACCOUNTING_ENABLED="${accounting_enabled}"
+INSTALL_SLURM_CLUSTER="${install_slurm_cluster}"
+LOGIN_ENABLED="${login_enabled}"
+
+SLINKY_OPERATOR_NAMESPACE="${slinky_operator_namespace}"
+SLURM_NAMESPACE="${slurm_namespace}"
+OPENLDAP_NAMESPACE="${openldap_namespace}"
+OPENLDAP_READONLY_REPLICAS="${openldap_readonly_replicas}"
+OPENLDAP_ADMIN_PASSWORD="${openldap_admin_password}"
+OPENLDAP_CONFIG_PASSWORD="${openldap_config_password}"
+OPENLDAP_BASE_DN="${openldap_base_dn}"
+OPENLDAP_DC="${openldap_dc}"
+NODESET_NAME="${nodeset_name}"
+
+echo "== Wait for kubeconfig, kubectl, and helm =="
+for i in $(seq 1 30); do
+  if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then
+    echo "Kubeconfig is ready"
+    break
+  fi
+  echo "Waiting for kubeconfig... ($i/30)"
+  sleep 10
+done
+if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then
+  echo "ERROR: kubeconfig is not available"
+  exit 1
+fi
+for i in $(seq 1 30); do
+  if command -v helm >/dev/null 2>&1; then
+    echo "Helm is ready"
+    break
+  fi
+  echo "Waiting for helm... ($i/30)"
+  sleep 10
+done
+if ! command -v helm >/dev/null 2>&1; then
+  echo "ERROR: helm is not available"
+  exit 1
+fi
+
+kubectl create namespace "$SLURM_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+if [ "$IDENTITY_ENABLED" = "true" ]; then
+  echo "== Deploy cert-manager for OpenLDAP certificates =="
+  if helm status cert-manager --namespace cert-manager >/dev/null 2>&1; then
+    echo "cert-manager is already installed"
+  else
+    helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+      --namespace cert-manager \
+      --create-namespace \
+      --version "${cert_manager_chart_version}" \
+      --set crds.enabled=true \
+      --set crds.keep=false \
+      --wait \
+      --timeout 300s \
+      --history-max 1
+  fi
+
+  echo "== Deploy HA OpenLDAP prerequisites and SSSD configuration =="
+  kubectl apply -f "$WORKDIR/openldap-prereqs.yaml"
+  kubectl -n "$OPENLDAP_NAMESPACE" wait --for=condition=Ready certificate/openldap-tls --timeout=300s
+
+  echo "== Deploy HA OpenLDAP =="
+  helm repo add helm-openldap https://jp-gouin.github.io/helm-openldap/ --force-update
+  helm repo update helm-openldap
+  helm upgrade --install openldap helm-openldap/openldap-stack-ha \
+    --version "${openldap_chart_version}" \
+    --namespace "$OPENLDAP_NAMESPACE" \
+    --create-namespace \
+    -f "$WORKDIR/openldap-values.yaml" \
+    --wait \
+    --timeout 600s \
+    --history-max 1
+  kubectl -n "$OPENLDAP_NAMESPACE" rollout status statefulset/openldap --timeout=600s
+  if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
+    kubectl -n "$OPENLDAP_NAMESPACE" rollout status statefulset/openldap-readonly --timeout=600s
+  fi
+
+  echo "== Apply OpenLDAP TLS cn=config settings =="
+  kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapmodify \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+    < "$WORKDIR/openldap-tls-config.ldif"
+  if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
+    for i in $(seq 0 $((OPENLDAP_READONLY_REPLICAS - 1))); do
+      kubectl -n "$OPENLDAP_NAMESPACE" exec -i "openldap-readonly-$i" -- \
+        /opt/bitnami/openldap/bin/ldapmodify \
+          -x -H ldap://127.0.0.1:1389 \
+          -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+        < "$WORKDIR/openldap-tls-config.ldif"
+    done
+  fi
+
+  echo "== Ensure primary syncprov overlay exists =="
+  if kubectl -n "$OPENLDAP_NAMESPACE" exec openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapsearch \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+      -b olcDatabase={2}mdb,cn=config \
+      olcOverlay=syncprov dn | grep -q '^dn:'; then
+    echo "syncprov already present"
+  else
+    kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+      /opt/bitnami/openldap/bin/ldapadd \
+        -x -H ldap://127.0.0.1:1389 \
+        -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+      < "$WORKDIR/openldap-primary-syncprov.ldif"
+  fi
+
+  ldapsearch_primary() {
+    kubectl -n "$OPENLDAP_NAMESPACE" exec openldap-0 -- \
+      /opt/bitnami/openldap/bin/ldapsearch \
+        -x -H ldap://127.0.0.1:1389 \
+        -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD" "$@"
+  }
+
+  ldapadd_primary() {
+    kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+      /opt/bitnami/openldap/bin/ldapadd \
+        -x -H ldap://127.0.0.1:1389 \
+        -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD"
+  }
+
+  ldapmodify_primary() {
+    kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+      /opt/bitnami/openldap/bin/ldapmodify \
+        -x -H ldap://127.0.0.1:1389 \
+        -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD"
+  }
+
+  ldap_entry_exists() {
+    ldapsearch_primary -b "$1" -s base dn >/dev/null 2>&1
+  }
+
+  echo "== Ensure LDAP base tree exists =="
+  if ! ldap_entry_exists "$OPENLDAP_BASE_DN"; then
+    printf "%s\n" \
+      "dn: $OPENLDAP_BASE_DN" \
+      "objectClass: top" \
+      "objectClass: dcObject" \
+      "objectClass: organization" \
+      "o: Slurm" \
+      "dc: $OPENLDAP_DC" | ldapadd_primary
+  fi
+  if ! ldap_entry_exists "ou=People,$OPENLDAP_BASE_DN"; then
+    printf "%s\n" \
+      "dn: ou=People,$OPENLDAP_BASE_DN" \
+      "objectClass: organizationalUnit" \
+      "ou: People" | ldapadd_primary
+  fi
+  if ! ldap_entry_exists "ou=Groups,$OPENLDAP_BASE_DN"; then
+    printf "%s\n" \
+      "dn: ou=Groups,$OPENLDAP_BASE_DN" \
+      "objectClass: organizationalUnit" \
+      "ou: Groups" | ldapadd_primary
+  fi
+
+  echo "== Copy OpenLDAP CA into the Slurm namespace =="
+  CRT="$(kubectl -n "$OPENLDAP_NAMESPACE" get secret openldap-tls -o jsonpath='{.data.ca\.crt}')"
+  if [ -z "$CRT" ]; then
+    CRT="$(kubectl -n "$OPENLDAP_NAMESPACE" get secret openldap-ca-root -o jsonpath='{.data.tls\.crt}')"
+  fi
+  kubectl -n "$SLURM_NAMESPACE" create secret generic openldap-ca \
+    --from-literal=ca.crt="$(printf '%s' "$CRT" | base64 -d)" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
+if [ "$HOME_ENABLED" = "true" ]; then
+  echo "== Deploy FSS-backed Slurm /home PVC =="
+  kubectl apply -f "$WORKDIR/slurm-home-pvc.yaml"
+  kubectl -n "$SLURM_NAMESPACE" get pvc slurm-home
+fi
+
+if [ "$ACCOUNTING_ENABLED" = "true" ]; then
+  echo "== Deploy MariaDB operator and Slurm accounting database =="
+  helm repo add mariadb-operator https://helm.mariadb.com/mariadb-operator --force-update
+  helm repo update mariadb-operator
+  helm upgrade --install mariadb-operator-crds mariadb-operator/mariadb-operator-crds \
+    --namespace mariadb --create-namespace --wait --timeout 300s --history-max 1
+  helm upgrade --install mariadb-operator mariadb-operator/mariadb-operator \
+    --namespace mariadb --create-namespace --wait --timeout 300s --history-max 1
+  kubectl -n mariadb rollout status deploy/mariadb-operator-webhook --timeout=300s
+  kubectl -n mariadb rollout status deploy/mariadb-operator-cert-controller --timeout=300s
+  kubectl apply -f "$WORKDIR/mariadb.yaml"
+  kubectl -n "$SLURM_NAMESPACE" wait --for=condition=Ready pod/mariadb-0 --timeout=600s
+fi
+
+echo "== Deploy Slinky operator =="
+helm upgrade --install slurm-operator-crds \
+  oci://ghcr.io/slinkyproject/charts/slurm-operator-crds \
+  --namespace "$SLINKY_OPERATOR_NAMESPACE" \
+  --create-namespace \
+  --version "${slinky_operator_chart_version}" \
+  --wait \
+  --timeout 300s \
+  --history-max 1
+
+if [ -s "$WORKDIR/slinky-operator-values-override.yaml" ]; then
+  helm upgrade --install slurm-operator \
+    oci://ghcr.io/slinkyproject/charts/slurm-operator \
+    --namespace "$SLINKY_OPERATOR_NAMESPACE" \
+    --create-namespace \
+    --version "${slinky_operator_chart_version}" \
+    -f "$WORKDIR/slinky-operator-values-override.yaml" \
+    --wait \
+    --timeout 300s \
+    --history-max 1
+else
+  helm upgrade --install slurm-operator \
+    oci://ghcr.io/slinkyproject/charts/slurm-operator \
+    --namespace "$SLINKY_OPERATOR_NAMESPACE" \
+    --create-namespace \
+    --version "${slinky_operator_chart_version}" \
+    --wait \
+    --timeout 300s \
+    --history-max 1
+fi
+kubectl -n "$SLINKY_OPERATOR_NAMESPACE" rollout status deployment/slurm-operator-webhook --timeout=300s
+
+if [ "$INSTALL_SLURM_CLUSTER" = "true" ]; then
+  echo "== Deploy Slurm cluster =="
+  if [ -s "$WORKDIR/slurm-values-override.yaml" ]; then
+    helm upgrade --install slurm \
+      oci://ghcr.io/slinkyproject/charts/slurm \
+      --namespace "$SLURM_NAMESPACE" \
+      --create-namespace \
+      --version "${slinky_slurm_chart_version}" \
+      -f "$WORKDIR/slurm-values.yaml" \
+      -f "$WORKDIR/slurm-values-override.yaml" \
+      --wait \
+      --timeout 900s \
+      --history-max 1
+  else
+    helm upgrade --install slurm \
+      oci://ghcr.io/slinkyproject/charts/slurm \
+      --namespace "$SLURM_NAMESPACE" \
+      --create-namespace \
+      --version "${slinky_slurm_chart_version}" \
+      -f "$WORKDIR/slurm-values.yaml" \
+      --wait \
+      --timeout 900s \
+      --history-max 1
+  fi
+
+  kubectl -n "$SLURM_NAMESPACE" wait --for=condition=Ready pod/slurm-controller-0 --timeout=900s
+  if [ "$LOGIN_ENABLED" = "true" ]; then
+    kubectl -n "$SLURM_NAMESPACE" rollout status deploy/slurm-login-slinky --timeout=600s
+  fi
+  if [ "$ACCOUNTING_ENABLED" = "true" ]; then
+    kubectl -n "$SLURM_NAMESPACE" rollout status statefulset/slurm-accounting --timeout=600s
+  fi
+  if kubectl -n "$SLURM_NAMESPACE" get statefulset "slurm-worker-$NODESET_NAME" >/dev/null 2>&1; then
+    kubectl -n "$SLURM_NAMESPACE" rollout status "statefulset/slurm-worker-$NODESET_NAME" --timeout=900s
+  fi
+
+  echo "== Validation snapshot =="
+  kubectl -n "$SLURM_NAMESPACE" get pods -o wide
+  kubectl -n "$SLURM_NAMESPACE" exec slurm-controller-0 -c slurmctld -- sinfo -N -o "%N|%t|%C|%m|%G|%E"
+fi

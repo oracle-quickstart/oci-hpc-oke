@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "null_resource" "fss_pv_via_operator" {
-  count = alltrue([var.create_fss, local.deploy_from_operator]) ? 1 : 0
+  count = alltrue([local.create_fss_effective, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
     volume_handle   = format("%v:%v:%s", oci_file_storage_file_system.fss.0.id, data.oci_core_private_ip.fss_mt_ip.0.ip_address, local.fss_export_path)

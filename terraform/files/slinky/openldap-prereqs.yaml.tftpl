@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${openldap_namespace}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${slurm_namespace}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: openldap-root-selfsigned
+  namespace: ${openldap_namespace}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openldap-ca-root
+  namespace: ${openldap_namespace}
+spec:
+  secretName: openldap-ca-root
+  isCA: true
+  commonName: openldap-ca-root
+  issuerRef:
+    name: openldap-root-selfsigned
+    kind: Issuer
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - cert sign
+    - crl sign
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: openldap-ca
+  namespace: ${openldap_namespace}
+spec:
+  ca:
+    secretName: openldap-ca-root
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openldap-tls
+  namespace: ${openldap_namespace}
+spec:
+  secretName: openldap-tls
+  commonName: openldap.${openldap_namespace}.svc.cluster.local
+  dnsNames:
+    - openldap.${openldap_namespace}.svc
+    - openldap.${openldap_namespace}.svc.cluster.local
+    - openldap-readonly.${openldap_namespace}.svc
+    - openldap-readonly.${openldap_namespace}.svc.cluster.local
+    - openldap-headless.${openldap_namespace}.svc
+    - openldap-headless.${openldap_namespace}.svc.cluster.local
+    - openldap-headless-readonly.${openldap_namespace}.svc
+    - openldap-headless-readonly.${openldap_namespace}.svc.cluster.local
+    - openldap-0.openldap-headless.${openldap_namespace}.svc.cluster.local
+${readonly_replica_dns_names}
+  issuerRef:
+    name: openldap-ca
+    kind: Issuer
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: site-sssd-ha-ldap-conf
+  namespace: ${slurm_namespace}
+type: Opaque
+stringData:
+  sssd.conf: |
+    [sssd]
+    config_file_version = 2
+    services = nss,pam,ssh
+    domains = LDAP
+
+    [nss]
+    filter_users = root,slurm
+    filter_groups = root,slurm
+
+    [pam]
+
+    [ssh]
+
+    [domain/LDAP]
+    id_provider = ldap
+    auth_provider = ldap
+    access_provider = permit
+    entry_cache_timeout = 60
+
+    ldap_uri = ldaps://openldap-readonly.${openldap_namespace}.svc.cluster.local:636,ldaps://openldap.${openldap_namespace}.svc.cluster.local:636
+    ldap_search_base = ${openldap_base_dn}
+    ldap_user_search_base = ou=People,${openldap_base_dn}
+    ldap_group_search_base = ou=Groups,${openldap_base_dn}
+
+    ldap_schema = rfc2307
+    ldap_id_mapping = false
+    ldap_tls_reqcert = demand
+    ldap_tls_cacert = /etc/sssd/ca/ca.crt
+    ldap_default_bind_dn = cn=admin,${openldap_base_dn}
+    ldap_default_authtok_type = password
+    ldap_default_authtok = ${openldap_admin_password}
+
+    ldap_user_object_class = posixAccount
+    ldap_user_name = uid
+    ldap_user_uid_number = uidNumber
+    ldap_user_gid_number = gidNumber
+    ldap_user_home_directory = homeDirectory
+    ldap_user_shell = loginShell
+    ldap_user_ssh_public_key = description
+
+    ldap_group_object_class = posixGroup
+    ldap_group_name = cn
+    ldap_group_gid_number = gidNumber
+    ldap_group_member = memberUid
+
+    cache_credentials = true
+    enumerate = false
