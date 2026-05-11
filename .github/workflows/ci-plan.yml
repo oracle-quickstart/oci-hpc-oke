@@ -171,6 +171,7 @@ jobs:
               format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
               github.ref
             }}
+          fetch-depth: 0
 
       - name: Verify checked-out PR SHA
         if: needs.check-changes.outputs.pr_head_sha != ''
@@ -183,6 +184,16 @@ jobs:
             echo "The PR changed after this run started. Re-run against the latest commit."
             exit 1
           fi
+
+      - name: Rebase PR head onto base branch
+        if: needs.check-changes.outputs.base_ref != ''
+        env:
+          BASE_REF: ${{ needs.check-changes.outputs.base_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git rebase "origin/${BASE_REF}"
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -271,6 +282,7 @@ jobs:
               format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
               github.ref
             }}
+          fetch-depth: 0
 
       - name: Verify checked-out PR SHA
         if: needs.check-changes.outputs.pr_head_sha != ''
@@ -283,6 +295,16 @@ jobs:
             echo "The PR changed after this run started. Re-run against the latest commit."
             exit 1
           fi
+
+      - name: Rebase PR head onto base branch
+        if: needs.check-changes.outputs.base_ref != ''
+        env:
+          BASE_REF: ${{ needs.check-changes.outputs.base_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git rebase "origin/${BASE_REF}"
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
@@ -364,6 +386,7 @@ jobs:
               format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
               github.ref
             }}
+          fetch-depth: 0
 
       - name: Verify checked-out PR SHA
         if: needs.check-changes.outputs.pr_head_sha != ''
@@ -376,6 +399,16 @@ jobs:
             echo "The PR changed after this run started. Re-run against the latest commit."
             exit 1
           fi
+
+      - name: Rebase PR head onto base branch
+        if: needs.check-changes.outputs.base_ref != ''
+        env:
+          BASE_REF: ${{ needs.check-changes.outputs.base_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git rebase "origin/${BASE_REF}"
 
       - name: Install OCI CLI
         run: pip install oci-cli --quiet
@@ -476,6 +509,7 @@ jobs:
               format('refs/pull/{0}/head', needs.check-changes.outputs.pr_number) ||
               github.ref
             }}
+          fetch-depth: 0
 
       - name: Verify checked-out PR SHA
         if: needs.check-changes.outputs.pr_head_sha != ''
@@ -488,6 +522,16 @@ jobs:
             echo "The PR changed after this run started. Re-run against the latest commit."
             exit 1
           fi
+
+      - name: Rebase PR head onto base branch
+        if: needs.check-changes.outputs.base_ref != ''
+        env:
+          BASE_REF: ${{ needs.check-changes.outputs.base_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git rebase "origin/${BASE_REF}"
 
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
