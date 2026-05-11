@@ -1,0 +1,33 @@
+---
+- name: Apply Dirty-frag kernel module mitigation
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Prevent vulnerable kernel modules from loading
+      ansible.builtin.copy:
+        dest: /etc/modprobe.d/dirtyfrag.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          install esp4 /bin/false
+          install esp6 /bin/false
+          install rxrpc /bin/false
+
+    - name: Unload vulnerable kernel modules
+      ansible.builtin.command:
+        cmd: rmmod esp4 esp6 rxrpc
+      register: dirtyfrag_rmmod
+      changed_when: true
+      failed_when: dirtyfrag_rmmod.rc != 0
+
+    - name: Drop kernel caches
+      ansible.builtin.shell:
+        cmd: echo 3 > /proc/sys/vm/drop_caches
+      changed_when: true
+
+    - name: Report mitigation status
+      ansible.builtin.debug:
+        msg: Dirty-frag mitigation applied
