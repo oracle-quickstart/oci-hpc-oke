@@ -80,6 +80,7 @@ jobs:
       overrides: ${{ steps.parse.outputs.overrides || steps.manual.outputs.overrides }}
       pr_number: ${{ steps.pr-comment.outputs.pr_number || steps.pr-dispatch.outputs.pr_number || steps.pr-call.outputs.pr_number }}
       pr_head_sha: ${{ steps.pr-comment.outputs.head_sha || steps.pr-dispatch.outputs.head_sha || steps.pr-call.outputs.head_sha }}
+      base_ref: ${{ steps.pr-comment.outputs.base_ref || steps.pr-dispatch.outputs.base_ref || steps.pr-call.outputs.base_ref }}
     steps:
       - name: React to trigger comment
         if: github.event_name == 'issue_comment'
@@ -109,6 +110,7 @@ jobs:
             });
             core.setOutput('pr_number', String(prNumber));
             core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('base_ref', pr.data.base.ref);
 
       - name: Resolve PR context from workflow dispatch
         id: pr-dispatch
@@ -126,6 +128,7 @@ jobs:
             });
             core.setOutput('pr_number', String(prNumber));
             core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('base_ref', pr.data.base.ref);
 
       - name: Resolve PR context from workflow call
         id: pr-call
@@ -143,6 +146,7 @@ jobs:
             });
             core.setOutput('pr_number', String(prNumber));
             core.setOutput('head_sha', pr.data.head.sha);
+            core.setOutput('base_ref', pr.data.base.ref);
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         if: github.event_name == 'issue_comment'
@@ -187,6 +191,7 @@ jobs:
               needs.check-tf-trigger.outputs.pr_number != '' && format('refs/pull/{0}/head', needs.check-tf-trigger.outputs.pr_number) ||
               github.ref
             }}
+          fetch-depth: 0
 
       - name: Verify checked-out PR SHA
         if: needs.check-tf-trigger.outputs.pr_head_sha != ''
@@ -199,6 +204,19 @@ jobs:
             echo "The PR changed after this run started. Re-run against the latest commit."
             exit 1
           fi
+
+      - name: Squash PR changes and rebase onto base branch
+        if: needs.check-tf-trigger.outputs.base_ref != ''
+        env:
+          BASE_REF: ${{ needs.check-tf-trigger.outputs.base_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          MERGE_BASE=$(git merge-base HEAD "origin/${BASE_REF}")
+          git reset --soft "$MERGE_BASE"
+          git commit -m "Squashed PR changes"
+          git rebase "origin/${BASE_REF}"
 
       - name: Install Terraform
         run: |
