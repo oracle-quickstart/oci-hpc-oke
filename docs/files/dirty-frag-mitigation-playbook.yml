@@ -16,11 +16,22 @@
           install esp6 /bin/false
           install rxrpc /bin/false
 
+    - name: Read loaded kernel modules
+      ansible.builtin.command:
+        cmd: lsmod
+      register: dirtyfrag_lsmod
+      changed_when: false
+
     - name: Unload vulnerable kernel modules
       ansible.builtin.command:
-        cmd: rmmod esp4 esp6 rxrpc
+        cmd: "rmmod {{ item }}"
+      loop:
+        - esp4
+        - esp6
+        - rxrpc
+      when: dirtyfrag_lsmod.stdout is search('^' ~ item ~ '\\s')
       register: dirtyfrag_rmmod
-      changed_when: true
+      changed_when: dirtyfrag_rmmod.rc == 0
       failed_when: dirtyfrag_rmmod.rc != 0
 
     - name: Drop kernel caches
