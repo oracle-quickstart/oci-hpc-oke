@@ -233,18 +233,6 @@ module "oke" {
   cluster_name = local.cluster_name
   cluster_type = "enhanced"
   cluster_addons = merge(
-    {
-      "NvidiaGpuPlugin" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-        configurations = [
-          {
-            key   = "isDcgmExporterDisabled"
-            value = "true"
-          }
-        ]
-      }
-    },
     local.total_worker_nodes > 50 ? {
       "CoreDNS" = {
         remove_addon_resources_on_delete = true

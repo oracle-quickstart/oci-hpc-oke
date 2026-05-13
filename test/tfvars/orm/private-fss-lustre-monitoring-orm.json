@@ -13,7 +13,6 @@
   "install_grafana": "true",
   "install_grafana_dashboards": "true",
   "use_lets_encrypt_prod_endpoint": "false",
-  "install_nvidia_dcgm_exporter": "false",
   "install_amd_device_metrics_exporter": "false",
   "install_mpi_operator": "false",
   "install_kueue": "false",

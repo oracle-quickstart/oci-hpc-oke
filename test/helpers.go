@@ -83,7 +83,6 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 		vars["install_grafana_dashboards"] = false
 		vars["install_monitoring"] = false
 		vars["install_node_problem_detector_kube_prometheus_stack"] = false
-		vars["install_nvidia_dcgm_exporter"] = false
 		vars["setup_alerting"] = false
 		vars["worker_cpu_enabled"] = false
 		vars["worker_gpu_enabled"] = false

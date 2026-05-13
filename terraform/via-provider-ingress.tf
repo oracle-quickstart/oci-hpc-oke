@@ -40,11 +40,19 @@ resource "time_sleep" "wait_for_ingress_lb_termination" {
   ]
 }
 
+resource "time_sleep" "wait_for_cert_manager_webhook" {
+  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  depends_on      = [helm_release.cert_manager]
+  create_duration = "15s"
+}
+
 resource "kubectl_manifest" "cluster_issuer" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   depends_on = [
     helm_release.ingress,
+    time_sleep.wait_for_cert_manager_webhook,
   ]
 
   yaml_body = (var.use_lets_encrypt_prod_endpoint ?

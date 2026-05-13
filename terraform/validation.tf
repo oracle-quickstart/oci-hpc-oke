@@ -43,6 +43,8 @@ locals {
 
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
+
+  invalid_gpu_operator_without_nfd = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -177,6 +179,17 @@ resource "null_resource" "ssh_public_key_should_have_comment" {
     precondition {
       condition     = local.ssh_public_key_has_comment
       error_message = "Error: SSH public key should have a comment. Please ensure the SSH public key has a comment."
+    }
+  }
+}
+
+resource "null_resource" "validate_gpu_operator_requires_nfd" {
+  count = local.invalid_gpu_operator_without_nfd ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_gpu_operator_without_nfd
+      error_message = "NVIDIA GPU Operator addon requires Node Feature Discovery. Please set `deploy_node_feature_discovery=true` or set `deploy_nvidia_gpu_operator=false`."
     }
   }
 }

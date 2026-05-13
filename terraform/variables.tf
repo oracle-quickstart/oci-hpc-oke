@@ -277,11 +277,6 @@ variable "install_grafana_dashboards" {
   type    = bool
 }
 
-variable "install_nvidia_dcgm_exporter" {
-  default = true
-  type    = bool
-}
-
 variable "install_amd_device_metrics_exporter" {
   default = false
   type    = bool
@@ -305,11 +300,6 @@ variable "node_problem_detector_chart_version" {
 
 variable "prometheus_stack_chart_version" {
   default = "81.6.3"
-  type    = string
-}
-
-variable "dcgm_exporter_chart_version" {
-  default = "4.8.1"
   type    = string
 }
 
@@ -398,7 +388,7 @@ variable "preferred_kubernetes_services" {
 }
 variable "setup_credential_provider_for_ocir" {
   type        = bool
-  default     = false
+  default     = true
   description = "Setup the OKE credential provider for OCIR."
 }
 
@@ -408,6 +398,88 @@ variable "override_hostnames" {
   type    = bool
 }
 variable "disable_gpu_device_plugin" { default = false }
+
+variable "deploy_node_feature_discovery" {
+  type        = bool
+  default     = true
+  description = "Deploy the NodeFeatureDiscovery OKE addon."
+}
+
+variable "deploy_nvidia_gpu_operator" {
+  type        = bool
+  default     = true
+  description = "Deploy the NvidiaGpuOperator OKE addon."
+}
+
+variable "nvidia_gpu_operator_advanced_options" {
+  type        = bool
+  default     = false
+  description = "Show advanced NVIDIA GPU Operator configuration options in the ORM UI."
+}
+
+variable "nvidia_gpu_operator_addon_version" {
+  type        = string
+  default     = "v25.10.1"
+  description = "Version of the NvidiaGpuOperator OKE addon."
+}
+
+variable "nvidia_gpu_operator_disable_plugin" {
+  type        = bool
+  default     = true
+  description = "Disable the NvidiaGpuPlugin when using the NVIDIA GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_cdi_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable CDI (Container Device Interface) in the NVIDIA GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_toolkit_enabled" {
+  type        = bool
+  default     = true
+  description = "Enable the NVIDIA container toolkit in the NVIDIA GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_skip_nfd_dependency_check" {
+  type        = bool
+  default     = false
+  description = "Skip the NodeFeatureDiscovery dependency check in the NVIDIA GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_mig_manager_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable the NVIDIA MIG Manager in the NVIDIA GPU Operator addon."
+}
+
+variable "nvidia_gpu_operator_mig_strategy" {
+  type        = string
+  default     = "single"
+  description = "MIG strategy for GFD and Device Plugin (none, single, mixed)."
+}
+
+variable "nvidia_gpu_operator_configuration" {
+  type = map(string)
+  default = {
+    "cdi.default"                                = "false"
+    "daemonsets.rollingUpdate.maxUnavailable"    = "10%"
+    "dcgm.enabled"                               = "true"
+    "dcgmExporter.enabled"                       = "true"
+    "dcgmExporter.service.internalTrafficPolicy" = "Cluster"
+    "dcgmExporter.serviceMonitor.enabled"        = "false"
+    "dcgmExporter.serviceMonitor.interval"       = "15s"
+    "dcgmExporter.serviceMonitor.honorLabels"    = "false"
+    "devicePlugin.enabled"                       = "true"
+    "devicePlugin.mps.root"                      = "/run/nvidia/mps"
+    "toolkit.installDir"                         = "/usr/local/nvidia"
+    "operator.logging.level"                     = "info"
+    "hostPaths.rootFS"                           = "/"
+    "hostPaths.driverInstallDir"                 = "/run/nvidia/driver"
+  }
+  description = "Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon. These are merged with the individual variables above, which take precedence."
+}
+
 variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string
