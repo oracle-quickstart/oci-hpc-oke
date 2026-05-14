@@ -144,7 +144,7 @@ variableGroups:
       - bastion_service_max_session_ttl
       - bastion_service_allow_worker_ssh
 
-  - title: OKE Cluster
+  - title: Cluster
     variables:
       - compartment_ocid
       - cluster_name
@@ -156,7 +156,24 @@ variableGroups:
       - max_pods_per_node
       - preferred_kubernetes_services
 
-  - title: "Workers: System"
+  - title: "Cluster Components"
+    variables:
+      - deploy_node_feature_discovery
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+      - nvidia_gpu_operator_addon_version
+      - nvidia_gpu_operator_disable_plugin
+      - nvidia_gpu_operator_cdi_enabled
+      - nvidia_gpu_operator_toolkit_enabled
+      - nvidia_gpu_operator_skip_nfd_dependency_check
+      - nvidia_gpu_operator_mig_manager_enabled
+      - nvidia_gpu_operator_mig_strategy
+      - setup_credential_provider_for_ocir
+      - install_oci_hpc_oke_utils
+      - install_kueue
+      - install_mpi_operator
+
+  - title: "Worker Pool: System"
     variables:
       - worker_ops_ad
       - worker_ops_pool_size
@@ -174,7 +191,7 @@ variableGroups:
       - worker_ops_image_compartment
       - worker_ops_image_custom_id
       
-  - title: "Workers: CPU"
+  - title: "Worker Pool: CPU"
     variables:
       - worker_cpu_enabled
       - worker_cpu_ad
@@ -195,7 +212,7 @@ variableGroups:
       - worker_cpu_image_compartment
       - worker_cpu_image_custom_id
       
-  - title: "Workers: GPU"
+  - title: "Worker Pool: GPU"
     variables:
       - worker_gpu_enabled
       - worker_gpu_ad
@@ -212,7 +229,7 @@ variableGroups:
       - worker_gpu_image_compartment
       - worker_gpu_image_custom_id
 
-  - title: "Workers: GPU + RDMA"
+  - title: "Worker Pool: GPU with RDMA"
     variables:
       - worker_rdma_enabled
       - worker_rdma_ad
@@ -243,26 +260,6 @@ variableGroups:
     - lustre_size_in_tb
     - lustre_performance_tier
     - lustre_mount_path
-
-  - title: "OKE Add-ons"
-    variables:
-      - deploy_node_feature_discovery
-      - deploy_nvidia_gpu_operator
-      - nvidia_gpu_operator_advanced_options
-      - nvidia_gpu_operator_addon_version
-      - nvidia_gpu_operator_disable_plugin
-      - nvidia_gpu_operator_cdi_enabled
-      - nvidia_gpu_operator_toolkit_enabled
-      - nvidia_gpu_operator_skip_nfd_dependency_check
-      - nvidia_gpu_operator_mig_manager_enabled
-      - nvidia_gpu_operator_mig_strategy
-
-  - title: "Cluster Components"
-    variables:
-      - setup_credential_provider_for_ocir
-      - install_oci_hpc_oke_utils
-      - install_kueue
-      - install_mpi_operator
 
   - title: "Monitoring & Observability"
     variables:
@@ -1073,9 +1070,9 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
   nvidia_gpu_operator_configuration:
-    title: NVIDIA GPU Operator addon advanced configurations
+    title: NVIDIA GPU Operator add-on advanced configurations
     type: map(string)
-    description: Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon.
+    description: Additional configuration key-value pairs for the NVIDIA GPU Operator OKE add-on.
     visible: false
   install_amd_device_metrics_exporter:
     title: Install AMD Device Exporter
@@ -1267,8 +1264,8 @@ variables:
     description: The kind of load balancers which should be provisioned by default for the services of type Load Balancer.
     required: true
   setup_credential_provider_for_ocir:
-    title: Setup OKE credential-provider for OCIR
-    description: Allow OKE worker nodes to authenticate with OCIR using instance-principal. If "Create policies" box is not checked, make sure to create policy to allow worker nodes to read repos in compartment.
+    title: Install Image Credential Provider for Container Registry (OCIR)
+    description: Install the image credential provider so OKE worker nodes can authenticate with OCIR using instance principal authentication. If Create Policies is disabled, create a policy that allows worker nodes to read repositories in the compartment.
     type: boolean
     default: true
 
@@ -1281,18 +1278,18 @@ variables:
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
-    description: Disable Nvidia GPU Device Plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
+    description: Disable the NVIDIA GPU device plugin that is deployed by OKE. This is required if you want to use the NVIDIA GPU Operator to deploy the GPU device plugin.
     default: false
     visible: false
   deploy_node_feature_discovery:
-    title: Deploy Node Feature Discovery addon
+    title: Install Node Feature Discovery add-on
     type: boolean
-    description: Deploy the Node Feature Discovery OKE addon. This is a prerequisite for NVIDIA GPU Operator and Network Operator.
+    description: Install the Node Feature Discovery OKE add-on. This is a prerequisite for NVIDIA GPU Operator and Network Operator add-ons.
     default: true
   deploy_nvidia_gpu_operator:
-    title: Deploy NVIDIA GPU Operator addon
+    title: Install NVIDIA GPU Operator add-on
     type: boolean
-    description: Deploy the NVIDIA GPU Operator OKE addon. Requires the Node Feature Discovery addon.
+    description: Install the NVIDIA GPU Operator OKE add-on. Requires the Node Feature Discovery add-on.
     default: true
     visible:
       - deploy_node_feature_discovery
@@ -1305,9 +1302,9 @@ variables:
     visible:
       - deploy_nvidia_gpu_operator
   nvidia_gpu_operator_addon_version:
-    title: NVIDIA GPU Operator addon version
+    title: NVIDIA GPU Operator add-on version
     type: enum
-    description: Version of the NvidiaGpuOperator OKE addon.
+    description: Version of the NVIDIA GPU Operator OKE add-on.
     default: "v25.10.1"
     required: true
     enum:
@@ -1318,9 +1315,9 @@ variables:
       - deploy_nvidia_gpu_operator
       - nvidia_gpu_operator_advanced_options
   nvidia_gpu_operator_disable_plugin:
-    title: Disable NvidiaGpuPlugin in NVIDIA GPU Operator
+    title: Disable NVIDIA GPU plugin in NVIDIA GPU Operator
     type: boolean
-    description: Disable the NvidiaGpuPlugin when using the NVIDIA GPU Operator addon.
+    description: Disable the NVIDIA GPU plugin when using the NVIDIA GPU Operator add-on.
     default: true
     visible:
       and:
@@ -1329,7 +1326,7 @@ variables:
   nvidia_gpu_operator_cdi_enabled:
     title: Enable CDI in NVIDIA GPU Operator
     type: boolean
-    description: Enable CDI (Container Device Interface) in the NVIDIA GPU Operator addon.
+    description: Enable CDI (Container Device Interface) in the NVIDIA GPU Operator add-on.
     default: true
     visible:
       and:
@@ -1338,7 +1335,7 @@ variables:
   nvidia_gpu_operator_toolkit_enabled:
     title: Enable NVIDIA toolkit in NVIDIA GPU Operator
     type: boolean
-    description: Enable the NVIDIA container toolkit in the NVIDIA GPU Operator addon.
+    description: Enable the NVIDIA container toolkit in the NVIDIA GPU Operator add-on.
     default: true
     visible:
       and:
@@ -1347,7 +1344,7 @@ variables:
   nvidia_gpu_operator_skip_nfd_dependency_check:
     title: Skip NFD dependency check in NVIDIA GPU Operator
     type: boolean
-    description: Skip the NodeFeatureDiscovery dependency check in the NVIDIA GPU Operator addon.
+    description: Skip the Node Feature Discovery dependency check in the NVIDIA GPU Operator add-on.
     default: true
     visible:
       and:
@@ -1356,7 +1353,7 @@ variables:
   nvidia_gpu_operator_mig_manager_enabled:
     title: Enable MIG Manager in NVIDIA GPU Operator
     type: boolean
-    description: Enable the NVIDIA MIG Manager in the NVIDIA GPU Operator addon.
+    description: Enable the NVIDIA MIG Manager in the NVIDIA GPU Operator add-on.
     default: false
     visible:
       and:
@@ -1822,7 +1819,7 @@ variables:
 
   # Workers - GPU Cluster-network
   worker_rdma_enabled:
-    title: Create GPU + RDMA pool
+    title: Create GPU with RDMA pool
     type: boolean
     description: Create a worker pool with Cluster Network placement for RDMA networking
   worker_rdma_ad:
@@ -1981,7 +1978,7 @@ variables:
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils
-    description: Install the OCI HPC OKE Utils Helm chart (includes node labeler with RDMA topology, compute host health, firmware versions, and maintenance event tracking; image prepuller; and hostexec).
+    description: Install the OCI HPC OKE Utils Helm chart, including the node labeler, image prepuller, and hostexec. The node labeler adds RDMA topology, compute host health, firmware version, and maintenance event labels.
     type: boolean
     default: true
 
