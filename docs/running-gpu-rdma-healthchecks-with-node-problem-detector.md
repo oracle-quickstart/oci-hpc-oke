@@ -50,7 +50,7 @@ By default, health checks run every 5 minutes. You can modify the frequency by e
 Deploy Node Problem Detector using the Helm chart with the OKE-specific health check configuration:
 
 ```bash
-helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.0 \
+helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
     -n monitoring \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/terraform/files/node-problem-detector/values.yaml
 ```

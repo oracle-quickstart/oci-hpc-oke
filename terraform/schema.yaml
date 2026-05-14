@@ -1090,7 +1090,7 @@ variables:
     title: AMD Device Metrics Exporter chart version
     type: string
     required: true
-    default: "v1.2.1"
+    default: "v1.5.0"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1099,7 +1099,7 @@ variables:
     title: Node Problem Detector chart version
     type: string
     required: true
-    default: "2.3.18"
+    default: "2.4.1"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1108,7 +1108,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "69.8.2"
+    default: "85.0.3"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1117,7 +1117,7 @@ variables:
     title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "0.2.1"
+    default: "0.5.0"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1956,7 +1956,7 @@ variables:
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
-    default: "0.16.3"
+    default: "0.17.2"
     required: true
     visible: false
   kueue_local_queue_default_namespace:
