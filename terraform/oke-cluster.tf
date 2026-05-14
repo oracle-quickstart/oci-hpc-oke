@@ -230,44 +230,8 @@ module "oke" {
   }
   bastion_upgrade = false
 
-  cluster_name = local.cluster_name
-  cluster_type = "enhanced"
-  cluster_addons = merge(
-    local.total_worker_nodes > 50 ? {
-      "CoreDNS" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-        configurations = [
-          {
-            key   = "minReplica"
-            value = tostring(min(3, max(1, var.worker_ops_pool_size)))
-          },
-          {
-            key   = "nodesPerReplica"
-            value = "8"
-          },
-          {
-            key   = "coreDnsContainerResources"
-            value = jsonencode({ requests = { cpu = "200m", memory = "300Mi" }, limits = { memory = "1Gi" } })
-          },
-          {
-            key   = "tolerations"
-            value = jsonencode([{ key = "nvidia.com/gpu", operator = "Exists" }, { key = "amd.com/gpu", operator = "Exists" }])
-          }
-        ]
-      }
-    } : {},
-
-    anytrue([
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape),
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)
-      ]) ? {
-      "AmdGpuPlugin" = {
-        remove_addon_resources_on_delete = true
-        override_existing                = true
-      }
-    } : {}
-  )
+  cluster_name                       = local.cluster_name
+  cluster_type                       = "enhanced"
   cni_type                           = local.cni_type
   control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
   control_plane_is_public            = var.control_plane_is_public
