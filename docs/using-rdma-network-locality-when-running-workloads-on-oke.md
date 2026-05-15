@@ -72,7 +72,7 @@ This is the recommended approach because:
 ### Step 1: Install Kueue
 
 ```sh
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.16.3" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.17.2" --create-namespace --namespace=kueue-system
 ```
 
 ### Step 2: Create a Topology

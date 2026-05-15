@@ -223,7 +223,7 @@ kubectl get servicemonitor -n ${MONITORING_NAMESPACE} device-metrics-exporter
 ### 4.1 Install Node Problem Detector
 
 ```bash
-helm upgrade --install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.0 \
+helm upgrade --install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --wait
@@ -802,7 +802,7 @@ helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/kube-prometheus/values.yaml \
   --reuse-values \
-  --version 81.6.3 \
+  --version 85.0.3 \
   --wait
 ```
 
@@ -828,7 +828,7 @@ helm upgrade amd-device-metrics-exporter amd-gpu-operator/device-metrics-exporte
 ### Update Node Problem Detector
 
 ```bash
-helm upgrade gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.3.22 \
+helm upgrade gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --wait
