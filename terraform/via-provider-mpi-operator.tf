@@ -10,6 +10,7 @@ resource "kubectl_manifest" "mpi_operator" {
 
   yaml_body         = each.value
   server_side_apply = true
+  wait_for_rollout  = false
 
   depends_on = [
     module.oke,

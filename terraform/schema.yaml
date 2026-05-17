@@ -47,6 +47,8 @@ variableGroups:
       # Kueue
       - kueue_chart_version
       - kueue_local_queue_default_namespace
+      # NVIDIA DRA Driver
+      - nvidia_dra_driver_chart_version
       # OCI HPC OKE Utils
       - install_image_prepuller
       - install_hostexec
@@ -174,6 +176,7 @@ variableGroups:
       - install_oci_hpc_oke_utils
       - install_kueue
       - install_mpi_operator
+      - install_nvidia_dra_driver
 
   - title: "Worker Pool: System"
     variables:
@@ -1992,13 +1995,9 @@ variables:
       compartmentId: ${compartment_ocid}
   worker_gmc_gpu_memory_fabric_ids:
     title: GPU Memory Fabric OCIDs
-    description: List of GPU Memory Fabric OCIDs. One GPU Memory Cluster is created for each fabric.
-    type: array
-    items:
-      type: string
-      pattern: "^ocid1\\..*"
-    unique_items: true
-    minItems: 1
+    description: Enter one GPU Memory Fabric OCID per line. One GPU Memory Cluster is created for each fabric.
+    type: text
+    multiline: true
     required: true
     visible: ${worker_gmc_enabled}
   worker_gmc_boot_volume_size:
@@ -2070,7 +2069,7 @@ variables:
   # Kueue
   install_kueue:
     title: Install Kueue
-    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the GPU + RDMA worker pool."
+    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the active GPU worker pool."
     type: boolean
     default: true
   install_rdma_labeler:
@@ -2089,10 +2088,7 @@ variables:
     default: "default"
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
     required: true
-    visible:
-      and:
-        - ${worker_rdma_enabled}
-        - ${install_kueue}
+    visible: ${install_kueue}
 
   # MPI Operator
   install_mpi_operator:
@@ -2100,6 +2096,19 @@ variables:
     description: Install MPI Operator for running MPIJob workloads.
     type: boolean
     default: true
+
+  # NVIDIA DRA Driver
+  install_nvidia_dra_driver:
+    title: Install NVIDIA DRA Driver
+    description: Install the NVIDIA DRA driver Helm chart for GPU Memory Cluster compute domains.
+    type: boolean
+    default: true
+    visible: ${worker_gmc_enabled}
+  nvidia_dra_driver_chart_version:
+    title: NVIDIA DRA Driver Helm chart version
+    type: string
+    default: "0.4.0"
+    visible: false
 
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:

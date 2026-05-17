@@ -26,6 +26,7 @@ locals {
       var.install_mpi_operator,
       var.install_kueue,
       var.install_oci_hpc_oke_utils,
+      var.install_nvidia_dra_driver,
     ])
   ])
 

@@ -3,13 +3,14 @@
 
 locals {
   kueue_amd_shapes   = ["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"]
-  kueue_is_amd       = contains(local.kueue_amd_shapes, var.worker_rdma_shape)
+  kueue_shape        = var.worker_gmc_enabled ? var.worker_gmc_shape : var.worker_rdma_shape
+  kueue_is_amd       = contains(local.kueue_amd_shapes, local.kueue_shape)
   kueue_gpu_resource = local.kueue_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
-  kueue_flavor_name  = "${lower(replace(var.worker_rdma_shape, ".", "-"))}-rdma-topology-aware"
+  kueue_flavor_name  = "${lower(replace(local.kueue_shape, ".", "-"))}-rdma-topology-aware"
 }
 
 resource "helm_release" "kueue" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
@@ -26,19 +27,19 @@ resource "helm_release" "kueue" {
 
 # Kueue Topology for RDMA-aware scheduling
 resource "kubectl_manifest" "kueue_topology" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body  = file("${path.module}/files/kueue/topology.yaml")
   depends_on = [helm_release.kueue]
 }
 
-# ResourceFlavor matching the RDMA worker pool shape
+# ResourceFlavor matching the active GPU worker pool shape
 resource "kubectl_manifest" "kueue_resource_flavor" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/resource-flavor.yaml.tpl", {
     flavor_name   = local.kueue_flavor_name
-    shape         = var.worker_rdma_shape
+    shape         = local.kueue_shape
     gpu_label_key = local.kueue_gpu_resource
   })
 
@@ -47,7 +48,7 @@ resource "kubectl_manifest" "kueue_resource_flavor" {
 
 # ClusterQueue with resource quotas
 resource "kubectl_manifest" "kueue_cluster_queue" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/cluster-queue.yaml.tpl", {
     flavor_name  = local.kueue_flavor_name
@@ -59,7 +60,7 @@ resource "kubectl_manifest" "kueue_cluster_queue" {
 
 # LocalQueue in the user-specified namespace
 resource "kubectl_manifest" "kueue_local_queue" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/local-queue.yaml.tpl", {
     flavor_name = local.kueue_flavor_name

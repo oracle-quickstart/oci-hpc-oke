@@ -45,6 +45,7 @@ locals {
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
 
   invalid_gpu_operator_without_nfd = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
+  invalid_nvidia_dra_without_nfd   = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -190,6 +191,17 @@ resource "null_resource" "validate_gpu_operator_requires_nfd" {
     precondition {
       condition     = !local.invalid_gpu_operator_without_nfd
       error_message = "NVIDIA GPU Operator addon requires Node Feature Discovery. Please set `deploy_node_feature_discovery=true` or set `deploy_nvidia_gpu_operator=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_nvidia_dra_requires_nfd" {
+  count = local.invalid_nvidia_dra_without_nfd ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_nvidia_dra_without_nfd
+      error_message = "NVIDIA DRA driver requires Node Feature Discovery for GPU node selection. Please set `deploy_node_feature_discovery=true` or set `install_nvidia_dra_driver=false`."
     }
   }
 }

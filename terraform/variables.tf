@@ -289,6 +289,18 @@ variable "install_mpi_operator" {
   description = "Install MPI Operator for running MPIJob workloads."
 }
 
+variable "install_nvidia_dra_driver" {
+  default     = true
+  type        = bool
+  description = "Install the NVIDIA DRA driver Helm chart for GPU Memory Cluster compute domains."
+}
+
+variable "nvidia_dra_driver_chart_version" {
+  default     = "0.4.0"
+  type        = string
+  description = "NVIDIA DRA driver Helm chart version."
+}
+
 variable "monitoring_namespace" {
   default = "monitoring"
   type    = string
@@ -761,9 +773,17 @@ variable "worker_gmc_kubernetes_version" {
   type        = string
 }
 variable "worker_gmc_gpu_memory_fabric_ids" {
-  default     = []
-  description = "List of GPU Memory Fabric OCIDs to fan out into one GPU Memory Cluster per fabric."
-  type        = list(string)
+  default     = ""
+  description = "GPU Memory Fabric OCIDs to fan out into one GPU Memory Cluster per fabric, one OCID per line."
+  type        = string
+  validation {
+    condition = alltrue([
+      for id in compact([
+        for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+      ]) : can(regex("^ocid1\\..*", id))
+    ])
+    error_message = "GPU Memory Fabric OCIDs must be provided one per line."
+  }
 }
 variable "worker_gmc_scale_target_size" {
   default     = 18
@@ -785,7 +805,7 @@ variable "worker_gmc_scale_is_downsize_enabled" {
 variable "install_kueue" {
   default     = true
   type        = bool
-  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue). Requires worker_rdma_enabled."
+  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue)."
 }
 
 variable "kueue_chart_version" {

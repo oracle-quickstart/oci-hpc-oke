@@ -23,6 +23,9 @@ locals {
   worker_gpu_image_id    = var.worker_gpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_gpu_image_custom_uri, {}), "id", null) : coalesce(var.worker_gpu_image_custom_id, var.worker_gpu_image_platform_id, "none")
   worker_rdma_image_type = contains(["platform", "custom"], lower(var.worker_rdma_image_type)) ? "custom" : "oke"
   worker_rdma_image_id   = var.worker_rdma_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_rdma_image_custom_uri, {}), "id", null) : coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
+  worker_gmc_gpu_memory_fabric_ids = compact([
+    for id in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(id)
+  ])
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
@@ -211,7 +214,7 @@ locals {
       mode                  = "gpu-memory-cluster"
       placement_ads         = [substr(var.worker_gmc_ad, -1, 0)]
       shape                 = var.worker_gmc_shape
-      gpu_memory_fabric_ids = var.worker_gmc_gpu_memory_fabric_ids
+      gpu_memory_fabric_ids = local.worker_gmc_gpu_memory_fabric_ids
       gpu_memory_cluster_scale_config = {
         target_size         = var.worker_gmc_scale_target_size
         is_upsize_enabled   = var.worker_gmc_scale_is_upsize_enabled
