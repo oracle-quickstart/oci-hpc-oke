@@ -95,6 +95,10 @@ locals {
     var.setup_oci_metrics_exporter ? [
       "Allow dynamic-group %v to read all-resources in compartment id %v",
       "Allow dynamic-group %v to use stream-family in compartment id %v"
+    ] : [],
+    var.worker_gmc_enabled ? [
+      "Allow dynamic-group %v to manage compute-clusters in compartment id %v",
+      "Allow dynamic-group %v to manage compute-gpu-memory-clusters in compartment id %v"
     ] : []
   ))
 
@@ -169,6 +173,24 @@ resource "oci_identity_policy" "services_policies" {
     ] : [],
     []
   ))
+  lifecycle {
+    ignore_changes = [defined_tags]
+  }
+}
+
+resource "oci_identity_policy" "gmc_tenancy" {
+  provider       = oci.home
+  count          = alltrue([var.create_policies, var.worker_gmc_enabled]) ? 1 : 0
+  compartment_id = var.tenancy_ocid
+  name           = format("oke-gmc-tenancy-%v", local.state_id)
+  description    = format("GPU Memory Cluster tenancy policies for OKE Terraform state %v", local.state_id)
+  statements = [
+    format("Allow dynamic-group %v to read compute-gpu-memory-fabrics in tenancy", local.policy_group_ref),
+    "Allow any-user to manage instance-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
+    "Allow any-user to use virtual-network-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
+    "Allow any-user to read compute-management-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
+    "Allow any-user to use volume-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}"
+  ]
   lifecycle {
     ignore_changes = [defined_tags]
   }

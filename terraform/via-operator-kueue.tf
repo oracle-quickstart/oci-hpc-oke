@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 module "kueue" {
-  count  = alltrue([var.install_kueue, var.worker_rdma_enabled, local.deploy_from_operator]) ? 1 : 0
+  count  = alltrue([var.install_kueue, local.deploy_from_operator]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -33,7 +33,7 @@ module "kueue" {
     "cat <<'EOF' | kubectl apply -f -",
     split("\n", templatefile("${path.module}/files/kueue/resource-flavor.yaml.tpl", {
       flavor_name   = local.kueue_flavor_name
-      shape         = var.worker_rdma_shape
+      shape         = local.kueue_shape
       gpu_label_key = local.kueue_gpu_resource
     })),
     "EOF",

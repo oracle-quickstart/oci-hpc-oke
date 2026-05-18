@@ -26,6 +26,7 @@ locals {
       var.install_mpi_operator,
       var.install_kueue,
       var.install_oci_hpc_oke_utils,
+      var.install_nvidia_dra_driver,
     ])
   ])
 
@@ -198,8 +199,7 @@ locals {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.4.3"
+  source = "git::https://github.com/oracle-terraform-modules/terraform-oci-oke.git//?ref=25ef9a02ada3fc3bf7c43f200503682e79f58f03"
 
   providers = { oci.home = oci.home }
 
@@ -242,6 +242,7 @@ module "oke" {
   create_iam_tag_namespace           = false
   create_operator                    = var.create_operator
   create_vcn                         = var.create_vcn
+  enable_ipv6                        = var.enable_ipv6
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true

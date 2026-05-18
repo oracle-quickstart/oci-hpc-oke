@@ -23,6 +23,9 @@ locals {
   worker_gpu_image_id    = var.worker_gpu_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_gpu_image_custom_uri, {}), "id", null) : coalesce(var.worker_gpu_image_custom_id, var.worker_gpu_image_platform_id, "none")
   worker_rdma_image_type = contains(["platform", "custom"], lower(var.worker_rdma_image_type)) ? "custom" : "oke"
   worker_rdma_image_id   = var.worker_rdma_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.worker_rdma_image_custom_uri, {}), "id", null) : coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
+  worker_gmc_gpu_memory_fabric_ids = compact([
+    for id in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(id)
+  ])
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
@@ -182,6 +185,47 @@ locals {
       image_id                       = local.worker_rdma_image_id
       max_pods_per_node              = var.worker_rdma_max_pods_per_node
       kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
+      legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
+      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata                  = local.node_metadata
+      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      agent_config = {
+        are_all_plugins_disabled = false
+        is_management_disabled   = false
+        is_monitoring_disabled   = false
+        plugins_config = {
+          "Bastion"                             = "DISABLED"
+          "Block Volume Management"             = "DISABLED"
+          "Compute HPC RDMA Authentication"     = "ENABLED"
+          "Compute HPC RDMA Auto-Configuration" = "ENABLED"
+          "Compute Instance Monitoring"         = "ENABLED"
+          "Compute Instance Run Command"        = "ENABLED"
+          "Compute RDMA GPU Monitoring"         = "ENABLED"
+          "Custom Logs Monitoring"              = "ENABLED"
+          "Management Agent"                    = "ENABLED"
+          "Oracle Autonomous Linux"             = "DISABLED"
+          "OS Management Service Agent"         = "DISABLED"
+        }
+      }
+    },
+    "oke-gmc" = {
+      create                = local.create_workers && var.worker_gmc_enabled
+      description           = "OKE self-managed GPU Memory Cluster"
+      mode                  = "gpu-memory-cluster"
+      placement_ads         = [substr(var.worker_gmc_ad, -1, 0)]
+      shape                 = var.worker_gmc_shape
+      gpu_memory_fabric_ids = local.worker_gmc_gpu_memory_fabric_ids
+      gpu_memory_cluster_scale_config = {
+        target_size         = var.worker_gmc_scale_target_size
+        is_upsize_enabled   = var.worker_gmc_scale_is_upsize_enabled
+        is_downsize_enabled = var.worker_gmc_scale_is_downsize_enabled
+      }
+      boot_volume_size               = var.worker_gmc_boot_volume_size
+      boot_volume_vpus_per_gb        = var.worker_gmc_boot_volume_vpus_per_gb
+      image_type                     = "custom"
+      image_id                       = var.worker_gmc_image_id
+      max_pods_per_node              = var.worker_gmc_max_pods_per_node
+      kubernetes_version             = coalesce(var.worker_gmc_kubernetes_version, var.kubernetes_version)
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
       cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
       node_metadata                  = local.node_metadata

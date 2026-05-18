@@ -62,6 +62,7 @@ variable "ssh_public_key" {
 
 # Network
 variable "create_vcn" { default = true }
+variable "enable_ipv6" { default = false }
 
 variable "vcn_compartment_ocid" {
   default = null
@@ -286,6 +287,18 @@ variable "install_mpi_operator" {
   default     = true
   type        = bool
   description = "Install MPI Operator for running MPIJob workloads."
+}
+
+variable "install_nvidia_dra_driver" {
+  default     = true
+  type        = bool
+  description = "Install the NVIDIA DRA driver Helm chart for GPU Memory Cluster compute domains."
+}
+
+variable "nvidia_dra_driver_chart_version" {
+  default     = "0.4.0"
+  type        = string
+  description = "NVIDIA DRA driver Helm chart version."
 }
 
 variable "monitoring_namespace" {
@@ -718,11 +731,81 @@ variable "worker_rdma_kubernetes_version" {
   type        = string
 }
 
+# Workers - GPU Memory Cluster
+variable "worker_gmc_enabled" {
+  default     = false
+  description = "Whether to create the GPU Memory Cluster worker pool."
+  type        = bool
+}
+variable "worker_gmc_ad" {
+  default     = ""
+  description = "Availability domain for the GMC worker pool (e.g. 'ZHZP:AP-SYDNEY-1-AD-1'). Only the trailing AD number is used."
+  type        = string
+}
+variable "worker_gmc_shape" {
+  default     = "BM.GPU.GB200-v3.4"
+  description = "Shape for the GMC worker pool."
+  type        = string
+}
+variable "worker_gmc_image_id" {
+  default     = null
+  description = "Custom image OCID for the GMC worker pool. Must be a GMC/RDMA-compatible image for the chosen shape."
+  type        = string
+}
+variable "worker_gmc_boot_volume_size" {
+  default     = 512
+  description = "Boot volume size in GB for the GMC worker pool."
+  type        = number
+}
+variable "worker_gmc_boot_volume_vpus_per_gb" {
+  default     = 10
+  description = "Boot volume VPUs/GB for the GMC worker pool."
+  type        = number
+}
+variable "worker_gmc_max_pods_per_node" {
+  default     = 64
+  description = "Maximum number of pods per node for the GMC worker pool. Max is 110."
+  type        = number
+}
+variable "worker_gmc_kubernetes_version" {
+  default     = null
+  description = "Kubernetes version for the GMC worker pool. Defaults to cluster version if not specified."
+  type        = string
+}
+variable "worker_gmc_gpu_memory_fabric_ids" {
+  default     = ""
+  description = "GPU Memory Fabric OCIDs to fan out into one GPU Memory Cluster per fabric, one OCID per line."
+  type        = string
+  validation {
+    condition = alltrue([
+      for id in compact([
+        for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+      ]) : can(regex("^ocid1\\..*", id))
+    ])
+    error_message = "GPU Memory Fabric OCIDs must be provided one per line."
+  }
+}
+variable "worker_gmc_scale_target_size" {
+  default     = 18
+  description = "Target size for the GPU Memory Cluster scale config (number of nodes per fabric)."
+  type        = number
+}
+variable "worker_gmc_scale_is_upsize_enabled" {
+  default     = true
+  description = "Allow the OCI control plane to upsize the GPU Memory Cluster."
+  type        = bool
+}
+variable "worker_gmc_scale_is_downsize_enabled" {
+  default     = true
+  description = "Allow the OCI control plane to downsize the GPU Memory Cluster."
+  type        = bool
+}
+
 # Kueue
 variable "install_kueue" {
   default     = true
   type        = bool
-  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue). Requires worker_rdma_enabled."
+  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue)."
 }
 
 variable "kueue_chart_version" {

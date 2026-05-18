@@ -100,7 +100,7 @@ resource "null_resource" "helm_deployment_via_operator" {
         join(" ", compact(concat([
           "helm upgrade --install ${var.deployment_name}",
           var.helm_chart_path != "" ? local.operator_helm_chart_path : "%{if var.helm_repository_url != "" && lower(substr(var.helm_repository_url, 0, 4)) == "http"}${var.helm_chart_name} --repo ${var.helm_repository_url}%{else}${var.helm_repository_url}/${var.helm_chart_name}%{endif}",
-          var.helm_chart_path != "" ? "%{if var.helm_chart_version != ""}--version ${var.helm_chart_version}%{endif}" : "",
+          var.helm_chart_version != "" ? "--version ${var.helm_chart_version}" : "",
           "--namespace ${var.namespace} --create-namespace",
           "-f ${local.operator_helm_values_override_template_file_path}",
           "-f ${local.operator_helm_values_override_user_file_path}"
@@ -109,7 +109,7 @@ resource "null_resource" "helm_deployment_via_operator" {
         join(" ", compact(concat([
           "helm upgrade --install ${var.deployment_name}",
           var.helm_chart_path != "" ? local.operator_helm_chart_path : "%{if var.helm_repository_url != "" && lower(substr(var.helm_repository_url, 0, 4)) == "http"}${var.helm_chart_name} --repo ${var.helm_repository_url}%{else}${var.helm_repository_url}/${var.helm_chart_name}%{endif}",
-          var.helm_chart_path != "" ? "%{if var.helm_chart_version != ""}--version ${var.helm_chart_version}%{endif}" : "",
+          var.helm_chart_version != "" ? "--version ${var.helm_chart_version}" : "",
           "--namespace ${var.namespace} --create-namespace",
           "-f ${local.operator_helm_values_override_template_file_path}"
         ], var.deployment_extra_args))),
