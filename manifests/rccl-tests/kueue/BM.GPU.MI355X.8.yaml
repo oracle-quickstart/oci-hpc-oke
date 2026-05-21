@@ -16,6 +16,16 @@ spec:
   resourceGroups:
   - coveredResources: ["cpu", "memory", "amd.com/gpu", "ephemeral-storage"]
     flavors:
+    - name: vm-standard-e5-flex
+      resources:
+      - name: cpu
+        nominalQuota: "100"
+      - name: memory
+        nominalQuota: "512Gi"
+      - name: amd.com/gpu
+        nominalQuota: "0"
+      - name: ephemeral-storage
+        nominalQuota: "1024Gi"
     - name: bm-gpu-mi355x-8
       resources:
       - name: cpu
@@ -78,7 +88,7 @@ spec:
                     sleep 5
                   done
                   echo "All workers are ready!"
-                  
+
                   mpirun \
                     --allow-run-as-root \
                     --bind-to numa \
@@ -102,7 +112,7 @@ spec:
                     -x NCCL_IB_FIFO_TC=185 \
                     -x NCCL_IGNORE_CPU_AFFINITY=1 \
                     -x NCCL_PXN_DISABLE=0 \
-                    -x NCCL_DMABUF_ENABLE=0 \
+                    -x NCCL_DMABUF_ENABLE=1 \
                     -x NCCL_DEBUG=WARN \
                     -x NCCL_NET_OPTIONAL_RECV_COMPLETION=1 \
                     -x RCCL_IB_ABORT_ON_ERROR=1 \
