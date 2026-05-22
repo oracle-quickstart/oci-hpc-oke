@@ -119,7 +119,7 @@ spec:
                     -x NCCL_IGNORE_CPU_AFFINITY=1 \
                     -x NCCL_PXN_DISABLE=0 \
                     -x NCCL_DMABUF_ENABLE=1 \
-                    -x NCCL_DEBUG=INFO \
+                    -x NCCL_DEBUG=WARN \
                     -x NCCL_NET_OPTIONAL_RECV_COMPLETION=1 \
                     -x RCCL_IB_ABORT_ON_ERROR=1 \
                     -x NCCL_IB_USE_INLINE=1 \
