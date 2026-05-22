@@ -62,7 +62,7 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 ##### Ubuntu 24.04
 
-- [ROCm 7.2.0](https://objectstorage.ap-kulai-1.oraclecloud.com/p/r7NmOiphWU9Pm9G7yBSkGIYRT5EXCjSNL2BYqso7R-s2zYBoTPmdwn3uyJ-pCvGb/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-MOFED-2410_1140-AMD-ROCM-72-2026.03.13-0)
+- [ROCm 7.2.0](https://objectstorage.ap-kulai-1.oraclecloud.com/p/tbQvgvf3OBUWCUHudgkXKWKQcKXDc1FUvLlcAqn0gIJGucJ7oVuojGo24vPoiymV/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-MOFED-2410_1140-AMD-ROCM-721-oca-plugin-157-10-2967-ipv4-2026.04.08-0)
 
 ##### Ubuntu 22.04
 
@@ -247,6 +247,12 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI355X-v1.8.yaml
 ```
+
+#### BM.GPU.MI355X.8
+```sh
+kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI355X.8.yaml
+```
+
 #### BM.GPU.MI300X.8
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/rccl-tests/kueue/BM.GPU.MI300X.8.yaml
