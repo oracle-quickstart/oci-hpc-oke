@@ -60,5 +60,5 @@ resource "null_resource" "mpi_operator" {
     ]
   }
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.kueue]
 }

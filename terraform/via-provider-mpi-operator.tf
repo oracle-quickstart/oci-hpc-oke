@@ -14,6 +14,7 @@ resource "kubectl_manifest" "mpi_operator" {
 
   depends_on = [
     module.oke,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    data.oci_resourcemanager_private_endpoint_reachable_ip.oke,
+    terraform_data.wait_for_kueue_webhook,
   ]
 }

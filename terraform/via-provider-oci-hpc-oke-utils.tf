@@ -5,7 +5,8 @@ resource "helm_release" "oci_hpc_oke_utils" {
   count = alltrue([var.install_oci_hpc_oke_utils, var.worker_rdma_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    data.oci_resourcemanager_private_endpoint_reachable_ip.oke,
+    terraform_data.wait_for_kueue_webhook,
   ]
   namespace        = "kube-system"
   name             = "oci-hpc-oke-utils"

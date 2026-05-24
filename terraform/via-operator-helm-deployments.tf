@@ -29,7 +29,7 @@ module "certmanager" {
   helm_template_values_override = file("${path.module}/files/cert-manager/values.yaml")
   helm_user_values_override     = ""
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.kueue]
 }
 
 module "ingress" {
@@ -75,7 +75,7 @@ module "ingress" {
   )
   helm_user_values_override = ""
 
-  depends_on = [module.oke, module.certmanager]
+  depends_on = [module.oke, module.certmanager, module.kueue]
 }
 
 
@@ -150,7 +150,7 @@ module "kube_prometheus_stack" {
       } : {})
     }
   )
-  depends_on = [module.ingress]
+  depends_on = [module.ingress, module.kueue]
 }
 
 

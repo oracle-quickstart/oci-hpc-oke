@@ -35,5 +35,5 @@ module "oci_hpc_oke_utils" {
   })
   helm_user_values_override = ""
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.kueue]
 }

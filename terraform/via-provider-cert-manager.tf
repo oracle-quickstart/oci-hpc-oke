@@ -5,7 +5,8 @@ resource "helm_release" "cert_manager" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
-    data.oci_resourcemanager_private_endpoint_reachable_ip.oke
+    data.oci_resourcemanager_private_endpoint_reachable_ip.oke,
+    terraform_data.wait_for_kueue_webhook,
   ]
   namespace         = "cert-manager"
   name              = "cert-manager"

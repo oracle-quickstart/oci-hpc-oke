@@ -25,6 +25,8 @@ module "kueue" {
   deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
 
   post_deployment_commands = flatten([
+    "kubectl rollout status deployment/kueue-controller-manager -n kueue-system --timeout=300s",
+    "kubectl wait --for=jsonpath='{.subsets[0].addresses[0].ip}' endpoints/kueue-webhook-service -n kueue-system --timeout=300s",
     # Deploy Kueue Topology
     "cat <<'EOF' | kubectl apply -f -",
     split("\n", file("${path.module}/files/kueue/topology.yaml")),
