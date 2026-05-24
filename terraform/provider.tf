@@ -56,6 +56,7 @@ provider "kubectl" {
   host                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.cluster_public_endpoint != "https://" ? local.cluster_public_endpoint : local.cluster_private_endpoint)
   cluster_ca_certificate = base64decode(local.cluster_ca_cert)
   tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
+  apply_retry_count      = 30
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"

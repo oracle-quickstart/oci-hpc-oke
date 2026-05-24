@@ -217,6 +217,8 @@ resource "null_resource" "nvidia_dcgm_exporter_metrics_via_operator" {
 
   provisioner "remote-exec" {
     inline = [
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "kubectl create namespace ${self.triggers.namespace} --dry-run=client -o yaml | kubectl apply -f -",
       "kubectl create configmap ${self.triggers.config_name} --namespace ${self.triggers.namespace} --from-file=${self.triggers.config_key}=${self.triggers.metrics_target} --dry-run=client -o yaml | kubectl apply -f -",
@@ -227,6 +229,8 @@ resource "null_resource" "nvidia_dcgm_exporter_metrics_via_operator" {
   provisioner "remote-exec" {
     when = destroy
     inline = [
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "kubectl delete configmap ${self.triggers.config_name} --namespace ${self.triggers.namespace} --ignore-not-found",
     ]
@@ -299,6 +303,7 @@ resource "terraform_data" "wait_for_non_gpu_workers" {
       set -euo pipefail
 
       export PATH="$PATH:/usr/local/bin"
+      export PYTHONWARNINGS="ignore:the 'strict' parameter::urllib3.poolmanager"
 
       if [ -n "${self.input.oci_auth}" ]; then
         export OCI_CLI_AUTH="${self.input.oci_auth}"

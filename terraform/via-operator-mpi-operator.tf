@@ -33,6 +33,7 @@ resource "null_resource" "mpi_operator" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
       "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
       "kubectl apply --server-side -f /tmp/mpi-operator.yaml",
@@ -45,6 +46,7 @@ resource "null_resource" "mpi_operator" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "kubectl delete namespace mpi-operator --ignore-not-found --wait=false"
     ]
     on_failure = continue

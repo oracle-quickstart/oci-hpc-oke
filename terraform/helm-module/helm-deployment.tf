@@ -87,6 +87,7 @@ resource "null_resource" "helm_deployment_via_operator" {
       [
         "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
         "export OCI_CLI_AUTH=instance_principal",
+        "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
         "echo 'Checking for kubeconfig...'",
         "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
         "if ! kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
@@ -125,6 +126,7 @@ resource "null_resource" "helm_deployment_via_operator" {
     inline = [
       "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
     "helm uninstall ${self.triggers.deployment_name} --namespace ${self.triggers.namespace} --wait"]
     on_failure = continue
   }
