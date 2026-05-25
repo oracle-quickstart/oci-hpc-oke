@@ -29,7 +29,7 @@ spec:
 securityContext:
       privileged: true
       capabilities:
-        add: [ "IPC_LOCK" ]
+        add: [ "IPC_LOCK", "SYS_ADMIN" ]
 ```
 ```yaml
     volumeMounts:
@@ -43,6 +43,10 @@ These sections ensure:
 - **InfiniBand device mount** - Provides access to `/dev/infiniband` for RDMA operations
 - **Shared memory** - Allocates sufficient shared memory for multi-GPU communication
 - **IPC_LOCK capability** - Required for pinning memory in RDMA operations
+- **SYS_ADMIN capability** - Required for additional system-level operations used by the training framework
+
+> [!IMPORTANT]
+> Your container image must include the RDMA userspace libraries (`libibverbs1`, `ibverbs-providers`, `librdmacm1`) for NCCL to use native InfiniBand/RoCE transport. Without them, NCCL falls back to TCP over IPoIB and you lose the RDMA performance benefit. The `ultralytics/yolov5:latest` image used in the examples below does not include these libraries, so each example installs them at pod startup via `apt-get`. For production workloads, bake these packages into a custom image instead.
 
 ## Table of Contents
 
@@ -88,6 +92,7 @@ Add the following parameters to your `torchrun` command:
 
 ```sh
 --rdzv-id=$JOB_ID
+--rdzv-backend=c10d
 --rdzv-endpoint=$(IFS=',' read -ra workers <<< "$VC_WORKER_HOSTS"; echo "${workers[0]}"):23456
 --rdzv-conf=is_host=$(if [ $VC_TASK_INDEX == 0 ]; then echo "true"; else echo "false"; fi)
 --local_addr=$(IFS=',' read -ra workers <<< "$VC_WORKER_HOSTS"; echo "${workers[VC_TASK_INDEX]}")
@@ -99,6 +104,7 @@ Explanation of the above parameters:
 | Parameter        | Explanation                                                                                                                                                                                               |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | \--rdzv-id       | Use the JOB_ID env var as the unique ID for Rendezvous.                                                                                                                                                   |
+| \--rdzv-backend  | Use `c10d` as the backend.                                                                                                                                                                                |
 | \--rdzv-endpoint | Volcano adds the `VC_WORKER_HOSTS` variable, which has the comma separated list of all hosts in the job. We are using the first node in the list as the Rendezvous endpoint.                              |
 | \--rdzv-conf     | Volcano adds the `VC_TASK_INDEX` variable, which is the sequence number of a job container for multi-node training. The value of the first pod is 0. We tell `torchrun` to use the first pod as the host. |
 | \--local_addr    | Volcano adds the `VC_WORKER_HOSTS` and `VC_TASK_INDEX` variables. We tell `torchrun` to use the pod's FQDN as the local address.                                                                          |
@@ -109,13 +115,12 @@ Explanation of the above parameters:
 Here's a complete example using YOLOv5 with Volcano:
 
 > [!IMPORTANT]
-> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
 metadata:
-  annotations:
   name: yolov5-job
 spec:
   minAvailable: 0
@@ -128,13 +133,13 @@ spec:
   - name: worker
     replicas: 2
     template:
-      metadata:
       spec:
         containers:
         - command:
           - /bin/bash
           - -c
           - |
+            apt-get update -qq && apt-get install -y -qq libibverbs1 ibverbs-providers librdmacm1
             torchrun \
             --rdzv-id=$JOB_ID \
             --rdzv-backend=c10d \
@@ -191,7 +196,7 @@ spec:
             capabilities:
               add:
               - IPC_LOCK
-              - CAP_SYS_ADMIN
+              - SYS_ADMIN
           volumeMounts:
           - { mountPath: /dev/infiniband, name: devinf }
           - { mountPath: /dev/shm, name: shm }
@@ -265,7 +270,7 @@ spec:
         - etcd-server=http://etcd-server:2380
         - --initial-cluster-state
         - new
-      image: quay.io/coreos/etcd:latest
+      image: quay.io/coreos/etcd:v3.5.30
       name: etcd-server
       ports:
         - containerPort: 2379
@@ -354,13 +359,12 @@ Explanation of the above parameters:
 Here's a complete example using YOLOv5 with Volcano and etcd:
 
 > [!IMPORTANT]
-> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: batch.volcano.sh/v1alpha1
 kind: Job
 metadata:
-  annotations:
   name: yolov5-job
 spec:
   minAvailable: 0
@@ -373,13 +377,13 @@ spec:
   - name: worker
     replicas: 2
     template:
-      metadata:
       spec:
         containers:
         - command:
           - /bin/bash
           - -c
           - |
+            apt-get update -qq && apt-get install -y -qq libibverbs1 ibverbs-providers librdmacm1
             torchrun \
             --rdzv-id=$JOB_ID \
             --rdzv-backend=etcd-v2 \
@@ -435,7 +439,7 @@ spec:
             capabilities:
               add:
               - IPC_LOCK
-              - CAP_SYS_ADMIN
+              - SYS_ADMIN
           volumeMounts:
           - { mountPath: /dev/infiniband, name: devinf }
           - { mountPath: /dev/shm, name: shm }
@@ -455,6 +459,20 @@ spec:
 
 Training Operator (formerly known as Kubeflow Training Operator) provides Kubernetes custom resources for distributed training workloads.
 
+> [!IMPORTANT]
+> Training Operator bundles its own `MPIJob` CRD (`kubeflow.org/v1`) which conflicts with the standalone [mpi-operator](https://github.com/kubeflow/mpi-operator) (`kubeflow.org/v2beta1`). This stack deploys the standalone mpi-operator by default starting with v26.3.0. If you already have the standalone mpi-operator installed, you must remove it (and its CRD) before installing Training Operator, otherwise the Training Operator pod will crash-loop on cache sync:
+>
+> ```bash
+> kubectl delete -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/mpi-operator/mpi-operator.yaml
+> kubectl delete crd mpijobs.kubeflow.org
+> ```
+>
+> Also note that the install commands below require `--server-side --force-conflicts` because the PyTorchJob and PaddleJob CRDs exceed kubectl's 262 KB client-side annotation limit:
+>
+> ```bash
+> kubectl apply --server-side --force-conflicts -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.9.3"
+> ```
+
 ### Using `c10d` as the Backend
 
 The `c10d` backend provides native PyTorch distributed training support.
@@ -462,7 +480,7 @@ The `c10d` backend provides native PyTorch distributed training support.
 #### Step 1: Install Training Operator
 
 ```bash
-kubectl apply -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.1"
+kubectl apply --server-side --force-conflicts -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.9.3"
 ```
 
 #### Step 2: Configure Job Environment Variables
@@ -485,7 +503,7 @@ Add environment variables for the pod name and replica index to your PyTorch job
 Add the following parameters to your `torchrun` command:
 
 ```sh
-PET_RDZV_CONF=is_host=$(if [ $REPLICA_INDEX == 0 ]; then echo "true"; else echo "false"; fi)
+export PET_RDZV_CONF=is_host=$(if [ $REPLICA_INDEX == 0 ]; then echo "true"; else echo "false"; fi)
 --rdzv-conf=$PET_RDZV_CONF
 --local_addr=$POD_NAME
 ```
@@ -502,7 +520,7 @@ Explanation of the above parameters:
 Here's a complete example using YOLOv5 with Training Operator:
 
 > [!IMPORTANT]
-> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: "kubeflow.org/v1"
@@ -559,6 +577,7 @@ spec:
               args:
                 - "-c"
                 - |
+                  apt-get update -qq && apt-get install -y -qq libibverbs1 ibverbs-providers librdmacm1
                   export PET_RDZV_CONF=is_host=$(if [ $REPLICA_INDEX == 0 ]; then echo "true"; else echo "false"; fi)
                   torchrun \
                   --local_addr=$POD_NAME \
@@ -584,7 +603,7 @@ spec:
                   capabilities:
                     add:
                     - IPC_LOCK
-                    - CAP_SYS_ADMIN
+                    - SYS_ADMIN
           volumes:
           - emptyDir:
               medium: Memory
@@ -601,7 +620,7 @@ The `etcd` backend provides an alternative rendezvous mechanism for Training Ope
 #### Step 1: Install Training Operator
 
 ```bash
-kubectl apply -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.8.1"
+kubectl apply --server-side --force-conflicts -k "github.com/kubeflow/training-operator.git/manifests/overlays/standalone?ref=v1.9.3"
 ```
 
 #### Step 2: Deploy etcd Service
@@ -651,7 +670,7 @@ spec:
         - etcd-server=http://etcd-server:2380
         - --initial-cluster-state
         - new
-      image: quay.io/coreos/etcd:latest
+      image: quay.io/coreos/etcd:v3.5.30
       name: etcd-server
       ports:
         - containerPort: 2379
@@ -745,7 +764,7 @@ Explanation:
 Here's a complete example using YOLOv5 with Training Operator and etcd:
 
 > [!IMPORTANT]
-> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` A100 shape. Modify these variables according to your GPU shape.
+> The NCCL environment variables in this example are configured for the `BM.GPU.B4.8` shape. Modify these variables according to your GPU shape.
 
 ```yaml
 apiVersion: "kubeflow.org/v1"
@@ -762,7 +781,7 @@ spec:
     maxRestarts: 100
   pytorchReplicaSpecs:
     Worker:
-      replicas: 1
+      replicas: 2
       restartPolicy: OnFailure
       template:
         spec:
@@ -800,10 +819,10 @@ spec:
               args:
                 - "-c"
                 - |
+                  apt-get update -qq && apt-get install -y -qq libibverbs1 ibverbs-providers librdmacm1
                   torchrun \
                   --nproc_per_node=1 \
                   --local_addr=$POD_NAME \
-                  --nproc_per_node=1 \
                   train.py \
                   --batch-size=32 \
                   --epochs=100 \
@@ -824,7 +843,7 @@ spec:
                   capabilities:
                     add:
                     - IPC_LOCK
-                    - CAP_SYS_ADMIN
+                    - SYS_ADMIN
           volumes:
           - emptyDir:
               medium: Memory
