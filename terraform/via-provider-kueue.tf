@@ -13,6 +13,7 @@ resource "helm_release" "kueue" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
+    kubectl_manifest.cert_manager_webhook_probe,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
   ]
   namespace        = "kueue-system"
@@ -25,12 +26,21 @@ resource "helm_release" "kueue" {
   max_history      = 1
 }
 
+resource "kubectl_manifest" "kueue_webhook_probe" {
+  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  # Apply a harmless Kueue resource first so kubectl provider retries absorb
+  # webhook CA propagation races before the real Kueue objects are created.
+  yaml_body  = file("${path.module}/files/kueue/webhook-readiness-probe.yaml")
+  depends_on = [helm_release.kueue]
+}
+
 # Kueue Topology for RDMA-aware scheduling
 resource "kubectl_manifest" "kueue_topology" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body  = file("${path.module}/files/kueue/topology.yaml")
-  depends_on = [helm_release.kueue]
+  depends_on = [helm_release.kueue, kubectl_manifest.kueue_webhook_probe]
 }
 
 # ResourceFlavor matching the active GPU worker pool shape

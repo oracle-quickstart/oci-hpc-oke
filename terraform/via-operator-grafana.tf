@@ -161,6 +161,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
     inline = compact(flatten([
       "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "cd /home/${self.triggers.operator_user}/grafana/",
       "kubectl apply -k .",
     ]))
@@ -171,6 +172,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
     inline = [
       "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "cd /home/${self.triggers.operator_user}/grafana/",
       "kubectl delete -k ."
     ]

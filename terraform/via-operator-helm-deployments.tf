@@ -2,7 +2,15 @@
 # Copyright (c) 2026 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 module "certmanager" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
+  count = alltrue([
+    anytrue([
+      var.preferred_kubernetes_services == "public",
+      var.install_kueue,
+      var.install_nvidia_dra_driver,
+      alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack])
+    ]),
+    local.deploy_from_operator
+  ]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -19,10 +27,30 @@ module "certmanager" {
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
+    "export OCI_CLI_AUTH=instance_principal",
+    "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+    "grep -q 'parameter::urllib3.poolmanager' ~/.bashrc || cat >> ~/.bashrc <<'EOF'\nexport PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"\nEOF",
   ]
 
-  post_deployment_commands = []
+  post_deployment_commands = [
+    join("\n", [
+      "probe_apply_success=false",
+      "for i in $(seq 1 30); do",
+      "  if cat <<'EOF' | kubectl apply -f -; then",
+      file("${path.module}/files/cert-manager/webhook-readiness-probe.yaml"),
+      "EOF",
+      "    probe_apply_success=true",
+      "    break",
+      "  fi",
+      "  echo \"cert-manager webhook probe apply failed ($i/30), retrying in 2s...\"",
+      "  sleep 10",
+      "done",
+      "if [ \"$probe_apply_success\" != \"true\" ]; then",
+      "  echo \"ERROR: failed to apply cert-manager webhook probe after 30 attempts\"",
+      "  exit 1",
+      "fi",
+    ])
+  ]
 
   deployment_extra_args = ["--force", "--dependency-update", "--history-max 1", "--wait"]
 
@@ -53,7 +81,6 @@ module "ingress" {
     "export OCI_CLI_AUTH=instance_principal"
   ]
   post_deployment_commands = flatten([
-    "sleep 15", #wait for cert-manager webhook to be ready before applying ClusterIssuer
     "cat <<'EOF' | kubectl apply -f -",
     (var.use_lets_encrypt_prod_endpoint == true ?
       split("\n", templatefile("${path.module}/files/cert-manager/cluster-issuer-prod.yaml", { state = local.state_id })) :

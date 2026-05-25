@@ -28,6 +28,7 @@ resource "null_resource" "fss_pv_via_operator" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
       "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
       "printf 'apiVersion: v1\\nkind: PersistentVolume\\nmetadata:\\n  name: fss-pv\\nspec:\\n  capacity:\\n    storage: 50Gi\\n  accessModes:\\n  - ReadWriteMany\\n  persistentVolumeReclaimPolicy: Retain\\n  csi:\\n    driver: fss.csi.oraclecloud.com\\n    volumeHandle: %s\\n' '${self.triggers.volume_handle}' | kubectl apply -f -",
@@ -39,6 +40,7 @@ resource "null_resource" "fss_pv_via_operator" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "kubectl delete pv fss-pv --ignore-not-found --wait=true --timeout=120s",
     ]
     on_failure = continue

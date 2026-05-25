@@ -19,12 +19,30 @@ module "kueue" {
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
+    "export OCI_CLI_AUTH=instance_principal",
+    "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\""
   ]
 
   deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
 
   post_deployment_commands = flatten([
+    join("\n", [
+      "kueue_webhook_probe_success=false",
+      "for i in $(seq 1 60); do",
+      "  if cat <<'EOF' | kubectl apply --server-side --dry-run=server -f -; then",
+      file("${path.module}/files/kueue/webhook-readiness-probe.yaml"),
+      "EOF",
+      "    kueue_webhook_probe_success=true",
+      "    break",
+      "  fi",
+      "  echo \"Kueue webhook probe failed ($i/60), retrying in 2s...\"",
+      "  sleep 2",
+      "done",
+      "if [ \"$kueue_webhook_probe_success\" != \"true\" ]; then",
+      "  echo \"ERROR: Kueue webhook did not become ready after 60 attempts\"",
+      "  exit 1",
+      "fi",
+    ]),
     # Deploy Kueue Topology
     "cat <<'EOF' | kubectl apply -f -",
     split("\n", file("${path.module}/files/kueue/topology.yaml")),
@@ -56,5 +74,5 @@ module "kueue" {
   helm_template_values_override = ""
   helm_user_values_override     = ""
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.certmanager]
 }

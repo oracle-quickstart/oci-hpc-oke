@@ -19,7 +19,8 @@ module "nvidia_dra_driver" {
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${var.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
+    "export OCI_CLI_AUTH=instance_principal",
+    "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\""
   ]
 
   deployment_extra_args    = ["--wait", "--timeout 300s", "--history-max 1"]
@@ -48,5 +49,5 @@ module "nvidia_dra_driver" {
   })
   helm_user_values_override = ""
 
-  depends_on = [module.oke]
+  depends_on = [module.oke, module.certmanager]
 }
