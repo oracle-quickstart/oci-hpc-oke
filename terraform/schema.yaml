@@ -1976,7 +1976,7 @@ variables:
   worker_gmc_enabled:
     title: Create GPU Memory Cluster pool
     type: boolean
-    description: Create a self-managed GPU Memory Cluster worker pool.
+    description: "Create a self-managed GPU Memory Cluster worker pool. Note: your tenancy must be whitelisted for the GMC declarative size feature. Please work with your cloud engineer to get it whitelisted."
   worker_gmc_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
