@@ -1239,8 +1239,7 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
   control_plane_allowed_cidrs:
     title: Kubernetes endpoint allowed CIDRs
     description: List of CIDR ranges for allowed Kubernetes endpoint communication.
@@ -1528,8 +1527,7 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
 
   # Workers - CPU pool
   worker_cpu_enabled:
@@ -1723,8 +1721,7 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
 
   # Workers - GPU node-pool
   worker_gpu_enabled:
@@ -1843,8 +1840,7 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
 
   # Workers - GPU Cluster-network
   worker_rdma_enabled:
@@ -1969,14 +1965,13 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
 
   # Workers - GPU Memory Cluster
   worker_gmc_enabled:
     title: Create GPU Memory Cluster pool
     type: boolean
-    description: Create a self-managed GPU Memory Cluster worker pool.
+    description: "Create a self-managed GPU Memory Cluster worker pool. Note: your tenancy must be whitelisted for the GMC declarative size feature. Please work with your cloud engineer to get it whitelisted."
   worker_gmc_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
@@ -2018,8 +2013,7 @@ variables:
     enum:
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.34.1"
-      - "v1.33.1"
+      - "v1.33.10"
   worker_gmc_image_id:
     title: Image
     description: Custom image OCID for the GPU Memory Cluster worker pool.

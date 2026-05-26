@@ -301,17 +301,22 @@ NCCL version 2.25.1+cuda12.8
 
 ## Guides
 
+- [Accessing a Private OKE Cluster via OCI Bastion Service](./docs/accessing-private-oke-cluster-via-oci-bastion-service.md)
 - [Adding SSH keys to worker nodes](./docs/adding-ssh-keys-to-worker-nodes.md)
 - [Deploying the Monitoring Stack manually](./docs/deploying-monitoring-stack-manually.md)
+- [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
+- [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
+- [Replacing the boot volume of self-managed nodes using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
 - [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
 - [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
-- [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+- [Running ib_write_bw Tests Between Nodes](./docs/running-ib-write-bw-test.md)
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md)
+- [Upgrading OKE clusters](./docs/oke-hpc-upgrade.md)
 - [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
-- [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
-- [Replacing the boot volume of self-managed nodes using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
-- [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./docs/using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md)
+- [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+- [CVE-2026-31431 ("Copy Fail")](./docs/copy-fail.md)
+- [Dirty Frag: CVE-2026-43284, CVE-2026-43500](./docs/dirty-frag.md)
 
 ## Contributing
 
