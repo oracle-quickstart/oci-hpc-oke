@@ -240,6 +240,8 @@ variableGroups:
       - worker_rdma_ad
       - worker_rdma_pool_size
       - worker_rdma_shape
+      - worker_rdma_compute_cluster_id
+      - worker_rdma_host_group_id
       - worker_rdma_boot_volume_size
       - worker_rdma_boot_volume_vpus_per_gb
       - worker_rdma_kubernetes_version
@@ -1842,11 +1844,11 @@ variables:
       - "v1.34.2"
       - "v1.33.10"
 
-  # Workers - GPU Cluster-network
+  # Workers - GPU + RDMA OKE node pool
   worker_rdma_enabled:
     title: Create GPU with RDMA pool
     type: boolean
-    description: Create a worker pool with Cluster Network placement for RDMA networking.
+    description: Create an OKE-managed worker pool with Compute Cluster placement for RDMA networking.
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
@@ -1868,6 +1870,18 @@ variables:
     visible: ${worker_rdma_enabled}
     dependsOn:
       compartmentId: ${compartment_ocid}
+  worker_rdma_compute_cluster_id:
+    title: Compute Cluster OCID
+    description: Compute Cluster used for GPU + RDMA managed node placement.
+    type: ocid
+    required: true
+    visible: ${worker_rdma_enabled}
+  worker_rdma_host_group_id:
+    title: Compute Host Group OCID
+    description: Optional Compute Host Group used with the GPU + RDMA managed node pool.
+    type: ocid
+    required: false
+    visible: ${worker_rdma_enabled}
   worker_rdma_boot_volume_size:
     title: Boot volume size (GB)
     type: integer

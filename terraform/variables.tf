@@ -694,13 +694,23 @@ variable "worker_gpu_node_cycling_mode" {
   type        = string
 }
 
-# Workers - GPU Cluster-network
+# Workers - GPU + RDMA node pool
 variable "worker_rdma_enabled" { default = false }
 variable "worker_rdma_ad" { default = "" }
 variable "worker_rdma_pool_size" { default = 4 }
 variable "worker_rdma_shape" { default = "BM.GPU.H100.8" }
 variable "worker_rdma_boot_volume_size" { default = 512 }
 variable "worker_rdma_boot_volume_vpus_per_gb" { default = 10 }
+variable "worker_rdma_compute_cluster_id" {
+  default     = null
+  description = "Compute Cluster OCID to use for GPU + RDMA OKE-managed node pool placement."
+  type        = string
+}
+variable "worker_rdma_host_group_id" {
+  default     = null
+  description = "Optional Compute Host Group OCID to use with the GPU + RDMA OKE-managed node pool."
+  type        = string
+}
 variable "worker_rdma_image_type" { default = "Custom" }
 variable "worker_rdma_image_os" { default = "Oracle Linux" }
 variable "worker_rdma_image_os_version" { default = "8" }

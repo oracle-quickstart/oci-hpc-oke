@@ -173,40 +173,29 @@ locals {
       cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-rdma" = {
-      create                         = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
-      description                    = "OKE self-managed Cluster Network with RDMA"
-      placement_ads                  = [substr(var.worker_rdma_ad, -1, 0)]
-      mode                           = "cluster-network"
-      size                           = var.worker_rdma_pool_size
-      shape                          = var.worker_rdma_shape
-      boot_volume_size               = var.worker_rdma_boot_volume_size
-      boot_volume_vpus_per_gb        = var.worker_rdma_boot_volume_vpus_per_gb
-      image_type                     = "custom" # only custom is supported.
-      image_id                       = local.worker_rdma_image_id
-      max_pods_per_node              = var.worker_rdma_max_pods_per_node
-      kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
-      legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
-      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata                  = local.node_metadata
-      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
-      agent_config = {
-        are_all_plugins_disabled = false
-        is_management_disabled   = false
-        is_monitoring_disabled   = false
-        plugins_config = {
-          "Bastion"                             = "DISABLED"
-          "Block Volume Management"             = "DISABLED"
-          "Compute HPC RDMA Authentication"     = "ENABLED"
-          "Compute HPC RDMA Auto-Configuration" = "ENABLED"
-          "Compute Instance Monitoring"         = "ENABLED"
-          "Compute Instance Run Command"        = "ENABLED"
-          "Compute RDMA GPU Monitoring"         = "ENABLED"
-          "Custom Logs Monitoring"              = "ENABLED"
-          "Management Agent"                    = "ENABLED"
-          "Oracle Autonomous Linux"             = "DISABLED"
-          "OS Management Service Agent"         = "DISABLED"
-        }
-      }
+      create             = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
+      description        = "OKE-managed GPU + RDMA Node Pool with Compute Cluster placement"
+      placement_ads      = [substr(var.worker_rdma_ad, -1, 0)]
+      mode               = "node-pool"
+      size               = var.worker_rdma_pool_size
+      shape              = var.worker_rdma_shape
+      boot_volume_size   = var.worker_rdma_boot_volume_size
+      image_type         = local.worker_rdma_image_type
+      os                 = var.worker_rdma_image_os
+      os_version         = var.worker_rdma_image_os_version
+      image_id           = local.worker_rdma_image_id
+      max_pods_per_node  = var.worker_rdma_max_pods_per_node
+      kubernetes_version = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
+      cloud_init         = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata = merge(
+        {
+          "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled,
+          compute_cluster : trimspace(coalesce(var.worker_rdma_compute_cluster_id, "")),
+        },
+        trimspace(coalesce(var.worker_rdma_host_group_id, "")) != "" ? { host_group_id : trimspace(var.worker_rdma_host_group_id) } : {},
+        local.node_metadata
+      )
+      node_labels = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
     },
     "oke-gmc" = {
       create                = local.create_workers && var.worker_gmc_enabled

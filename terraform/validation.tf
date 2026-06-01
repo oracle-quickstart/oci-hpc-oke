@@ -6,7 +6,11 @@ locals {
   invalid_public_ep              = !var.create_public_subnets && var.control_plane_is_public
   invalid_bastion                = !var.create_public_subnets && var.create_bastion
   invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
-  invalid_grace_blackwell_shape  = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4"], var.worker_rdma_shape)
+  invalid_worker_rdma_compute_cluster = (
+    var.worker_rdma_enabled &&
+    trimspace(coalesce(var.worker_rdma_compute_cluster_id, "")) == ""
+  )
+  invalid_grace_blackwell_shape = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4"], var.worker_rdma_shape)
   invalid_image_uri = anytrue([
     var.worker_ops_image_use_uri && !startswith(coalesce(var.worker_ops_image_custom_uri, "none"), "http"),
     var.worker_cpu_image_use_uri && !startswith(coalesce(var.worker_cpu_image_custom_uri, "none"), "http"),
@@ -105,6 +109,17 @@ resource "null_resource" "validate_worker_rdma_image" {
     precondition {
       condition     = !local.invalid_worker_rdma_image
       error_message = "GPU & RDMA worker pools only support Ubuntu images. The selected image '${one(data.oci_core_image.worker_rdma[*].display_name)}' is an Oracle Linux image. Please choose an Ubuntu-based custom image."
+    }
+  }
+}
+
+resource "null_resource" "validate_worker_rdma_compute_cluster" {
+  count = local.invalid_worker_rdma_compute_cluster ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_worker_rdma_compute_cluster
+      error_message = "GPU + RDMA worker pools require `worker_rdma_compute_cluster_id` so OKE can place managed nodes in the Compute Cluster."
     }
   }
 }
