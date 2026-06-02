@@ -1,0 +1,110 @@
+# Copyright (c) 2017, 2023 Oracle Corporation and/or its affiliates.
+# Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
+
+locals {
+  int_lb_nsg_config = try(var.nsgs.int_lb, { create = "never" })
+  int_lb_nsg_create = coalesce(lookup(local.int_lb_nsg_config, "create", null), "auto")
+  int_lb_nsg_enabled = anytrue([
+    local.int_lb_nsg_create == "always",
+    alltrue([
+      local.int_lb_nsg_create == "auto",
+      coalesce(lookup(local.int_lb_nsg_config, "id", null), "none") == "none",
+      var.create_cluster, var.load_balancers == "internal" || var.load_balancers == "both",
+    ]),
+  ])
+  # Return provided NSG when configured with an existing ID or created resource ID
+  int_lb_nsg_id = one(compact([try(var.nsgs.int_lb.id, null), one(oci_core_network_security_group.int_lb[*].id)]))
+  int_lb_rules  = local.int_lb_nsg_enabled ? (var.use_stateless_rules ? local.int_lb_stateless_rules : local.int_lb_stateful_rules) : {}
+  int_lb_stateful_rules = merge(
+    {
+      "Allow TCP egress from internal load balancers to workers for Node Ports" : {
+        protocol = local.tcp_protocol, port_min = local.node_port_min, port_max = local.node_port_max, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+      "Allow UDP egress from internal load balancers to workers for Node Ports" : {
+        protocol = local.udp_protocol, port_min = local.node_port_min, port_max = local.node_port_max, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+      "Allow ICMP egress from internal load balancers to worker nodes for path discovery" : {
+        protocol = local.icmp_protocol, port = local.all_ports, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+      "Allow TCP egress from internal load balancers to workers for health checks" : {
+        protocol = local.tcp_protocol, port = local.health_check_port, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+    },
+
+    local.pod_nsg_enabled ? {
+      "Allow all egress from internal load balancers to pods" : {
+        protocol = local.all_protocols, port = local.all_ports, destination = local.pod_nsg_id, destination_type = local.rule_type_nsg,
+      },
+    } : {},
+
+    var.enable_ipv6 ? {
+      "Allow ICMPv6 egress from internal load balancers to worker nodes for path discovery" : {
+        protocol = local.icmpv6_protocol, port = local.all_ports, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+    } : {},
+    var.enable_waf ? local.waf_rules : {},
+    var.allow_rules_internal_lb,
+  )
+
+  int_lb_stateless_rules = merge(
+    {
+      "Allow TCP egress from internal load balancers to workers for Node Ports" : {
+        protocol = local.tcp_protocol, destination_port_min = local.node_port_min, destination_port_max = local.node_port_max, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg, stateless = true
+      },
+      "Allow TCP ingress to internal load balancers from workers for Node Ports" : {
+        protocol = local.tcp_protocol, source_port_min = local.node_port_min, source_port_max = local.node_port_max, source = local.worker_nsg_id, source_type = local.rule_type_nsg, stateless = true
+      },
+
+      "Allow UDP egress from internal load balancers to workers for Node Ports" : {
+        protocol = local.udp_protocol, destination_port_min = local.node_port_min, destination_port_max = local.node_port_max, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg, stateless = true
+      },
+      "Allow UDP ingress to internal load balancers from workers for Node Ports" : {
+        protocol = local.udp_protocol, source_port_min = local.node_port_min, source_port_max = local.node_port_max, source = local.worker_nsg_id, source_type = local.rule_type_nsg, stateless = true
+      },
+
+      "Allow TCP egress from internal load balancers to pods for health checks" : {
+        protocol = local.tcp_protocol, destination_port_min = local.health_check_port, destination_port_max = local.health_check_port, destination = local.pod_nsg_id, destination_type = local.rule_type_nsg, stateless = true
+      },
+      "Allow TCP egress to internal load balancers from pods for health checks" : {
+        protocol = local.tcp_protocol, source_port_min = local.health_check_port, source_port_max = local.health_check_port, source = local.pod_nsg_id, source_type = local.rule_type_nsg, stateless = true
+      },
+
+      "Allow ICMP egress from internal load balancers to worker nodes for path discovery" : {
+        protocol = local.icmp_protocol, port = local.all_ports, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+    },
+
+    local.pod_nsg_enabled ? {
+      "Allow all egress from internal load balancers to pods" : {
+        protocol = local.all_protocols, port = local.all_ports, destination = local.pod_nsg_id, destination_type = local.rule_type_nsg, stateless = true
+      },
+      "Allow all ingress from pods to internal load balancers" : {
+        protocol = local.all_protocols, port = local.all_ports, source = local.pod_nsg_id, source_type = local.rule_type_nsg, stateless = true
+      },
+    } : {},
+
+    var.enable_ipv6 ? {
+      "Allow ICMPv6 egress from internal load balancers to worker nodes for path discovery" : {
+        protocol = local.icmpv6_protocol, port = local.all_ports, destination = local.worker_nsg_id, destination_type = local.rule_type_nsg,
+      },
+    } : {},
+    var.enable_waf ? local.waf_rules : {},
+    var.allow_rules_internal_lb,
+  )
+}
+
+resource "oci_core_network_security_group" "int_lb" {
+  count          = local.int_lb_nsg_enabled ? 1 : 0
+  compartment_id = var.compartment_id
+  display_name   = "int_lb-${var.state_id}"
+  vcn_id         = var.vcn_id
+  defined_tags   = var.defined_tags
+  freeform_tags  = var.freeform_tags
+  lifecycle {
+    ignore_changes = [defined_tags, freeform_tags, display_name, vcn_id]
+  }
+}
+
+output "int_lb_nsg_id" {
+  value = local.int_lb_nsg_id
+}

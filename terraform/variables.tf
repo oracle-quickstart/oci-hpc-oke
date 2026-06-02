@@ -88,6 +88,11 @@ variable "workers_sn_cidr" { default = null }
 variable "pods_sn_cidr" { default = null }
 variable "fss_sn_cidr" { default = null }
 variable "lustre_sn_cidr" { default = null }
+variable "worker_secondary_vnic_subnets" {
+  default     = {}
+  description = "Additional subnet definitions for worker secondary VNICs. Keys can be referenced by worker_pool_secondary_vnics[*][*].subnet_key, and values follow the module subnets map shape, for example { create = \"always\", cidr = \"100.64.0.0/20\" }."
+  type        = any
+}
 variable "bastion_sn_id" { default = null }
 variable "bastion_service_sn_id" { default = null }
 variable "operator_sn_id" { default = null }
@@ -519,6 +524,11 @@ variable "legacy_imds_endpoints_disabled" {
   type        = bool
   default     = true
   description = "Whether to disable legacy IMDS endpoints on nodepool instances (IMDSv1). When true, only IMDSv2 is available."
+}
+variable "worker_pool_secondary_vnics" {
+  default     = {}
+  description = "Per-worker-pool secondary VNIC profiles keyed by worker pool name, then VNIC name. Applies to managed OKE node pools such as oke-system, oke-cpu, oke-gpu, and oke-rdma. Each profile can include subnet_id or subnet_key, ip_count, nsg_ids, assign_public_ip, skip_source_dest_check, display_name, and optional application_resources."
+  type        = any
 }
 
 # Workers - System pool

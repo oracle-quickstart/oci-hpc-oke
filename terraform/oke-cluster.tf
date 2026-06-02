@@ -183,7 +183,8 @@ locals {
         { id = var.lustre_sn_id, create = "never" } : {},
         lookup(var.subnet_advanced_attrs, "lustre", {})
       )
-    } : {}
+    } : {},
+    { for key, subnet in var.worker_secondary_vnic_subnets : key => merge({ create = "always" }, subnet) }
   )
 
   cni_type = contains(["npn", "VCN-Native Pod Networking"], var.cni_type) ? "npn" : "flannel"
@@ -199,7 +200,7 @@ locals {
 }
 
 module "oke" {
-  source = "git::https://github.com/oracle-terraform-modules/terraform-oci-oke.git//?ref=25ef9a02ada3fc3bf7c43f200503682e79f58f03"
+  source = "./modules/terraform-oci-oke"
 
   providers = { oci.home = oci.home }
 

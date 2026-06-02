@@ -115,6 +115,7 @@ locals {
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_ops_node_cycling_mode]
+      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-system", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -141,6 +142,7 @@ locals {
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
+      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-cpu", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -166,6 +168,7 @@ locals {
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
+      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-gpu", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -187,6 +190,7 @@ locals {
       max_pods_per_node  = var.worker_rdma_max_pods_per_node
       kubernetes_version = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
       cloud_init         = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      secondary_vnics    = lookup(var.worker_pool_secondary_vnics, "oke-rdma", {})
       node_metadata = merge(
         {
           "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled,
