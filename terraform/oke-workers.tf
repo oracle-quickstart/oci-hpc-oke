@@ -184,25 +184,36 @@ locals {
       for config in local.worker_secondary_vnic_pool_configs : config.enabled && config.subnet_key == local.worker_secondary_vnic_default_subnet_keys.system_cpu && try(trimspace(config.subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
       ]) ? {
       (local.worker_secondary_vnic_default_subnet_keys.system_cpu) = {
-        create          = "always"
-        ipv4cidr_blocks = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.system_cpu
-        dns_label       = "syscpu"
+        create                    = "always"
+        ipv4cidr_blocks           = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.system_cpu
+        dns_label                 = "syscpu"
+        secondary_vnic_pod_subnet = true
       }
     } : {},
     anytrue([
       for config in local.worker_secondary_vnic_pool_configs : config.enabled && config.subnet_key == local.worker_secondary_vnic_default_subnet_keys.gpu_rdma && try(trimspace(config.subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
       ]) ? {
       (local.worker_secondary_vnic_default_subnet_keys.gpu_rdma) = {
-        create          = "always"
-        ipv4cidr_blocks = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.gpu_rdma
-        dns_label       = "gpurdma"
+        create                    = "always"
+        ipv4cidr_blocks           = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.gpu_rdma
+        dns_label                 = "gpurdma"
+        secondary_vnic_pod_subnet = true
       }
     } : {},
     {
       for _, config in local.worker_secondary_vnic_pool_configs : config.subnet_key => {
-        create          = "always"
-        ipv4cidr_blocks = config.ipv4cidr_blocks
-        dns_label       = config.dns_label
+        create                    = "never"
+        id                        = try(trimspace(config.subnet_id), "")
+        secondary_vnic_pod_subnet = true
+      }
+      if config.enabled && try(trimspace(config.subnet_id), "") != ""
+    },
+    {
+      for _, config in local.worker_secondary_vnic_pool_configs : config.subnet_key => {
+        create                    = "always"
+        ipv4cidr_blocks           = config.ipv4cidr_blocks
+        dns_label                 = config.dns_label
+        secondary_vnic_pod_subnet = true
       }
       if config.enabled && try(trimspace(config.explicit_subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
     }
@@ -217,6 +228,7 @@ locals {
             vnic_display_name      = config.display_name
             ip_count               = config.ip_count
             nsg_ids                = config.nsg_ids
+            subnet_key             = config.subnet_key
             assign_public_ip       = false
             skip_source_dest_check = false
           },

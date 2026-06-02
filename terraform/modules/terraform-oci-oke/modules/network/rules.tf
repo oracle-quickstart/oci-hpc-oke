@@ -16,6 +16,7 @@ locals {
     { for k, v in local.pub_lb_rules : k => merge(v, { "nsg_id" = local.pub_lb_nsg_id }) },
     { for k, v in local.workers_rules : k => merge(v, { "nsg_id" = local.worker_nsg_id }) },
     { for k, v in local.pods_rules : k => merge(v, { "nsg_id" = local.pod_nsg_id }) },
+    local.secondary_vnic_pod_nsg_rules,
     { for k, v in local.operator_rules : k => merge(v, { "nsg_id" = local.operator_nsg_id }) },
     { for k, v in local.fss_rules : k => merge(v, { "nsg_id" = local.fss_nsg_id }) },
     ) : x => merge(y, {
@@ -50,6 +51,7 @@ locals {
     local.pub_lb_nsg_enabled ? { "pub_lb" = local.pub_lb_nsg_id } : {},
     local.worker_nsg_enabled ? { "workers" = local.worker_nsg_id } : {},
     local.pod_nsg_enabled ? { "pods" = local.pod_nsg_id } : {},
+    { for k, v in local.secondary_vnic_pod_nsg_ids : "secondary_vnic_pods_${k}" => v },
     local.operator_nsg_enabled ? { "operator" = local.operator_nsg_id } : {},
     local.fss_nsg_enabled ? { "fss" = local.fss_nsg_id } : {},
   ) : x => y }

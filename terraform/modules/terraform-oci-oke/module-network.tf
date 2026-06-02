@@ -258,6 +258,10 @@ output "pod_nsg_id" {
   description = "Network Security Group for pods."
   value       = try(module.network.pod_nsg_id, null)
 }
+output "secondary_vnic_pod_nsg_ids" {
+  description = "Network Security Groups for managed node pool secondary VNIC pod subnets."
+  value       = try(module.network.secondary_vnic_pod_nsg_ids, {})
+}
 output "fss_nsg_id" {
   description = "Network Security Group for File Storage Service resources."
   value       = try(module.network.fss_nsg_id, null)

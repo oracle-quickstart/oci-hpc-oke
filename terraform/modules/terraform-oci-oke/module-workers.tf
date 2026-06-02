@@ -23,6 +23,10 @@ locals {
       secondary_vnics = {
         for vnic_name, vnic in lookup(pool, "secondary_vnics", {}) : vnic_name => merge(vnic, {
           subnet_id = try(trimspace(vnic.subnet_id), "") != "" ? trimspace(vnic.subnet_id) : try(module.network.subnet_ids[vnic.subnet_key], null)
+          nsg_ids = distinct(compact(concat(
+            try(tolist(vnic.nsg_ids), []),
+            try([module.network.secondary_vnic_pod_nsg_ids[vnic.subnet_key]], [])
+          )))
         })
       }
     })
