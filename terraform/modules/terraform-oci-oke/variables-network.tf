@@ -169,14 +169,15 @@ variable "subnets" {
   }
   description = "Configuration for standard subnets. The 'create' parameter of each entry defaults to 'auto', creating subnets when other enabled components are expected to utilize them, and may be configured with 'never' or 'always' to force disabled/enabled."
   type = map(object({
-    create       = optional(string)
-    id           = optional(string)
-    newbits      = optional(string)
-    netnum       = optional(string)
-    cidr         = optional(string)
-    display_name = optional(string)
-    dns_label    = optional(string)
-    ipv6_cidr    = optional(string)
+    create          = optional(string)
+    id              = optional(string)
+    newbits         = optional(string)
+    netnum          = optional(string)
+    cidr            = optional(string)
+    ipv4cidr_blocks = optional(list(string))
+    display_name    = optional(string)
+    dns_label       = optional(string)
+    ipv6_cidr       = optional(string)
   }))
   validation {
     condition = alltrue([
@@ -186,10 +187,10 @@ variable "subnets" {
   }
   validation {
     condition = alltrue([
-      for v in flatten([for k, v in var.subnets : keys(v)]) : contains(["create", "id", "cidr", "netnum", "newbits", "display_name", "dns_label", "ipv6_cidr"], v)
+      for v in flatten([for k, v in var.subnets : keys(v)]) : contains(["create", "id", "cidr", "ipv4cidr_blocks", "netnum", "newbits", "display_name", "dns_label", "ipv6_cidr"], v)
     ])
     error_message = format("Invalid subnet configuration keys: %s", jsonencode(distinct([
-      for v in flatten([for k, v in var.subnets : keys(v)]) : v if !contains(["create", "id", "cidr", "netnum", "newbits", "display_name", "dns_label", "ipv6_cidr"], v)
+      for v in flatten([for k, v in var.subnets : keys(v)]) : v if !contains(["create", "id", "cidr", "ipv4cidr_blocks", "netnum", "newbits", "display_name", "dns_label", "ipv6_cidr"], v)
     ])))
   }
 }

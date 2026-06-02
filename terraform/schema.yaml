@@ -36,10 +36,6 @@ variableGroups:
       - lustre_cluster_placement_group_id
       - lustre_file_system_name
       # Max pods per node (per pool)
-      - worker_ops_max_pods_per_node
-      - worker_cpu_max_pods_per_node
-      - worker_gpu_max_pods_per_node
-      - worker_rdma_max_pods_per_node
       - worker_gmc_max_pods_per_node
       - oke_ons_webhook_chart_version
       - oci_metrics_exporter_chart_version
@@ -195,6 +191,11 @@ variableGroups:
       - worker_ops_image_custom_uri
       - worker_ops_image_compartment
       - worker_ops_image_custom_id
+      - worker_ops_secondary_vnic_enabled
+      - worker_ops_secondary_vnic_subnet_id
+      - worker_ops_secondary_vnic_ip_count
+      - worker_ops_max_pods_per_node
+      - worker_ops_secondary_vnic_nsg_ids
       
   - title: "Worker Pool: CPU"
     variables:
@@ -216,6 +217,11 @@ variableGroups:
       - worker_cpu_image_custom_uri
       - worker_cpu_image_compartment
       - worker_cpu_image_custom_id
+      - worker_cpu_secondary_vnic_enabled
+      - worker_cpu_secondary_vnic_subnet_id
+      - worker_cpu_secondary_vnic_ip_count
+      - worker_cpu_max_pods_per_node
+      - worker_cpu_secondary_vnic_nsg_ids
       
   - title: "Worker Pool: GPU"
     variables:
@@ -233,6 +239,11 @@ variableGroups:
       - worker_gpu_image_custom_uri
       - worker_gpu_image_compartment
       - worker_gpu_image_custom_id
+      - worker_gpu_secondary_vnic_enabled
+      - worker_gpu_secondary_vnic_subnet_id
+      - worker_gpu_secondary_vnic_ip_count
+      - worker_gpu_max_pods_per_node
+      - worker_gpu_secondary_vnic_nsg_ids
 
   - title: "Worker Pool: GPU with RDMA"
     variables:
@@ -253,6 +264,11 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
+      - worker_rdma_secondary_vnic_enabled
+      - worker_rdma_secondary_vnic_subnet_id
+      - worker_rdma_secondary_vnic_ip_count
+      - worker_rdma_max_pods_per_node
+      - worker_rdma_secondary_vnic_nsg_ids
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -662,7 +678,7 @@ variables:
         - networking_advanced_options
   pods_sn_cidr:
     title: Subnet CIDR for the pods subnet
-    description: CIDR subnet to use for the pods subnet. If not provided a dynamic subnet will be created if required.
+    description: CIDR subnet to use for the legacy pods subnet. This is only used when at least one enabled managed node pool does not use a secondary VNIC profile. If all enabled managed pools use secondary VNICs, Terraform does not create this subnet.
     type: string
     pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
     required: false
@@ -733,7 +749,8 @@ variables:
     visible: ${create_vcn}
   vcn_cidrs:
     title: VCN CIDR ranges
-    description: Comma-separated list of CIDR blocks for the created VCN.
+    description: >-
+      Comma-separated list of CIDR blocks for the created VCN. For GVA secondary VNIC defaults, add a second CIDR such as 100.64.0.0/16; blank system/CPU fields use the first half of that second CIDR, and blank GPU/GPU+RDMA fields use the second half. Each generated secondary VNIC subnet is then configured with two IPv4 CIDR blocks: a smaller first block for normal VNIC private IPs and a larger second block for private IP CIDR allocation.
     type: string
     required: true
     visible: ${create_vcn}
@@ -743,6 +760,16 @@ variables:
     type: boolean
     default: true
     visible: ${create_vcn}
+  worker_secondary_vnic_subnets:
+    title: Advanced worker secondary VNIC subnets
+    description: Hidden advanced Terraform variable for custom secondary VNIC subnet definitions.
+    type: map(string)
+    visible: false
+  worker_pool_secondary_vnics:
+    title: Advanced worker pool secondary VNIC profiles
+    description: Hidden advanced Terraform variable for custom per-pool secondary VNIC profiles.
+    type: map(string)
+    visible: false
 
   # Bastion
   create_bastion:
@@ -1530,6 +1557,56 @@ variables:
       - "v1.35.2"
       - "v1.34.2"
       - "v1.33.10"
+  worker_ops_secondary_vnic_enabled:
+    title: Configure secondary VNIC for pod IPs
+    description: Add a GVA secondary VNIC profile to the system node pool.
+    type: boolean
+    default: false
+  worker_ops_secondary_vnic_subnet_cidr:
+    title: Advanced secondary subnet range
+    description: >-
+      Hidden advanced Terraform input. The Resource Manager UI uses derived two-CIDR-block defaults for new VCNs, or an existing subnet selection for existing VCNs.
+    type: string
+    required: false
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+    visible: false
+  worker_ops_secondary_vnic_subnet_id:
+    title: Existing secondary VNIC subnet
+    description: >-
+      For an existing VCN, select a subnet for the system pool secondary VNIC. The subnet should already have two IPv4 CIDR blocks: a smaller first block for normal VNIC private IPs and a larger second block for private IP CIDR allocation. Leave blank when creating a new VCN so Terraform creates the default two-CIDR-block subnet.
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${vcn_compartment_ocid}
+      vcnId: ${vcn_id}
+    visible:
+      and:
+        - ${worker_ops_secondary_vnic_enabled}
+        - { not: [create_vcn] }
+  worker_ops_secondary_vnic_ip_count:
+    title: Pod IPs per secondary VNIC
+    description: Number of pod IPs allocated on each secondary VNIC.
+    type: enum
+    enum: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    default: 32
+    visible: ${worker_ops_secondary_vnic_enabled}
+  worker_ops_max_pods_per_node:
+    title: Maximum pods per node
+    description: Kubelet maximum pods per system node. Tune this with the secondary VNIC pod IP count.
+    type: integer
+    minimum: 1
+    maximum: 110
+    default: 110
+    visible: ${worker_ops_secondary_vnic_enabled}
+  worker_ops_secondary_vnic_nsg_ids:
+    title: Secondary VNIC NSG OCIDs
+    description: Optional network security group OCIDs to attach to the system pool secondary VNIC.
+    type: array
+    items:
+      type: string
+    unique_items: true
+    minItems: 0
+    visible: ${worker_ops_secondary_vnic_enabled}
 
   # Workers - CPU pool
   worker_cpu_enabled:
@@ -1724,6 +1801,67 @@ variables:
       - "v1.35.2"
       - "v1.34.2"
       - "v1.33.10"
+  worker_cpu_secondary_vnic_enabled:
+    title: Configure secondary VNIC for pod IPs
+    description: Add a GVA secondary VNIC profile to the CPU node pool.
+    type: boolean
+    default: false
+    visible: ${worker_cpu_enabled}
+  worker_cpu_secondary_vnic_subnet_cidr:
+    title: Advanced secondary subnet range
+    description: >-
+      Hidden advanced Terraform input. The Resource Manager UI uses derived two-CIDR-block defaults for new VCNs, or an existing subnet selection for existing VCNs.
+    type: string
+    required: false
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+    visible: false
+  worker_cpu_secondary_vnic_subnet_id:
+    title: Existing secondary VNIC subnet
+    description: >-
+      For an existing VCN, select a subnet for the CPU pool secondary VNIC. The subnet should already have two IPv4 CIDR blocks: a smaller first block for normal VNIC private IPs and a larger second block for private IP CIDR allocation. Leave blank when creating a new VCN so Terraform creates the default two-CIDR-block subnet.
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${vcn_compartment_ocid}
+      vcnId: ${vcn_id}
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - ${worker_cpu_secondary_vnic_enabled}
+        - { not: [create_vcn] }
+  worker_cpu_secondary_vnic_ip_count:
+    title: Pod IPs per secondary VNIC
+    description: Number of pod IPs allocated on each secondary VNIC.
+    type: enum
+    enum: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    default: 32
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - ${worker_cpu_secondary_vnic_enabled}
+  worker_cpu_max_pods_per_node:
+    title: Maximum pods per node
+    description: Kubelet maximum pods per CPU node. Tune this with the secondary VNIC pod IP count.
+    type: integer
+    minimum: 1
+    maximum: 110
+    default: 110
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - ${worker_cpu_secondary_vnic_enabled}
+  worker_cpu_secondary_vnic_nsg_ids:
+    title: Secondary VNIC NSG OCIDs
+    description: Optional network security group OCIDs to attach to the CPU pool secondary VNIC.
+    type: array
+    items:
+      type: string
+    unique_items: true
+    minItems: 0
+    visible:
+      and:
+        - ${worker_cpu_enabled}
+        - ${worker_cpu_secondary_vnic_enabled}
 
   # Workers - GPU node-pool
   worker_gpu_enabled:
@@ -1843,6 +1981,67 @@ variables:
       - "v1.35.2"
       - "v1.34.2"
       - "v1.33.10"
+  worker_gpu_secondary_vnic_enabled:
+    title: Configure secondary VNIC for pod IPs
+    description: Add a GVA secondary VNIC profile to the GPU node pool.
+    type: boolean
+    default: false
+    visible: ${worker_gpu_enabled}
+  worker_gpu_secondary_vnic_subnet_cidr:
+    title: Advanced secondary subnet range
+    description: >-
+      Hidden advanced Terraform input. The Resource Manager UI uses derived two-CIDR-block defaults for new VCNs, or an existing subnet selection for existing VCNs.
+    type: string
+    required: false
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+    visible: false
+  worker_gpu_secondary_vnic_subnet_id:
+    title: Existing secondary VNIC subnet
+    description: >-
+      For an existing VCN, select a subnet for the GPU pool secondary VNIC. The subnet should already have two IPv4 CIDR blocks: a smaller first block for normal VNIC private IPs and a larger second block for private IP CIDR allocation. Leave blank when creating a new VCN so Terraform creates the default two-CIDR-block subnet.
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${vcn_compartment_ocid}
+      vcnId: ${vcn_id}
+    visible:
+      and:
+        - ${worker_gpu_enabled}
+        - ${worker_gpu_secondary_vnic_enabled}
+        - { not: [create_vcn] }
+  worker_gpu_secondary_vnic_ip_count:
+    title: Pod IPs per secondary VNIC
+    description: Number of pod IPs allocated on each secondary VNIC.
+    type: enum
+    enum: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    default: 32
+    visible:
+      and:
+        - ${worker_gpu_enabled}
+        - ${worker_gpu_secondary_vnic_enabled}
+  worker_gpu_max_pods_per_node:
+    title: Maximum pods per node
+    description: Kubelet maximum pods per GPU node. Tune this with the secondary VNIC pod IP count.
+    type: integer
+    minimum: 1
+    maximum: 110
+    default: 64
+    visible:
+      and:
+        - ${worker_gpu_enabled}
+        - ${worker_gpu_secondary_vnic_enabled}
+  worker_gpu_secondary_vnic_nsg_ids:
+    title: Secondary VNIC NSG OCIDs
+    description: Optional network security group OCIDs to attach to the GPU pool secondary VNIC.
+    type: array
+    items:
+      type: string
+    unique_items: true
+    minItems: 0
+    visible:
+      and:
+        - ${worker_gpu_enabled}
+        - ${worker_gpu_secondary_vnic_enabled}
 
   # Workers - GPU + RDMA OKE node pool
   worker_rdma_enabled:
@@ -1980,6 +2179,67 @@ variables:
       - "v1.35.2"
       - "v1.34.2"
       - "v1.33.10"
+  worker_rdma_secondary_vnic_enabled:
+    title: Configure secondary VNIC for pod IPs
+    description: Add a GVA secondary VNIC profile to the GPU + RDMA node pool.
+    type: boolean
+    default: false
+    visible: ${worker_rdma_enabled}
+  worker_rdma_secondary_vnic_subnet_cidr:
+    title: Advanced secondary subnet range
+    description: >-
+      Hidden advanced Terraform input. The Resource Manager UI uses derived two-CIDR-block defaults for new VCNs, or an existing subnet selection for existing VCNs.
+    type: string
+    required: false
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+    visible: false
+  worker_rdma_secondary_vnic_subnet_id:
+    title: Existing secondary VNIC subnet
+    description: >-
+      For an existing VCN, select a subnet for the GPU + RDMA pool secondary VNIC. The subnet should already have two IPv4 CIDR blocks: a smaller first block for normal VNIC private IPs and a larger second block for private IP CIDR allocation. Leave blank when creating a new VCN so Terraform creates the default two-CIDR-block subnet.
+    type: oci:core:subnet:id
+    required: false
+    dependsOn:
+      compartmentId: ${vcn_compartment_ocid}
+      vcnId: ${vcn_id}
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_secondary_vnic_enabled}
+        - { not: [create_vcn] }
+  worker_rdma_secondary_vnic_ip_count:
+    title: Pod IPs per secondary VNIC
+    description: Number of pod IPs allocated on each secondary VNIC.
+    type: enum
+    enum: [1, 2, 4, 8, 16, 32, 64, 128, 256]
+    default: 32
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_secondary_vnic_enabled}
+  worker_rdma_max_pods_per_node:
+    title: Maximum pods per node
+    description: Kubelet maximum pods per GPU + RDMA node. Tune this with the secondary VNIC pod IP count.
+    type: integer
+    minimum: 1
+    maximum: 110
+    default: 64
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_secondary_vnic_enabled}
+  worker_rdma_secondary_vnic_nsg_ids:
+    title: Secondary VNIC NSG OCIDs
+    description: Optional network security group OCIDs to attach to the GPU + RDMA pool secondary VNIC.
+    type: array
+    items:
+      type: string
+    unique_items: true
+    minItems: 0
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_secondary_vnic_enabled}
 
   # Workers - GPU Memory Cluster
   worker_gmc_enabled:

@@ -54,12 +54,19 @@ resource "oci_containerengine_node_pool" "tfscaled_workers" {
     }
 
     dynamic "node_pool_pod_network_option_details" {
-      for_each = var.cni_type == "npn" ? [1] : []
-      content { # VCN-Native requires max pods/node, nsg ids, subnet ids
+      for_each = var.cni_type == "npn" && !each.value.has_secondary_vnics ? [1] : []
+      content { # Standard VCN-Native requires max pods/node, nsg ids, subnet ids
         cni_type          = "OCI_VCN_IP_NATIVE"
         max_pods_per_node = each.value.max_pods_per_node
         pod_nsg_ids       = compact(tolist(each.value.pod_nsg_ids))
         pod_subnet_ids    = compact(tolist([each.value.pod_subnet_id]))
+      }
+    }
+
+    dynamic "node_pool_pod_network_option_details" {
+      for_each = var.cni_type == "npn" && each.value.has_secondary_vnics ? [1] : []
+      content { # GVA secondary VNICs cannot be combined with pod subnet/NSG/max-pods options.
+        cni_type = "OCI_VCN_IP_NATIVE"
       }
     }
   }
@@ -169,7 +176,7 @@ resource "oci_containerengine_node_pool" "tfscaled_workers" {
     precondition {
       condition = alltrue([
         for _, vnic in lookup(each.value, "secondary_vnics", {}) :
-        try(vnic.subnet_id, null) != null
+        try(vnic.subnet_id, null) != null || try(trimspace(vnic.subnet_key), "") != ""
       ])
       error_message = "secondary_vnics entries must specify subnet_id or a subnet_key that resolves to a module-created subnet."
     }
@@ -177,9 +184,9 @@ resource "oci_containerengine_node_pool" "tfscaled_workers" {
     precondition {
       condition = alltrue([
         for _, vnic in lookup(each.value, "secondary_vnics", {}) :
-        lookup(vnic, "ip_count", 1) >= 1 && lookup(vnic, "ip_count", 1) <= 16
+        contains([1, 2, 4, 8, 16, 32, 64, 128, 256], lookup(vnic, "ip_count", 32))
       ])
-      error_message = "secondary_vnics ip_count must be between 1 and 16."
+      error_message = "secondary_vnics ip_count must be a power of two from 1 to 256."
     }
 
     precondition {
@@ -249,12 +256,19 @@ resource "oci_containerengine_node_pool" "autoscaled_workers" {
     }
 
     dynamic "node_pool_pod_network_option_details" {
-      for_each = var.cni_type == "npn" ? [1] : []
-      content { # VCN-Native requires max pods/node, nsg ids, subnet ids
+      for_each = var.cni_type == "npn" && !each.value.has_secondary_vnics ? [1] : []
+      content { # Standard VCN-Native requires max pods/node, nsg ids, subnet ids
         cni_type          = "OCI_VCN_IP_NATIVE"
         max_pods_per_node = each.value.max_pods_per_node
         pod_nsg_ids       = compact(tolist(each.value.pod_nsg_ids))
         pod_subnet_ids    = compact(tolist([each.value.pod_subnet_id]))
+      }
+    }
+
+    dynamic "node_pool_pod_network_option_details" {
+      for_each = var.cni_type == "npn" && each.value.has_secondary_vnics ? [1] : []
+      content { # GVA secondary VNICs cannot be combined with pod subnet/NSG/max-pods options.
+        cni_type = "OCI_VCN_IP_NATIVE"
       }
     }
   }
@@ -364,7 +378,7 @@ resource "oci_containerengine_node_pool" "autoscaled_workers" {
     precondition {
       condition = alltrue([
         for _, vnic in lookup(each.value, "secondary_vnics", {}) :
-        try(vnic.subnet_id, null) != null
+        try(vnic.subnet_id, null) != null || try(trimspace(vnic.subnet_key), "") != ""
       ])
       error_message = "secondary_vnics entries must specify subnet_id or a subnet_key that resolves to a module-created subnet."
     }
@@ -372,9 +386,9 @@ resource "oci_containerengine_node_pool" "autoscaled_workers" {
     precondition {
       condition = alltrue([
         for _, vnic in lookup(each.value, "secondary_vnics", {}) :
-        lookup(vnic, "ip_count", 1) >= 1 && lookup(vnic, "ip_count", 1) <= 16
+        contains([1, 2, 4, 8, 16, 32, 64, 128, 256], lookup(vnic, "ip_count", 32))
       ])
-      error_message = "secondary_vnics ip_count must be between 1 and 16."
+      error_message = "secondary_vnics ip_count must be a power of two from 1 to 256."
     }
 
     precondition {

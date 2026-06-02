@@ -8,8 +8,20 @@ locals {
   invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
   invalid_worker_rdma_compute_cluster = (
     var.worker_rdma_enabled &&
-    trimspace(coalesce(var.worker_rdma_compute_cluster_id, "")) == ""
+    local.worker_rdma_compute_cluster_id == ""
   )
+  invalid_worker_secondary_vnic_subnets = [
+    for pool_name, config in local.worker_secondary_vnic_pool_configs : pool_name
+    if config.enabled &&
+    try(trimspace(config.subnet_cidr), "") == "" &&
+    try(trimspace(config.subnet_id), "") == ""
+  ]
+  invalid_worker_secondary_vnic_subnet_sources = [
+    for pool_name, config in local.worker_secondary_vnic_pool_configs : pool_name
+    if config.enabled &&
+    try(trimspace(config.explicit_subnet_cidr), "") != "" &&
+    try(trimspace(config.subnet_id), "") != ""
+  ]
   invalid_grace_blackwell_shape = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4"], var.worker_rdma_shape)
   invalid_image_uri = anytrue([
     var.worker_ops_image_use_uri && !startswith(coalesce(var.worker_ops_image_custom_uri, "none"), "http"),
@@ -35,7 +47,7 @@ locals {
   pods_subnet_prefix    = var.pods_sn_cidr != null ? tonumber(split("/", var.pods_sn_cidr)[1]) : local.vcn_prefix_length + 1
   pods_subnet_capacity  = pow(2, 32 - local.pods_subnet_prefix) - 3
   is_vcn_native_cni     = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
-  invalid_pods_capacity = local.is_vcn_native_cni && local.total_pods_required > local.pods_subnet_capacity
+  invalid_pods_capacity = local.is_vcn_native_cni && local.legacy_pod_subnet_required && local.total_pods_required > local.pods_subnet_capacity
 
   # FSS PV cannot be created when all deploy paths are inactive (private endpoint, no operator, no ORM)
   fss_pv_unreachable = alltrue([
@@ -120,6 +132,28 @@ resource "null_resource" "validate_worker_rdma_compute_cluster" {
     precondition {
       condition     = !local.invalid_worker_rdma_compute_cluster
       error_message = "GPU + RDMA worker pools require `worker_rdma_compute_cluster_id` so OKE can place managed nodes in the Compute Cluster."
+    }
+  }
+}
+
+resource "null_resource" "validate_worker_secondary_vnic_subnets" {
+  count = length(local.invalid_worker_secondary_vnic_subnets) > 0 ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(local.invalid_worker_secondary_vnic_subnets) == 0
+      error_message = "Secondary VNIC configuration requires a new subnet CIDR, an existing subnet OCID, or create_vcn=true so a default subnet CIDR can be derived for: ${join(", ", local.invalid_worker_secondary_vnic_subnets)}."
+    }
+  }
+}
+
+resource "null_resource" "validate_worker_secondary_vnic_subnet_sources" {
+  count = length(local.invalid_worker_secondary_vnic_subnet_sources) > 0 ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(local.invalid_worker_secondary_vnic_subnet_sources) == 0
+      error_message = "Secondary VNIC configuration accepts either a new subnet CIDR or an existing subnet OCID, but not both, for: ${join(", ", local.invalid_worker_secondary_vnic_subnet_sources)}."
     }
   }
 }

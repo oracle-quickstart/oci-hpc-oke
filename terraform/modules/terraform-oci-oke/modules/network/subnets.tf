@@ -13,15 +13,25 @@ locals {
     for k, v in var.subnets : k => merge(v, {
       "type" = (lookup(v, "netnum", null) == null && lookup(v, "newbits", null) != null ? "newbits"
         : (lookup(v, "netnum", null) != null && lookup(v, "newbits", null) != null ? "netnum"
-          : (lookup(v, "cidr", null) != null ? "cidr"
-            : (lookup(v, "id", null) != null ? "id"
-      : "invalid"))))
+          : (lookup(v, "ipv4cidr_blocks", null) != null ? "ipv4cidr_blocks"
+            : (lookup(v, "cidr", null) != null ? "cidr"
+              : (lookup(v, "id", null) != null ? "id"
+      : "invalid")))))
     }) if lookup(v, "create", "auto") != "never"
   }
 
   # Handle subnets configured with provided CIDRs
   subnet_cidrs_cidr_input = {
     for k, v in local.subnet_cidrs_new : k => lookup(v, "cidr") if v.type == "cidr"
+  }
+
+  # Handle subnets configured with multiple provided IPv4 CIDRs
+  subnet_cidrs_ipv4cidr_blocks_input = {
+    for k, v in local.subnet_cidrs_new : k => try(element(lookup(v, "ipv4cidr_blocks"), 0), null) if v.type == "ipv4cidr_blocks"
+  }
+
+  subnet_ipv4cidr_blocks_all = {
+    for k, v in local.subnet_cidrs_new : k => lookup(v, "ipv4cidr_blocks") if v.type == "ipv4cidr_blocks"
   }
 
   # Handle subnets configured with only newbits for sizing
@@ -44,6 +54,7 @@ locals {
   // Combine provided and calculated subnet CIDRs
   subnet_cidrs_all = merge(
     local.subnet_cidrs_cidr_input,
+    local.subnet_cidrs_ipv4cidr_blocks_input,
     local.subnet_cidrs_newbits_resolved,
     local.subnet_cidrs_netnum_newbits_ranges,
   )
@@ -115,11 +126,19 @@ locals {
           lookup(try(lookup(var.subnets, k), { create = "never" }), "create", "auto") == "always" # force enabled
         ]),
       ])
+    },
+    { for k, v in var.subnets : k => merge({ create = true }, v)
+      if alltrue([
+        !contains(keys(local.subnet_info), k),
+        contains(keys(local.subnet_cidrs_all), k),
+        lookup(v, "create", "auto") == "always",
+        lookup(v, "id", null) == null,
+      ])
     }
   )
 
   subnet_output = { for k, v in var.subnets :
-    k => lookup(v, "id", null) != null ? v.id : lookup(lookup(oci_core_subnet.oke, k, {}), "id", null)
+    k => lookup(v, "id", null) != null ? v.id : try(oci_core_subnet.oke[k].id, null)
   }
 
   create_mixed_igw_ngw_route_table = alltrue([
@@ -131,7 +150,7 @@ locals {
 }
 
 resource "null_resource" "validate_subnets" {
-  count = anytrue([for k, v in local.subnet_cidrs_new : contains(["netnum", "newbits", "cidr"], v.type)
+  count = anytrue([for k, v in local.subnet_cidrs_new : contains(["netnum", "newbits", "cidr", "ipv4cidr_blocks"], v.type)
     if lookup(v, "create", "auto") != "never"
   ]) ? 1 : 0
 
@@ -139,6 +158,13 @@ resource "null_resource" "validate_subnets" {
     precondition {
       condition     = !contains([for k, v in local.subnet_cidrs_new : v.type], "invalid")
       error_message = format("Invalid subnet specification: %s", jsonencode({ for k, v in local.subnet_cidrs_new : k => v if v.type == "invalid" }))
+    }
+
+    precondition {
+      condition = alltrue([
+        for k, v in local.subnet_cidrs_new : v.type != "ipv4cidr_blocks" || length(coalesce(lookup(v, "ipv4cidr_blocks", null), [])) > 0
+      ])
+      error_message = format("Subnets configured with ipv4cidr_blocks must include at least one CIDR: %s", jsonencode({ for k, v in local.subnet_cidrs_new : k => v if v.type == "ipv4cidr_blocks" && length(coalesce(lookup(v, "ipv4cidr_blocks", null), [])) == 0 }))
     }
 
     precondition {
@@ -187,9 +213,10 @@ resource "oci_core_route_table" "igw_ngw_mixed_route_id" {
 resource "oci_core_subnet" "oke" {
   for_each = local.subnets_to_create
 
-  compartment_id = var.compartment_id
-  vcn_id         = var.vcn_id
-  cidr_block     = lookup(local.subnet_cidrs_all, each.key)
+  compartment_id  = var.compartment_id
+  vcn_id          = var.vcn_id
+  cidr_block      = contains(keys(local.subnet_ipv4cidr_blocks_all), each.key) ? null : lookup(local.subnet_cidrs_all, each.key)
+  ipv4cidr_blocks = lookup(local.subnet_ipv4cidr_blocks_all, each.key, null)
   display_name = (lookup(var.subnets, each.key, null) != null ?
     (lookup(var.subnets[each.key], "display_name", null) != null ?
       var.subnets[each.key]["display_name"] :
@@ -208,7 +235,7 @@ resource "oci_core_subnet" "oke" {
   lifecycle {
     ignore_changes = [
       freeform_tags, defined_tags,
-      cidr_block, dns_label, security_list_ids, vcn_id,
+      cidr_block, ipv4cidr_blocks, dns_label, security_list_ids, vcn_id,
     ]
   }
 }

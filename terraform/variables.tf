@@ -90,7 +90,7 @@ variable "fss_sn_cidr" { default = null }
 variable "lustre_sn_cidr" { default = null }
 variable "worker_secondary_vnic_subnets" {
   default     = {}
-  description = "Additional subnet definitions for worker secondary VNICs. Keys can be referenced by worker_pool_secondary_vnics[*][*].subnet_key, and values follow the module subnets map shape, for example { create = \"always\", cidr = \"100.64.0.0/20\" }."
+  description = "Additional subnet definitions for worker secondary VNICs. Keys can be referenced by worker_pool_secondary_vnics[*][*].subnet_key, and values follow the module subnets map shape, for example { create = \"always\", ipv4cidr_blocks = [\"100.64.0.0/21\", \"100.64.8.0/21\"] }."
   type        = any
 }
 variable "bastion_sn_id" { default = null }
@@ -529,6 +529,88 @@ variable "worker_pool_secondary_vnics" {
   default     = {}
   description = "Per-worker-pool secondary VNIC profiles keyed by worker pool name, then VNIC name. Applies to managed OKE node pools such as oke-system, oke-cpu, oke-gpu, and oke-rdma. Each profile can include subnet_id or subnet_key, ip_count, nsg_ids, assign_public_ip, skip_source_dest_check, display_name, and optional application_resources."
   type        = any
+}
+
+# Worker secondary VNIC UI inputs
+variable "worker_ops_secondary_vnic_enabled" { default = false }
+variable "worker_ops_secondary_vnic_subnet_cidr" {
+  default = null
+  type    = string
+}
+variable "worker_ops_secondary_vnic_subnet_id" {
+  default = null
+  type    = string
+}
+variable "worker_ops_secondary_vnic_ip_count" {
+  default = 32
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_ops_secondary_vnic_ip_count)
+    error_message = "worker_ops_secondary_vnic_ip_count must be a power of two from 1 to 256."
+  }
+}
+variable "worker_ops_secondary_vnic_nsg_ids" {
+  default = []
+  type    = list(string)
+}
+variable "worker_cpu_secondary_vnic_enabled" { default = false }
+variable "worker_cpu_secondary_vnic_subnet_cidr" {
+  default = null
+  type    = string
+}
+variable "worker_cpu_secondary_vnic_subnet_id" {
+  default = null
+  type    = string
+}
+variable "worker_cpu_secondary_vnic_ip_count" {
+  default = 32
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_cpu_secondary_vnic_ip_count)
+    error_message = "worker_cpu_secondary_vnic_ip_count must be a power of two from 1 to 256."
+  }
+}
+variable "worker_cpu_secondary_vnic_nsg_ids" {
+  default = []
+  type    = list(string)
+}
+variable "worker_gpu_secondary_vnic_enabled" { default = false }
+variable "worker_gpu_secondary_vnic_subnet_cidr" {
+  default = null
+  type    = string
+}
+variable "worker_gpu_secondary_vnic_subnet_id" {
+  default = null
+  type    = string
+}
+variable "worker_gpu_secondary_vnic_ip_count" {
+  default = 32
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_gpu_secondary_vnic_ip_count)
+    error_message = "worker_gpu_secondary_vnic_ip_count must be a power of two from 1 to 256."
+  }
+}
+variable "worker_gpu_secondary_vnic_nsg_ids" {
+  default = []
+  type    = list(string)
+}
+variable "worker_rdma_secondary_vnic_enabled" { default = false }
+variable "worker_rdma_secondary_vnic_subnet_cidr" {
+  default = null
+  type    = string
+}
+variable "worker_rdma_secondary_vnic_subnet_id" {
+  default = null
+  type    = string
+}
+variable "worker_rdma_secondary_vnic_ip_count" {
+  default = 32
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_rdma_secondary_vnic_ip_count)
+    error_message = "worker_rdma_secondary_vnic_ip_count must be a power of two from 1 to 256."
+  }
+}
+variable "worker_rdma_secondary_vnic_nsg_ids" {
+  default = []
+  type    = list(string)
 }
 
 # Workers - System pool

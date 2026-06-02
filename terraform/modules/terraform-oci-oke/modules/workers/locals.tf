@@ -184,6 +184,9 @@ locals {
       # Override Node-cycling mode
       node_cycling_mode = pool.node_cycling_mode != null ? [for entry in pool.node_cycling_mode : lookup(local.supported_node_cycling_mode, lower(entry))] : null
 
+      # Managed OKE GVA secondary VNICs use a CNI-only pod network option block.
+      has_secondary_vnics = try(tobool(pool.has_secondary_vnics), length(lookup(pool, "secondary_vnics", {})) > 0)
+
     }) if tobool(pool.create)
   }
 

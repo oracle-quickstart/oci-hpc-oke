@@ -19,12 +19,10 @@ locals {
 
   worker_pools = {
     for pool_name, pool in var.worker_pools : pool_name => merge(pool, {
+      has_secondary_vnics = length(lookup(pool, "secondary_vnics", {})) > 0
       secondary_vnics = {
         for vnic_name, vnic in lookup(pool, "secondary_vnics", {}) : vnic_name => merge(vnic, {
-          subnet_id = try(coalesce(
-            lookup(vnic, "subnet_id", null),
-            lookup(module.network.subnet_ids, lookup(vnic, "subnet_key", ""), null),
-          ), null)
+          subnet_id = try(trimspace(vnic.subnet_id), "") != "" ? trimspace(vnic.subnet_id) : try(module.network.subnet_ids[vnic.subnet_key], null)
         })
       }
     })

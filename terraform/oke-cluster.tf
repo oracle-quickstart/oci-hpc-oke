@@ -61,6 +61,14 @@ locals {
   rule_type_nsg     = "NETWORK_SECURITY_GROUP"
   rule_type_cidr    = "CIDR_BLOCK"
   rule_type_service = "SERVICE_CIDR_BLOCK"
+  cni_type          = contains(["npn", "VCN-Native Pod Networking"], var.cni_type) ? "npn" : "flannel"
+
+  legacy_pod_subnet_required = local.cni_type == "npn" && anytrue([
+    local.create_workers && length(lookup(local.worker_pool_secondary_vnics, "oke-system", {})) == 0,
+    local.create_workers && var.worker_cpu_enabled && length(lookup(local.worker_pool_secondary_vnics, "oke-cpu", {})) == 0,
+    local.create_workers && var.worker_gpu_enabled && length(lookup(local.worker_pool_secondary_vnics, "oke-gpu", {})) == 0,
+    local.create_workers && var.worker_rdma_enabled && length(lookup(local.worker_pool_secondary_vnics, "oke-rdma", {})) == 0,
+  ])
 
   nsgs = merge(
     {
@@ -70,7 +78,7 @@ locals {
       pub_lb   = { create = "auto" }
       cp       = { create = "auto" }
       workers  = { create = "auto" }
-      pods     = { create = "auto" }
+      pods     = local.legacy_pod_subnet_required ? { create = "auto" } : { create = "never" }
     },
     var.create_fss ? {
       fss = { create = "always" }
@@ -140,12 +148,12 @@ locals {
         lookup(var.subnet_advanced_attrs, "workers", {})
       )
       pods = merge(
-        { create = "auto" },
-        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
+        local.legacy_pod_subnet_required ? { create = "auto" } : { create = "never" },
+        local.legacy_pod_subnet_required && ((var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids)) ?
         { newbits = 1, netnum = 1 } : {},
-        var.create_vcn && var.pods_sn_cidr != null ?
+        local.legacy_pod_subnet_required && var.create_vcn && var.pods_sn_cidr != null ?
         { cidr = var.pods_sn_cidr } : {},
-        !var.create_vcn && var.custom_subnet_ids ?
+        local.legacy_pod_subnet_required && !var.create_vcn && var.custom_subnet_ids ?
         { id = var.pods_sn_id, create = "never" } : {},
         lookup(var.subnet_advanced_attrs, "pods", {})
       )
@@ -184,11 +192,8 @@ locals {
         lookup(var.subnet_advanced_attrs, "lustre", {})
       )
     } : {},
-    { for key, subnet in var.worker_secondary_vnic_subnets : key => merge({ create = "always" }, subnet) }
+    { for key, subnet in local.worker_secondary_vnic_subnets : key => merge({ create = "always" }, subnet) }
   )
-
-  cni_type = contains(["npn", "VCN-Native Pod Networking"], var.cni_type) ? "npn" : "flannel"
-
   operator_denseio_ocpus = {
     "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = var.operator_shape_ocpus_denseIO_e5_flex

@@ -49,14 +49,15 @@ variable "worker_is_public" { type = bool }
 
 variable "subnets" {
   type = map(object({
-    create       = optional(string)
-    id           = optional(string)
-    newbits      = optional(string)
-    netnum       = optional(string)
-    cidr         = optional(string)
-    display_name = optional(string)
-    dns_label    = optional(string)
-    ipv6_cidr    = optional(string)
+    create          = optional(string)
+    id              = optional(string)
+    newbits         = optional(string)
+    netnum          = optional(string)
+    cidr            = optional(string)
+    ipv4cidr_blocks = optional(list(string))
+    display_name    = optional(string)
+    dns_label       = optional(string)
+    ipv6_cidr       = optional(string)
   }))
 }
 

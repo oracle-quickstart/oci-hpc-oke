@@ -94,6 +94,140 @@ locals {
   worker_ops_max_pods_per_node = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
   worker_cpu_max_pods_per_node = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
 
+  worker_secondary_vnic_vcn_cidrs = [
+    for cidr in split(",", var.vcn_cidrs) : trimspace(cidr)
+    if trimspace(cidr) != ""
+  ]
+  worker_secondary_vnic_default_base_cidr = try(
+    local.worker_secondary_vnic_vcn_cidrs[length(local.worker_secondary_vnic_vcn_cidrs) > 1 ? 1 : 0],
+    null
+  )
+  worker_secondary_vnic_has_dedicated_cidr = length(local.worker_secondary_vnic_vcn_cidrs) > 1
+  worker_secondary_vnic_default_subnet_keys = {
+    system_cpu = "system_cpu_gva_pods"
+    gpu_rdma   = "gpu_rdma_gva_pods"
+  }
+  worker_secondary_vnic_default_subnet_cidrs = {
+    system_cpu = try(cidrsubnet(local.worker_secondary_vnic_default_base_cidr, local.worker_secondary_vnic_has_dedicated_cidr ? 1 : 3, local.worker_secondary_vnic_has_dedicated_cidr ? 0 : 1), null)
+    gpu_rdma   = try(cidrsubnet(local.worker_secondary_vnic_default_base_cidr, local.worker_secondary_vnic_has_dedicated_cidr ? 1 : 3, local.worker_secondary_vnic_has_dedicated_cidr ? 1 : 3), null)
+  }
+  worker_secondary_vnic_default_subnet_ipv4cidr_blocks = {
+    system_cpu = try([cidrsubnet(local.worker_secondary_vnic_default_subnet_cidrs.system_cpu, 3, 0), cidrsubnet(local.worker_secondary_vnic_default_subnet_cidrs.system_cpu, 1, 1)], null)
+    gpu_rdma   = try([cidrsubnet(local.worker_secondary_vnic_default_subnet_cidrs.gpu_rdma, 3, 0), cidrsubnet(local.worker_secondary_vnic_default_subnet_cidrs.gpu_rdma, 1, 1)], null)
+  }
+
+  worker_ops_secondary_vnic_subnet_cidr  = try(trimspace(var.worker_ops_secondary_vnic_subnet_cidr), "")
+  worker_ops_secondary_vnic_subnet_id    = try(trimspace(var.worker_ops_secondary_vnic_subnet_id), "")
+  worker_cpu_secondary_vnic_subnet_cidr  = try(trimspace(var.worker_cpu_secondary_vnic_subnet_cidr), "")
+  worker_cpu_secondary_vnic_subnet_id    = try(trimspace(var.worker_cpu_secondary_vnic_subnet_id), "")
+  worker_gpu_secondary_vnic_subnet_cidr  = try(trimspace(var.worker_gpu_secondary_vnic_subnet_cidr), "")
+  worker_gpu_secondary_vnic_subnet_id    = try(trimspace(var.worker_gpu_secondary_vnic_subnet_id), "")
+  worker_rdma_secondary_vnic_subnet_cidr = try(trimspace(var.worker_rdma_secondary_vnic_subnet_cidr), "")
+  worker_rdma_secondary_vnic_subnet_id   = try(trimspace(var.worker_rdma_secondary_vnic_subnet_id), "")
+  worker_rdma_compute_cluster_id         = try(trimspace(var.worker_rdma_compute_cluster_id), "")
+  worker_rdma_host_group_id              = try(trimspace(var.worker_rdma_host_group_id), "")
+
+  worker_secondary_vnic_pool_configs = {
+    "oke-system" = {
+      enabled              = var.worker_ops_secondary_vnic_enabled
+      subnet_key           = local.worker_ops_secondary_vnic_subnet_cidr != "" ? "ops_gva_pods" : local.worker_secondary_vnic_default_subnet_keys.system_cpu
+      explicit_subnet_cidr = local.worker_ops_secondary_vnic_subnet_cidr
+      subnet_cidr          = local.worker_ops_secondary_vnic_subnet_cidr != "" ? local.worker_ops_secondary_vnic_subnet_cidr : (var.create_vcn && local.worker_ops_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_cidrs.system_cpu : null)
+      ipv4cidr_blocks      = local.worker_ops_secondary_vnic_subnet_cidr != "" ? try([cidrsubnet(local.worker_ops_secondary_vnic_subnet_cidr, 3, 0), cidrsubnet(local.worker_ops_secondary_vnic_subnet_cidr, 1, 1)], null) : (var.create_vcn && local.worker_ops_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.system_cpu : null)
+      subnet_id            = local.worker_ops_secondary_vnic_subnet_id
+      dns_label            = local.worker_ops_secondary_vnic_subnet_cidr != "" ? "opsgva" : "syscpu"
+      display_name         = "oke-system-pods"
+      ip_count             = var.worker_ops_secondary_vnic_ip_count
+      nsg_ids              = var.worker_ops_secondary_vnic_nsg_ids
+    }
+    "oke-cpu" = {
+      enabled              = var.worker_cpu_secondary_vnic_enabled
+      subnet_key           = local.worker_cpu_secondary_vnic_subnet_cidr != "" ? "cpu_gva_pods" : local.worker_secondary_vnic_default_subnet_keys.system_cpu
+      explicit_subnet_cidr = local.worker_cpu_secondary_vnic_subnet_cidr
+      subnet_cidr          = local.worker_cpu_secondary_vnic_subnet_cidr != "" ? local.worker_cpu_secondary_vnic_subnet_cidr : (var.create_vcn && local.worker_cpu_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_cidrs.system_cpu : null)
+      ipv4cidr_blocks      = local.worker_cpu_secondary_vnic_subnet_cidr != "" ? try([cidrsubnet(local.worker_cpu_secondary_vnic_subnet_cidr, 3, 0), cidrsubnet(local.worker_cpu_secondary_vnic_subnet_cidr, 1, 1)], null) : (var.create_vcn && local.worker_cpu_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.system_cpu : null)
+      subnet_id            = local.worker_cpu_secondary_vnic_subnet_id
+      dns_label            = local.worker_cpu_secondary_vnic_subnet_cidr != "" ? "cpugva" : "syscpu"
+      display_name         = "oke-cpu-pods"
+      ip_count             = var.worker_cpu_secondary_vnic_ip_count
+      nsg_ids              = var.worker_cpu_secondary_vnic_nsg_ids
+    }
+    "oke-gpu" = {
+      enabled              = var.worker_gpu_secondary_vnic_enabled
+      subnet_key           = local.worker_gpu_secondary_vnic_subnet_cidr != "" ? "gpu_gva_pods" : local.worker_secondary_vnic_default_subnet_keys.gpu_rdma
+      explicit_subnet_cidr = local.worker_gpu_secondary_vnic_subnet_cidr
+      subnet_cidr          = local.worker_gpu_secondary_vnic_subnet_cidr != "" ? local.worker_gpu_secondary_vnic_subnet_cidr : (var.create_vcn && local.worker_gpu_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_cidrs.gpu_rdma : null)
+      ipv4cidr_blocks      = local.worker_gpu_secondary_vnic_subnet_cidr != "" ? try([cidrsubnet(local.worker_gpu_secondary_vnic_subnet_cidr, 3, 0), cidrsubnet(local.worker_gpu_secondary_vnic_subnet_cidr, 1, 1)], null) : (var.create_vcn && local.worker_gpu_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.gpu_rdma : null)
+      subnet_id            = local.worker_gpu_secondary_vnic_subnet_id
+      dns_label            = local.worker_gpu_secondary_vnic_subnet_cidr != "" ? "gpugva" : "gpurdma"
+      display_name         = "oke-gpu-pods"
+      ip_count             = var.worker_gpu_secondary_vnic_ip_count
+      nsg_ids              = var.worker_gpu_secondary_vnic_nsg_ids
+    }
+    "oke-rdma" = {
+      enabled              = var.worker_rdma_secondary_vnic_enabled
+      subnet_key           = local.worker_rdma_secondary_vnic_subnet_cidr != "" ? "rdma_gva_pods" : local.worker_secondary_vnic_default_subnet_keys.gpu_rdma
+      explicit_subnet_cidr = local.worker_rdma_secondary_vnic_subnet_cidr
+      subnet_cidr          = local.worker_rdma_secondary_vnic_subnet_cidr != "" ? local.worker_rdma_secondary_vnic_subnet_cidr : (var.create_vcn && local.worker_rdma_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_cidrs.gpu_rdma : null)
+      ipv4cidr_blocks      = local.worker_rdma_secondary_vnic_subnet_cidr != "" ? try([cidrsubnet(local.worker_rdma_secondary_vnic_subnet_cidr, 3, 0), cidrsubnet(local.worker_rdma_secondary_vnic_subnet_cidr, 1, 1)], null) : (var.create_vcn && local.worker_rdma_secondary_vnic_subnet_id == "" ? local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.gpu_rdma : null)
+      subnet_id            = local.worker_rdma_secondary_vnic_subnet_id
+      dns_label            = local.worker_rdma_secondary_vnic_subnet_cidr != "" ? "rdmagva" : "gpurdma"
+      display_name         = "oke-rdma-pods"
+      ip_count             = var.worker_rdma_secondary_vnic_ip_count
+      nsg_ids              = var.worker_rdma_secondary_vnic_nsg_ids
+    }
+  }
+
+  worker_secondary_vnic_subnets = merge(
+    var.worker_secondary_vnic_subnets,
+    anytrue([
+      for config in local.worker_secondary_vnic_pool_configs : config.enabled && config.subnet_key == local.worker_secondary_vnic_default_subnet_keys.system_cpu && try(trimspace(config.subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
+      ]) ? {
+      (local.worker_secondary_vnic_default_subnet_keys.system_cpu) = {
+        create          = "always"
+        ipv4cidr_blocks = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.system_cpu
+        dns_label       = "syscpu"
+      }
+    } : {},
+    anytrue([
+      for config in local.worker_secondary_vnic_pool_configs : config.enabled && config.subnet_key == local.worker_secondary_vnic_default_subnet_keys.gpu_rdma && try(trimspace(config.subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
+      ]) ? {
+      (local.worker_secondary_vnic_default_subnet_keys.gpu_rdma) = {
+        create          = "always"
+        ipv4cidr_blocks = local.worker_secondary_vnic_default_subnet_ipv4cidr_blocks.gpu_rdma
+        dns_label       = "gpurdma"
+      }
+    } : {},
+    {
+      for _, config in local.worker_secondary_vnic_pool_configs : config.subnet_key => {
+        create          = "always"
+        ipv4cidr_blocks = config.ipv4cidr_blocks
+        dns_label       = config.dns_label
+      }
+      if config.enabled && try(trimspace(config.explicit_subnet_cidr), "") != "" && try(trimspace(config.subnet_id), "") == ""
+    }
+  )
+
+  worker_pool_secondary_vnics = merge(
+    {
+      for pool_name, config in local.worker_secondary_vnic_pool_configs : pool_name => {
+        pods = merge(
+          {
+            display_name           = config.display_name
+            vnic_display_name      = config.display_name
+            ip_count               = config.ip_count
+            nsg_ids                = config.nsg_ids
+            assign_public_ip       = false
+            skip_source_dest_check = false
+          },
+          try(trimspace(config.subnet_id), "") != "" ? { subnet_id = try(trimspace(config.subnet_id), "") } : { subnet_key = config.subnet_key }
+        )
+      }
+      if config.enabled
+    },
+    var.worker_pool_secondary_vnics
+  )
+
   worker_pools = {
     "oke-system" = {
       create                       = local.create_workers
@@ -115,7 +249,7 @@ locals {
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_ops_node_cycling_mode]
-      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-system", {})
+      secondary_vnics              = lookup(local.worker_pool_secondary_vnics, "oke-system", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -142,7 +276,7 @@ locals {
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_cpu_node_cycling_mode]
-      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-cpu", {})
+      secondary_vnics              = lookup(local.worker_pool_secondary_vnics, "oke-cpu", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -168,7 +302,7 @@ locals {
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
       node_cycling_mode            = [var.worker_gpu_node_cycling_mode]
-      secondary_vnics              = lookup(var.worker_pool_secondary_vnics, "oke-gpu", {})
+      secondary_vnics              = lookup(local.worker_pool_secondary_vnics, "oke-gpu", {})
       node_metadata = merge(
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
@@ -190,13 +324,13 @@ locals {
       max_pods_per_node  = var.worker_rdma_max_pods_per_node
       kubernetes_version = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
       cloud_init         = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      secondary_vnics    = lookup(var.worker_pool_secondary_vnics, "oke-rdma", {})
+      secondary_vnics    = lookup(local.worker_pool_secondary_vnics, "oke-rdma", {})
       node_metadata = merge(
         {
           "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled,
-          compute_cluster : trimspace(coalesce(var.worker_rdma_compute_cluster_id, "")),
+          compute_cluster : local.worker_rdma_compute_cluster_id,
         },
-        trimspace(coalesce(var.worker_rdma_host_group_id, "")) != "" ? { host_group_id : trimspace(var.worker_rdma_host_group_id) } : {},
+        local.worker_rdma_host_group_id != "" ? { host_group_id : local.worker_rdma_host_group_id } : {},
         local.node_metadata
       )
       node_labels = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
