@@ -7,11 +7,28 @@ locals {
   invalid_bastion                = !var.create_public_subnets && var.create_bastion
   invalid_worker_rdma_image      = can(regex("(?i)oracle.*linux", one(data.oci_core_image.worker_rdma[*].display_name)))
   invalid_grace_blackwell_shape  = contains(["BM.GPU.GB200.4", "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB300.4"], var.worker_rdma_shape)
+  invalid_bastion_custom_image = var.create_bastion && local.bastion_image_type == "custom" && (
+    var.bastion_image_use_uri ? trimspace(coalesce(var.bastion_image_custom_uri, "none")) == "none" : trimspace(coalesce(var.bastion_image_id, "none")) == "none"
+  )
+  invalid_operator_custom_image = var.create_operator && local.operator_image_type == "custom" && (
+    var.operator_image_use_uri ? trimspace(coalesce(var.operator_image_custom_uri, "none")) == "none" : trimspace(coalesce(var.operator_image_id, "none")) == "none"
+  )
+  allowed_image_uri_prefixes = ["http://", "https://"]
+  image_uri_values = {
+    bastion     = lower(trimspace(coalesce(var.bastion_image_custom_uri, "none")))
+    operator    = lower(trimspace(coalesce(var.operator_image_custom_uri, "none")))
+    worker_ops  = lower(trimspace(coalesce(var.worker_ops_image_custom_uri, "none")))
+    worker_cpu  = lower(trimspace(coalesce(var.worker_cpu_image_custom_uri, "none")))
+    worker_gpu  = lower(trimspace(coalesce(var.worker_gpu_image_custom_uri, "none")))
+    worker_rdma = lower(trimspace(coalesce(var.worker_rdma_image_custom_uri, "none")))
+  }
   invalid_image_uri = anytrue([
-    var.worker_ops_image_use_uri && !startswith(coalesce(var.worker_ops_image_custom_uri, "none"), "http"),
-    var.worker_cpu_image_use_uri && !startswith(coalesce(var.worker_cpu_image_custom_uri, "none"), "http"),
-    var.worker_gpu_image_use_uri && !startswith(coalesce(var.worker_gpu_image_custom_uri, "none"), "http"),
-    var.worker_rdma_image_use_uri && !startswith(coalesce(var.worker_rdma_image_custom_uri, "none"), "http"),
+    var.bastion_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.bastion, prefix)]),
+    var.operator_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.operator, prefix)]),
+    var.worker_ops_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.worker_ops, prefix)]),
+    var.worker_cpu_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.worker_cpu, prefix)]),
+    var.worker_gpu_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.worker_gpu, prefix)]),
+    var.worker_rdma_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.worker_rdma, prefix)]),
   ])
 
   # Pods subnet capacity validation
@@ -110,12 +127,34 @@ resource "null_resource" "validate_worker_rdma_image" {
 }
 
 resource "null_resource" "validate_image_uri" {
-  count = anytrue([var.worker_ops_image_use_uri, var.worker_cpu_image_use_uri, var.worker_gpu_image_use_uri, var.worker_rdma_image_use_uri]) ? 1 : 0
+  count = anytrue([var.bastion_image_use_uri, var.operator_image_use_uri, var.worker_ops_image_use_uri, var.worker_cpu_image_use_uri, var.worker_gpu_image_use_uri, var.worker_rdma_image_use_uri]) ? 1 : 0
 
   lifecycle {
     precondition {
       condition     = !local.invalid_image_uri
-      error_message = "Error: Invalid image URI detected. Please ensure the URI is correct and accessible."
+      error_message = "Error: Invalid image URI detected. Image import URIs must start with http:// or https://."
+    }
+  }
+}
+
+resource "null_resource" "validate_bastion_image_selection" {
+  count = local.invalid_bastion_custom_image ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_bastion_custom_image
+      error_message = "When bastion_image_type is custom, provide either bastion_image_id or enable bastion_image_use_uri with bastion_image_custom_uri."
+    }
+  }
+}
+
+resource "null_resource" "validate_operator_image_selection" {
+  count = local.invalid_operator_custom_image ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_operator_custom_image
+      error_message = "When operator_image_type is custom, provide either operator_image_id or enable operator_image_use_uri with operator_image_custom_uri."
     }
   }
 }

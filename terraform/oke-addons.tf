@@ -192,10 +192,10 @@ resource "null_resource" "nvidia_dcgm_exporter_metrics_via_operator" {
     config_key      = local.nvidia_dcgm_exporter_metrics_filename
     namespace       = local.nvidia_gpu_operator_namespace
     bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = var.bastion_user
+    bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
     operator_host   = module.oke.operator_private_ip
-    operator_user   = var.operator_user
+    operator_user   = local.operator_user
     metrics_target  = "/tmp/${local.nvidia_dcgm_exporter_metrics_filename}"
   }
 

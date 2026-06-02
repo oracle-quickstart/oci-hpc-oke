@@ -196,6 +196,37 @@ locals {
     "VM.DenseIO.E4.Flex" = 16 * var.operator_shape_ocpus_denseIO_e4_flex,
     "VM.DenseIO.E5.Flex" = 12 * var.operator_shape_ocpus_denseIO_e5_flex
   }
+
+  bastion_image_type  = lower(var.bastion_image_type)
+  bastion_image_id    = var.bastion_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.bastion_image_custom_uri, {}), "id", null) : var.bastion_image_id
+  operator_image_type = lower(var.operator_image_type)
+  operator_image_id   = var.operator_image_use_uri ? lookup(lookup(oci_core_image.imported_image, var.operator_image_custom_uri, {}), "id", null) : var.operator_image_id
+
+  bastion_image_operating_system         = local.bastion_image_type == "custom" ? coalesce(try(one(data.oci_core_image.bastion_selected[*].operating_system), null), var.bastion_image_os) : var.bastion_image_os
+  bastion_image_operating_system_version = local.bastion_image_type == "custom" ? coalesce(try(one(data.oci_core_image.bastion_selected[*].operating_system_version), null), var.bastion_image_os_version) : var.bastion_image_os_version
+  operator_image_operating_system        = local.operator_image_type == "custom" ? coalesce(try(one(data.oci_core_image.operator_selected[*].operating_system), null), var.operator_image_os) : var.operator_image_os
+  operator_image_operating_system_version = local.operator_image_type == "custom" ? coalesce(
+    try(one(data.oci_core_image.operator_selected[*].operating_system_version), null),
+    var.operator_image_os_version
+  ) : var.operator_image_os_version
+  bastion_user = lower(var.bastion_user) == "auto" ? (
+    local.bastion_image_operating_system != null && can(regex("(?i)oracle.*linux", local.bastion_image_operating_system)) ? "opc" : "ubuntu"
+  ) : var.bastion_user
+  operator_user = lower(var.operator_user) == "auto" ? (
+    local.operator_image_operating_system != null && can(regex("(?i)oracle.*linux", local.operator_image_operating_system)) ? "opc" : "ubuntu"
+  ) : var.operator_user
+}
+
+data "oci_core_image" "bastion_selected" {
+  count = var.create_bastion && local.bastion_image_type == "custom" && (var.bastion_image_use_uri || coalesce(var.bastion_image_id, "none") != "none") ? 1 : 0
+
+  image_id = local.bastion_image_id
+}
+
+data "oci_core_image" "operator_selected" {
+  count = var.create_operator && local.operator_image_type == "custom" && (var.operator_image_use_uri || coalesce(var.operator_image_id, "none") != "none") ? 1 : 0
+
+  image_id = local.operator_image_id
 }
 
 module "oke" {
@@ -218,10 +249,11 @@ module "oke" {
   bastion_allowed_cidrs        = flatten(tolist([var.bastion_allowed_cidrs]))
   bastion_await_cloudinit      = false
   bastion_is_public            = var.create_public_subnets ? var.bastion_is_public : false
-  bastion_image_type           = var.bastion_image_type
-  bastion_image_os             = var.bastion_image_os
-  bastion_image_os_version     = var.bastion_image_os_version
-  bastion_user                 = var.bastion_user
+  bastion_image_type           = local.bastion_image_type
+  bastion_image_id             = local.bastion_image_id
+  bastion_image_os             = local.bastion_image_operating_system
+  bastion_image_os_version     = local.bastion_image_operating_system_version
+  bastion_user                 = local.bastion_user
   bastion_shape = {
     shape            = var.bastion_shape_name,
     ocpus            = var.bastion_shape_ocpus,
@@ -247,10 +279,11 @@ module "oke" {
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
   max_pods_per_node                  = var.max_pods_per_node
-  operator_image_type                = var.operator_image_type
-  operator_image_os                  = var.operator_image_os # Ignored when bastion_image_type = "custom"
-  operator_image_os_version          = var.operator_image_os_version
-  operator_user                      = var.operator_user
+  operator_image_type                = local.operator_image_type
+  operator_image_id                  = local.operator_image_id
+  operator_image_os                  = local.operator_image_operating_system
+  operator_image_os_version          = local.operator_image_operating_system_version
+  operator_user                      = local.operator_user
   operator_await_cloudinit           = local.any_deployments_via_operator ? true : false
   operator_install_kubectl_from_repo = true
   operator_install_helm_from_repo    = true

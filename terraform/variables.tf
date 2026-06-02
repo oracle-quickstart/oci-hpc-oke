@@ -143,6 +143,11 @@ variable "bastion_image_type" {
   default     = "platform"
   description = "Whether to use a platform or custom image for the created bastion instance. When custom is set, the bastion_image_id must be specified."
   type        = string
+
+  validation {
+    condition     = contains(["platform", "custom"], lower(var.bastion_image_type))
+    error_message = "bastion_image_type must be either 'platform' or 'custom'."
+  }
 }
 variable "bastion_image_os" {
   default     = "Canonical Ubuntu"
@@ -159,10 +164,30 @@ variable "bastion_image_id" {
   description = "Image ID for created bastion instance."
   type        = string
 }
-variable "bastion_user" {
-  default     = "ubuntu"
-  description = "The user used to SSH into the bastion instance."
+variable "bastion_image_compartment" {
+  default     = null
+  description = "Compartment containing the selected bastion custom image."
   type        = string
+}
+variable "bastion_image_custom_uri" {
+  default     = null
+  description = "Object Storage URI used to import a custom image for the created bastion instance."
+  type        = string
+}
+variable "bastion_image_use_uri" {
+  default     = false
+  description = "Import the bastion custom image from an Object Storage URI."
+  type        = bool
+}
+variable "bastion_user" {
+  default     = "auto"
+  description = "The user used to SSH into the bastion instance. Set to 'auto' to use opc for Oracle Linux images and ubuntu for all other images, or override with your own username."
+  type        = string
+
+  validation {
+    condition     = lower(var.bastion_user) == "auto" || can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.bastion_user))
+    error_message = "bastion_user must be 'auto' or a valid Linux username."
+  }
 }
 
 # Bastion Service
@@ -221,11 +246,36 @@ variable "operator_image_type" {
   default     = "platform"
   description = "Whether to use a platform or custom image for the created operator instance. When custom is set, the operator_image_id must be specified."
   type        = string
+
+  validation {
+    condition     = contains(["platform", "custom"], lower(var.operator_image_type))
+    error_message = "operator_image_type must be either 'platform' or 'custom'."
+  }
+}
+variable "operator_image_compartment" {
+  default     = null
+  description = "Compartment containing the selected operator custom image."
+  type        = string
+}
+variable "operator_image_custom_uri" {
+  default     = null
+  description = "Object Storage URI used to import a custom image for the created operator instance."
+  type        = string
+}
+variable "operator_image_use_uri" {
+  default     = false
+  description = "Import the operator custom image from an Object Storage URI."
+  type        = bool
 }
 variable "operator_user" {
-  default     = "ubuntu"
-  description = "The user used to SSH into the operator instance."
+  default     = "auto"
+  description = "The user used to SSH into the operator instance. Set to 'auto' to use opc for Oracle Linux images and ubuntu for all other images, or override with your own username."
   type        = string
+
+  validation {
+    condition     = lower(var.operator_user) == "auto" || can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.operator_user))
+    error_message = "operator_user must be 'auto' or a valid Linux username."
+  }
 }
 
 # STORAGE

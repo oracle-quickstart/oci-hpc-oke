@@ -15,6 +15,26 @@ output "nat_route_table_id" { value = module.oke.nat_route_table_id }
 output "bastion_id" { value = module.oke.bastion_id }
 output "bastion_public_ip" { value = module.oke.bastion_public_ip }
 output "bastion_ssh_command" { value = var.create_bastion ? module.oke.ssh_to_bastion : "" }
+output "bastion_image_type" {
+  description = "Image selection mode used for the bastion instance."
+  value       = var.create_bastion ? local.bastion_image_type : ""
+}
+output "bastion_image_id" {
+  description = "Image OCID used for the bastion instance."
+  value       = var.create_bastion && local.bastion_image_id != null ? local.bastion_image_id : ""
+}
+output "bastion_image_os" {
+  description = "Operating system name for the bastion instance image."
+  value       = var.create_bastion ? coalesce(local.bastion_image_operating_system, "") : ""
+}
+output "bastion_image_os_version" {
+  description = "Operating system version for the bastion instance image."
+  value       = var.create_bastion ? coalesce(local.bastion_image_operating_system_version, "") : ""
+}
+output "bastion_ssh_user" {
+  description = "SSH username selected for the bastion instance."
+  value       = var.create_bastion ? local.bastion_user : ""
+}
 output "bastion_subnet_id" { value = module.oke.bastion_subnet_id }
 output "bastion_subnet_cidr" { value = module.oke.bastion_subnet_cidr }
 output "bastion_nsg_id" { value = module.oke.bastion_nsg_id }
@@ -53,6 +73,26 @@ output "bastion_service_worker_ssh_command" {
 output "operator_id" { value = module.oke.operator_id }
 output "operator_private_ip" { value = module.oke.operator_private_ip }
 output "operator_ssh_command" { value = var.create_operator ? module.oke.ssh_to_operator : "" }
+output "operator_image_type" {
+  description = "Image selection mode used for the operator instance."
+  value       = var.create_operator ? local.operator_image_type : ""
+}
+output "operator_image_id" {
+  description = "Image OCID used for the operator instance."
+  value       = var.create_operator && local.operator_image_id != null ? local.operator_image_id : ""
+}
+output "operator_image_os" {
+  description = "Operating system name for the operator instance image."
+  value       = var.create_operator ? coalesce(local.operator_image_operating_system, "") : ""
+}
+output "operator_image_os_version" {
+  description = "Operating system version for the operator instance image."
+  value       = var.create_operator ? coalesce(local.operator_image_operating_system_version, "") : ""
+}
+output "operator_ssh_user" {
+  description = "SSH username selected for the operator instance."
+  value       = var.create_operator ? local.operator_user : ""
+}
 output "operator_subnet_id" { value = module.oke.operator_subnet_id }
 output "operator_subnet_cidr" { value = module.oke.operator_subnet_cidr }
 output "operator_nsg_id" { value = module.oke.operator_nsg_id }
