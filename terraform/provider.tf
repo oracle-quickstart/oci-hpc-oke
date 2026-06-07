@@ -57,6 +57,9 @@ provider "kubectl" {
   cluster_ca_certificate = base64decode(local.cluster_ca_cert)
   tls_server_name        = trimsuffix(trimprefix(local.cluster_private_endpoint, "https://"), ":6443")
   apply_retry_count      = 30
+  # alekc/kubectl >= 2.3.0 validates the kube config eagerly at provider-configure
+  # time. On a fresh apply the OKE endpoint is not known yet, so defer the check.
+  lazy_load = true
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "oci"
