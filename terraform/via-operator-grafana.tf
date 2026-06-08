@@ -10,7 +10,7 @@ locals {
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${var.operator_user}/grafana/dashboards/common", cdk])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/common", cdk])]
           options = {
             labels = {
               grafana_dashboard = "1"
@@ -28,7 +28,7 @@ locals {
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${var.operator_user}/grafana/dashboards/nvidia", cdk])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/nvidia", cdk])]
           options = {
             labels = {
               grafana_dashboard = "1"
@@ -46,7 +46,7 @@ locals {
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${var.operator_user}/grafana/dashboards/amd", cdk])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/amd", cdk])]
           options = {
             labels = {
               grafana_dashboard = "1"
@@ -63,7 +63,7 @@ locals {
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${var.operator_user}/grafana/dashboards/oci", cdk])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/oci", cdk])]
           options = {
             labels = {
               grafana_dashboard = "1"
@@ -79,7 +79,7 @@ locals {
         {
           name      = "alert-${trimsuffix(cak, ".yaml")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${var.operator_user}/grafana/alerts", cak])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/alerts", cak])]
           options = {
             labels = {
               grafana_alert = "1"
@@ -99,10 +99,10 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
     manifest_md5    = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_amd_dashboard_files_path, local.grafana_nvidia_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
     namespace       = var.monitoring_namespace
     bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = var.bastion_user
+    bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
     operator_host   = module.oke.operator_private_ip
-    operator_user   = var.operator_user
+    operator_user   = local.operator_user
   }
 
 

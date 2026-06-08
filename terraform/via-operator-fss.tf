@@ -7,10 +7,10 @@ resource "null_resource" "fss_pv_via_operator" {
   triggers = {
     volume_handle   = format("%v:%v:%s", oci_file_storage_file_system.fss.0.id, data.oci_core_private_ip.fss_mt_ip.0.ip_address, local.fss_export_path)
     bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = var.bastion_user
+    bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
     operator_host   = module.oke.operator_private_ip
-    operator_user   = var.operator_user
+    operator_user   = local.operator_user
   }
 
   connection {
@@ -26,7 +26,7 @@ resource "null_resource" "fss_pv_via_operator" {
 
   provisioner "remote-exec" {
     inline = [
-      "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",

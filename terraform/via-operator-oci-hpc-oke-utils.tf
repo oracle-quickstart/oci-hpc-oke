@@ -6,9 +6,9 @@ module "oci_hpc_oke_utils" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name = "oci-hpc-oke-utils"
@@ -16,7 +16,7 @@ module "oci_hpc_oke_utils" {
   helm_chart_path = "${path.module}/files/oci-hpc-oke-utils"
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal",
     "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\""
   ]

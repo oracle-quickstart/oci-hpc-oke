@@ -20,18 +20,6 @@ variableGroups:
       - current_user_ocid
       - tenancy_ocid
       - region
-      # Bastion variables
-      - bastion_image_id
-      - bastion_image_os
-      - bastion_image_os_version
-      - bastion_image_type
-      - bastion_user
-      # Operator variables
-      - operator_image_id
-      - operator_image_os
-      - operator_image_os_version
-      - operator_image_type
-      - operator_user
       # Storage
       - lustre_cluster_placement_group_id
       - lustre_file_system_name
@@ -135,6 +123,14 @@ variableGroups:
       - bastion_shape_name
       - bastion_shape_ocpus
       - bastion_shape_memory
+      - bastion_image_type
+      - bastion_image_os
+      - bastion_image_os_version
+      - bastion_image_use_uri
+      - bastion_image_custom_uri
+      - bastion_image_compartment
+      - bastion_image_id
+      - bastion_user
       - create_operator
       - operator_shape_config
       - operator_shape_name
@@ -143,6 +139,14 @@ variableGroups:
       - operator_shape_ocpus_denseIO_e5_flex
       - operator_shape_memory
       - operator_shape_boot
+      - operator_image_type
+      - operator_image_os
+      - operator_image_os_version
+      - operator_image_use_uri
+      - operator_image_custom_uri
+      - operator_image_compartment
+      - operator_image_id
+      - operator_user
       - create_oci_bastion_service
       - bastion_service_allowed_cidrs
       - bastion_service_max_session_ttl
@@ -830,6 +834,93 @@ variables:
           - eq: [bastion_shape_name, "VM.Standard.Ampere.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.Intel.Generic"]
           - eq: [bastion_shape_name, "VM.Standard.E3.Flex"]
+  bastion_image_type:
+    title: Bastion image type
+    description: Use the latest platform image for the selected OS and version, select an image OCID, or import a custom image from an Object Storage URI.
+    type: enum
+    default: Platform
+    enum: [Platform, Custom]
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+  bastion_image_os:
+    title: Bastion operating system
+    type: enum
+    default: "Canonical Ubuntu"
+    enum: ["Canonical Ubuntu"]
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Platform]
+  bastion_image_os_version:
+    title: Bastion operating system version
+    type: enum
+    default: "22.04"
+    enum: ["22.04", "24.04"]
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Platform]
+  bastion_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    default: false
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Custom]
+  bastion_image_custom_uri:
+    title: Bastion image URI
+    type: string
+    pattern: "^(http|https)://.+"
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Custom]
+        - ${bastion_image_use_uri}
+  bastion_image_compartment:
+    title: Bastion image compartment
+    type: oci:identity:compartment:id
+    required: true
+    default: ${compartment_ocid}
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Custom]
+        - not: [bastion_image_use_uri]
+  bastion_image_id:
+    title: Bastion image
+    type: oci:core:image:id
+    required: true
+    dependsOn:
+      compartmentId: ${bastion_image_compartment}
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
+        - eq: [bastion_image_type, Custom]
+        - not: [bastion_image_use_uri]
+  bastion_user:
+    title: Bastion SSH user
+    description: SSH user for the bastion image. Use auto to select opc for Oracle Linux images and ubuntu for all other images, or override with your own username.
+    type: string
+    pattern: "^(auto|AUTO|Auto|[a-z_][a-z0-9_-]{0,31})$"
+    required: true
+    default: "auto"
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_shape_config}
 
   # Bastion Service
   create_oci_bastion_service:
@@ -977,6 +1068,93 @@ variables:
       and:
       - create_operator
       - operator_shape_config
+  operator_image_type:
+    title: Operator image type
+    description: Use the latest platform image for the selected OS and version, select an image OCID, or import a custom image from an Object Storage URI.
+    type: enum
+    default: Platform
+    enum: [Platform, Custom]
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+  operator_image_os:
+    title: Operator operating system
+    type: enum
+    default: "Canonical Ubuntu"
+    enum: ["Canonical Ubuntu"]
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Platform]
+  operator_image_os_version:
+    title: Operator operating system version
+    type: enum
+    default: "22.04"
+    enum: ["22.04", "24.04"]
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Platform]
+  operator_image_use_uri:
+    title: Import custom image from URI
+    type: boolean
+    default: false
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Custom]
+  operator_image_custom_uri:
+    title: Operator image URI
+    type: string
+    pattern: "^(http|https)://.+"
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Custom]
+        - ${operator_image_use_uri}
+  operator_image_compartment:
+    title: Operator image compartment
+    type: oci:identity:compartment:id
+    required: true
+    default: ${compartment_ocid}
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Custom]
+        - not: [operator_image_use_uri]
+  operator_image_id:
+    title: Operator image
+    type: oci:core:image:id
+    required: true
+    dependsOn:
+      compartmentId: ${operator_image_compartment}
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
+        - eq: [operator_image_type, Custom]
+        - not: [operator_image_use_uri]
+  operator_user:
+    title: Operator SSH user
+    description: SSH user for the operator image. Use auto to select opc for Oracle Linux images and ubuntu for all other images, or override with your own username.
+    type: string
+    pattern: "^(auto|AUTO|Auto|[a-z_][a-z0-9_-]{0,31})$"
+    required: true
+    default: "auto"
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_shape_config}
  
   # Storage
   create_fss:
@@ -2166,6 +2344,11 @@ outputGroups:
       - bastion_nsg_id
       - bastion_public_ip
       - bastion_ssh_command
+      - bastion_image_type
+      - bastion_image_id
+      - bastion_image_os
+      - bastion_image_os_version
+      - bastion_ssh_user
       - bastion_ssh_secret_id
 
   - title: Bastion Service
@@ -2185,6 +2368,11 @@ outputGroups:
       - operator_nsg_id
       - operator_private_ip
       - operator_ssh_command
+      - operator_image_type
+      - operator_image_id
+      - operator_image_os
+      - operator_image_os_version
+      - operator_ssh_user
 
 #  - title: File Storage Service (FSS)
 #    outputs:
@@ -2279,23 +2467,38 @@ outputs:
 
   # Bastion
   bastion_id:
-    title: Instance
+    title: Bastion instance OCID
     type: ocid
   bastion_subnet_id:
-    title: Subnet
+    title: Bastion subnet OCID
     type: ocid
   bastion_subnet_cidr:
-    title: Subnet CIDR
+    title: Bastion subnet CIDR
     type: string
   bastion_nsg_id:
-    title: Network security group
+    title: Bastion network security group OCID
     type: ocid
   bastion_public_ip:
-    title: Address
+    title: Bastion public IP address
     type: copyableString
   bastion_ssh_command:
-    title: SSH command
+    title: Bastion SSH command
     type: copyableString
+  bastion_image_type:
+    title: Bastion image type
+    type: string
+  bastion_image_id:
+    title: Bastion image OCID
+    type: ocid
+  bastion_image_os:
+    title: Bastion image operating system
+    type: string
+  bastion_image_os_version:
+    title: Bastion image operating system version
+    type: string
+  bastion_ssh_user:
+    title: Bastion SSH user
+    type: string
 
 # Bastion Service
   bastion_service_id:
@@ -2319,22 +2522,38 @@ outputs:
 
   # Operator
   operator_id:
-    title: Instance
+    title: Operator instance OCID
+    type: ocid
   operator_subnet_id:
-    title: Subnet
+    title: Operator subnet OCID
     type: ocid
   operator_subnet_cidr:
-    title: Subnet CIDR
+    title: Operator subnet CIDR
     type: string
   operator_nsg_id:
-    title: Network security group
+    title: Operator network security group OCID
     type: ocid
   operator_private_ip:
-    title: Address
+    title: Operator private IP address
     type: copyableString
   operator_ssh_command:
-    title: SSH command
+    title: Operator SSH command
     type: copyableString
+  operator_image_type:
+    title: Operator image type
+    type: string
+  operator_image_id:
+    title: Operator image OCID
+    type: ocid
+  operator_image_os:
+    title: Operator image operating system
+    type: string
+  operator_image_os_version:
+    title: Operator image operating system version
+    type: string
+  operator_ssh_user:
+    title: Operator SSH user
+    type: string
 
   # Cluster
   cluster_id:
@@ -2387,28 +2606,28 @@ outputs:
 
   # Workers
   worker_subnet_id:
-    title: Subnet
+    title: Worker subnet OCID
     type: ocid
   worker_subnet_cidr:
-    title: Subnet CIDR
+    title: Worker subnet CIDR
     type: string
   worker_nsg_id:
-    title: Network security group
+    title: Worker network security group OCID
     type: ocid
   worker_ops_pool_id:
   # Workers - System pool
-    title: System pool
+    title: System worker node pool OCID
     type: ocid
   worker_cpu_pool_id:
-    title: CPU pool
+    title: CPU worker node pool OCID
     type: ocid
     visible: ${worker_cpu_enabled}
   worker_gpu_pool_id:
-    title: GPU pool
+    title: GPU worker node pool OCID
     type: ocid
     visible: worker_gpu_enabled
   worker_rdma_pool_id:
-    title: RDMA pool
+    title: RDMA worker node pool OCID
     type: ocid
     visible: ${worker_rdma_enabled}
   

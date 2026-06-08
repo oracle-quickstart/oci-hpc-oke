@@ -2,7 +2,14 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  unique_image_urls = distinct(compact([var.worker_ops_image_custom_uri, var.worker_cpu_image_custom_uri, var.worker_gpu_image_custom_uri, var.worker_rdma_image_custom_uri]))
+  unique_image_urls = distinct(compact([
+    var.bastion_image_use_uri ? var.bastion_image_custom_uri : null,
+    var.operator_image_use_uri ? var.operator_image_custom_uri : null,
+    var.worker_ops_image_custom_uri,
+    var.worker_cpu_image_custom_uri,
+    var.worker_gpu_image_custom_uri,
+    var.worker_rdma_image_custom_uri
+  ]))
 }
 
 resource "oci_core_image" "imported_image" {

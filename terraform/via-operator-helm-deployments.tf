@@ -14,9 +14,9 @@ module "certmanager" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name     = "cert-manager"
@@ -26,7 +26,7 @@ module "certmanager" {
   helm_chart_version  = var.cert_manager_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal",
     "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
     "grep -q 'parameter::urllib3.poolmanager' ~/.bashrc || cat >> ~/.bashrc <<'EOF'\nexport PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"\nEOF",
@@ -65,9 +65,9 @@ module "ingress" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name     = "contour"
@@ -77,7 +77,7 @@ module "ingress" {
   helm_chart_version  = var.ingress_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
   post_deployment_commands = flatten([
@@ -111,9 +111,9 @@ module "kube_prometheus_stack" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name     = "kube-prometheus-stack"
@@ -123,7 +123,7 @@ module "kube_prometheus_stack" {
   helm_chart_version  = var.prometheus_stack_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal",
     "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
     "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
@@ -186,9 +186,9 @@ module "node_problem_detector" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name     = "gpu-rdma-node-problem-detector"
@@ -198,7 +198,7 @@ module "node_problem_detector" {
   helm_chart_version  = var.node_problem_detector_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
@@ -217,10 +217,10 @@ resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
   triggers = {
     manifest_md5    = md5(local.nvidia_dcgm_exporter_service_monitor_manifest)
     bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = var.bastion_user
+    bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
     operator_host   = module.oke.operator_private_ip
-    operator_user   = var.operator_user
+    operator_user   = local.operator_user
   }
 
   connection {
@@ -241,7 +241,7 @@ resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
 
   provisioner "remote-exec" {
     inline = [
-      "export PATH=$PATH:/usr/local/bin:/home/${var.operator_user}/bin",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
       "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
@@ -283,9 +283,9 @@ module "amd_device_metrics_exporter" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name     = "amd-device-metrics-exporter"
@@ -295,7 +295,7 @@ module "amd_device_metrics_exporter" {
   helm_chart_version  = var.amd_device_metrics_exporter_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
@@ -313,9 +313,9 @@ module "oke-ons-webhook" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name    = "oke-ons-webhook"
@@ -324,7 +324,7 @@ module "oke-ons-webhook" {
   helm_chart_version = var.oke_ons_webhook_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
@@ -350,9 +350,9 @@ module "oci_metrics_exporter" {
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = var.bastion_user
+  bastion_user    = local.bastion_user
   operator_host   = module.oke.operator_private_ip
-  operator_user   = var.operator_user
+  operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
   deployment_name    = "oci-metrics-exporter"
@@ -361,7 +361,7 @@ module "oci_metrics_exporter" {
   helm_chart_version = var.oci_metrics_exporter_chart_version
 
   pre_deployment_commands = [
-    "export PATH=$PATH:/home/${var.operator_user}/bin",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
     "export OCI_CLI_AUTH=instance_principal"
   ]
   deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
