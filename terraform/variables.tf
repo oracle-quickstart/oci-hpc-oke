@@ -448,6 +448,23 @@ variable "nvidia_gpu_operator_cdi_enabled" {
   description = "Enable CDI (Container Device Interface) in the NVIDIA GPU Operator addon."
 }
 
+variable "nvidia_gpu_operator_cdi_default" {
+  type        = bool
+  default     = true
+  description = "Use CDI as the default device-injection mode (cdi.default). Requires nvidia_gpu_operator_cdi_enabled = true and a CDI-capable device list strategy (nvidia_gpu_operator_device_list_strategy = \"cdi-cri\"); otherwise GPU pods fail with \"unresolvable CDI devices\"."
+}
+
+variable "nvidia_gpu_operator_device_list_strategy" {
+  type        = string
+  default     = "cdi-cri"
+  description = "DEVICE_LIST_STRATEGY for the NVIDIA device plugin. \"cdi-cri\" (the default) makes the device plugin generate the workload CDI spec and pass devices via CRI, which is required when CDI is enabled. \"envvar\" passes bare GPU UUIDs and is incompatible with CDI mode. Any value other than \"envvar\" makes the addon set devicePlugin.env."
+
+  validation {
+    condition     = contains(["envvar", "cdi-cri", "cdi-annotations", "volume-mounts"], var.nvidia_gpu_operator_device_list_strategy)
+    error_message = "nvidia_gpu_operator_device_list_strategy must be one of: envvar, cdi-cri, cdi-annotations, volume-mounts."
+  }
+}
+
 variable "nvidia_gpu_operator_toolkit_enabled" {
   type        = bool
   default     = true
@@ -475,7 +492,6 @@ variable "nvidia_gpu_operator_mig_strategy" {
 variable "nvidia_gpu_operator_configuration" {
   type = map(string)
   default = {
-    "cdi.default"                                  = "false"
     "daemonsets.rollingUpdate.maxUnavailable"      = "10%"
     "dcgm.enabled"                                 = "true"
     "dcgmExporter.enabled"                         = "true"

@@ -168,6 +168,8 @@ variableGroups:
       - nvidia_gpu_operator_addon_version
       - nvidia_gpu_operator_disable_plugin
       - nvidia_gpu_operator_cdi_enabled
+      - nvidia_gpu_operator_cdi_default
+      - nvidia_gpu_operator_device_list_strategy
       - nvidia_gpu_operator_toolkit_enabled
       - nvidia_gpu_operator_skip_nfd_dependency_check
       - nvidia_gpu_operator_mig_manager_enabled
@@ -1350,6 +1352,30 @@ variables:
     type: boolean
     description: Enable CDI (Container Device Interface) in the NVIDIA GPU Operator add-on.
     default: true
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+  nvidia_gpu_operator_cdi_default:
+    title: Use CDI as the default device-injection mode
+    type: boolean
+    description: Set cdi.default in the NVIDIA GPU Operator add-on. Requires CDI enabled and a CDI-capable device list strategy (cdi-cri); otherwise GPU pods fail with "unresolvable CDI devices".
+    default: true
+    visible:
+      and:
+      - deploy_nvidia_gpu_operator
+      - nvidia_gpu_operator_advanced_options
+      - nvidia_gpu_operator_cdi_enabled
+  nvidia_gpu_operator_device_list_strategy:
+    title: Device plugin DEVICE_LIST_STRATEGY
+    type: enum
+    description: DEVICE_LIST_STRATEGY for the NVIDIA device plugin. cdi-cri (the default) makes the device plugin generate the workload CDI spec and pass devices via CRI, required when CDI is enabled. envvar passes bare GPU UUIDs and is incompatible with CDI mode.
+    default: cdi-cri
+    enum:
+      - envvar
+      - cdi-cri
+      - cdi-annotations
+      - volume-mounts
     visible:
       and:
       - deploy_nvidia_gpu_operator

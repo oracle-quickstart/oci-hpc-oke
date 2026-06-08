@@ -131,13 +131,32 @@ locals {
     var.worker_cpu_enabled ? lookup(module.oke.worker_pool_ids, "oke-cpu", null) : null,
   ])
 
+  # When a CDI-capable device list strategy is selected, override the device plugin
+  # environment so it stops passing bare GPU UUIDs (envvar) and instead generates the
+  # workload CDI spec and passes devices via CRI. Required for CDI to actually work;
+  # see the nvidia_gpu_operator_device_list_strategy variable.
+  nvidia_gpu_operator_device_plugin_env = jsonencode([
+    { name = "PASS_DEVICE_SPECS", value = "true" },
+    { name = "FAIL_ON_INIT_ERROR", value = "true" },
+    { name = "DEVICE_LIST_STRATEGY", value = var.nvidia_gpu_operator_device_list_strategy },
+    { name = "DEVICE_ID_STRATEGY", value = "uuid" },
+    { name = "NVIDIA_VISIBLE_DEVICES", value = "all" },
+    { name = "NVIDIA_DRIVER_CAPABILITIES", value = "all" },
+  ])
+
+  nvidia_gpu_operator_device_plugin_configurations = var.nvidia_gpu_operator_device_list_strategy != "envvar" ? {
+    "devicePlugin.env" = local.nvidia_gpu_operator_device_plugin_env
+  } : {}
+
   nvidia_gpu_operator_addon_configurations = [
     for k, v in merge(
       var.nvidia_gpu_operator_configuration,
       local.nvidia_dcgm_exporter_metrics_addon_configurations,
+      local.nvidia_gpu_operator_device_plugin_configurations,
       {
         disableNvidiaGpuPlugin                  = tostring(var.nvidia_gpu_operator_disable_plugin)
         "cdi.enabled"                           = tostring(var.nvidia_gpu_operator_cdi_enabled)
+        "cdi.default"                           = tostring(var.nvidia_gpu_operator_cdi_default)
         "toolkit.enabled"                       = tostring(var.nvidia_gpu_operator_toolkit_enabled)
         skipNodeFeatureDiscoveryDependencyCheck = tostring(var.nvidia_gpu_operator_skip_nfd_dependency_check)
         "migManager.enabled"                    = tostring(var.nvidia_gpu_operator_mig_manager_enabled)
