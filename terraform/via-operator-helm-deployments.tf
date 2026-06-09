@@ -255,7 +255,7 @@ resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
-      "kubectl delete servicemonitor nvidia-dcgm-exporter -n gpu-operator --ignore-not-found"
+      "kubectl delete servicemonitor nvidia-dcgm-exporter-oke -n gpu-operator --ignore-not-found"
     ]
     on_failure = continue
   }
