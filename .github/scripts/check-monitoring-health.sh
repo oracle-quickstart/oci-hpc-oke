@@ -27,13 +27,16 @@ else
 fi
 
 echo "Health check: Grafana -> Prometheus query"
-QUERY_STATUS=$(curl -s --insecure -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" | jq -r '.status // empty')
-if [ "$QUERY_STATUS" = "success" ]; then
-  echo "OK:   Prometheus query via Grafana returned success"
-else
-  echo "FAIL: Prometheus query via Grafana returned: $QUERY_STATUS"
-  exit 1
-fi
+for i in $(seq 1 60); do
+  QUERY_STATUS=$(curl -s --insecure -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/datasources/proxy/uid/prometheus/api/v1/query?query=up" | jq -r '.status // empty' || true)
+  if [ "$QUERY_STATUS" = "success" ]; then
+    echo "OK:   Prometheus query via Grafana returned success"
+    break
+  fi
+  echo "  attempt $i: status=${QUERY_STATUS:-<empty>}, retrying in 10s..."
+  sleep 10
+done
+[ "$QUERY_STATUS" = "success" ] || { echo "FAIL: Prometheus query via Grafana did not return success after 60 attempts (last: ${QUERY_STATUS:-<empty>})"; exit 1; }
 
 echo "Health check: node-exporter DaemonSet"
 DS_DESIRED=$(kubectl get daemonset -n monitoring -l app.kubernetes.io/name=prometheus-node-exporter -o jsonpath='{.items[0].status.desiredNumberScheduled}')
