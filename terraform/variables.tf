@@ -362,7 +362,7 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "85.0.3"
+  default = "86.2.2"
   type    = string
 }
 
@@ -377,7 +377,7 @@ variable "cert_manager_chart_version" {
 }
 
 variable "ingress_chart_version" {
-  default = "0.5.0"
+  default = "0.6.0"
   type    = string
 }
 
@@ -875,7 +875,7 @@ variable "install_kueue" {
 }
 
 variable "kueue_chart_version" {
-  default = "0.17.2"
+  default = "0.18.0"
   type    = string
 }
 
