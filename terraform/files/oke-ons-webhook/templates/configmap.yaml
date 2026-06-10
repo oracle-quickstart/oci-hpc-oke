@@ -9,7 +9,7 @@ data:
     {{ .Files.Get "files/notification_template.j2" | nindent 4 }}
   script.py: |
     # /// script
-    # requires-python = ">=3.12"
+    # requires-python = ">=3.12,<3.14"
     # dependencies = [
     #   "oci",
     #   "requests",

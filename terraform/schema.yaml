@@ -1305,7 +1305,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "85.0.3"
+    default: "86.2.2"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1314,7 +1314,7 @@ variables:
     title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "0.5.0"
+    default: "0.6.0"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -2276,7 +2276,7 @@ variables:
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
-    default: "0.17.2"
+    default: "0.18.0"
     required: true
     visible: false
   kueue_local_queue_default_namespace:

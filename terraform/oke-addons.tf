@@ -59,7 +59,10 @@ locals {
     apiVersion = "monitoring.coreos.com/v1"
     kind       = "ServiceMonitor"
     metadata = {
-      name      = "nvidia-dcgm-exporter"
+      # Must not be named "nvidia-dcgm-exporter": the GPU operator deletes a
+      # ServiceMonitor with that name when dcgmExporter.serviceMonitor.enabled
+      # is false, which the addon configuration sets below.
+      name      = "nvidia-dcgm-exporter-oke"
       namespace = local.nvidia_gpu_operator_namespace
       labels    = local.nvidia_dcgm_exporter_service_monitor_additional_labels
     }
