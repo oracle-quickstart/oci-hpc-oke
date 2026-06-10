@@ -175,7 +175,7 @@ jobs:
     needs: [check-orm-trigger]
     if: >-
       always() && (
-        (github.event_name == 'workflow_call' && inputs.pr_number == 0) ||
+        (github.event_name == 'release' && inputs.pr_number == 0) ||
         needs.check-orm-trigger.result == 'success'
       )
     runs-on: ubuntu-latest
