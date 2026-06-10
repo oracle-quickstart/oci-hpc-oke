@@ -260,8 +260,29 @@ if [ "$INSTALL_SLURM_CLUSTER" = "true" ]; then
   if [ "$ACCOUNTING_ENABLED" = "true" ]; then
     kubectl -n "$SLURM_NAMESPACE" rollout status statefulset/slurm-accounting --timeout=600s
   fi
-  if kubectl -n "$SLURM_NAMESPACE" get statefulset "slurm-worker-$NODESET_NAME" >/dev/null 2>&1; then
-    kubectl -n "$SLURM_NAMESPACE" rollout status "statefulset/slurm-worker-$NODESET_NAME" --timeout=900s
+  # The operator manages nodeset pods directly, so there is no StatefulSet or
+  # DaemonSet object to watch with rollout status. Poll the NodeSet status instead.
+  echo "== Wait for Slurm worker nodeset =="
+  WORKER_NODESET="slurm-worker-$NODESET_NAME"
+  WORKER_DESIRED=0
+  WORKER_READY=0
+  for i in $(seq 1 60); do
+    WORKER_DESIRED="$(kubectl -n "$SLURM_NAMESPACE" get nodeset "$WORKER_NODESET" -o jsonpath='{.status.desired}' 2>/dev/null || true)"
+    WORKER_READY="$(kubectl -n "$SLURM_NAMESPACE" get nodeset "$WORKER_NODESET" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    [ -n "$WORKER_DESIRED" ] || WORKER_DESIRED=0
+    [ -n "$WORKER_READY" ] || WORKER_READY=0
+    if [ "$WORKER_DESIRED" -gt 0 ] && [ "$WORKER_READY" -ge "$WORKER_DESIRED" ]; then
+      echo "Worker nodeset $WORKER_NODESET is ready ($WORKER_READY/$WORKER_DESIRED)"
+      break
+    fi
+    echo "Waiting for worker nodeset $WORKER_NODESET... $WORKER_READY/$WORKER_DESIRED ready ($i/60)"
+    sleep 15
+  done
+  if [ "$WORKER_DESIRED" -le 0 ]; then
+    echo "WARNING: worker nodeset $WORKER_NODESET reports no desired pods. Check that worker nodes match the nodeset selector."
+  elif [ "$WORKER_READY" -lt "$WORKER_DESIRED" ]; then
+    echo "ERROR: worker nodeset $WORKER_NODESET is not ready ($WORKER_READY/$WORKER_DESIRED)"
+    exit 1
   fi
 
   echo "== Validation snapshot =="

@@ -176,8 +176,9 @@ nodesets:
 
   ${nodeset_name}:
     enabled: true
-    scalingMode: StatefulSet
-    replicas: ${worker_replicas}
+    scalingMode: DaemonSet
+    # replicas only applies when scalingMode is StatefulSet
+    # replicas: ${worker_replicas}
     useResourceLimits: false
     slurmd:
       image:
