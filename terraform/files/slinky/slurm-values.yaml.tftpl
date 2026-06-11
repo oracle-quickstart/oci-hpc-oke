@@ -192,10 +192,12 @@ nodesets:
       annotations:
         k8s.v1.cni.cncf.io/networks: ${worker_rdma_networks}
 %{ endif ~}
-    # The chart renders this field even in DaemonSet mode; keep it aligned with
-    # the worker pool size so operator-side pod pruning cannot fall back to 1.
+    # Ignored in DaemonSet mode (pod count follows matching nodes); only used
+    # if the nodeset is overridden to StatefulSet scaling.
     replicas: ${worker_replicas}
-    workloadDisruptionProtection: false
+    # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
+    # evict workers while Slurm jobs are running on them
+    workloadDisruptionProtection: true
     useResourceLimits: false
     slurmd:
       image:
@@ -209,30 +211,14 @@ nodesets:
         - ${worker_slurmd_parameters}
 %{ endif ~}
       env:
-        # The stock slurm-operator 1.1.0 derives DaemonSet pod hostnames by cutting
-        # the Kubernetes node name at the first dot, which collides on IP-named OKE
-        # nodes. Name Slurm nodes after spec.nodeName until an operator build with
-        # nodeset.slinky.slurm.net/hostname-override support is installed.
+        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
+        # hostname_override=true on the stack so nodes register by hostname
+        # instead of private IP and Slurm node names stay clean.
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
       lifecycle:
-        postStart:
-          exec:
-            command:
-              - /usr/bin/sh
-              - -c
-              - |
-                for i in $(seq 1 30); do
-                  pid="$(pgrep -x slurmd | head -1 || true)"
-                  if [ -n "$pid" ]; then
-                    prlimit --pid "$pid" --memlock=unlimited:unlimited || true
-                    exit 0
-                  fi
-                  sleep 1
-                done
-                exit 0
         preStop:
           exec:
             command:

@@ -76,7 +76,6 @@ locals {
     accounting_enabled            = var.slinky_accounting_enabled
     install_slurm_cluster         = var.slinky_install_slurm_cluster
     login_enabled                 = var.slinky_login_enabled
-    worker_shape                  = local.slinky_worker_shape
     slinky_operator_namespace     = var.slinky_operator_namespace
     slurm_namespace               = var.slinky_slurm_namespace
     openldap_namespace            = var.slinky_openldap_namespace

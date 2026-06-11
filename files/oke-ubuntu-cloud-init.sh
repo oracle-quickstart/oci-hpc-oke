@@ -90,6 +90,20 @@ until curl -fsSL -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2
 
 # Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape 2>/dev/null) || true
+
+# RDMA workloads pin memory through ibv_reg_mr, which fails against the
+# container runtime default of 8 MB locked memory. Start all containers on GPU
+# nodes with unlimited memlock so slurmd and other RDMA pods inherit it.
+if [[ "$SHAPE" == *GPU* ]]; then
+    mkdir -p /etc/crio/crio.conf.d
+    cat >/etc/crio/crio.conf.d/12-memlock.conf <<'EOF'
+[crio.runtime]
+default_ulimits = [
+    "memlock=-1:-1"
+]
+EOF
+fi
+
 if [[ -z "$SHAPE" ]]; then
     echo "Warning: Unable to fetch instance shape from metadata service, skipping nvidia-imex check" >&2
 elif [[ "$SHAPE" == BM.GPU.GB200* ]] || [[ "$SHAPE" == BM.GPU.GB300* ]]; then
