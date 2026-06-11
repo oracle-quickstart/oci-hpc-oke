@@ -456,7 +456,7 @@ variable "setup_credential_provider_for_ocir" {
 }
 
 # OKE Cluster Setup - Advanced Options
-variable "override_hostnames" {
+variable "hostname_override" {
   default = false
   type    = bool
 }
@@ -1019,7 +1019,7 @@ variable "slinky_worker_image_repository" {
 variable "slinky_worker_image_tag" {
   default     = "auto"
   type        = string
-  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested NVIDIA NCCL or AMD RCCL image for the selected worker shape."
+  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL."
 }
 
 variable "slinky_gpu_autodetect" {
@@ -1130,6 +1130,18 @@ variable "slinky_controller_image_tag" {
   default     = "slurmctld-pmix-sssd-nss-25.11-ubuntu24.04"
   type        = string
   description = "Container image tag for the Slurm controller pod. The full-suite default includes SSSD/NSS support."
+}
+
+variable "slinky_login_image_repository" {
+  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  type        = string
+  description = "Container image repository for the Slurm login pod."
+}
+
+variable "slinky_login_image_tag" {
+  default     = "login-pyxis-25.11.5-ubuntu24.04-r6"
+  type        = string
+  description = "Container image tag for the Slurm login pod. The default includes Pyxis and Enroot for containerized jobs."
 }
 
 variable "slinky_sssd_image_repository" {

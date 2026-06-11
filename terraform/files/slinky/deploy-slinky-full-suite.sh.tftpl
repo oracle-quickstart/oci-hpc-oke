@@ -259,8 +259,6 @@ if [ "$INSTALL_SLURM_CLUSTER" = "true" ]; then
       --version "${slinky_slurm_chart_version}" \
       -f "$WORKDIR/slurm-values.yaml" \
       -f "$WORKDIR/slurm-values-override.yaml" \
-      --wait \
-      --timeout 900s \
       --history-max 1
   else
     helm upgrade --install slurm \
@@ -269,8 +267,6 @@ if [ "$INSTALL_SLURM_CLUSTER" = "true" ]; then
       --create-namespace \
       --version "${slinky_slurm_chart_version}" \
       -f "$WORKDIR/slurm-values.yaml" \
-      --wait \
-      --timeout 900s \
       --history-max 1
   fi
 

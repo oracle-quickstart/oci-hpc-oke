@@ -45,6 +45,8 @@ locals {
     controller_image_tag           = var.slinky_controller_image_tag
     sssd_image_repository          = var.slinky_sssd_image_repository
     sssd_image_tag                 = var.slinky_sssd_image_tag
+    login_image_repository         = var.slinky_login_image_repository
+    login_image_tag                = var.slinky_login_image_tag
     gpu_autodetect                 = local.slinky_gpu_autodetect
     login_enabled                  = var.slinky_login_enabled
     login_root_ssh_authorized_keys = local.slinky_login_root_ssh_authorized_keys

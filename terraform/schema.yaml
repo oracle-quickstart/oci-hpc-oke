@@ -163,6 +163,7 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
+      - hostname_override
 
   - title: "Cluster Components"
     variables:
@@ -312,6 +313,8 @@ variableGroups:
       - slinky_openldap_readonly_replicas
       - slinky_openldap_storage_size
       - slinky_mariadb_storage_size
+      - slinky_login_image_repository
+      - slinky_login_image_tag
       - slinky_controller_image_repository
       - slinky_controller_image_tag
       - slinky_sssd_image_repository
@@ -1517,11 +1520,11 @@ variables:
     default: true
 
 # OKE Cluster Setup - Advanced Options
-  override_hostnames:
+  hostname_override:
     title: Use hostnames instead of IP addresses as OKE worker node names
+    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address.
     type: boolean
     default: false
-    visible: false  
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
@@ -2359,10 +2362,6 @@ variables:
     description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, login service, and a shape-specific GPU worker nodeset."
     type: boolean
     default: false
-    visible:
-      or:
-        - ${worker_rdma_enabled}
-        - ${worker_gpu_enabled}
   slinky_advanced_options:
     title: Advanced options
     type: boolean
@@ -2572,7 +2571,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_image_tag:
     title: Slurm worker image tag
-    description: "Use auto to select the tested NVIDIA NCCL or AMD RCCL image for the selected worker shape."
+    description: "Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL."
     type: string
     default: "auto"
     visible:
@@ -2684,6 +2683,23 @@ variables:
         - ${install_slinky}
         - ${slinky_advanced_options}
         - ${slinky_accounting_enabled}
+  slinky_login_image_repository:
+    title: Slurm login image repository
+    type: string
+    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_login_image_tag:
+    title: Slurm login image tag
+    description: "The default image includes Pyxis and Enroot for containerized jobs."
+    type: string
+    default: "login-pyxis-25.11.5-ubuntu24.04-r6"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
   slinky_controller_image_repository:
     title: Slurm controller image repository
     type: string

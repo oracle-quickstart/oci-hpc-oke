@@ -110,6 +110,10 @@ controller:
 %{ endif ~}
 
 configFiles:
+  # Glob syntax is required: only login and slurmd pods have the Pyxis libraries,
+  # and a literal path would fail config resolution in slurmctld.
+  plugstack.conf: |
+    include /usr/share/pyxis/*
   gres.conf: |
     AutoDetect=${gpu_autodetect}
   cgroup.conf: |
@@ -139,6 +143,12 @@ loginsets:
       PasswordAuthentication no
 %{ endif ~}
     login:
+      image:
+        repository: ${login_image_repository}
+        tag: ${login_image_tag}
+      # Enroot in the login pod needs a privileged container
+      securityContext:
+        privileged: true
       volumeMounts:
 %{ if home_enabled ~}
         - name: home
