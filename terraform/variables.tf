@@ -952,10 +952,15 @@ variable "slinky_login_enabled" {
   description = "Enable a Slinky LoginSet with a LoadBalancer service. The stack SSH public key is used for root access when provided."
 }
 
-variable "slinky_worker_host_network" {
-  default     = true
-  type        = bool
-  description = "Run Slinky slurmd pods with hostNetwork. This is the default for OKE bare-metal GPU/RDMA shapes."
+variable "slinky_worker_network_mode" {
+  default     = "hostNetwork"
+  type        = string
+  description = "Network mode for Slinky slurmd pods. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace."
+
+  validation {
+    condition     = contains(["virtualFunctions", "hostNetwork"], var.slinky_worker_network_mode)
+    error_message = "slinky_worker_network_mode must be either 'virtualFunctions' or 'hostNetwork'."
+  }
 }
 
 variable "slinky_worker_mount_infiniband" {
@@ -973,13 +978,36 @@ variable "slinky_worker_ssh_enabled" {
 variable "slinky_worker_replicas" {
   default     = null
   type        = number
-  description = "Number of Slinky slurmd replicas. Defaults to the enabled GPU/RDMA worker pool size."
+  description = "Number of Slinky slurmd replicas when overriding the worker NodeSet to StatefulSet. Ignored by the default DaemonSet worker mode."
 }
 
 variable "slinky_gpus_per_node" {
   default     = null
   type        = number
   description = "GPUs per Slinky slurmd pod. Defaults to the final numeric component of the selected GPU worker shape."
+}
+
+variable "slinky_worker_rdma_resource" {
+  default     = "nvidia.com/sriov-rdma-vf"
+  type        = string
+  description = "Extended resource requested by virtualFunctions Slinky RDMA workers."
+}
+
+variable "slinky_worker_rdma_vfs_per_node" {
+  default     = 16
+  type        = number
+  description = "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker."
+
+  validation {
+    condition     = try(var.slinky_worker_rdma_vfs_per_node == floor(var.slinky_worker_rdma_vfs_per_node), true)
+    error_message = "slinky_worker_rdma_vfs_per_node must be an integer."
+  }
+}
+
+variable "slinky_worker_rdma_network" {
+  default     = "default/sriov-rdma-vf"
+  type        = string
+  description = "Multus NetworkAttachmentDefinition used by pod-networked Slinky RDMA workers. Use namespace/name when the NAD is not in the Slurm namespace."
 }
 
 variable "slinky_worker_image_repository" {

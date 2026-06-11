@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  slinky_workdir = "/home/${var.operator_user}/tf-slinky"
+  slinky_workdir = "/home/${local.operator_user}/tf-slinky"
 
   slinky_openldap_prereqs_yaml = templatefile("${path.module}/files/slinky/openldap-prereqs.yaml.tftpl", {
     openldap_namespace         = var.slinky_openldap_namespace
@@ -56,18 +56,25 @@ locals {
     gpus_per_node                  = local.slinky_gpus_per_node
     mount_infiniband               = var.slinky_worker_mount_infiniband
     worker_ssh_enabled             = var.slinky_worker_ssh_enabled
-    worker_host_network            = var.slinky_worker_host_network
+    worker_host_network            = local.slinky_worker_host_network
+    worker_sriov_enabled           = local.slinky_worker_sriov_enabled
+    worker_rdma_resource           = var.slinky_worker_rdma_resource
+    worker_rdma_vfs_per_node       = var.slinky_worker_rdma_vfs_per_node
+    worker_rdma_networks           = local.slinky_worker_rdma_networks_annotation
+    worker_slurmd_parameters       = local.slinky_worker_slurmd_parameters
+    worker_numa_topology_enabled   = local.slinky_worker_numa_topology_enabled
     worker_features_yaml           = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
     worker_shape                   = local.slinky_worker_shape
   })
 
   slinky_deploy_script = templatefile("${path.module}/files/slinky/deploy-slinky-full-suite.sh.tftpl", {
-    operator_user                 = var.operator_user
+    operator_user                 = local.operator_user
     identity_enabled              = var.slinky_identity_enabled
     home_enabled                  = var.slinky_home_enabled
     accounting_enabled            = var.slinky_accounting_enabled
     install_slurm_cluster         = var.slinky_install_slurm_cluster
     login_enabled                 = var.slinky_login_enabled
+    worker_shape                  = local.slinky_worker_shape
     slinky_operator_namespace     = var.slinky_operator_namespace
     slurm_namespace               = var.slinky_slurm_namespace
     openldap_namespace            = var.slinky_openldap_namespace
@@ -101,10 +108,10 @@ resource "null_resource" "slinky_full_suite_via_operator" {
   triggers = {
     manifest_md5       = local.slinky_manifest_bundle_md5
     bastion_host       = module.oke.bastion_public_ip
-    bastion_user       = var.bastion_user
+    bastion_user       = local.bastion_user
     ssh_private_key    = tls_private_key.stack_key.private_key_openssh
     operator_host      = module.oke.operator_private_ip
-    operator_user      = var.operator_user
+    operator_user      = local.operator_user
     slurm_namespace    = var.slinky_slurm_namespace
     slinky_namespace   = var.slinky_operator_namespace
     openldap_namespace = var.slinky_openldap_namespace

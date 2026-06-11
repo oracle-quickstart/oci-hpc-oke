@@ -11,6 +11,7 @@ HOME_ENABLED="${home_enabled}"
 ACCOUNTING_ENABLED="${accounting_enabled}"
 INSTALL_SLURM_CLUSTER="${install_slurm_cluster}"
 LOGIN_ENABLED="${login_enabled}"
+WORKER_SHAPE="${worker_shape}"
 
 SLINKY_OPERATOR_NAMESPACE="${slinky_operator_namespace}"
 SLURM_NAMESPACE="${slurm_namespace}"
@@ -230,6 +231,26 @@ kubectl -n "$SLINKY_OPERATOR_NAMESPACE" rollout status deployment/slurm-operator
 
 if [ "$INSTALL_SLURM_CLUSTER" = "true" ]; then
   echo "== Deploy Slurm cluster =="
+  echo "== Prepare DaemonSet Slurm worker hostnames =="
+  # OKE nodes can be named by private IP. HostNetwork DaemonSet pods need stable
+  # Slurm node names, so an operator with hostname-override support reads this
+  # annotation and uses it as the generated pod hostname. The stock slurm-operator
+  # 1.1.0 ignores this annotation; workers are named by spec.nodeName until an
+  # operator build with nodeset.slinky.slurm.net/hostname-override is installed.
+  mapfile -t WORKER_NODES < <(
+    kubectl get nodes \
+      -l "node.kubernetes.io/instance-type=$WORKER_SHAPE" \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort
+  )
+  if [ "$${#WORKER_NODES[@]}" -eq 0 ]; then
+    echo "WARNING: no Kubernetes nodes found for worker shape $WORKER_SHAPE"
+  fi
+  for i in "$${!WORKER_NODES[@]}"; do
+    kubectl annotate node "$${WORKER_NODES[$i]}" \
+      nodeset.slinky.slurm.net/hostname-override="$NODESET_NAME-$i" \
+      --overwrite
+  done
+
   if [ -s "$WORKDIR/slurm-values-override.yaml" ]; then
     helm upgrade --install slurm \
       oci://ghcr.io/slinkyproject/charts/slurm \

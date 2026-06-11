@@ -67,6 +67,16 @@ locals {
     !var.worker_rdma_enabled,
     !var.worker_gpu_enabled,
   ])
+  invalid_slinky_virtual_functions = alltrue([
+    var.install_slinky,
+    var.slinky_worker_network_mode == "virtualFunctions",
+    anytrue([
+      !var.worker_rdma_enabled,
+      trimspace(coalesce(var.slinky_worker_rdma_network, "")) == "",
+      trimspace(coalesce(var.slinky_worker_rdma_resource, "")) == "",
+      coalesce(var.slinky_worker_rdma_vfs_per_node, 0) <= 0,
+    ]),
+  ])
   invalid_slinky_openldap_topology = alltrue([
     var.install_slinky,
     var.slinky_identity_enabled,
@@ -245,6 +255,17 @@ resource "null_resource" "validate_slinky_workers" {
     precondition {
       condition     = !local.invalid_slinky_workers
       error_message = "install_slinky=true requires either worker_rdma_enabled=true or worker_gpu_enabled=true so the stack can create a shape-specific Slurm worker nodeset."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_virtual_functions" {
+  count = local.invalid_slinky_virtual_functions ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_virtual_functions
+      error_message = "slinky_worker_network_mode=virtualFunctions requires worker_rdma_enabled=true, non-empty slinky_worker_rdma_resource and slinky_worker_rdma_network, and slinky_worker_rdma_vfs_per_node > 0."
     }
   }
 }

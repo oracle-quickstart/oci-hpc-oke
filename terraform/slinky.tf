@@ -23,11 +23,27 @@ locals {
     local.slinky_is_amd ? "slurmd-rocm-rccl-25.11.5-rocm7.1.1-sssd-r2" : "slurmd-nvml-nccl-25.11.5-ubuntu24.04-r2"
   ) : var.slinky_worker_image_tag
 
+  slinky_worker_host_network = var.slinky_worker_network_mode == "hostNetwork"
+
+  slinky_worker_sriov_enabled = alltrue([
+    !local.slinky_worker_host_network,
+    trimspace(coalesce(var.slinky_worker_rdma_network, "")) != "",
+    trimspace(coalesce(var.slinky_worker_rdma_resource, "")) != "",
+    coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > 0,
+  ])
+  slinky_worker_rdma_networks_annotation = local.slinky_worker_sriov_enabled ? join(",", [
+    for _ in range(coalesce(var.slinky_worker_rdma_vfs_per_node, 0)) : var.slinky_worker_rdma_network
+  ]) : ""
+
+  slinky_worker_numa_topology_enabled = contains(["BM.GPU.B4.8"], local.slinky_worker_shape)
+  slinky_worker_slurmd_parameters     = local.slinky_worker_numa_topology_enabled ? "numa_node_as_socket" : ""
+
   slinky_worker_features = distinct(compact(concat(
     [lower(replace(replace(replace(local.slinky_worker_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))],
     local.slinky_is_amd ? ["amd", "rocm"] : ["nvidia"],
     var.worker_rdma_enabled ? ["rdma"] : [],
-    var.slinky_worker_host_network ? ["hostnetwork"] : []
+    local.slinky_worker_host_network ? ["hostnetwork"] : [],
+    local.slinky_worker_sriov_enabled ? ["sriov"] : []
   )))
 
   slinky_readonly_replica_dns_names = join("\n", [

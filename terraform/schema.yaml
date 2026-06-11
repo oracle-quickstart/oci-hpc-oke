@@ -289,11 +289,14 @@ variableGroups:
       - slinky_slurm_namespace
       - slinky_operator_namespace
       - slinky_login_enabled
-      - slinky_worker_host_network
+      - slinky_worker_network_mode
       - slinky_worker_mount_infiniband
       - slinky_worker_ssh_enabled
       - slinky_worker_replicas
       - slinky_gpus_per_node
+      - slinky_worker_rdma_resource
+      - slinky_worker_rdma_vfs_per_node
+      - slinky_worker_rdma_network
       - slinky_gpu_autodetect
       - slinky_worker_image_repository
       - slinky_worker_image_tag
@@ -2468,10 +2471,14 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-  slinky_worker_host_network:
-    title: Run Slurm workers with hostNetwork
-    type: boolean
-    default: true
+  slinky_worker_network_mode:
+    title: Slurm worker network mode
+    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs."
+    type: enum
+    enum:
+      - hostNetwork
+      - virtualFunctions
+    default: "hostNetwork"
     visible:
       and:
         - ${install_slinky}
@@ -2494,7 +2501,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_replicas:
     title: Slurm worker replicas
-    description: "Defaults to the selected GPU/RDMA worker pool size."
+    description: "Only applies when overriding the worker NodeSet to StatefulSet. The generated default uses DaemonSet."
     type: integer
     required: false
     visible:
@@ -2510,6 +2517,36 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_worker_rdma_resource:
+    title: Slurm worker RDMA VF resource
+    description: "Extended resource requested by pod-networked Slinky RDMA workers."
+    type: string
+    default: "nvidia.com/sriov-rdma-vf"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - eq: [slinky_worker_network_mode, virtualFunctions]
+  slinky_worker_rdma_vfs_per_node:
+    title: Slurm worker RDMA VFs
+    description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker."
+    type: integer
+    default: 16
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - eq: [slinky_worker_network_mode, virtualFunctions]
+  slinky_worker_rdma_network:
+    title: Slurm worker RDMA network
+    description: "Multus NetworkAttachmentDefinition for pod-networked Slinky RDMA workers. Use namespace/name when needed."
+    type: string
+    default: "default/sriov-rdma-vf"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - eq: [slinky_worker_network_mode, virtualFunctions]
   slinky_gpu_autodetect:
     title: Slurm GPU AutoDetect
     description: "Use auto to select rsmi for AMD shapes and nvml for NVIDIA shapes."

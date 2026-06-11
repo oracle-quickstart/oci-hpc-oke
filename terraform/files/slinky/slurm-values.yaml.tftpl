@@ -177,8 +177,15 @@ nodesets:
   ${nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
-    # replicas only applies when scalingMode is StatefulSet
-    # replicas: ${worker_replicas}
+%{ if worker_sriov_enabled ~}
+    metadata:
+      annotations:
+        k8s.v1.cni.cncf.io/networks: ${worker_rdma_networks}
+%{ endif ~}
+    # The chart renders this field even in DaemonSet mode; keep it aligned with
+    # the worker pool size so operator-side pod pruning cannot fall back to 1.
+    replicas: ${worker_replicas}
+    workloadDisruptionProtection: false
     useResourceLimits: false
     slurmd:
       image:
@@ -187,12 +194,35 @@ nodesets:
       args:
         - -N
         - $(KUBE_NODE_NAME)
+%{ if worker_slurmd_parameters != "" ~}
+        - --parameters
+        - ${worker_slurmd_parameters}
+%{ endif ~}
       env:
+        # The stock slurm-operator 1.1.0 derives DaemonSet pod hostnames by cutting
+        # the Kubernetes node name at the first dot, which collides on IP-named OKE
+        # nodes. Name Slurm nodes after spec.nodeName until an operator build with
+        # nodeset.slinky.slurm.net/hostname-override support is installed.
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
       lifecycle:
+        postStart:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - |
+                for i in $(seq 1 30); do
+                  pid="$(pgrep -x slurmd | head -1 || true)"
+                  if [ -n "$pid" ]; then
+                    prlimit --pid "$pid" --memlock=unlimited:unlimited || true
+                    exit 0
+                  fi
+                  sleep 1
+                done
+                exit 0
         preStop:
           exec:
             command:
@@ -202,8 +232,14 @@ nodesets:
       resources:
         limits:
           ${gpu_resource}: ${gpus_per_node}
+%{ if worker_sriov_enabled ~}
+          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
+%{ endif ~}
         requests:
           ${gpu_resource}: ${gpus_per_node}
+%{ if worker_sriov_enabled ~}
+          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
+%{ endif ~}
       volumeMounts:
 %{ if mount_infiniband ~}
         - name: devinf
@@ -231,6 +267,16 @@ nodesets:
         Port 2222
 %{ endif ~}
     extraConfMap:
+%{ if worker_numa_topology_enabled ~}
+      Boards: 1
+      CPUs: 128
+      SocketsPerBoard: 8
+      CoresPerSocket: 16
+      ThreadsPerCore: 1
+%{ endif ~}
+%{ if worker_slurmd_parameters != "" ~}
+      Parameters: ${worker_slurmd_parameters}
+%{ endif ~}
       Gres:
         - gpu:${gpus_per_node}
       Features:
@@ -245,11 +291,14 @@ ${worker_features_yaml}
     updateStrategy:
       type: RollingUpdate
       rollingUpdate:
-        maxUnavailable: 25%
+        maxUnavailable: ${worker_replicas}
     podSpec:
 %{ if worker_host_network ~}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+%{ else ~}
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
 %{ endif ~}
       nodeSelector:
         node.kubernetes.io/instance-type: ${worker_shape}
