@@ -4,7 +4,11 @@
 locals {
   user_public_ssh_key     = var.ssh_public_key != null ? trimspace(var.ssh_public_key) : ""
   bundled_ssh_public_keys = "${local.user_public_ssh_key}\n${trimspace(tls_private_key.stack_key.public_key_openssh)}"
-  ssh_public_key          = local.any_deployments_via_operator ? local.bundled_ssh_public_keys : local.user_public_ssh_key # need to use known public/private key pair to deploy resources via ORM 
+  # Always bundle the stack key. Bundling only when via-operator deployments are
+  # enabled changes the operator's ssh_public_key trigger when a feature like
+  # Slinky is enabled on an existing stack, forcing an operator replacement (and
+  # leaving an existing bastion without the stack key).
+  ssh_public_key = local.bundled_ssh_public_keys
 }
 
 resource "tls_private_key" "stack_key" {
