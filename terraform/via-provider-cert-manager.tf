@@ -8,6 +8,7 @@ resource "helm_release" "cert_manager" {
       var.install_kueue,
       var.install_nvidia_dra_driver,
       alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack]),
+      alltrue([var.install_slinky, var.slinky_identity_enabled]),
     ]),
     local.deploy_from_local || local.deploy_from_orm
   ]) ? 1 : 0

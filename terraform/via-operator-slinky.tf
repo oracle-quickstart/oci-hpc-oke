@@ -24,6 +24,17 @@ locals {
     system_node_shape          = var.worker_ops_shape
   })
 
+  slinky_configure_openldap_script = templatefile("${path.module}/files/slinky/configure-openldap.sh.tftpl", {
+    operator_user              = local.operator_user
+    openldap_namespace         = var.slinky_openldap_namespace
+    slurm_namespace            = var.slinky_slurm_namespace
+    openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
+    openldap_admin_password    = var.slinky_openldap_admin_password
+    openldap_config_password   = var.slinky_openldap_config_password
+    openldap_base_dn           = var.slinky_openldap_base_dn
+    openldap_dc                = local.slinky_openldap_dc
+  })
+
   slinky_home_pvc_yaml = templatefile("${path.module}/files/slinky/slurm-home-pvc.yaml.tftpl", {
     slurm_namespace = var.slinky_slurm_namespace
     home_pv_name    = var.slinky_home_pv_name
@@ -68,54 +79,20 @@ locals {
     worker_features_yaml           = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
     worker_shape                   = local.slinky_worker_shape
   })
-
-  slinky_deploy_script = templatefile("${path.module}/files/slinky/deploy-slinky-full-suite.sh.tftpl", {
-    operator_user                 = local.operator_user
-    identity_enabled              = var.slinky_identity_enabled
-    home_enabled                  = var.slinky_home_enabled
-    accounting_enabled            = var.slinky_accounting_enabled
-    install_slurm_cluster         = var.slinky_install_slurm_cluster
-    login_enabled                 = var.slinky_login_enabled
-    slinky_operator_namespace     = var.slinky_operator_namespace
-    slurm_namespace               = var.slinky_slurm_namespace
-    openldap_namespace            = var.slinky_openldap_namespace
-    openldap_readonly_replicas    = var.slinky_openldap_readonly_replicas
-    openldap_admin_password       = var.slinky_openldap_admin_password
-    openldap_config_password      = var.slinky_openldap_config_password
-    openldap_base_dn              = var.slinky_openldap_base_dn
-    openldap_dc                   = local.slinky_openldap_dc
-    nodeset_name                  = var.slinky_nodeset_name
-    cert_manager_chart_version    = var.cert_manager_chart_version
-    openldap_chart_version        = var.slinky_openldap_chart_version
-    slinky_operator_chart_version = var.slinky_operator_chart_version
-    slinky_slurm_chart_version    = var.slinky_slurm_chart_version
-  })
-
-  slinky_manifest_bundle_md5 = nonsensitive(md5(join("\n---\n", [
-    local.slinky_openldap_prereqs_yaml,
-    local.slinky_openldap_values_yaml,
-    local.slinky_home_pvc_yaml,
-    local.slinky_mariadb_yaml,
-    local.slinky_slurm_values_yaml,
-    local.slinky_deploy_script,
-    var.slinky_operator_values_override,
-    var.slinky_slurm_values_override,
-  ])))
 }
 
-resource "null_resource" "slinky_full_suite_via_operator" {
-  count = local.slinky_deploy_from_operator ? 1 : 0
+# OpenLDAP namespaces, TLS certificates, and SSSD configuration. Applied before
+# the OpenLDAP chart so the openldap-tls secret exists at install time.
+resource "null_resource" "slinky_openldap_prereqs_via_operator" {
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_identity_enabled]) ? 1 : 0
 
   triggers = {
-    manifest_md5       = local.slinky_manifest_bundle_md5
-    bastion_host       = module.oke.bastion_public_ip
-    bastion_user       = local.bastion_user
-    ssh_private_key    = tls_private_key.stack_key.private_key_openssh
-    operator_host      = module.oke.operator_private_ip
-    operator_user      = local.operator_user
-    slurm_namespace    = var.slinky_slurm_namespace
-    slinky_namespace   = var.slinky_operator_namespace
-    openldap_namespace = var.slinky_openldap_namespace
+    manifest_md5    = nonsensitive(md5(local.slinky_openldap_prereqs_yaml))
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
   }
 
   connection {
@@ -141,9 +118,104 @@ resource "null_resource" "slinky_full_suite_via_operator" {
     destination = "${local.slinky_workdir}/openldap-prereqs.yaml"
   }
 
-  provisioner "file" {
-    content     = local.slinky_openldap_values_yaml
-    destination = "${local.slinky_workdir}/openldap-values.yaml"
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
+      "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: kubeconfig is not available'; exit 1; fi",
+      "kubectl apply -f ${local.slinky_workdir}/openldap-prereqs.yaml",
+      "kubectl -n ${var.slinky_openldap_namespace} wait --for=condition=Ready certificate/openldap-tls --timeout=300s",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [
+    module.oke,
+    helm_release.cert_manager,
+    module.certmanager,
+  ]
+}
+
+module "slinky_openldap" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_identity_enabled]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "openldap"
+  helm_chart_name     = "openldap-stack-ha"
+  namespace           = var.slinky_openldap_namespace
+  helm_repository_url = "https://jp-gouin.github.io/helm-openldap/"
+  helm_chart_version  = var.slinky_openldap_chart_version
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+
+  post_deployment_commands = concat(
+    ["kubectl -n ${var.slinky_openldap_namespace} rollout status statefulset/openldap --timeout=600s"],
+    var.slinky_openldap_readonly_replicas > 0 ? ["kubectl -n ${var.slinky_openldap_namespace} rollout status statefulset/openldap-readonly --timeout=600s"] : [],
+  )
+
+  deployment_extra_args = ["--wait", "--timeout 600s", "--history-max 1"]
+
+  # The chart version comment line is part of the values hash, so version bumps
+  # trigger a redeploy.
+  helm_template_values_override = "# openldap-stack-ha chart ${var.slinky_openldap_chart_version}\n${local.slinky_openldap_values_yaml}"
+  helm_user_values_override     = ""
+
+  depends_on = [null_resource.slinky_openldap_prereqs_via_operator]
+}
+
+# LDAP settings that require exec into the OpenLDAP pods: TLS cn=config,
+# syncprov overlay, base tree, and copying the CA into the Slurm namespace.
+resource "null_resource" "slinky_openldap_config_via_operator" {
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_identity_enabled]) ? 1 : 0
+
+  triggers = {
+    script_md5      = nonsensitive(md5(local.slinky_configure_openldap_script))
+    tls_config_md5  = md5(file("${path.module}/files/slinky/openldap-tls-config.ldif"))
+    syncprov_md5    = md5(file("${path.module}/files/slinky/openldap-primary-syncprov.ldif"))
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
   }
 
   provisioner "file" {
@@ -157,8 +229,187 @@ resource "null_resource" "slinky_full_suite_via_operator" {
   }
 
   provisioner "file" {
+    content     = local.slinky_configure_openldap_script
+    destination = "${local.slinky_workdir}/configure-openldap.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "chmod 700 ${local.slinky_workdir}/configure-openldap.sh",
+      "${local.slinky_workdir}/configure-openldap.sh",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [module.slinky_openldap]
+}
+
+resource "null_resource" "slinky_home_pvc_via_operator" {
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_home_enabled]) ? 1 : 0
+
+  triggers = {
+    manifest_md5    = md5(local.slinky_home_pvc_yaml)
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
+  }
+
+  provisioner "file" {
     content     = local.slinky_home_pvc_yaml
     destination = "${local.slinky_workdir}/slurm-home-pvc.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
+      "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: kubeconfig is not available'; exit 1; fi",
+      "kubectl create namespace ${var.slinky_slurm_namespace} --dry-run=client -o yaml | kubectl apply -f -",
+      "kubectl apply -f ${local.slinky_workdir}/slurm-home-pvc.yaml",
+      "kubectl -n ${var.slinky_slurm_namespace} get pvc slurm-home",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [
+    module.oke,
+    null_resource.fss_pv_via_operator,
+    kubernetes_persistent_volume_v1.fss,
+  ]
+}
+
+module "slinky_mariadb_operator_crds" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_accounting_enabled]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "mariadb-operator-crds"
+  helm_chart_name     = "mariadb-operator-crds"
+  namespace           = "mariadb"
+  helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+  post_deployment_commands = []
+
+  deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
+
+  helm_template_values_override = ""
+  helm_user_values_override     = ""
+
+  depends_on = [module.oke]
+}
+
+module "slinky_mariadb_operator" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_accounting_enabled]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "mariadb-operator"
+  helm_chart_name     = "mariadb-operator"
+  namespace           = "mariadb"
+  helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+  post_deployment_commands = [
+    "kubectl -n mariadb rollout status deploy/mariadb-operator-webhook --timeout=300s",
+    "kubectl -n mariadb rollout status deploy/mariadb-operator-cert-controller --timeout=300s",
+  ]
+
+  deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
+
+  helm_template_values_override = ""
+  helm_user_values_override     = ""
+
+  depends_on = [module.slinky_mariadb_operator_crds]
+}
+
+resource "null_resource" "slinky_mariadb_via_operator" {
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_accounting_enabled]) ? 1 : 0
+
+  triggers = {
+    manifest_md5    = md5(local.slinky_mariadb_yaml)
+    slurm_namespace = var.slinky_slurm_namespace
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
   }
 
   provisioner "file" {
@@ -166,30 +417,14 @@ resource "null_resource" "slinky_full_suite_via_operator" {
     destination = "${local.slinky_workdir}/mariadb.yaml"
   }
 
-  provisioner "file" {
-    content     = local.slinky_slurm_values_yaml
-    destination = "${local.slinky_workdir}/slurm-values.yaml"
-  }
-
-  provisioner "file" {
-    content     = var.slinky_operator_values_override
-    destination = "${local.slinky_workdir}/slinky-operator-values-override.yaml"
-  }
-
-  provisioner "file" {
-    content     = var.slinky_slurm_values_override
-    destination = "${local.slinky_workdir}/slurm-values-override.yaml"
-  }
-
-  provisioner "file" {
-    content     = local.slinky_deploy_script
-    destination = "${local.slinky_workdir}/deploy-slinky-full-suite.sh"
-  }
-
   provisioner "remote-exec" {
     inline = [
-      "chmod 700 ${local.slinky_workdir}/deploy-slinky-full-suite.sh",
-      "${local.slinky_workdir}/deploy-slinky-full-suite.sh",
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl create namespace ${var.slinky_slurm_namespace} --dry-run=client -o yaml | kubectl apply -f -",
+      "kubectl apply -f ${local.slinky_workdir}/mariadb.yaml",
+      "kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready pod/mariadb-0 --timeout=600s",
     ]
   }
 
@@ -198,13 +433,7 @@ resource "null_resource" "slinky_full_suite_via_operator" {
     inline = [
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
-      "helm uninstall slurm --namespace ${self.triggers.slurm_namespace} --wait || true",
-      "helm uninstall slurm-operator --namespace ${self.triggers.slinky_namespace} --wait || true",
-      "helm uninstall slurm-operator-crds --namespace ${self.triggers.slinky_namespace} --wait || true",
-      "helm uninstall openldap --namespace ${self.triggers.openldap_namespace} --wait || true",
       "kubectl delete mariadb mariadb --namespace ${self.triggers.slurm_namespace} --ignore-not-found=true || true",
-      "helm uninstall mariadb-operator --namespace mariadb --wait || true",
-      "helm uninstall mariadb-operator-crds --namespace mariadb --wait || true",
     ]
     on_failure = continue
   }
@@ -217,16 +446,153 @@ resource "null_resource" "slinky_full_suite_via_operator" {
       triggers["operator_host"],
       triggers["operator_user"],
       triggers["slurm_namespace"],
-      triggers["slinky_namespace"],
-      triggers["openldap_namespace"],
     ]
   }
 
+  depends_on = [module.slinky_mariadb_operator]
+}
+
+module "slinky_operator_crds" {
+  count  = local.slinky_deploy_from_operator ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "slurm-operator-crds"
+  helm_chart_name     = "slurm-operator-crds"
+  namespace           = var.slinky_operator_namespace
+  helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
+  helm_chart_version  = var.slinky_operator_chart_version
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+  post_deployment_commands = []
+
+  deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
+
+  # The chart version comment line is part of the values hash, so version bumps
+  # trigger a redeploy.
+  helm_template_values_override = "# slurm-operator-crds chart ${var.slinky_operator_chart_version}\n"
+  helm_user_values_override     = ""
+
+  depends_on = [module.oke]
+}
+
+module "slinky_operator" {
+  count  = local.slinky_deploy_from_operator ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "slurm-operator"
+  helm_chart_name     = "slurm-operator"
+  namespace           = var.slinky_operator_namespace
+  helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
+  helm_chart_version  = var.slinky_operator_chart_version
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+  post_deployment_commands = [
+    "kubectl -n ${var.slinky_operator_namespace} rollout status deployment/slurm-operator-webhook --timeout=300s",
+  ]
+
+  deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
+
+  # The chart version comment line is part of the values hash, so version bumps
+  # trigger a redeploy.
+  helm_template_values_override = "# slurm-operator chart ${var.slinky_operator_chart_version}\n"
+  helm_user_values_override     = var.slinky_operator_values_override
+
+  depends_on = [module.slinky_operator_crds]
+}
+
+module "slinky_slurm" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "slurm"
+  helm_chart_name     = "slurm"
+  namespace           = var.slinky_slurm_namespace
+  helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
+  helm_chart_version  = var.slinky_slurm_chart_version
+
+  pre_deployment_commands = [
+    "set -e",
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal",
+  ]
+
+  post_deployment_commands = concat(
+    ["kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready pod/slurm-controller-0 --timeout=900s"],
+    var.slinky_login_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status deploy/slurm-login-slinky --timeout=600s"] : [],
+    var.slinky_accounting_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status statefulset/slurm-accounting --timeout=600s"] : [],
+    [
+      # The operator manages nodeset pods directly, so there is no StatefulSet
+      # or DaemonSet object to watch with rollout status. Poll the NodeSet
+      # status instead.
+      join("\n", [
+        "echo '== Wait for Slurm worker nodeset =='",
+        "WORKER_NODESET=\"slurm-worker-${var.slinky_nodeset_name}\"",
+        "WORKER_DESIRED=0",
+        "WORKER_READY=0",
+        "for i in $(seq 1 60); do",
+        "  WORKER_DESIRED=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.desired}' 2>/dev/null || true)\"",
+        "  WORKER_READY=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)\"",
+        "  [ -n \"$WORKER_DESIRED\" ] || WORKER_DESIRED=0",
+        "  [ -n \"$WORKER_READY\" ] || WORKER_READY=0",
+        "  if [ \"$WORKER_DESIRED\" -gt 0 ] && [ \"$WORKER_READY\" -ge \"$WORKER_DESIRED\" ]; then",
+        "    echo \"Worker nodeset $WORKER_NODESET is ready ($WORKER_READY/$WORKER_DESIRED)\"",
+        "    break",
+        "  fi",
+        "  echo \"Waiting for worker nodeset $WORKER_NODESET... $WORKER_READY/$WORKER_DESIRED ready ($i/60)\"",
+        "  sleep 15",
+        "done",
+        "if [ \"$WORKER_DESIRED\" -le 0 ]; then",
+        "  echo \"WARNING: worker nodeset $WORKER_NODESET reports no desired pods. Check that worker nodes match the nodeset selector.\"",
+        "elif [ \"$WORKER_READY\" -lt \"$WORKER_DESIRED\" ]; then",
+        "  echo \"ERROR: worker nodeset $WORKER_NODESET is not ready ($WORKER_READY/$WORKER_DESIRED)\"",
+        "  exit 1",
+        "fi",
+      ]),
+      "echo '== Validation snapshot =='",
+      "kubectl -n ${var.slinky_slurm_namespace} get pods -o wide",
+      "kubectl -n ${var.slinky_slurm_namespace} exec slurm-controller-0 -c slurmctld -- sinfo -N -o '%N|%t|%C|%m|%G|%E'",
+    ],
+  )
+
+  # No --wait: the controller and worker waits above replace it, and helm
+  # --wait times out while worker nodes are still joining the cluster.
+  deployment_extra_args = ["--history-max 1"]
+
+  # The chart version comment line is part of the values hash, so version bumps
+  # trigger a redeploy.
+  helm_template_values_override = "# slurm chart ${var.slinky_slurm_chart_version}\n${local.slinky_slurm_values_yaml}"
+  helm_user_values_override     = var.slinky_slurm_values_override
+
   depends_on = [
-    module.oke,
-    helm_release.cert_manager,
-    module.certmanager,
-    null_resource.fss_pv_via_operator,
-    kubernetes_persistent_volume_v1.fss,
+    module.slinky_operator,
+    null_resource.slinky_openldap_config_via_operator,
+    null_resource.slinky_home_pvc_via_operator,
+    null_resource.slinky_mariadb_via_operator,
   ]
 }
