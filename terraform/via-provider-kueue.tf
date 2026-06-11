@@ -35,9 +35,13 @@ resource "kubectl_manifest" "kueue_webhook_probe" {
   depends_on = [helm_release.kueue]
 }
 
-# Kueue Topology for RDMA-aware scheduling
+# Kueue Topology for RDMA-aware scheduling. The topology, flavor, and queues
+# are only created when an RDMA-capable pool exists: the flavor binds to the
+# oci-rdma topology whose node labels only RDMA-networked nodes carry, and
+# gating also prevents creating a flavor from the worker_rdma_shape default
+# for a pool that does not exist.
 resource "kubectl_manifest" "kueue_topology" {
-  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body  = file("${path.module}/files/kueue/topology.yaml")
   depends_on = [helm_release.kueue, kubectl_manifest.kueue_webhook_probe]
@@ -45,7 +49,7 @@ resource "kubectl_manifest" "kueue_topology" {
 
 # ResourceFlavor matching the active GPU worker pool shape
 resource "kubectl_manifest" "kueue_resource_flavor" {
-  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/resource-flavor.yaml.tpl", {
     flavor_name   = local.kueue_flavor_name
@@ -58,7 +62,7 @@ resource "kubectl_manifest" "kueue_resource_flavor" {
 
 # ClusterQueue with resource quotas
 resource "kubectl_manifest" "kueue_cluster_queue" {
-  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/cluster-queue.yaml.tpl", {
     flavor_name  = local.kueue_flavor_name
@@ -70,7 +74,7 @@ resource "kubectl_manifest" "kueue_cluster_queue" {
 
 # LocalQueue in the user-specified namespace
 resource "kubectl_manifest" "kueue_local_queue" {
-  count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = templatefile("${path.module}/files/kueue/local-queue.yaml.tpl", {
     flavor_name = local.kueue_flavor_name
