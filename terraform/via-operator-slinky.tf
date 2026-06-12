@@ -392,7 +392,15 @@ module "slinky_mariadb_operator" {
   helm_template_values_override = ""
   helm_user_values_override     = ""
 
-  depends_on = [module.slinky_mariadb_operator_crds]
+  # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
+  # installing this chart while Kueue is still starting fails with "no
+  # endpoints available for service kueue-webhook-service".
+  depends_on = [
+    module.slinky_mariadb_operator_crds,
+    module.kueue,
+    helm_release.kueue,
+    kubectl_manifest.kueue_webhook_probe,
+  ]
 }
 
 resource "null_resource" "slinky_mariadb_via_operator" {
@@ -531,7 +539,15 @@ module "slinky_operator" {
   helm_template_values_override = "# slurm-operator chart ${var.slinky_operator_chart_version}\n"
   helm_user_values_override     = var.slinky_operator_values_override
 
-  depends_on = [module.slinky_operator_crds]
+  # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
+  # installing this chart while Kueue is still starting fails with "no
+  # endpoints available for service kueue-webhook-service".
+  depends_on = [
+    module.slinky_operator_crds,
+    module.kueue,
+    helm_release.kueue,
+    kubectl_manifest.kueue_webhook_probe,
+  ]
 }
 
 module "slinky_slurm" {
