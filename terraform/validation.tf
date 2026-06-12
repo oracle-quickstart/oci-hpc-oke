@@ -73,6 +73,10 @@ locals {
     var.slinky_cpu_worker_enabled,
     !var.worker_cpu_enabled,
   ])
+  invalid_slinky_without_fss = alltrue([
+    var.install_slinky,
+    !local.create_fss_effective,
+  ])
   invalid_slinky_virtual_functions = alltrue([
     var.install_slinky,
     local.slinky_gpu_nodeset_enabled,
@@ -273,6 +277,17 @@ resource "null_resource" "validate_slinky_cpu_workers" {
     precondition {
       condition     = !local.invalid_slinky_cpu_workers
       error_message = "slinky_cpu_worker_enabled=true requires worker_cpu_enabled=true so the CPU worker pool exists."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_fss" {
+  count = local.invalid_slinky_without_fss ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_without_fss
+      error_message = "install_slinky=true requires FSS: set create_fss=true, or keep slinky_home_enabled=true with the default slinky_home_pv_name so FSS is provisioned automatically."
     }
   }
 }
