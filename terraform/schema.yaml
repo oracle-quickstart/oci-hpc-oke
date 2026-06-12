@@ -1213,7 +1213,7 @@ variables:
     title: Create a File Storage Service (FSS) file system
     description: Provision a shared File Storage Service (FSS) file system, mount target, and PersistentVolume. This is also enabled automatically when Slurm Operator full suite uses the default FSS-backed home directory.
     type: boolean
-    default: false
+    default: true
     required: true
   fss_ad:
     title: FSS availability domain

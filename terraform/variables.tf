@@ -279,7 +279,7 @@ variable "operator_user" {
 }
 
 # STORAGE
-variable "create_fss" { default = false }
+variable "create_fss" { default = true }
 variable "fss_ad" { default = "" }
 variable "nvme_raid_enabled" { default = true }
 variable "nvme_raid_level" { default = 10 }
