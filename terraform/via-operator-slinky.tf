@@ -78,6 +78,14 @@ locals {
     worker_numa_topology_enabled   = local.slinky_worker_numa_topology_enabled
     worker_features_yaml           = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
     worker_shape                   = local.slinky_worker_shape
+    gpu_nodeset_enabled            = local.slinky_gpu_nodeset_enabled
+    cpu_nodeset_enabled            = local.slinky_cpu_nodeset_enabled
+    cpu_nodeset_name               = var.slinky_cpu_nodeset_name
+    cpu_worker_replicas            = var.worker_cpu_pool_size
+    cpu_worker_image_repository    = local.slinky_cpu_worker_image_repository
+    cpu_worker_image_tag           = local.slinky_cpu_worker_image_tag
+    cpu_worker_features_yaml       = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
+    cpu_partition_default          = local.slinky_gpu_nodeset_enabled ? "NO" : "YES"
   })
 }
 
@@ -576,34 +584,39 @@ module "slinky_slurm" {
     ["kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready pod/slurm-controller-0 --timeout=900s"],
     var.slinky_login_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status deploy/slurm-login-slinky --timeout=600s"] : [],
     var.slinky_accounting_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status statefulset/slurm-accounting --timeout=600s"] : [],
+    # The operator manages nodeset pods directly, so there is no StatefulSet
+    # or DaemonSet object to watch with rollout status. Poll each enabled
+    # NodeSet's status instead.
     [
-      # The operator manages nodeset pods directly, so there is no StatefulSet
-      # or DaemonSet object to watch with rollout status. Poll the NodeSet
-      # status instead.
-      join("\n", [
-        "echo '== Wait for Slurm worker nodeset =='",
-        "WORKER_NODESET=\"slurm-worker-${var.slinky_nodeset_name}\"",
-        "WORKER_DESIRED=0",
-        "WORKER_READY=0",
-        "for i in $(seq 1 60); do",
-        "  WORKER_DESIRED=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.desired}' 2>/dev/null || true)\"",
-        "  WORKER_READY=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)\"",
-        "  [ -n \"$WORKER_DESIRED\" ] || WORKER_DESIRED=0",
-        "  [ -n \"$WORKER_READY\" ] || WORKER_READY=0",
-        "  if [ \"$WORKER_DESIRED\" -gt 0 ] && [ \"$WORKER_READY\" -ge \"$WORKER_DESIRED\" ]; then",
-        "    echo \"Worker nodeset $WORKER_NODESET is ready ($WORKER_READY/$WORKER_DESIRED)\"",
-        "    break",
-        "  fi",
-        "  echo \"Waiting for worker nodeset $WORKER_NODESET... $WORKER_READY/$WORKER_DESIRED ready ($i/60)\"",
-        "  sleep 15",
-        "done",
-        "if [ \"$WORKER_DESIRED\" -le 0 ]; then",
-        "  echo \"WARNING: worker nodeset $WORKER_NODESET reports no desired pods. Check that worker nodes match the nodeset selector.\"",
-        "elif [ \"$WORKER_READY\" -lt \"$WORKER_DESIRED\" ]; then",
-        "  echo \"ERROR: worker nodeset $WORKER_NODESET is not ready ($WORKER_READY/$WORKER_DESIRED)\"",
-        "  exit 1",
-        "fi",
-      ]),
+      for nodeset in concat(
+        local.slinky_gpu_nodeset_enabled ? [var.slinky_nodeset_name] : [],
+        local.slinky_cpu_nodeset_enabled ? [var.slinky_cpu_nodeset_name] : [],
+        ) : join("\n", [
+          "echo '== Wait for Slurm worker nodeset ${nodeset} =='",
+          "WORKER_NODESET=\"slurm-worker-${nodeset}\"",
+          "WORKER_DESIRED=0",
+          "WORKER_READY=0",
+          "for i in $(seq 1 60); do",
+          "  WORKER_DESIRED=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.desired}' 2>/dev/null || true)\"",
+          "  WORKER_READY=\"$(kubectl -n ${var.slinky_slurm_namespace} get nodeset \"$WORKER_NODESET\" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)\"",
+          "  [ -n \"$WORKER_DESIRED\" ] || WORKER_DESIRED=0",
+          "  [ -n \"$WORKER_READY\" ] || WORKER_READY=0",
+          "  if [ \"$WORKER_DESIRED\" -gt 0 ] && [ \"$WORKER_READY\" -ge \"$WORKER_DESIRED\" ]; then",
+          "    echo \"Worker nodeset $WORKER_NODESET is ready ($WORKER_READY/$WORKER_DESIRED)\"",
+          "    break",
+          "  fi",
+          "  echo \"Waiting for worker nodeset $WORKER_NODESET... $WORKER_READY/$WORKER_DESIRED ready ($i/60)\"",
+          "  sleep 15",
+          "done",
+          "if [ \"$WORKER_DESIRED\" -le 0 ]; then",
+          "  echo \"WARNING: worker nodeset $WORKER_NODESET reports no desired pods. Check that worker nodes match the nodeset selector.\"",
+          "elif [ \"$WORKER_READY\" -lt \"$WORKER_DESIRED\" ]; then",
+          "  echo \"ERROR: worker nodeset $WORKER_NODESET is not ready ($WORKER_READY/$WORKER_DESIRED)\"",
+          "  exit 1",
+          "fi",
+      ])
+    ],
+    [
       "echo '== Validation snapshot =='",
       "kubectl -n ${var.slinky_slurm_namespace} get pods -o wide",
       "kubectl -n ${var.slinky_slurm_namespace} exec slurm-controller-0 -c slurmctld -- sinfo -N -o '%N|%t|%C|%m|%G|%E'",

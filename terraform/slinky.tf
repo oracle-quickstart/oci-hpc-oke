@@ -46,6 +46,17 @@ locals {
     local.slinky_worker_sriov_enabled ? ["sriov"] : []
   )))
 
+  slinky_gpu_nodeset_enabled = anytrue([var.worker_rdma_enabled, var.worker_gpu_enabled])
+  slinky_cpu_nodeset_enabled = alltrue([var.slinky_cpu_worker_enabled, var.worker_cpu_enabled])
+
+  slinky_cpu_worker_image_repository = var.slinky_cpu_worker_image_repository != "" ? var.slinky_cpu_worker_image_repository : var.slinky_worker_image_repository
+  slinky_cpu_worker_image_tag        = var.slinky_cpu_worker_image_tag == "auto" ? local.slinky_worker_image_tag : var.slinky_cpu_worker_image_tag
+
+  slinky_cpu_worker_features = distinct(compact([
+    lower(replace(replace(var.worker_cpu_shape, ".", "-"), "_", "-")),
+    "cpu",
+  ]))
+
   slinky_readonly_replica_dns_names = join("\n", [
     for i in range(var.slinky_openldap_readonly_replicas) :
     "    - openldap-readonly-${i}.openldap-headless-readonly.${var.slinky_openldap_namespace}.svc.cluster.local"

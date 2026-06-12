@@ -66,9 +66,16 @@ locals {
     var.install_slinky,
     !var.worker_rdma_enabled,
     !var.worker_gpu_enabled,
+    !local.slinky_cpu_nodeset_enabled,
+  ])
+  invalid_slinky_cpu_workers = alltrue([
+    var.install_slinky,
+    var.slinky_cpu_worker_enabled,
+    !var.worker_cpu_enabled,
   ])
   invalid_slinky_virtual_functions = alltrue([
     var.install_slinky,
+    local.slinky_gpu_nodeset_enabled,
     var.slinky_worker_network_mode == "virtualFunctions",
     anytrue([
       !var.worker_rdma_enabled,
@@ -254,7 +261,18 @@ resource "null_resource" "validate_slinky_workers" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_workers
-      error_message = "install_slinky=true requires either worker_rdma_enabled=true or worker_gpu_enabled=true so the stack can create a shape-specific Slurm worker nodeset."
+      error_message = "install_slinky=true requires a worker pool for Slurm workers: set worker_rdma_enabled=true, worker_gpu_enabled=true, or worker_cpu_enabled=true with slinky_cpu_worker_enabled=true."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_cpu_workers" {
+  count = local.invalid_slinky_cpu_workers ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_cpu_workers
+      error_message = "slinky_cpu_worker_enabled=true requires worker_cpu_enabled=true so the CPU worker pool exists."
     }
   }
 }

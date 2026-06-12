@@ -1162,6 +1162,30 @@ variable "slinky_nodeset_name" {
   description = "Slinky nodeset name used for the shape-specific Slurm worker pool."
 }
 
+variable "slinky_cpu_worker_enabled" {
+  default     = false
+  type        = bool
+  description = "Run Slurm workers on the CPU worker pool. Requires worker_cpu_enabled."
+}
+
+variable "slinky_cpu_nodeset_name" {
+  default     = "cpu"
+  type        = string
+  description = "Slinky nodeset name used for the CPU Slurm worker pool."
+}
+
+variable "slinky_cpu_worker_image_repository" {
+  default     = ""
+  type        = string
+  description = "Container image repository for CPU Slurm workers. Empty uses slinky_worker_image_repository."
+}
+
+variable "slinky_cpu_worker_image_tag" {
+  default     = "auto"
+  type        = string
+  description = "Container image tag for CPU Slurm workers. auto uses the same image as the GPU workers, which runs fine without GPUs but is large; set a slimmer slurmd tag to speed up pulls on CPU nodes."
+}
+
 # OCI HPC OKE Utils
 variable "install_oci_hpc_oke_utils" {
   default     = true

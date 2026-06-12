@@ -184,6 +184,7 @@ nodesets:
   slinky:
     enabled: false
 
+%{ if gpu_nodeset_enabled ~}
   ${nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
@@ -324,6 +325,95 @@ ${worker_features_yaml}
             items:
               - key: ca.crt
                 path: ca.crt
+%{ endif ~}
+%{ endif ~}
+%{ if cpu_nodeset_enabled ~}
+
+  ${cpu_nodeset_name}:
+    enabled: true
+    scalingMode: DaemonSet
+    # Ignored in DaemonSet mode (pod count follows matching nodes); only used
+    # if the nodeset is overridden to StatefulSet scaling.
+    replicas: ${cpu_worker_replicas}
+    # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
+    # evict workers while Slurm jobs are running on them
+    workloadDisruptionProtection: true
+    useResourceLimits: false
+    slurmd:
+      image:
+        repository: ${cpu_worker_image_repository}
+        tag: ${cpu_worker_image_tag}
+      args:
+        - -N
+        - $(KUBE_NODE_NAME)
+      env:
+        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
+        # hostname_override=true on the stack so nodes register by hostname
+        # instead of private IP and Slurm node names stay clean.
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+%{ if home_enabled ~}
+        - name: home
+          mountPath: /home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          mountPath: /etc/sssd/ca
+          readOnly: true
+%{ endif ~}
+    logfile:
+      image:
+        repository: docker.io/library/alpine
+        tag: latest
+    ssh:
+      enabled: ${worker_ssh_enabled}
+    extraConfMap:
+      Features:
+${cpu_worker_features_yaml}
+      Weight: 1
+    partition:
+      enabled: true
+      configMap:
+        State: UP
+        Default: "${cpu_partition_default}"
+        MaxTime: UNLIMITED
+    podSpec:
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
+      # Select by node pool rather than instance type: the CPU pool can share
+      # a shape with the ops pool, and ops nodes must not run Slurm workers.
+      nodeSelector:
+        oke.oraclecloud.com/pool.name: oke-cpu
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi
+%{ if home_enabled ~}
+        - name: home
+          persistentVolumeClaim:
+            claimName: slurm-home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          secret:
+            secretName: openldap-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+%{ endif ~}
 %{ endif ~}
 
 partitions:

@@ -320,6 +320,10 @@ variableGroups:
       - slinky_sssd_image_repository
       - slinky_sssd_image_tag
       - slinky_nodeset_name
+      - slinky_cpu_worker_enabled
+      - slinky_cpu_nodeset_name
+      - slinky_cpu_worker_image_repository
+      - slinky_cpu_worker_image_tag
 
   - title: "Storage"
     variables:
@@ -2742,6 +2746,44 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_cpu_worker_enabled:
+    title: Run Slurm workers on the CPU worker pool
+    description: Requires the CPU worker pool to be enabled.
+    type: boolean
+    default: false
+    visible:
+      and:
+        - ${install_slinky}
+        - ${worker_cpu_enabled}
+  slinky_cpu_nodeset_name:
+    title: CPU Slurm worker nodeset name
+    type: string
+    default: "cpu"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_cpu_worker_enabled}
+  slinky_cpu_worker_image_repository:
+    title: CPU Slurm worker image repository
+    description: Empty uses the GPU Slurm worker image repository.
+    type: string
+    default: ""
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_cpu_worker_enabled}
+  slinky_cpu_worker_image_tag:
+    title: CPU Slurm worker image tag
+    description: auto uses the same image as the GPU Slurm workers.
+    type: string
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_cpu_worker_enabled}
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils
