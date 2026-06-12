@@ -102,6 +102,14 @@ default_ulimits = [
     "memlock=-1:-1"
 ]
 EOF
+
+    # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor by
+    # default, which breaks Enroot/Pyxis container startup in Slurm jobs
+    # (enroot-nsenter: failed to create user namespace: Permission denied).
+    cat >/etc/sysctl.d/90-oke-unprivileged-userns.conf <<'EOF'
+kernel.apparmor_restrict_unprivileged_userns = 0
+EOF
+    sysctl --system >/dev/null 2>&1 || true
 fi
 
 if [[ -z "$SHAPE" ]]; then
