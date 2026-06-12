@@ -258,6 +258,7 @@ resource "null_resource" "slinky_home_pvc_via_operator" {
 
   triggers = {
     manifest_md5    = md5(local.slinky_home_pvc_yaml)
+    slurm_namespace = var.slinky_slurm_namespace
     bastion_host    = module.oke.bastion_public_ip
     bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
@@ -301,6 +302,18 @@ resource "null_resource" "slinky_home_pvc_via_operator" {
     ]
   }
 
+  # Delete the PVC at destroy time. A bound PVC keeps the pv-protection
+  # finalizer on the FSS PV, and destroying the PV resource then hangs forever.
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl -n ${self.triggers.slurm_namespace} delete pvc slurm-home --ignore-not-found=true --timeout=120s || true",
+    ]
+    on_failure = continue
+  }
+
   lifecycle {
     ignore_changes = [
       triggers["bastion_host"],
@@ -308,6 +321,7 @@ resource "null_resource" "slinky_home_pvc_via_operator" {
       triggers["ssh_private_key"],
       triggers["operator_host"],
       triggers["operator_user"],
+      triggers["slurm_namespace"],
     ]
   }
 
