@@ -52,9 +52,10 @@ locals {
   slinky_cpu_worker_image_repository = var.slinky_cpu_worker_image_repository != "" ? var.slinky_cpu_worker_image_repository : var.slinky_worker_image_repository
   slinky_cpu_worker_image_tag        = var.slinky_cpu_worker_image_tag == "auto" ? local.slinky_worker_image_tag : var.slinky_cpu_worker_image_tag
 
+  # The operator adds the nodeset name itself as a feature, so "cpu" is
+  # already present and only the shape slug is needed here.
   slinky_cpu_worker_features = distinct(compact([
     lower(replace(replace(var.worker_cpu_shape, ".", "-"), "_", "-")),
-    "cpu",
   ]))
 
   slinky_readonly_replica_dns_names = join("\n", [
