@@ -31,6 +31,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 ---
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
@@ -57,6 +58,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -92,6 +94,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 ---
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
@@ -126,6 +129,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 ---
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
@@ -148,6 +152,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -171,6 +176,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -198,6 +204,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -225,6 +232,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -260,6 +268,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -295,6 +304,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -330,6 +340,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -357,6 +368,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 ---
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
@@ -383,6 +395,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -404,6 +417,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -425,6 +439,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -452,6 +467,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -479,6 +495,7 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 
 ---
 apiVersion: sriovnetwork.openshift.io/v1
@@ -514,4 +531,5 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
 

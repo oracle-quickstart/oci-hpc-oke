@@ -23,3 +23,4 @@ spec:
   numVfs: 1
   priority: 90
   resourceName: sriov-rdma-vf
+  externallyManaged: true
