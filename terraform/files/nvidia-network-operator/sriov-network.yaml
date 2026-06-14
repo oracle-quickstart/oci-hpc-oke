@@ -1,0 +1,32 @@
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: sriov-rdma-vf
+  namespace: nvidia-network-operator
+spec:
+  resourceName: sriov-rdma-vf
+  networkNamespace: default
+  spoofChk: "off"
+  ipam: |
+    {
+      "type": "nv-ipam",
+      "poolName": "sriov-pool"
+    }
+  metaPlugins: |
+    {
+      "type": "tuning",
+      "sysctl": {
+        "net.ipv4.conf.all.arp_announce": "2",
+        "net.ipv4.conf.all.arp_filter": "1",
+        "net.ipv4.conf.all.arp_ignore": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.all.accept_local": "1"
+      },
+      "mtu": 4220
+    },
+    {
+      "type": "rdma"
+    },
+    {
+      "type": "sbr"
+    }

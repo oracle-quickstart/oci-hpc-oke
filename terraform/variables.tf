@@ -564,6 +564,50 @@ variable "nvidia_gpu_operator_configuration" {
   description = "Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon. These are merged with the individual variables above, which take precedence."
 }
 
+variable "deploy_nvidia_network_operator" {
+  type        = bool
+  default     = false
+  description = "Deploy the NvidiaNetworkOperator OKE addon."
+}
+
+variable "nvidia_network_operator_addon_version" {
+  type        = string
+  default     = "v25.10.0"
+  description = "Version of the NvidiaNetworkOperator OKE addon."
+}
+
+variable "nvidia_network_operator_configuration" {
+  type = map(string)
+  default = {
+    "sriovNetworkOperator.enabled" = "true"
+  }
+  description = "Configuration key-value pairs for the NvidiaNetworkOperator OKE addon."
+}
+
+variable "nvidia_network_operator_ipam_subnet" {
+  type        = string
+  default     = "192.168.0.0/16"
+  description = "Subnet for the NVIDIA IPAM IP pool used by SR-IOV network interfaces."
+}
+
+variable "nvidia_network_operator_ipam_gateway" {
+  type        = string
+  default     = "192.168.0.1"
+  description = "Gateway for the NVIDIA IPAM IP pool used by SR-IOV network interfaces."
+}
+
+variable "nvidia_network_operator_ipam_per_node_block_size" {
+  type        = number
+  default     = 100
+  description = "Number of IPs allocated to each node from the NVIDIA IPAM IP pool."
+}
+
+variable "nvidia_network_operator_sriov_max_unavailable" {
+  type        = string
+  default     = "100%"
+  description = "Percentage or number of nodes that can be drained or rebooted concurrently during SR-IOV VF configuration. Use a lower percentage (for example 25%) to maintain cluster availability in production."
+}
+
 variable "kubeproxy_mode" { default = "ipvs" }
 variable "oke_pre_bootstrap_script" {
   type        = string
@@ -1012,13 +1056,13 @@ variable "slinky_worker_rdma_resource" {
 }
 
 variable "slinky_worker_rdma_vfs_per_node" {
-  default     = 16
+  default     = null
   type        = number
-  description = "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker."
+  description = "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker. Leave null (default) to derive it from the worker shape (the number of RDMA PFs it exposes); set explicitly only to request fewer VFs."
 
   validation {
-    condition     = try(var.slinky_worker_rdma_vfs_per_node == floor(var.slinky_worker_rdma_vfs_per_node), true)
-    error_message = "slinky_worker_rdma_vfs_per_node must be an integer."
+    condition     = var.slinky_worker_rdma_vfs_per_node == null ? true : try(var.slinky_worker_rdma_vfs_per_node == floor(var.slinky_worker_rdma_vfs_per_node) && var.slinky_worker_rdma_vfs_per_node > 0, false)
+    error_message = "slinky_worker_rdma_vfs_per_node must be a positive integer when set, or null to auto-derive from the worker shape."
   }
 }
 
@@ -1037,7 +1081,7 @@ variable "slinky_worker_image_repository" {
 variable "slinky_worker_image_tag" {
   default     = "auto"
   type        = string
-  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL."
+  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL with Pyxis."
 }
 
 variable "slinky_gpu_autodetect" {

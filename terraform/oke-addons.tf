@@ -127,6 +127,7 @@ locals {
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     var.deploy_nvidia_gpu_operator,
+    var.deploy_nvidia_network_operator,
   ])
 
   managed_addon_non_gpu_pool_ids = compact([
@@ -166,6 +167,10 @@ locals {
         "mig.strategy"                          = var.nvidia_gpu_operator_mig_strategy
       }
     ) : { key = k, value = v }
+  ]
+
+  nvidia_network_operator_addon_configurations = [
+    for k, v in var.nvidia_network_operator_configuration : { key = k, value = v }
   ]
 }
 
@@ -421,6 +426,32 @@ resource "oci_containerengine_addon" "nvidia_gpu_operator" {
     terraform_data.wait_for_non_gpu_workers,
     kubectl_manifest.nvidia_dcgm_exporter_metrics,
     null_resource.nvidia_dcgm_exporter_metrics_via_operator,
+    oci_containerengine_addon.node_feature_discovery,
+  ]
+}
+
+resource "oci_containerengine_addon" "nvidia_network_operator" {
+  count = var.deploy_nvidia_network_operator ? 1 : 0
+
+  addon_name = "NvidiaNetworkOperator"
+  cluster_id = module.oke.cluster_id
+
+  override_existing                = true
+  remove_addon_resources_on_delete = true
+  version                          = var.nvidia_network_operator_addon_version
+
+  dynamic "configurations" {
+    for_each = local.nvidia_network_operator_addon_configurations
+
+    content {
+      key   = configurations.value.key
+      value = configurations.value.value
+    }
+  }
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
     oci_containerengine_addon.node_feature_discovery,
   ]
 }

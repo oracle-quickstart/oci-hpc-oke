@@ -179,6 +179,11 @@ loginsets:
           mountPath: /etc/sssd/ca
           readOnly: true
 %{ endif ~}
+        # tmpfs /tmp for Enroot image import. OKE pod rootfs is overlay, where
+        # Enroot cannot create the device-node whiteouts it uses to flatten
+        # multi-layer images (mknod returns EPERM on overlay, works on tmpfs).
+        - name: enroot-tmp
+          mountPath: /tmp
     podSpec:
       nodeSelector:
         node.kubernetes.io/instance-type: ${system_node_shape}
@@ -196,6 +201,10 @@ loginsets:
               - key: ca.crt
                 path: ca.crt
 %{ endif ~}
+        - name: enroot-tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
     service:
       spec:
         type: LoadBalancer
@@ -278,6 +287,10 @@ nodesets:
           mountPath: /etc/sssd/ca
           readOnly: true
 %{ endif ~}
+        # tmpfs /tmp for Enroot image import (overlay rejects the device-node
+        # whiteouts Enroot creates while flattening multi-layer images).
+        - name: enroot-tmp
+          mountPath: /tmp
     logfile:
       image:
         repository: docker.io/library/alpine
@@ -356,6 +369,10 @@ ${worker_features_yaml}
               - key: ca.crt
                 path: ca.crt
 %{ endif ~}
+        - name: enroot-tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
 %{ endif ~}
 %{ if cpu_nodeset_enabled ~}
 
