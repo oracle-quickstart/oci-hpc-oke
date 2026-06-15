@@ -199,6 +199,7 @@ resource "null_resource" "slinky_openldap_config_via_operator" {
 
   triggers = {
     script_md5      = nonsensitive(md5(local.slinky_configure_openldap_script))
+    lpk_schema_md5  = md5(file("${path.module}/files/slinky/openssh-lpk-schema.ldif"))
     tls_config_md5  = md5(file("${path.module}/files/slinky/openldap-tls-config.ldif"))
     syncprov_md5    = md5(file("${path.module}/files/slinky/openldap-primary-syncprov.ldif"))
     bastion_host    = module.oke.bastion_public_ip
@@ -239,6 +240,11 @@ resource "null_resource" "slinky_openldap_config_via_operator" {
   provisioner "file" {
     content     = local.slinky_configure_openldap_script
     destination = "${local.slinky_workdir}/configure-openldap.sh"
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/files/slinky/openssh-lpk-schema.ldif"
+    destination = "${local.slinky_workdir}/openssh-lpk-schema.ldif"
   }
 
   provisioner "remote-exec" {
