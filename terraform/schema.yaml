@@ -2754,7 +2754,6 @@ variables:
     visible:
       and:
         - ${install_slinky}
-        - ${worker_cpu_enabled}
   slinky_cpu_nodeset_name:
     title: CPU Slurm worker nodeset name
     type: string
