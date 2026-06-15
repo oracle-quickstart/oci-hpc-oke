@@ -2568,7 +2568,7 @@ variables:
   slinky_worker_image_repository:
     title: Slurm worker image repository
     type: string
-    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    default: "iad.ocir.io/idxzjcdglx2s/slurm-operator"
     visible:
       and:
         - ${install_slinky}
@@ -2585,7 +2585,7 @@ variables:
   slinky_operator_chart_version:
     title: Slinky operator chart version
     type: string
-    default: "1.1.0"
+    default: "1.1.1"
     visible:
       and:
         - ${install_slinky}
@@ -2593,7 +2593,7 @@ variables:
   slinky_slurm_chart_version:
     title: Slinky Slurm chart version
     type: string
-    default: "1.1.0"
+    default: "1.1.1"
     visible:
       and:
         - ${install_slinky}
@@ -2690,7 +2690,7 @@ variables:
   slinky_login_image_repository:
     title: Slurm login image repository
     type: string
-    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    default: "iad.ocir.io/idxzjcdglx2s/slurm-operator"
     visible:
       and:
         - ${install_slinky}
@@ -2699,7 +2699,7 @@ variables:
     title: Slurm login image tag
     description: "The default image includes Pyxis and Enroot for containerized jobs."
     type: string
-    default: "login-pyxis-25.11.5-ubuntu24.04-r6"
+    default: "login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
     visible:
       and:
         - ${install_slinky}
@@ -2707,7 +2707,7 @@ variables:
   slinky_controller_image_repository:
     title: Slurm controller image repository
     type: string
-    default: "iad.ocir.io/idxzjcdglx2s/slinky"
+    default: "iad.ocir.io/idxzjcdglx2s/slurm-operator"
     visible:
       and:
         - ${install_slinky}
@@ -2715,7 +2715,7 @@ variables:
   slinky_controller_image_tag:
     title: Slurm controller image tag
     type: string
-    default: "slurmctld-pmix-sssd-nss-25.11-ubuntu24.04"
+    default: "slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1"
     visible:
       and:
         - ${install_slinky}
@@ -2732,7 +2732,7 @@ variables:
   slinky_sssd_image_tag:
     title: SSSD sidecar image tag
     type: string
-    default: "25.11-ubuntu24.04"
+    default: "26.05-ubuntu24.04"
     visible:
       and:
         - ${install_slinky}

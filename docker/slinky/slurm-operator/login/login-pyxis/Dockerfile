@@ -4,11 +4,11 @@
 #
 # Multi-platform build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t iad.ocir.io/idxzjcdglx2s/slinky:login-pyxis-25.11.5-ubuntu24.04-r6 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1 \
 #     --push .
 
-ARG BASE_LOGIN_IMAGE=ghcr.io/slinkyproject/login:25.11-ubuntu24.04
-ARG PYXIS_LOGIN_IMAGE=ghcr.io/slinkyproject/login-pyxis:25.11-ubuntu24.04
+ARG BASE_LOGIN_IMAGE=ghcr.io/slinkyproject/login:26.05-ubuntu24.04
+ARG PYXIS_LOGIN_IMAGE=ghcr.io/slinkyproject/login-pyxis:26.05-ubuntu24.04
 
 FROM --platform=$TARGETPLATFORM ${PYXIS_LOGIN_IMAGE} AS pyxis
 

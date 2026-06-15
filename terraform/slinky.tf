@@ -20,7 +20,7 @@ locals {
   slinky_openldap_dc      = split(".", var.slinky_openldap_domain)[0]
 
   slinky_worker_image_tag = var.slinky_worker_image_tag == "auto" ? (
-    local.slinky_is_amd ? "slurmd-rocm-rccl-25.11.5-rocm7.1.1-sssd-r2" : "slurmd-nvml-nccl-pyxis-25.11.5-ubuntu24.04-r7"
+    local.slinky_is_amd ? "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1" : "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
   ) : var.slinky_worker_image_tag
 
   slinky_worker_host_network = var.slinky_worker_network_mode == "hostNetwork"

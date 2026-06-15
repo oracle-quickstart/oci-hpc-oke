@@ -7,14 +7,14 @@
 #
 # Multi-platform build example:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t iad.ocir.io/idxzjcdglx2s/slinky:slurmd-nvml-core-25.11.5-ubuntu24.04 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-26.05.1-ubuntu24.04-2026-06-15.1 \
 #     --push .
 
-ARG SLURM_VERSION=25.11.5
+ARG SLURM_VERSION=26.05.1
 ARG SLURM_VERSION_MICRO=1
 ARG SLURM_DIR=slurm
 ARG PARENT_IMAGE=ubuntu:24.04
-ARG BASE_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd:25.11-ubuntu24.04
+ARG BASE_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd:26.05-ubuntu24.04
 
 ################################################################################
 FROM --platform=$BUILDPLATFORM alpine:latest AS slurm-src

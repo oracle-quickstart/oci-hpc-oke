@@ -5,9 +5,9 @@
 # the mpi/pmix_v5 plugin).
 #
 # Build:
-#   docker build -t your-registry/slurmctld-pmix:25.11-ubuntu24.04 .
+#   docker build -t your-registry/slurmctld-pmix:26.05.1-ubuntu24.04-2026-06-15.1 .
 
-ARG SLURMCTLD_IMAGE=ghcr.io/slinkyproject/slurmctld:25.11-ubuntu24.04
+ARG SLURMCTLD_IMAGE=ghcr.io/slinkyproject/slurmctld:26.05-ubuntu24.04
 
 FROM ${SLURMCTLD_IMAGE}
 

@@ -917,13 +917,13 @@ variable "slinky_slurm_namespace" {
 }
 
 variable "slinky_operator_chart_version" {
-  default     = "1.1.0"
+  default     = "1.1.1"
   type        = string
   description = "Slinky slurm-operator Helm chart version."
 }
 
 variable "slinky_slurm_chart_version" {
-  default     = "1.1.0"
+  default     = "1.1.1"
   type        = string
   description = "Slinky slurm Helm chart version."
 }
@@ -1011,7 +1011,7 @@ variable "slinky_worker_rdma_network" {
 }
 
 variable "slinky_worker_image_repository" {
-  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  default     = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
   type        = string
   description = "Container image repository for Slinky slurmd pods."
 }
@@ -1121,25 +1121,25 @@ variable "slinky_mariadb_storage_size" {
 }
 
 variable "slinky_controller_image_repository" {
-  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  default     = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
   type        = string
   description = "Container image repository for the Slurm controller pod."
 }
 
 variable "slinky_controller_image_tag" {
-  default     = "slurmctld-pmix-sssd-nss-25.11-ubuntu24.04"
+  default     = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1"
   type        = string
   description = "Container image tag for the Slurm controller pod. The full-suite default includes SSSD/NSS support."
 }
 
 variable "slinky_login_image_repository" {
-  default     = "iad.ocir.io/idxzjcdglx2s/slinky"
+  default     = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
   type        = string
   description = "Container image repository for the Slurm login pod."
 }
 
 variable "slinky_login_image_tag" {
-  default     = "login-pyxis-25.11.5-ubuntu24.04-r6"
+  default     = "login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
   type        = string
   description = "Container image tag for the Slurm login pod. The default includes Pyxis and Enroot for containerized jobs."
 }
@@ -1151,7 +1151,7 @@ variable "slinky_sssd_image_repository" {
 }
 
 variable "slinky_sssd_image_tag" {
-  default     = "25.11-ubuntu24.04"
+  default     = "26.05-ubuntu24.04"
   type        = string
   description = "Container image tag used for the SSSD sidecar."
 }

@@ -1,23 +1,23 @@
 # syntax=docker/dockerfile:1.7
 #
 # Slinky slurmd image for OKE AMD MI300X with:
-# - Slurm 25.11.5, ROCm 7.1.1 RCCL tests payload, SSSD identity
-#   (everything from slurmd-rocm-rccl-25.11.5-rocm7.1.1-sssd-r2)
+# - Slurm 26.05.1, ROCm 7.1.1 RCCL tests payload, SSSD identity
+#   (everything from slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1)
 # - Pyxis SPANK plugin and Enroot runtime
 #
 # Pyxis is built from source against the matching Slurm headers because this
 # image is Ubuntu 22.04 and the slinkyproject pyxis images are Ubuntu 24.04
 # (glibc mismatch prevents copying their binaries). Versions are pinned to
-# match the ghcr.io/slinkyproject 25.11 images used by the login pod:
+# match the ghcr.io/slinkyproject 26.05 images used by the login pod:
 # pyxis v0.23.0, enroot 4.1.2.
 #
 # Build:
 #   docker build \
-#     -t iad.ocir.io/idxzjcdglx2s/slinky:slurmd-rocm-rccl-25.11.5-rocm7.1.1-sssd-pyxis-r1 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-15.1 \
 #     -f Dockerfile .
 
-ARG BASE_IMAGE=iad.ocir.io/idxzjcdglx2s/slinky:slurmd-rocm-rccl-25.11.5-rocm7.1.1-sssd-r2
-ARG SLURM_VERSION=25.11.5
+ARG BASE_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1
+ARG SLURM_VERSION=26.05.1
 ARG PYXIS_VERSION=0.23.0
 ARG ENROOT_VERSION=4.1.2
 
