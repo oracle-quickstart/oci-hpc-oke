@@ -316,14 +316,81 @@ resource "null_resource" "slinky_home_pvc_via_operator" {
     ]
   }
 
-  # Delete the PVC at destroy time. A bound PVC keeps the pv-protection
-  # finalizer on the FSS PV, and destroying the PV resource then hangs forever.
+  # Delete pods that still reference slurm-home before deleting the PVC. A
+  # terminating pod can keep pvc-protection/pv-protection finalizers in place,
+  # which blocks the FSS PV destroy until Terraform times out.
   provisioner "remote-exec" {
     when = destroy
     inline = [
-      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
-      "export OCI_CLI_AUTH=instance_principal",
-      "kubectl -n ${self.triggers.slurm_namespace} delete pvc slurm-home --ignore-not-found=true --timeout=120s || true",
+      <<-EOT
+      set -e
+      export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin
+      export OCI_CLI_AUTH=instance_principal
+      export PYTHONWARNINGS="ignore:the 'strict' parameter::urllib3.poolmanager"
+      export NS="${self.triggers.slurm_namespace}"
+      export CLAIM="slurm-home"
+
+      for i in $(seq 1 30); do
+        if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then
+          echo 'Kubeconfig is ready'
+          break
+        fi
+        echo "Waiting for kubeconfig... ($i/30)"
+        sleep 10
+      done
+      if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then
+        echo 'WARNING: kubeconfig is not available; skipping slurm-home PVC cleanup'
+        exit 0
+      fi
+
+      find_pods_using_claim() {
+        kubectl -n "$NS" get pods -o json 2>/dev/null | python3 -c '
+import json
+import os
+import sys
+
+claim = os.environ["CLAIM"]
+data = json.load(sys.stdin)
+names = []
+for item in data.get("items", []):
+    for volume in item.get("spec", {}).get("volumes", []):
+        pvc = volume.get("persistentVolumeClaim")
+        if pvc and pvc.get("claimName") == claim:
+            names.append(item.get("metadata", {}).get("name", ""))
+            break
+print(" ".join(name for name in names if name))
+'
+      }
+
+      echo "== Delete pods using PVC $NS/$CLAIM =="
+      PODS="$(find_pods_using_claim || true)"
+      if [ -n "$PODS" ]; then
+        echo "Deleting pod(s): $PODS"
+        kubectl -n "$NS" delete pod $PODS --ignore-not-found=true --wait=true --timeout=180s || true
+      fi
+
+      PODS="$(find_pods_using_claim || true)"
+      if [ -n "$PODS" ]; then
+        echo "Force deleting pod(s) still using $CLAIM: $PODS"
+        kubectl -n "$NS" delete pod $PODS --force --grace-period=0 --ignore-not-found=true --wait=false || true
+        for i in $(seq 1 36); do
+          PODS="$(find_pods_using_claim || true)"
+          if [ -z "$PODS" ]; then
+            break
+          fi
+          echo "Waiting for pod(s) to disappear before PVC delete: $PODS ($i/36)"
+          sleep 5
+        done
+      fi
+
+      PODS="$(find_pods_using_claim || true)"
+      if [ -n "$PODS" ]; then
+        echo "WARNING: pod(s) still reference $CLAIM; attempting PVC delete anyway: $PODS"
+      fi
+
+      echo "== Delete PVC $NS/$CLAIM =="
+      kubectl -n "$NS" delete pvc "$CLAIM" --ignore-not-found=true --timeout=180s || true
+      EOT
     ]
     on_failure = continue
   }
