@@ -737,3 +737,612 @@ ais get oc://#fra/$BUCKET_FRA/obj /tmp/obj
 
 Similarly, you can download objects from buckets in other regions. 
 
+## 13. Add a Node to an Existing AIStore Cluster
+
+Use this section when the AIStore cluster is already running and you want to add one more OKE worker node to the AIStore deployment.
+
+This procedure assumes:
+
+- The AIStore namespace is `ais`.
+- The AIStore custom resource name is `ais`.
+- AIStore worker nodes are selected using the label `aistore.nvidia.com/role=proxy-target`.
+- The cluster uses the AIStore operator.
+- The AIStore targets use local NVMe host paths such as `/mnt/nvme0` through `/mnt/nvme11`.
+
+Set common variables:
+
+    export NS=ais
+    export AIS=ais
+    export NEW_NODE=<new-worker-node-name>
+    export NEW_SIZE=<new-ai-store-size>
+
+Example:
+
+    export NS=ais
+    export AIS=ais
+    export NEW_NODE=10.140.71.151
+    export NEW_SIZE=7
+
+### 13.1 Add or identify the new OKE worker node
+
+Add a worker node to the OKE node pool, or identify an existing node that you want to dedicate to AIStore.
+
+Verify that the node is ready:
+
+    kubectl get nodes -o wide
+    kubectl get node ${NEW_NODE}
+
+The node must show `Ready` before continuing.
+
+### 13.2 Label the node for AIStore
+
+IMPORTANT: If the `nvme-provisioner` DaemonSet from this guide is still running, labeling the node will cause it to run on the new node. That DaemonSet formats and mounts local NVMe devices. Do not label the node until you are ready for the node-local NVMe setup to run.
+
+Add the AIStore placement label:
+
+    kubectl label node ${NEW_NODE} aistore.nvidia.com/role=proxy-target --overwrite
+
+Verify:
+
+    kubectl get nodes -L aistore.nvidia.com/role
+    kubectl get nodes -l aistore.nvidia.com/role=proxy-target -o wide
+
+### 13.3 Wait for NVMe and host tuning DaemonSets
+
+If you used the `nvme-provisioner` and `sysctl-tuner` DaemonSets from this guide, verify that both have run on the new node:
+
+    kubectl -n kube-system get pods -l app=nvme-provisioner -o wide | grep ${NEW_NODE}
+    kubectl -n kube-system get pods -l app=sysctl-tuner -o wide | grep ${NEW_NODE}
+
+Check recent logs:
+
+    kubectl -n kube-system logs -l app=nvme-provisioner --tail=100
+    kubectl -n kube-system logs -l app=sysctl-tuner -c sysctl-apply --tail=100
+
+Verify the NVMe mount paths from the node, or with a privileged debug pod:
+
+    df -h | grep nvme
+    mount | grep nvme
+
+Expected result: the new node has the same mount layout as the existing AIStore nodes, for example `/mnt/nvme0` through `/mnt/nvme11`.
+
+### 13.4 Check current AIStore state before scaling
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+    kubectl get pods -n ${NS} -o wide
+
+Expected starting state:
+
+    ais          Ready
+    ais-proxy    N/N
+    ais-target   N/N
+
+Do not scale up while the cluster is already stuck in `Upgrading` or while existing targets are in `CrashLoopBackOff`.
+
+### 13.5 Increase proxy and target size in the AIStore custom resource
+
+This guide deploys AIStore using `proxySpec.size` and `targetSpec.size`, so update both values.
+
+Example: scale to `${NEW_SIZE}` proxies and `${NEW_SIZE}` targets:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+If your AIStore custom resource uses a top-level `spec.size` instead of per-role sizes, use this form instead:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"size\":${NEW_SIZE}}}"
+
+### 13.6 Watch the operator create the new pods
+
+Watch pods:
+
+    kubectl get pods -n ${NS} -o wide -w
+
+In another terminal, watch the operator logs:
+
+    kubectl logs -n ${NS} deploy/ais-operator-controller-manager --since=10m -f
+
+Expected result:
+
+- A new proxy pod is created, for example `ais-proxy-6`.
+- A new target pod is created, for example `ais-target-6`.
+- The new target lands on the newly labeled node if there are no other eligible empty AIStore nodes.
+- `kubectl get aistore -n ais` eventually returns `Ready`.
+
+### 13.7 Verify final state
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+    kubectl get pods -n ${NS} -o wide
+
+Expected result:
+
+    ais          Ready
+    ais-proxy    ${NEW_SIZE}/${NEW_SIZE}
+    ais-target   ${NEW_SIZE}/${NEW_SIZE}
+
+If an AIStore admin client is deployed, verify from the AIS CLI as well:
+
+    kubectl get deploy -n ${NS} | grep client
+
+    export AIS_CLIENT=$(kubectl get deploy -n ${NS} -o name | grep client | head -1)
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster
+
+If no admin client exists, run the AIS CLI from a host where `AIS_ENDPOINT` points to the AIStore proxy load balancer:
+
+    export AIS_ENDPOINT=http://$(kubectl get svc -n ais ais-proxy-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}'):51080
+    ais show cluster
+
+---
+
+## 14. Remove a Node from an Existing AIStore Cluster
+
+There are multiple valid removal workflows. Pick the scenario that matches the operation you are performing.
+
+### 14.1 Scenario selection
+
+| Scenario | Use when | Main action |
+|---|---|---|
+| Generic scale-down | You only need fewer AIStore nodes and do not care which Kubernetes node is removed | Patch the AIStore CR size down |
+| Remove a specific node with no spare capacity | You need to repair one exact node and cannot reschedule the pods elsewhere | Cordon/unlabel the node, scale the AIStore CR down, and remove only pods that are outside the desired replica range |
+| Remove a specific node with spare capacity | You have another prepared AIStore node available and want to keep the same AIStore size | Cordon/unlabel the repair node and delete the AIS pods on that node so Kubernetes recreates them elsewhere |
+| Temporary AIS lifecycle operation | You want to put an AIS node in maintenance without changing Kubernetes capacity | Use `ais cluster add-remove-nodes start-maintenance` from the AIS CLI |
+| Break-glass recovery | The operator is stuck in `Upgrading` after the CR already has the desired smaller size | Scale the StatefulSets only after confirming the CR already matches the intended final size |
+
+### 14.2 Common pre-checks before any node removal
+
+Set variables:
+
+    export NS=ais
+    export AIS=ais
+    export NODE_TO_REPAIR=<node-name-or-node-ip>
+    export OLD_SIZE=<current-ai-store-size>
+    export NEW_SIZE=<desired-ai-store-size-after-removal>
+
+Example:
+
+    export NS=ais
+    export AIS=ais
+    export NODE_TO_REPAIR=10.140.71.151
+    export OLD_SIZE=6
+    export NEW_SIZE=5
+
+Stop benchmark or load-generator DaemonSets before changing cluster size:
+
+    kubectl delete daemonset -n ${NS} ais-bench --ignore-not-found
+    kubectl delete daemonset -n ${NS} ais-bench-read --ignore-not-found
+
+Check for benchmark Jobs:
+
+    kubectl get jobs -n ${NS}
+
+Check AIStore health:
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+    kubectl get pods -n ${NS} -o wide
+
+If an AIS CLI client is available:
+
+    export AIS_CLIENT=$(kubectl get deploy -n ${NS} -o name | grep client | head -1)
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster
+
+Expected healthy state before a planned removal:
+
+    ais          Ready
+    ais-proxy    ${OLD_SIZE}/${OLD_SIZE}
+    ais-target   ${OLD_SIZE}/${OLD_SIZE}
+
+---
+
+## 14.3 Scenario A: Generic scale-down
+
+Use this when you want to reduce cluster size and do not care which Kubernetes node loses AIStore pods.
+
+### 14.3.1 Patch the AIStore custom resource
+
+This guide uses per-role sizes:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+If your CR uses top-level `spec.size`:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"size\":${NEW_SIZE}}}"
+
+### 14.3.2 Watch decommission and reconciliation
+
+    kubectl get pods -n ${NS} -o wide -w
+
+In another terminal:
+
+    kubectl logs -n ${NS} deploy/ais-operator-controller-manager --since=10m -f
+
+Expected behavior:
+
+- AIStore enters `Upgrading`.
+- Extra proxy pods are removed.
+- Extra target pods enter decommission/maintenance flow.
+- Rebalance runs if required.
+- The StatefulSets shrink to `${NEW_SIZE}`.
+- The AIStore CR returns to `Ready`.
+
+### 14.3.3 Verify
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+    kubectl get pods -n ${NS} -o wide
+
+Expected result:
+
+    ais          Ready
+    ais-proxy    ${NEW_SIZE}/${NEW_SIZE}
+    ais-target   ${NEW_SIZE}/${NEW_SIZE}
+
+---
+
+## 14.4 Scenario B: Remove a specific node with no spare capacity
+
+Use this when there is no extra AIStore-capable node available. Since there is no spare capacity, the AIStore cluster must shrink by one before the node can be repaired.
+
+IMPORTANT: Kubernetes StatefulSets scale by ordinal, not by arbitrary node name. If the node you want to repair does not host the highest proxy and target ordinals, a normal scale-down may remove different pods first. In that case, either repair the node that owns the highest ordinals, scale down further, or add a temporary replacement node first.
+
+### 14.4.1 Identify AIS pods on the node
+
+    kubectl get pods -n ${NS} -o wide | grep ${NODE_TO_REPAIR}
+
+Example output:
+
+    ais-proxy-5    1/1 Running ... 10.140.71.151
+    ais-target-5   1/1 Running ... 10.140.71.151
+
+Check all AIS pods and ordinals:
+
+    kubectl get pods -n ${NS} -o wide | egrep 'ais-proxy|ais-target'
+
+If the node hosts the highest proxy and target ordinals, it is a good scale-down candidate.
+
+### 14.4.2 Cordon the node
+
+Prevent new pods from being scheduled to the node:
+
+    kubectl cordon ${NODE_TO_REPAIR}
+
+### 14.4.3 Remove the AIStore scheduling label
+
+Remove the label so future AIS pods do not land on this node:
+
+    kubectl label node ${NODE_TO_REPAIR} aistore.nvidia.com/role-
+
+Verify:
+
+    kubectl get nodes -L aistore.nvidia.com/role
+
+### 14.4.4 Scale the AIStore CR down
+
+Patch both proxy and target sizes:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+If your CR uses top-level `spec.size`:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"size\":${NEW_SIZE}}}"
+
+### 14.4.5 Watch reconciliation
+
+    kubectl get pods -n ${NS} -o wide -w
+
+In another terminal:
+
+    kubectl logs -n ${NS} deploy/ais-operator-controller-manager --since=10m -f
+
+### 14.4.6 Remove leftover pods only if they are outside the desired replica range
+
+After scaling from 6 to 5, ordinals `0` through `4` are still inside the desired StatefulSet range. Ordinal `5` is outside the desired range.
+
+Safe to delete after scale-down:
+
+    ais-proxy-5
+    ais-target-5
+
+Not safe to delete just to empty the node if `${NEW_SIZE}=5`:
+
+    ais-proxy-0 through ais-proxy-4
+    ais-target-0 through ais-target-4
+
+If a pod outside the desired range is stuck, delete it:
+
+    kubectl delete pod -n ${NS} <proxy-pod-outside-desired-range> <target-pod-outside-desired-range>
+
+### 14.4.7 Verify the node is empty of AIS pods
+
+    kubectl get pods -n ${NS} -o wide | grep ${NODE_TO_REPAIR} || true
+
+Verify AIStore state:
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+
+Expected result:
+
+    ais          Ready
+    ais-proxy    ${NEW_SIZE}/${NEW_SIZE}
+    ais-target   ${NEW_SIZE}/${NEW_SIZE}
+
+### 14.4.8 Drain or repair the node
+
+Once no AIS proxy or target pods remain on the node:
+
+    kubectl drain ${NODE_TO_REPAIR} --ignore-daemonsets --delete-emptydir-data
+
+Proceed with the node repair or OKE node replacement.
+
+---
+
+## 14.5 Scenario C: Remove a specific node when spare capacity exists
+
+Use this when you want to keep the AIStore cluster at the same size and you have another prepared, labeled AIStore node available.
+
+This workflow is best for remote-backed or cache-heavy AIStore deployments, such as OCI Object Storage-backed buckets, where objects can be refetched if local cached copies are lost. If you store durable user data only in local AIS buckets without mirror or EC protection, do not use this workflow without a data-protection plan.
+
+### 14.5.1 Prepare the replacement node
+
+Follow Section 13 to add and prepare a new AIStore-capable node, but do not increase the AIStore size if you only want to move pods off the repair node.
+
+Verify the replacement node is labeled and ready:
+
+    kubectl get nodes -L aistore.nvidia.com/role
+    kubectl get nodes -l aistore.nvidia.com/role=proxy-target -o wide
+
+Verify the replacement node has NVMe mounts:
+
+    df -h | grep nvme
+    mount | grep nvme
+
+### 14.5.2 Cordon and unlabel the repair node
+
+    kubectl cordon ${NODE_TO_REPAIR}
+    kubectl label node ${NODE_TO_REPAIR} aistore.nvidia.com/role-
+
+### 14.5.3 Identify AIS pods on the repair node
+
+    kubectl get pods -n ${NS} -o wide | grep ${NODE_TO_REPAIR}
+
+Example:
+
+    ais-proxy-2    1/1 Running ... 10.140.71.151
+    ais-target-2   1/1 Running ... 10.140.71.151
+
+### 14.5.4 Delete the AIS pods on the repair node
+
+Because the AIStore CR size is unchanged, Kubernetes will recreate the pods on another eligible node. Since the repair node is cordoned and no longer has the AIStore label, replacement pods should land on the spare AIStore node.
+
+    kubectl delete pod -n ${NS} <proxy-pod-on-repair-node> <target-pod-on-repair-node>
+
+Watch placement:
+
+    kubectl get pods -n ${NS} -o wide -w
+
+### 14.5.5 Verify
+
+    kubectl get pods -n ${NS} -o wide | grep ${NODE_TO_REPAIR} || true
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+
+If an AIS CLI client is available:
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster
+
+Expected result:
+
+- The repair node has no AIS proxy or target pods.
+- The replacement node has the recreated pods.
+- AIStore returns to `Ready`.
+
+---
+
+## 14.6 Scenario D: Temporary AIS maintenance using AIS CLI
+
+Use AIS CLI lifecycle commands when you want to temporarily remove an AIS node from service at the AIS layer. This does not remove the Kubernetes pod and does not change the StatefulSet size.
+
+This is useful for short AIS-level maintenance, but it is not a substitute for changing the Kubernetes AIStore custom resource when you need to add or remove Kubernetes capacity.
+
+### 14.6.1 Show AIS node IDs
+
+From the AIStore admin client:
+
+    export AIS_CLIENT=$(kubectl get deploy -n ${NS} -o name | grep client | head -1)
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster target
+
+Identify the proxy or target node ID that corresponds to the pod or node you are maintaining.
+
+### 14.6.2 Put a target in maintenance
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- \
+      ais cluster add-remove-nodes start-maintenance <TARGET_NODE_ID>
+
+Watch rebalance:
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster target
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show job
+
+### 14.6.3 Return the node from maintenance
+
+After the node is ready to serve traffic again:
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- \
+      ais cluster add-remove-nodes stop-maintenance <TARGET_NODE_ID>
+
+Verify:
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- ais show cluster target
+
+### 14.6.4 Permanently decommission a node with AIS CLI
+
+Use this only when you understand how it interacts with the operator. The operator will still reconcile Kubernetes resources according to the AIStore CR sizes.
+
+    kubectl exec -n ${NS} ${AIS_CLIENT} -- \
+      ais cluster add-remove-nodes decommission <NODE_ID>
+
+In operator-managed Kubernetes deployments, prefer changing the AIStore CR size for normal scale-down operations.
+
+---
+
+## 14.7 Break-glass recovery when scale-down gets stuck
+
+Use this only if the AIStore CR already shows the intended smaller size, but the operator is stuck and the StatefulSets did not finish reconciling.
+
+Symptoms:
+
+    kubectl get aistore -n ${NS}
+
+shows:
+
+    ais    Upgrading
+
+and operator logs show messages like:
+
+    Target pod is in CrashLoopBackOff, skipping decommission
+    waiting for target <pod> to register in smap
+    Delaying scaling. Target still in decommissioning state
+
+Check logs:
+
+    kubectl logs -n ${NS} deploy/ais-operator-controller-manager --since=10m
+    kubectl logs -n ${NS} <stuck-target-pod> -c ais-node --previous --tail=200
+    kubectl logs -n ${NS} <stuck-target-pod> -c ais-node --tail=200
+
+Confirm the AIStore CR desired size:
+
+    kubectl describe aistore ${AIS} -n ${NS}
+
+If the CR already has the desired smaller size, but the StatefulSets are still larger, force the StatefulSets down to the same size:
+
+    kubectl scale sts ais-target -n ${NS} --replicas=${NEW_SIZE}
+    kubectl scale sts ais-proxy -n ${NS} --replicas=${NEW_SIZE}
+
+Watch:
+
+    kubectl get pods -n ${NS} -o wide -w
+
+Verify:
+
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+    kubectl get pods -n ${NS} -o wide
+
+Expected result:
+
+    ais          Ready
+    ais-proxy    ${NEW_SIZE}/${NEW_SIZE}
+    ais-target   ${NEW_SIZE}/${NEW_SIZE}
+
+This recovery path should not be the normal scale-down method. It is only for cases where the operator accepted the smaller desired size but was blocked by a broken or stuck extra pod.
+
+---
+
+## 14.8 Re-add a repaired node
+
+After the repaired node is ready:
+
+    export NODE_TO_REPAIR=<node-name-or-node-ip>
+    export RETURN_SIZE=<desired-ai-store-size-after-adding-back>
+
+Restore the AIStore label:
+
+    kubectl label node ${NODE_TO_REPAIR} aistore.nvidia.com/role=proxy-target --overwrite
+
+Uncordon the node:
+
+    kubectl uncordon ${NODE_TO_REPAIR}
+
+Verify:
+
+    kubectl get nodes -L aistore.nvidia.com/role
+    kubectl get nodes -l aistore.nvidia.com/role=proxy-target -o wide
+
+If the cluster was scaled down for the repair, scale AIStore back up:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${RETURN_SIZE}},\"targetSpec\":{\"size\":${RETURN_SIZE}}}}"
+
+If your CR uses top-level `spec.size`:
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"size\":${RETURN_SIZE}}}"
+
+Watch and verify:
+
+    kubectl get pods -n ${NS} -o wide -w
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+
+---
+
+## 14.9 Quick reference
+
+### Add one node
+
+    export NS=ais
+    export AIS=ais
+    export NEW_NODE=<new-node>
+    export NEW_SIZE=<old-size-plus-one>
+
+    kubectl label node ${NEW_NODE} aistore.nvidia.com/role=proxy-target --overwrite
+
+    kubectl -n kube-system get pods -l app=nvme-provisioner -o wide | grep ${NEW_NODE}
+    kubectl -n kube-system get pods -l app=sysctl-tuner -o wide | grep ${NEW_NODE}
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+    kubectl get pods -n ${NS} -o wide -w
+    kubectl get aistore -n ${NS}
+    kubectl get sts -n ${NS}
+
+### Generic scale-down
+
+    export NS=ais
+    export AIS=ais
+    export NEW_SIZE=<old-size-minus-one>
+
+    kubectl delete daemonset -n ${NS} ais-bench --ignore-not-found
+    kubectl delete daemonset -n ${NS} ais-bench-read --ignore-not-found
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+    kubectl get pods -n ${NS} -o wide -w
+
+### Remove a specific node with no spare capacity
+
+    export NS=ais
+    export AIS=ais
+    export NODE_TO_REPAIR=<node-to-repair>
+    export NEW_SIZE=<old-size-minus-one>
+
+    kubectl delete daemonset -n ${NS} ais-bench --ignore-not-found
+    kubectl delete daemonset -n ${NS} ais-bench-read --ignore-not-found
+
+    kubectl get pods -n ${NS} -o wide | grep ${NODE_TO_REPAIR}
+
+    kubectl cordon ${NODE_TO_REPAIR}
+    kubectl label node ${NODE_TO_REPAIR} aistore.nvidia.com/role-
+
+    kubectl patch aistore ${AIS} -n ${NS} --type merge \
+      -p "{\"spec\":{\"proxySpec\":{\"size\":${NEW_SIZE}},\"targetSpec\":{\"size\":${NEW_SIZE}}}}"
+
+    kubectl get pods -n ${NS} -o wide -w
+
+### Verify after any operation
+
+    kubectl get aistore -n ais
+    kubectl get sts -n ais
+    kubectl get pods -n ais -o wide
+    kubectl logs -n ais deploy/ais-operator-controller-manager --since=5m
