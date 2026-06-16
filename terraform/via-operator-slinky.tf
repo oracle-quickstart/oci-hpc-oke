@@ -189,7 +189,15 @@ module "slinky_openldap" {
   helm_template_values_override = "# openldap-stack-ha chart ${var.slinky_openldap_chart_version}\n${local.slinky_openldap_values_yaml}"
   helm_user_values_override     = ""
 
-  depends_on = [null_resource.slinky_openldap_prereqs_via_operator]
+  # Kueue's mutating webhook intercepts StatefulSet creates cluster-wide;
+  # installing this chart while Kueue is still starting fails with "no
+  # endpoints available for service kueue-webhook-service".
+  depends_on = [
+    null_resource.slinky_openldap_prereqs_via_operator,
+    module.kueue,
+    helm_release.kueue,
+    kubectl_manifest.kueue_webhook_probe,
+  ]
 }
 
 # LDAP settings that require exec into the OpenLDAP pods: TLS cn=config,
