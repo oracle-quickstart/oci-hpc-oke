@@ -13,22 +13,77 @@ OPENLDAP_ADMIN_PASSWORD="${openldap_admin_password}"
 OPENLDAP_CONFIG_PASSWORD="${openldap_config_password}"
 OPENLDAP_BASE_DN="${openldap_base_dn}"
 OPENLDAP_DC="${openldap_dc}"
+OPENSSH_LPK_SCHEMA_FILTER='(|(cn=*openssh-lpk)(olcAttributeTypes=*1.3.6.1.4.1.24552.500.1.1.1.13*)(olcObjectClasses=*1.3.6.1.4.1.24552.500.1.1.2.0*))'
 
-ensure_openssh_lpk_schema() {
+openssh_lpk_schema_exists() {
   local pod="$1"
 
-  if kubectl -n "$OPENLDAP_NAMESPACE" exec "$pod" -- \
+  kubectl -n "$OPENLDAP_NAMESPACE" exec "$pod" -- \
     /opt/bitnami/openldap/bin/ldapsearch \
       -x -H ldap://127.0.0.1:1389 \
       -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
-      -b cn=schema,cn=config '(cn=*openssh-lpk)' dn | grep -q '^dn:'; then
+      -b cn=schema,cn=config "$OPENSSH_LPK_SCHEMA_FILTER" dn | grep -q '^dn:'
+}
+
+ensure_openssh_lpk_schema() {
+  local pod="$1"
+  local output
+
+  if openssh_lpk_schema_exists "$pod"; then
     echo "openssh-lpk schema already present on $pod"
   else
-    kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+    if output=$(kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
       /opt/bitnami/openldap/bin/ldapadd \
         -x -H ldap://127.0.0.1:1389 \
         -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
-      < "$WORKDIR/openssh-lpk-schema.ldif"
+      < "$WORKDIR/openssh-lpk-schema.ldif" 2>&1); then
+      echo "$output"
+    elif echo "$output" | grep -Eq 'Duplicate (attributeType|objectClass)|Already exists'; then
+      echo "$output"
+      echo "openssh-lpk schema already present on $pod"
+    else
+      echo "$output"
+      return 1
+    fi
+  fi
+}
+
+wait_for_openssh_lpk_schema() {
+  local pod="$1"
+
+  for i in $(seq 1 60); do
+    if openssh_lpk_schema_exists "$pod"; then
+      echo "openssh-lpk schema present on $pod"
+      return 0
+    fi
+    echo "Waiting for openssh-lpk schema on $pod ($i/60)"
+    sleep 2
+  done
+
+  echo "openssh-lpk schema did not appear on $pod; attempting local add"
+  return 1
+}
+
+ensure_readonly_openssh_lpk_schema() {
+  local pod="$1"
+  local output
+
+  if wait_for_openssh_lpk_schema "$pod"; then
+    return 0
+  fi
+
+  if output=$(kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+    /opt/bitnami/openldap/bin/ldapadd \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+    < "$WORKDIR/openssh-lpk-schema.ldif" 2>&1); then
+    echo "$output"
+  elif echo "$output" | grep -Eq 'Duplicate (attributeType|objectClass)|Already exists'; then
+    echo "$output"
+    echo "openssh-lpk schema already present on $pod"
+  else
+    echo "$output"
+    return 1
   fi
 }
 
@@ -36,7 +91,7 @@ echo "== Ensure OpenSSH LPK schema exists =="
 ensure_openssh_lpk_schema openldap-0
 if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
   for i in $(seq 0 $((OPENLDAP_READONLY_REPLICAS - 1))); do
-    ensure_openssh_lpk_schema "openldap-readonly-$i"
+    ensure_readonly_openssh_lpk_schema "openldap-readonly-$i"
   done
 fi
 
