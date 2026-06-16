@@ -1120,6 +1120,18 @@ variable "slinky_mariadb_storage_size" {
   description = "Persistent storage size for the Slurm accounting MariaDB instance."
 }
 
+variable "slinky_accounting_image_repository" {
+  default     = "ghcr.io/slinkyproject/slurmdbd"
+  type        = string
+  description = "Container image repository for the SlurmDBD accounting pod."
+}
+
+variable "slinky_accounting_image_tag" {
+  default     = "26.05-ubuntu24.04"
+  type        = string
+  description = "Container image tag for the SlurmDBD accounting pod. Keep this on the same Slurm protocol version as the controller image."
+}
+
 variable "slinky_controller_image_repository" {
   default     = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
   type        = string

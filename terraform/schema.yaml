@@ -349,6 +349,8 @@ variableGroups:
       - slinky_openldap_readonly_replicas
       - slinky_openldap_storage_size
       - slinky_mariadb_storage_size
+      - slinky_accounting_image_repository
+      - slinky_accounting_image_tag
       - slinky_login_image_repository
       - slinky_login_image_tag
       - slinky_controller_image_repository
@@ -2682,6 +2684,25 @@ variables:
     title: MariaDB storage size
     type: string
     default: "16Gi"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_accounting_enabled}
+  slinky_accounting_image_repository:
+    title: SlurmDBD image repository
+    type: string
+    default: "ghcr.io/slinkyproject/slurmdbd"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_accounting_enabled}
+  slinky_accounting_image_tag:
+    title: SlurmDBD image tag
+    description: "Keep this on the same Slurm protocol version as the controller image."
+    type: string
+    default: "26.05-ubuntu24.04"
     visible:
       and:
         - ${install_slinky}

@@ -51,6 +51,8 @@ locals {
     identity_enabled               = var.slinky_identity_enabled
     home_enabled                   = var.slinky_home_enabled
     accounting_enabled             = var.slinky_accounting_enabled
+    accounting_image_repository    = var.slinky_accounting_image_repository
+    accounting_image_tag           = var.slinky_accounting_image_tag
     system_node_shape              = var.worker_ops_shape
     controller_image_repository    = var.slinky_controller_image_repository
     controller_image_tag           = var.slinky_controller_image_tag

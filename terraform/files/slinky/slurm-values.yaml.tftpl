@@ -428,6 +428,10 @@ partitions:
 accounting:
   enabled: ${accounting_enabled}
 %{ if accounting_enabled ~}
+  slurmdbd:
+    image:
+      repository: ${accounting_image_repository}
+      tag: ${accounting_image_tag}
   storageConfig:
     host: mariadb
     port: 3306
