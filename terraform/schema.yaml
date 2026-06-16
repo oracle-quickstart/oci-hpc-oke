@@ -2365,7 +2365,7 @@ variables:
   # Slinky / Slurm Operator
   install_slinky:
     title: Install Slurm Operator full suite
-    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, login service, and a shape-specific GPU worker nodeset."
+    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Worker nodesets are added when the corresponding CPU, GPU, or RDMA worker pools are enabled."
     type: boolean
     default: false
   slinky_advanced_options:

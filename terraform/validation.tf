@@ -62,19 +62,6 @@ locals {
     var.install_slinky,
     !local.slinky_deploy_from_operator,
   ])
-  invalid_slinky_system_only_workers = alltrue([
-    var.install_slinky,
-    !var.worker_rdma_enabled,
-    !var.worker_gpu_enabled,
-    !var.worker_cpu_enabled,
-  ])
-  invalid_slinky_workers = alltrue([
-    var.install_slinky,
-    !local.invalid_slinky_system_only_workers,
-    !var.worker_rdma_enabled,
-    !var.worker_gpu_enabled,
-    !local.slinky_cpu_nodeset_enabled,
-  ])
   invalid_slinky_cpu_workers = alltrue([
     var.install_slinky,
     var.slinky_cpu_worker_enabled,
@@ -262,28 +249,6 @@ resource "null_resource" "validate_slinky_deploy_path" {
     precondition {
       condition     = !local.invalid_slinky_deploy_path
       error_message = "install_slinky=true currently deploys the full Slurm suite from the operator host. Please set create_bastion=true, create_operator=true, and deploy_to_oke_from_orm=false."
-    }
-  }
-}
-
-resource "null_resource" "validate_slinky_workers" {
-  count = local.invalid_slinky_workers ? 1 : 0
-
-  lifecycle {
-    precondition {
-      condition     = !local.invalid_slinky_workers
-      error_message = "install_slinky=true requires a worker pool for Slurm workers: set worker_rdma_enabled=true, worker_gpu_enabled=true, or worker_cpu_enabled=true with slinky_cpu_worker_enabled=true."
-    }
-  }
-}
-
-resource "null_resource" "validate_slinky_system_only_workers" {
-  count = local.invalid_slinky_system_only_workers ? 1 : 0
-
-  lifecycle {
-    precondition {
-      condition     = !local.invalid_slinky_system_only_workers
-      error_message = "Slurm Operator requires a CPU or GPU worker pool. The system pool alone is not supported for Slurm workers."
     }
   }
 }

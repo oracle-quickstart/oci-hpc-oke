@@ -889,7 +889,7 @@ variable "kueue_local_queue_default_namespace" {
 variable "install_slinky" {
   default     = false
   type        = bool
-  description = "Install Slinky Slurm Operator and, by default, a Slurm cluster targeting the GPU worker pool."
+  description = "Install Slinky Slurm Operator and, by default, a Slurm cluster. If no Slurm worker nodesets are enabled, the controller, accounting, login, and identity services still deploy."
 }
 
 variable "slinky_advanced_options" {
