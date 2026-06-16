@@ -9,10 +9,10 @@
 #
 # Multi-platform build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-26.05.1-ubuntu24.04-2026-06-15.1 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-25.11.6-ubuntu24.04-2026-06-16.0 \
 #     --push .
 
-ARG BASE_SLURMD_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-26.05.1-ubuntu24.04-2026-06-15.1
+ARG BASE_SLURMD_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-25.11.6-ubuntu24.04-2026-06-16.0
 ARG NCCL_TESTS_IMAGE=iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
 
 FROM --platform=$TARGETPLATFORM ${NCCL_TESTS_IMAGE} AS nccl-tests

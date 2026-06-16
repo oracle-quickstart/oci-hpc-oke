@@ -3,7 +3,7 @@
 # Custom slurmctld image with PMIx plus SSSD/NSS client support.
 # SSSD itself is expected to run as a root sidecar in the controller pod.
 
-ARG SLURMCTLD_PMIX_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-26.05.1-ubuntu24.04-2026-06-15.1
+ARG SLURMCTLD_PMIX_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-25.11.6-ubuntu24.04-2026-06-16.0
 
 FROM ${SLURMCTLD_PMIX_IMAGE}
 

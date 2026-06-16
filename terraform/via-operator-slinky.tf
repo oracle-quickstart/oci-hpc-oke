@@ -52,14 +52,14 @@ locals {
     home_enabled                   = var.slinky_home_enabled
     accounting_enabled             = var.slinky_accounting_enabled
     accounting_image_repository    = var.slinky_accounting_image_repository
-    accounting_image_tag           = var.slinky_accounting_image_tag
+    accounting_image_tag           = local.slinky_accounting_image_tag
     system_node_shape              = var.worker_ops_shape
     controller_image_repository    = var.slinky_controller_image_repository
-    controller_image_tag           = var.slinky_controller_image_tag
+    controller_image_tag           = local.slinky_controller_image_tag
     sssd_image_repository          = var.slinky_sssd_image_repository
-    sssd_image_tag                 = var.slinky_sssd_image_tag
+    sssd_image_tag                 = local.slinky_sssd_image_tag
     login_image_repository         = var.slinky_login_image_repository
-    login_image_tag                = var.slinky_login_image_tag
+    login_image_tag                = local.slinky_login_image_tag
     gpu_autodetect                 = local.slinky_gpu_autodetect
     login_enabled                  = var.slinky_login_enabled
     login_root_ssh_authorized_keys = local.slinky_login_root_ssh_authorized_keys
@@ -579,7 +579,7 @@ module "slinky_operator_crds" {
   helm_chart_name     = "slurm-operator-crds"
   namespace           = var.slinky_operator_namespace
   helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
-  helm_chart_version  = var.slinky_operator_chart_version
+  helm_chart_version  = local.slinky_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -592,7 +592,7 @@ module "slinky_operator_crds" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm-operator-crds chart ${var.slinky_operator_chart_version}\n"
+  helm_template_values_override = "# slurm-operator-crds chart ${local.slinky_operator_chart_version}\n"
   helm_user_values_override     = ""
 
   depends_on = [module.oke]
@@ -612,7 +612,7 @@ module "slinky_operator" {
   helm_chart_name     = "slurm-operator"
   namespace           = var.slinky_operator_namespace
   helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
-  helm_chart_version  = var.slinky_operator_chart_version
+  helm_chart_version  = local.slinky_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -627,7 +627,7 @@ module "slinky_operator" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm-operator chart ${var.slinky_operator_chart_version}\n"
+  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n"
   helm_user_values_override     = var.slinky_operator_values_override
 
   # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
@@ -655,7 +655,7 @@ module "slinky_slurm" {
   helm_chart_name     = "slurm"
   namespace           = var.slinky_slurm_namespace
   helm_repository_url = "oci://ghcr.io/slinkyproject/charts"
-  helm_chart_version  = var.slinky_slurm_chart_version
+  helm_chart_version  = local.slinky_slurm_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -693,7 +693,7 @@ module "slinky_slurm" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm chart ${var.slinky_slurm_chart_version}\n${local.slinky_slurm_values_yaml}"
+  helm_template_values_override = "# slurm chart ${local.slinky_slurm_chart_version}\n${local.slinky_slurm_values_yaml}"
   helm_user_values_override     = var.slinky_slurm_values_override
 
   depends_on = [

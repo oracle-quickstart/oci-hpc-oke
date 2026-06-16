@@ -916,16 +916,27 @@ variable "slinky_slurm_namespace" {
   description = "Kubernetes namespace for the Slurm cluster resources."
 }
 
-variable "slinky_operator_chart_version" {
-  default     = "1.1.1"
+variable "slinky_image_profile" {
+  default     = "25.11.6-ubuntu24.04"
   type        = string
-  description = "Slinky slurm-operator Helm chart version."
+  description = "Tested Slinky image profile used by auto chart and image tag settings."
+
+  validation {
+    condition     = contains(["25.11.6-ubuntu24.04"], var.slinky_image_profile)
+    error_message = "slinky_image_profile must be one of: 25.11.6-ubuntu24.04."
+  }
+}
+
+variable "slinky_operator_chart_version" {
+  default     = "auto"
+  type        = string
+  description = "Slinky slurm-operator Helm chart version. Use auto to select the version from slinky_image_profile."
 }
 
 variable "slinky_slurm_chart_version" {
-  default     = "1.1.1"
+  default     = "auto"
   type        = string
-  description = "Slinky slurm Helm chart version."
+  description = "Slinky slurm Helm chart version. Use auto to select the version from slinky_image_profile."
 }
 
 variable "slinky_operator_cert_manager_enabled" {
@@ -1127,9 +1138,9 @@ variable "slinky_accounting_image_repository" {
 }
 
 variable "slinky_accounting_image_tag" {
-  default     = "26.05-ubuntu24.04"
+  default     = "auto"
   type        = string
-  description = "Container image tag for the SlurmDBD accounting pod. Keep this on the same Slurm protocol version as the controller image."
+  description = "Container image tag for the SlurmDBD accounting pod. Use auto to select the tag from slinky_image_profile."
 }
 
 variable "slinky_controller_image_repository" {
@@ -1139,9 +1150,9 @@ variable "slinky_controller_image_repository" {
 }
 
 variable "slinky_controller_image_tag" {
-  default     = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1"
+  default     = "auto"
   type        = string
-  description = "Container image tag for the Slurm controller pod. The full-suite default includes SSSD/NSS support."
+  description = "Container image tag for the Slurm controller pod. Use auto to select the tag from slinky_image_profile."
 }
 
 variable "slinky_login_image_repository" {
@@ -1151,9 +1162,9 @@ variable "slinky_login_image_repository" {
 }
 
 variable "slinky_login_image_tag" {
-  default     = "login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
+  default     = "auto"
   type        = string
-  description = "Container image tag for the Slurm login pod. The default includes Pyxis and Enroot for containerized jobs."
+  description = "Container image tag for the Slurm login pod. Use auto to select the tag from slinky_image_profile."
 }
 
 variable "slinky_sssd_image_repository" {
@@ -1163,9 +1174,9 @@ variable "slinky_sssd_image_repository" {
 }
 
 variable "slinky_sssd_image_tag" {
-  default     = "26.05-ubuntu24.04"
+  default     = "auto"
   type        = string
-  description = "Container image tag used for the SSSD sidecar."
+  description = "Container image tag used for the SSSD sidecar. Use auto to select the tag from slinky_image_profile."
 }
 
 variable "slinky_nodeset_name" {

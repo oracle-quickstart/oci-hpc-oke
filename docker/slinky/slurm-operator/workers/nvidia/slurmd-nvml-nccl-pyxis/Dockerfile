@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # Slinky slurmd image for OKE NVIDIA GPU shapes with:
-# - Slurm 26.05
+# - Slurm 25.11
 # - NVML AutoDetect plugins
 # - NCCL tests and HPCX payload
 # - Pyxis SPANK plugin and Enroot runtime
@@ -9,11 +9,11 @@
 #
 # Multi-platform build:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0 \
 #     --push .
 
-ARG BASE_SLURMD_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-26.05.1-ubuntu24.04-2026-06-15.1
-ARG PYXIS_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd-pyxis:26.05-ubuntu24.04
+ARG BASE_SLURMD_IMAGE=iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-25.11.6-ubuntu24.04-2026-06-16.0
+ARG PYXIS_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd-pyxis:25.11.6-ubuntu24.04
 
 FROM --platform=$TARGETPLATFORM ${PYXIS_SLURMD_IMAGE} AS pyxis
 

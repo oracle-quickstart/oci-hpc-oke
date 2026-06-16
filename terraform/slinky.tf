@@ -19,8 +19,30 @@ locals {
   slinky_worker_replicas  = coalesce(var.slinky_worker_replicas, local.slinky_worker_pool_size)
   slinky_openldap_dc      = split(".", var.slinky_openldap_domain)[0]
 
+  slinky_image_profiles = {
+    "25.11.6-ubuntu24.04" = {
+      operator_chart_version = "1.1.1"
+      slurm_chart_version    = "1.1.1"
+      accounting_image_tag   = "25.11.6-ubuntu24.04"
+      controller_image_tag   = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-16.0"
+      login_image_tag        = "login-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
+      sssd_image_tag         = "25.11.6-ubuntu24.04"
+      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
+      amd_worker_tag         = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
+    }
+  }
+
+  slinky_image_profile = local.slinky_image_profiles[var.slinky_image_profile]
+
+  slinky_operator_chart_version = var.slinky_operator_chart_version == "auto" ? local.slinky_image_profile.operator_chart_version : var.slinky_operator_chart_version
+  slinky_slurm_chart_version    = var.slinky_slurm_chart_version == "auto" ? local.slinky_image_profile.slurm_chart_version : var.slinky_slurm_chart_version
+  slinky_accounting_image_tag   = var.slinky_accounting_image_tag == "auto" ? local.slinky_image_profile.accounting_image_tag : var.slinky_accounting_image_tag
+  slinky_controller_image_tag   = var.slinky_controller_image_tag == "auto" ? local.slinky_image_profile.controller_image_tag : var.slinky_controller_image_tag
+  slinky_login_image_tag        = var.slinky_login_image_tag == "auto" ? local.slinky_image_profile.login_image_tag : var.slinky_login_image_tag
+  slinky_sssd_image_tag         = var.slinky_sssd_image_tag == "auto" ? local.slinky_image_profile.sssd_image_tag : var.slinky_sssd_image_tag
+
   slinky_worker_image_tag = var.slinky_worker_image_tag == "auto" ? (
-    local.slinky_is_amd ? "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1" : "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
+    local.slinky_is_amd ? local.slinky_image_profile.amd_worker_tag : local.slinky_image_profile.nvidia_worker_tag
   ) : var.slinky_worker_image_tag
 
   slinky_worker_host_network = var.slinky_worker_network_mode == "hostNetwork"

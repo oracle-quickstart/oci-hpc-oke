@@ -7,32 +7,34 @@
 #
 # Multi-platform build example:
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-26.05.1-ubuntu24.04-2026-06-15.1 \
+#     -t iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-25.11.6-ubuntu24.04-2026-06-16.0 \
 #     --push .
 
-ARG SLURM_VERSION=26.05.1
-ARG SLURM_VERSION_MICRO=1
+ARG SLURM_VERSION=25.11.6
 ARG SLURM_DIR=slurm
 ARG PARENT_IMAGE=ubuntu:24.04
-ARG BASE_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd:26.05-ubuntu24.04
+ARG BASE_SLURMD_IMAGE=ghcr.io/slinkyproject/slurmd:25.11.6-ubuntu24.04
 
 ################################################################################
 FROM --platform=$BUILDPLATFORM alpine:latest AS slurm-src
 
 ARG SLURM_VERSION
-ARG SLURM_VERSION_MICRO
 ARG SLURM_DIR
-ARG SLURM_TAR="slurm-${SLURM_VERSION//./-}-${SLURM_VERSION_MICRO}.tar.gz"
 
 WORKDIR /workspace/
 
-RUN apk add -q --no-cache tar
+RUN apk add -q --no-cache bzip2 curl tar
 
-ADD https://github.com/SchedMD/slurm/archive/refs/tags/${SLURM_TAR} ${SLURM_TAR}
-
-RUN mkdir -p ${SLURM_DIR} \
-    && tar --strip-components=1 -zxvf ${SLURM_TAR} -C ${SLURM_DIR} \
-    && rm ${SLURM_TAR}
+RUN set -xeuo pipefail; \
+    mkdir -p "${SLURM_DIR}"; \
+    if curl -fsSLo slurm.tar.bz2 "https://download.schedmd.com/slurm/slurm-${SLURM_VERSION}.tar.bz2"; then \
+      tar --strip-components=1 -jxvf slurm.tar.bz2 -C "${SLURM_DIR}"; \
+      rm slurm.tar.bz2; \
+    else \
+      curl -fsSLo slurm.tar.gz "https://github.com/SchedMD/slurm/archive/${SLURM_VERSION}.tar.gz"; \
+      tar --strip-components=1 -zxvf slurm.tar.gz -C "${SLURM_DIR}"; \
+      rm slurm.tar.gz; \
+    fi
 
 ################################################################################
 FROM ${PARENT_IMAGE} AS build
@@ -83,7 +85,7 @@ multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
   --libdir="/usr/lib/${multiarch}" \
   --with-nvml=/usr \
   --without-hdf5 \
-  --without-pam \
+  --disable-pam \
   --disable-debug
 make -j"$(nproc)" -C src/api full_version.map libslurmfull.la
 make -j"$(nproc)" -C src/plugins/gpu/common

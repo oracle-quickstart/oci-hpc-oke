@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.7
 #
 # Slinky slurmd image for AMD ROCm GPU shapes that need:
-# - Slurm 26.05.1 with gpu_rsmi/gres_gpu support
+# - Slurm 25.11.6 with gpu_rsmi/gres_gpu support
 # - SSSD/NSS client support for LDAP-backed Slurm users
 # - RCCL tests built against the same ROCm/RCCL stack used at runtime
 #
 # The RCCL base image is linux/amd64 only, so this image is intentionally
 # linux/amd64-only until the AMD base image strategy changes.
 
-ARG SLURM_VERSION=26.05.1
+ARG SLURM_VERSION=25.11.6
 ARG BASE_RCCL_IMAGE=iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
 
 FROM ${BASE_RCCL_IMAGE} AS build-slurm
