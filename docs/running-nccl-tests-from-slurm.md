@@ -1,4 +1,4 @@
-# Running NCCL Tests from Slurm
+# Running NCCL Tests from Slurm Operator
 
 This guide runs `nccl-tests` through the Slinky Slurm deployment. It is for
 clusters where the Slurm GPU workers already mount `/dev/infiniband` and use a
