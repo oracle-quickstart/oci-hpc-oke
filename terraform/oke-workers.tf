@@ -29,7 +29,7 @@ locals {
   hostname_override_effective = coalesce(var.hostname_override, var.install_slinky)
 
   runcmd_bootstrap = local.create_workers ? format(
-    "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://gist.githubusercontent.com/OguzPastirmaci/296f58b65ed56e3b5580f6b96bb950a1/raw/3341bfca2dc5c9fe667e4357b440998cc8d88999/gistfile1.txt && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
+    "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
     var.kubernetes_version, var.setup_credential_provider_for_ocir, local.hostname_override_effective
   ) : ""
 
