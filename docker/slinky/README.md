@@ -77,31 +77,23 @@ These tags exist in OCIR but are not the current target.
 | Role | Existing tag |
 | --- | --- |
 | Controller with PMIx | `slurmctld-pmix-26.05-ubuntu24.04-2026-06-15.0` |
-| Controller with PMIx | `slurmctld-pmix-26.05.1-ubuntu24.04-2026-06-15.1` |
 | Controller with PMIx | `slurmctld-pmix-26.05.1-ubuntu26.04-2026-06-16.1` |
 | Controller with PMIx plus SSSD/NSS | `slurmctld-pmix-sssd-nss-26.05-ubuntu24.04-2026-06-15.0` |
-| Controller with PMIx plus SSSD/NSS | `slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1` |
 | Controller with PMIx plus SSSD/NSS | `slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1` |
 | Login with Pyxis | `login-pyxis-26.05-ubuntu24.04-2026-06-15.0` |
-| Login with Pyxis | `login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1` |
 | Login with Pyxis | `login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1` |
 | NVIDIA worker base | `slurmd-nvml-core-26.05-ubuntu24.04-2026-06-15.0` |
-| NVIDIA worker base | `slurmd-nvml-core-26.05.1-ubuntu24.04-2026-06-15.1` |
 | NVIDIA worker base | `slurmd-nvml-core-26.05.1-ubuntu26.04-2026-06-16.1` |
 | NVIDIA worker base | `slurmd-nvml-core-26.05.1-ubuntu26.04-2026-06-16.2` |
 | NVIDIA worker with NCCL | `slurmd-nvml-nccl-26.05-ubuntu24.04-2026-06-15.0` |
-| NVIDIA worker with NCCL | `slurmd-nvml-nccl-26.05.1-ubuntu24.04-2026-06-15.1` |
 | NVIDIA worker with NCCL | `slurmd-nvml-nccl-26.05.1-ubuntu26.04-2026-06-16.1` |
 | NVIDIA worker with NCCL | `slurmd-nvml-nccl-26.05.1-ubuntu26.04-2026-06-16.2` |
 | NVIDIA worker with NCCL plus Pyxis | `slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0` |
-| NVIDIA worker with NCCL plus Pyxis | `slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1` |
 | NVIDIA worker with NCCL plus Pyxis | `slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.1` |
 | NVIDIA worker with NCCL plus Pyxis | `slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2` |
 | AMD worker with RCCL | `slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-2026-06-15.0` |
-| AMD worker with RCCL | `slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1` |
 | AMD worker with RCCL | `slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-16.1` |
 | AMD worker with RCCL plus Pyxis | `slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0` |
-| AMD worker with RCCL plus Pyxis | `slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-15.1` |
 | AMD worker with RCCL plus Pyxis | `slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-16.1` |
 
 The `26.05.1-ubuntu26.04-2026-06-16.1` controller and login images, plus the
@@ -156,7 +148,6 @@ Supported profiles:
 | --- | --- |
 | `25.11.6-ubuntu24.04` | Current default target. |
 | `26.05-ubuntu24.04` | Existing OCIR 26.05 custom image family. |
-| `26.05.1-ubuntu24.04` | Existing OCIR 26.05.1 Ubuntu 24.04 custom image family. |
 | `26.05.1-ubuntu26.04` | Existing OCIR 26.05.1 Ubuntu 26.04 custom controller, login, and NVIDIA worker image family. Accounting, REST API, and SSSD sidecar stay on the upstream 26.05 Ubuntu 24.04 tags. |
 
 The existing advanced repository and tag variables remain escape hatches. Set a

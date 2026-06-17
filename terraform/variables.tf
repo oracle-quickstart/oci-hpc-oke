@@ -925,10 +925,9 @@ variable "slinky_image_profile" {
     condition = contains([
       "25.11.6-ubuntu24.04",
       "26.05-ubuntu24.04",
-      "26.05.1-ubuntu24.04",
       "26.05.1-ubuntu26.04",
     ], var.slinky_image_profile)
-    error_message = "slinky_image_profile must be one of: 25.11.6-ubuntu24.04, 26.05-ubuntu24.04, 26.05.1-ubuntu24.04, 26.05.1-ubuntu26.04."
+    error_message = "slinky_image_profile must be one of: 25.11.6-ubuntu24.04, 26.05-ubuntu24.04, 26.05.1-ubuntu26.04."
   }
 }
 

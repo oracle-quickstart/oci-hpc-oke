@@ -42,17 +42,6 @@ locals {
       nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0"
       amd_worker_tag         = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-2026-06-15.0"
     }
-    "26.05.1-ubuntu24.04" = {
-      operator_chart_version = "1.1.1"
-      slurm_chart_version    = "1.1.1"
-      accounting_image_tag   = "26.05-ubuntu24.04"
-      restapi_image_tag      = "26.05-ubuntu24.04"
-      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1"
-      login_image_tag        = "login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
-      sssd_image_tag         = "26.05-ubuntu24.04"
-      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
-      amd_worker_tag         = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1"
-    }
     "26.05.1-ubuntu26.04" = {
       operator_chart_version = "1.1.1"
       slurm_chart_version    = "1.1.1"

@@ -46,6 +46,42 @@ locals {
     mariadb_storage_size = var.slinky_mariadb_storage_size
   })
 
+  slinky_slurm_auth_secret_yaml = yamlencode({
+    apiVersion = "v1"
+    kind       = "Secret"
+    immutable  = true
+    type       = "Opaque"
+    metadata = {
+      name      = "slurm-auth-slurm"
+      namespace = var.slinky_slurm_namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+        "app.kubernetes.io/part-of"    = "slurm"
+      }
+    }
+    data = {
+      "slurm.key" = try(random_bytes.slinky_slurm_key[0].base64, "")
+    }
+  })
+
+  slinky_jwt_auth_secret_yaml = yamlencode({
+    apiVersion = "v1"
+    kind       = "Secret"
+    immutable  = true
+    type       = "Opaque"
+    metadata = {
+      name      = "slurm-auth-jwt"
+      namespace = var.slinky_slurm_namespace
+      labels = {
+        "app.kubernetes.io/managed-by" = "terraform"
+        "app.kubernetes.io/part-of"    = "slurm"
+      }
+    }
+    data = {
+      "jwt.key" = try(random_bytes.slinky_jwt_key[0].base64, "")
+    }
+  })
+
   slinky_slurm_values_yaml = templatefile("${path.module}/files/slinky/slurm-values.yaml.tftpl", {
     cluster_name                   = local.cluster_name
     identity_enabled               = var.slinky_identity_enabled
@@ -91,6 +127,83 @@ locals {
     cpu_worker_features_yaml       = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
     cpu_partition_default          = local.slinky_gpu_nodeset_enabled ? "NO" : "YES"
   })
+}
+
+resource "random_bytes" "slinky_slurm_key" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? 1 : 0
+  length = 1024
+}
+
+resource "random_bytes" "slinky_jwt_key" {
+  count  = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? 1 : 0
+  length = 1024
+}
+
+resource "null_resource" "slinky_auth_secrets_via_operator" {
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? 1 : 0
+
+  triggers = {
+    slurm_secret_md5 = nonsensitive(md5(local.slinky_slurm_auth_secret_yaml))
+    jwt_secret_md5   = nonsensitive(md5(local.slinky_jwt_auth_secret_yaml))
+    slurm_namespace  = var.slinky_slurm_namespace
+    bastion_host     = module.oke.bastion_public_ip
+    bastion_user     = local.bastion_user
+    ssh_private_key  = tls_private_key.stack_key.private_key_openssh
+    operator_host    = module.oke.operator_private_ip
+    operator_user    = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
+  }
+
+  provisioner "file" {
+    content     = local.slinky_slurm_auth_secret_yaml
+    destination = "${local.slinky_workdir}/slurm-auth-slurm-secret.yaml"
+  }
+
+  provisioner "file" {
+    content     = local.slinky_jwt_auth_secret_yaml
+    destination = "${local.slinky_workdir}/slurm-auth-jwt-secret.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl create namespace ${var.slinky_slurm_namespace} --dry-run=client -o yaml | kubectl apply -f -",
+      "if kubectl -n ${var.slinky_slurm_namespace} get secret slurm-auth-slurm >/dev/null 2>&1; then echo 'Preserving existing slurm-auth-slurm Secret'; else kubectl apply -f ${local.slinky_workdir}/slurm-auth-slurm-secret.yaml; fi",
+      "if kubectl -n ${var.slinky_slurm_namespace} get secret slurm-auth-jwt >/dev/null 2>&1; then echo 'Preserving existing slurm-auth-jwt Secret'; else kubectl apply -f ${local.slinky_workdir}/slurm-auth-jwt-secret.yaml; fi",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+      triggers["slurm_namespace"],
+    ]
+  }
+
+  depends_on = [module.oke]
 }
 
 # OpenLDAP namespaces, TLS certificates, and SSSD configuration. Applied before
@@ -700,6 +813,7 @@ module "slinky_slurm" {
 
   depends_on = [
     module.slinky_operator,
+    null_resource.slinky_auth_secrets_via_operator,
     null_resource.slinky_openldap_config_via_operator,
     null_resource.slinky_home_pvc_via_operator,
     null_resource.slinky_mariadb_via_operator,

@@ -1,5 +1,17 @@
 clusterName: ${cluster_name}
 
+slurmKey:
+  create: false
+  secretRef:
+    name: slurm-auth-slurm
+    key: slurm.key
+
+jwtKey:
+  create: false
+  secretRef:
+    name: slurm-auth-jwt
+    key: jwt.key
+
 %{ if identity_enabled ~}
 sssd:
   secretRef:

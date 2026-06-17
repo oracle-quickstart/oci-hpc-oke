@@ -310,7 +310,7 @@ variableGroups:
       - deploy_to_oke_from_orm
       - avoid_waiting_for_delete_target
 
-  - title: "Preview Features"
+  - title: "Preview Features (not for production use)"
     variables:
       - install_slinky
       - slinky_advanced_options
@@ -2367,7 +2367,7 @@ variables:
 
   # Slinky / Slurm Operator
   install_slinky:
-    title: Install Slurm Operator full suite
+    title: Install Slurm Operator
     description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Worker nodesets are added when the corresponding CPU, GPU, or RDMA worker pools are enabled."
     type: boolean
     default: false
@@ -2392,7 +2392,6 @@ variables:
     enum:
       - 25.11.6-ubuntu24.04
       - 26.05-ubuntu24.04
-      - 26.05.1-ubuntu24.04
       - 26.05.1-ubuntu26.04
     default: "25.11.6-ubuntu24.04"
     visible:
@@ -2809,6 +2808,7 @@ variables:
     visible:
       and:
         - ${install_slinky}
+        - ${slinky_advanced_options}
   slinky_cpu_nodeset_name:
     title: CPU Slurm worker nodeset name
     type: string
