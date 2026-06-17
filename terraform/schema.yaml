@@ -163,7 +163,6 @@ variableGroups:
       - control_plane_allowed_cidrs
       - max_pods_per_node
       - preferred_kubernetes_services
-      - hostname_override
 
   - title: "Cluster Components"
     variables:
@@ -314,6 +313,7 @@ variableGroups:
     variables:
       - install_slinky
       - slinky_advanced_options
+      - hostname_override
       - slinky_install_slurm_cluster
       - slinky_image_profile
       - slinky_identity_enabled
@@ -1528,12 +1528,6 @@ variables:
     type: boolean
     default: true
 
-# OKE Cluster Setup - Advanced Options
-  hostname_override:
-    title: Use hostnames instead of IP addresses as OKE worker node names
-    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address.
-    type: boolean
-    default: false
   disable_gpu_device_plugin:
     title: Disable OKE GPU device plugin
     type: boolean
@@ -2377,6 +2371,15 @@ variables:
     default: false
     required: false
     visible: ${install_slinky}
+  hostname_override:
+    title: Use hostnames instead of IP addresses as OKE worker node names
+    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Enable this for Slurm deployments so Slurm node names are stable hostnames instead of private IP addresses.
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
   slinky_install_slurm_cluster:
     title: Install Slurm cluster
     type: boolean

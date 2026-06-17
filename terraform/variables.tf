@@ -457,8 +457,9 @@ variable "setup_credential_provider_for_ocir" {
 
 # OKE Cluster Setup - Advanced Options
 variable "hostname_override" {
-  default = false
-  type    = bool
+  default     = null
+  type        = bool
+  description = "Bootstrap worker nodes with kubelet --hostname-override. When unset, defaults to true for Slurm Operator deployments and false otherwise."
 }
 variable "disable_gpu_device_plugin" { default = false }
 
