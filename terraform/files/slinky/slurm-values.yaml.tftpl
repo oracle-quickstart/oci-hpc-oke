@@ -8,17 +8,21 @@ sssd:
 
 %{ endif ~}
 controller:
-%{ if identity_enabled ~}
   slurmctld:
     image:
       repository: ${controller_image_repository}
       tag: ${controller_image_tag}
+%{ if identity_enabled ~}
     volumeMounts:
       - name: sssd-state
         mountPath: /var/lib/sss
       - name: sssd-run
         mountPath: /run/sssd
 %{ endif ~}
+  reconfigure:
+    image:
+      repository: ${controller_image_repository}
+      tag: ${controller_image_tag}
   persistence:
     enabled: true
     storageClassName: oci-bv
@@ -126,6 +130,10 @@ configFiles:
 
 restapi:
   replicas: 1
+  slurmrestd:
+    image:
+      repository: ${restapi_image_repository}
+      tag: ${restapi_image_tag}
   podSpec:
     nodeSelector:
       node.kubernetes.io/instance-type: ${system_node_shape}

@@ -53,6 +53,8 @@ locals {
     accounting_enabled             = var.slinky_accounting_enabled
     accounting_image_repository    = var.slinky_accounting_image_repository
     accounting_image_tag           = local.slinky_accounting_image_tag
+    restapi_image_repository       = var.slinky_restapi_image_repository
+    restapi_image_tag              = local.slinky_restapi_image_tag
     system_node_shape              = var.worker_ops_shape
     controller_image_repository    = var.slinky_controller_image_repository
     controller_image_tag           = local.slinky_controller_image_tag
@@ -664,7 +666,7 @@ module "slinky_slurm" {
   ]
 
   post_deployment_commands = concat(
-    ["kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready pod/slurm-controller-0 --timeout=900s"],
+    ["kubectl -n ${var.slinky_slurm_namespace} rollout status statefulset/slurm-controller --timeout=900s"],
     var.slinky_login_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status deploy/slurm-login-slinky --timeout=600s"] : [],
     var.slinky_accounting_enabled ? ["kubectl -n ${var.slinky_slurm_namespace} rollout status statefulset/slurm-accounting --timeout=600s"] : [],
     # Worker nodes can arrive later or need separate image/capacity fixes. Do

@@ -146,14 +146,23 @@ image, so their tags intentionally use `rocm7.1.1` instead of `ubuntu26.04`.
 ## Template Versioning
 
 Terraform uses `slinky_image_profile` as the version switch for generated Slinky
-values. The current profile is `25.11.6-ubuntu24.04`; when chart and image tag
+values. The default profile is `25.11.6-ubuntu24.04`; when chart and image tag
 variables are left as `auto`, Terraform resolves them from
 `local.slinky_image_profiles` in `terraform/slinky.tf`.
 
+Supported profiles:
+
+| Profile | Notes |
+| --- | --- |
+| `25.11.6-ubuntu24.04` | Current default target. |
+| `26.05-ubuntu24.04` | Existing OCIR 26.05 custom image family. |
+| `26.05.1-ubuntu24.04` | Existing OCIR 26.05.1 Ubuntu 24.04 custom image family. |
+| `26.05.1-ubuntu26.04` | Existing OCIR 26.05.1 Ubuntu 26.04 custom controller, login, and NVIDIA worker image family. Accounting, REST API, and SSSD sidecar stay on the upstream 26.05 Ubuntu 24.04 tags. |
+
 The existing advanced repository and tag variables remain escape hatches. Set a
 specific chart version or image tag only when testing a one-off image. Otherwise
-leave them as `auto` so the controller, login, accounting, SSSD sidecar, and
-worker images stay on the same tested Slurm release.
+leave them as `auto` so the controller, login, accounting, REST API, SSSD
+sidecar, and worker images stay on the same tested Slurm release.
 
 To add a new supported release, add a profile entry to
 `local.slinky_image_profiles`, add the profile name to the

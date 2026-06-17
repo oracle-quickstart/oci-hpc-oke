@@ -922,8 +922,13 @@ variable "slinky_image_profile" {
   description = "Tested Slinky image profile used by auto chart and image tag settings."
 
   validation {
-    condition     = contains(["25.11.6-ubuntu24.04"], var.slinky_image_profile)
-    error_message = "slinky_image_profile must be one of: 25.11.6-ubuntu24.04."
+    condition = contains([
+      "25.11.6-ubuntu24.04",
+      "26.05-ubuntu24.04",
+      "26.05.1-ubuntu24.04",
+      "26.05.1-ubuntu26.04",
+    ], var.slinky_image_profile)
+    error_message = "slinky_image_profile must be one of: 25.11.6-ubuntu24.04, 26.05-ubuntu24.04, 26.05.1-ubuntu24.04, 26.05.1-ubuntu26.04."
   }
 }
 
@@ -1141,6 +1146,18 @@ variable "slinky_accounting_image_tag" {
   default     = "auto"
   type        = string
   description = "Container image tag for the SlurmDBD accounting pod. Use auto to select the tag from slinky_image_profile."
+}
+
+variable "slinky_restapi_image_repository" {
+  default     = "ghcr.io/slinkyproject/slurmrestd"
+  type        = string
+  description = "Container image repository for the Slurm REST API pod."
+}
+
+variable "slinky_restapi_image_tag" {
+  default     = "auto"
+  type        = string
+  description = "Container image tag for the Slurm REST API pod. Use auto to select the tag from slinky_image_profile."
 }
 
 variable "slinky_controller_image_repository" {

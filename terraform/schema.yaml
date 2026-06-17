@@ -352,6 +352,8 @@ variableGroups:
       - slinky_mariadb_storage_size
       - slinky_accounting_image_repository
       - slinky_accounting_image_tag
+      - slinky_restapi_image_repository
+      - slinky_restapi_image_tag
       - slinky_login_image_repository
       - slinky_login_image_tag
       - slinky_controller_image_repository
@@ -2389,6 +2391,9 @@ variables:
     type: enum
     enum:
       - 25.11.6-ubuntu24.04
+      - 26.05-ubuntu24.04
+      - 26.05.1-ubuntu24.04
+      - 26.05.1-ubuntu26.04
     default: "25.11.6-ubuntu24.04"
     visible:
       and:
@@ -2720,6 +2725,23 @@ variables:
         - ${install_slinky}
         - ${slinky_advanced_options}
         - ${slinky_accounting_enabled}
+  slinky_restapi_image_repository:
+    title: Slurm REST API image repository
+    type: string
+    default: "ghcr.io/slinkyproject/slurmrestd"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_restapi_image_tag:
+    title: Slurm REST API image tag
+    description: "Use auto to select the tag from the Slinky image profile."
+    type: string
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
   slinky_login_image_repository:
     title: Slurm login image repository
     type: string

@@ -24,11 +24,45 @@ locals {
       operator_chart_version = "1.1.1"
       slurm_chart_version    = "1.1.1"
       accounting_image_tag   = "25.11.6-ubuntu24.04"
+      restapi_image_tag      = "25.11.6-ubuntu24.04"
       controller_image_tag   = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-16.0"
       login_image_tag        = "login-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
       sssd_image_tag         = "25.11.6-ubuntu24.04"
       nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
       amd_worker_tag         = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
+    }
+    "26.05-ubuntu24.04" = {
+      operator_chart_version = "1.1.1"
+      slurm_chart_version    = "1.1.1"
+      accounting_image_tag   = "26.05-ubuntu24.04"
+      restapi_image_tag      = "26.05-ubuntu24.04"
+      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05-ubuntu24.04-2026-06-15.0"
+      login_image_tag        = "login-pyxis-26.05-ubuntu24.04-2026-06-15.0"
+      sssd_image_tag         = "26.05-ubuntu24.04"
+      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0"
+      amd_worker_tag         = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-2026-06-15.0"
+    }
+    "26.05.1-ubuntu24.04" = {
+      operator_chart_version = "1.1.1"
+      slurm_chart_version    = "1.1.1"
+      accounting_image_tag   = "26.05-ubuntu24.04"
+      restapi_image_tag      = "26.05-ubuntu24.04"
+      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu24.04-2026-06-15.1"
+      login_image_tag        = "login-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
+      sssd_image_tag         = "26.05-ubuntu24.04"
+      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu24.04-2026-06-15.1"
+      amd_worker_tag         = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-15.1"
+    }
+    "26.05.1-ubuntu26.04" = {
+      operator_chart_version = "1.1.1"
+      slurm_chart_version    = "1.1.1"
+      accounting_image_tag   = "26.05-ubuntu24.04"
+      restapi_image_tag      = "26.05-ubuntu24.04"
+      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
+      login_image_tag        = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
+      sssd_image_tag         = "26.05-ubuntu24.04"
+      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
+      amd_worker_tag         = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-16.1"
     }
   }
 
@@ -37,6 +71,7 @@ locals {
   slinky_operator_chart_version = var.slinky_operator_chart_version == "auto" ? local.slinky_image_profile.operator_chart_version : var.slinky_operator_chart_version
   slinky_slurm_chart_version    = var.slinky_slurm_chart_version == "auto" ? local.slinky_image_profile.slurm_chart_version : var.slinky_slurm_chart_version
   slinky_accounting_image_tag   = var.slinky_accounting_image_tag == "auto" ? local.slinky_image_profile.accounting_image_tag : var.slinky_accounting_image_tag
+  slinky_restapi_image_tag      = var.slinky_restapi_image_tag == "auto" ? local.slinky_image_profile.restapi_image_tag : var.slinky_restapi_image_tag
   slinky_controller_image_tag   = var.slinky_controller_image_tag == "auto" ? local.slinky_image_profile.controller_image_tag : var.slinky_controller_image_tag
   slinky_login_image_tag        = var.slinky_login_image_tag == "auto" ? local.slinky_image_profile.login_image_tag : var.slinky_login_image_tag
   slinky_sssd_image_tag         = var.slinky_sssd_image_tag == "auto" ? local.slinky_image_profile.sssd_image_tag : var.slinky_sssd_image_tag
