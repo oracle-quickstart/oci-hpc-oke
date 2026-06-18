@@ -90,6 +90,28 @@ until curl -fsSL -H "Authorization: Bearer Oracle" http://169.254.169.254/opc/v2
 
 # Disable nvidia-imex.service for GB200 and GB300 shapes for Dynamic Resource Allocation (DRA) compatibility
 SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/shape 2>/dev/null) || true
+
+# RDMA workloads pin memory through ibv_reg_mr, which fails against the
+# container runtime default of 8 MB locked memory. Start all containers on GPU
+# nodes with unlimited memlock so slurmd and other RDMA pods inherit it.
+if [[ "$SHAPE" == *GPU* ]]; then
+    mkdir -p /etc/crio/crio.conf.d
+    cat >/etc/crio/crio.conf.d/12-memlock.conf <<'EOF'
+[crio.runtime]
+default_ulimits = [
+    "memlock=-1:-1"
+]
+EOF
+
+    # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor by
+    # default, which breaks Enroot/Pyxis container startup in Slurm jobs
+    # (enroot-nsenter: failed to create user namespace: Permission denied).
+    cat >/etc/sysctl.d/90-oke-unprivileged-userns.conf <<'EOF'
+kernel.apparmor_restrict_unprivileged_userns = 0
+EOF
+    sysctl --system >/dev/null 2>&1 || true
+fi
+
 if [[ -z "$SHAPE" ]]; then
     echo "Warning: Unable to fetch instance shape from metadata service, skipping nvidia-imex check" >&2
 elif [[ "$SHAPE" == BM.GPU.GB200* ]] || [[ "$SHAPE" == BM.GPU.GB300* ]]; then
@@ -103,11 +125,24 @@ fi
 
 kubernetes_version="${1-}"
 setup_credential_provider="${2:-false}"
+hostname_override="${3:-false}"
 
 if [[ "$setup_credential_provider" == "true" ]]; then
     download_oke_credential_provider_for_ocir && credential_provider_done=0 || credential_provider_done=1
 else
     credential_provider_done=1
+fi
+
+kubelet_extra_args=""
+if [[ "$credential_provider_done" -eq 0 ]]; then
+    kubelet_extra_args="--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+fi
+if [[ "$hostname_override" == "true" ]]; then
+    if [[ -n "$kubelet_extra_args" ]]; then
+        kubelet_extra_args="$kubelet_extra_args --hostname-override=$(hostname)"
+    else
+        kubelet_extra_args="--hostname-override=$(hostname)"
+    fi
 fi
 
 # Fetch and execute the OKE pre-bootstrap script from metadata
@@ -128,8 +163,8 @@ case "$ID" in
         if command -v oke >/dev/null 2>&1; then
             echo "[Ubuntu] oke binary already present, running bootstrap only"
             configure_crio_defaults "$kubernetes_version"
-            if [[ "$credential_provider_done" -eq 0 ]]; then
-                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            if [[ -n "$kubelet_extra_args" ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "$kubelet_extra_args"
             else
                 run_with_retry oke bootstrap
             fi
@@ -182,8 +217,8 @@ EOF
 
             echo "[Ubuntu] Running bootstrap"
             configure_crio_defaults "$kubernetes_version"
-            if [[ "$credential_provider_done" -eq 0 ]]; then
-                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            if [[ -n "$kubelet_extra_args" ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "$kubelet_extra_args"
             else
                 run_with_retry oke bootstrap
             fi
@@ -202,8 +237,8 @@ EOF
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
             
             configure_crio_defaults "$kubernetes_version"
-            if [[ "$credential_provider_done" -eq 0 ]]; then
-                run_with_retry oke bootstrap --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            if [[ -n "$kubelet_extra_args" ]]; then
+                run_with_retry oke bootstrap --kubelet-extra-args "$kubelet_extra_args"
             else
                 run_with_retry oke bootstrap
             fi
@@ -215,8 +250,8 @@ EOF
 
             echo "[Oracle Linux] Running init script"
             configure_crio_defaults "$kubernetes_version"
-            if [[ "$credential_provider_done" -eq 0 ]]; then
-                run_with_retry bash /var/run/oke-init.sh --kubelet-extra-args "--image-credential-provider-bin-dir=/usr/local/bin/ --image-credential-provider-config=/etc/kubernetes/credential-provider-config.yaml"
+            if [[ -n "$kubelet_extra_args" ]]; then
+                run_with_retry bash /var/run/oke-init.sh --kubelet-extra-args "$kubelet_extra_args"
             else
                 run_with_retry bash /var/run/oke-init.sh
             fi

@@ -162,12 +162,12 @@ resource "oci_identity_policy" "oke_quickstart_all" {
 
 resource "oci_identity_policy" "services_policies" {
   provider       = oci.home
-  count          = alltrue([var.create_policies, var.create_fss]) ? 1 : 0
+  count          = alltrue([var.create_policies, local.create_fss_effective]) ? 1 : 0
   compartment_id = var.compartment_ocid
   name           = format("oke-service-policies-%v", local.state_id)
   description    = format("OKE service policies for OKE Terraform state %v", local.state_id)
   statements = compact(concat(
-    var.create_fss ? [
+    local.create_fss_effective ? [
       "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
       "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
     ] : [],

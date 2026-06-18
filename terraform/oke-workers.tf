@@ -26,10 +26,11 @@ locals {
   worker_gmc_gpu_memory_fabric_ids = compact([
     for id in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(id)
   ])
+  hostname_override_effective = coalesce(var.hostname_override, var.install_slinky)
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
-    var.kubernetes_version, var.setup_credential_provider_for_ocir, var.override_hostnames
+    var.kubernetes_version, var.setup_credential_provider_for_ocir, local.hostname_override_effective
   ) : ""
 
   runcmd_nvme_raid = var.nvme_raid_enabled ? format(
@@ -37,7 +38,7 @@ locals {
     var.nvme_raid_level,
   ) : ""
 
-  runcmd_fss_mount = var.create_fss && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
+  runcmd_fss_mount = local.create_fss_effective && local.fss_mount_ip != "" && local.fss_export_path != "" ? format(
     "curl -sL -o /var/run/oke-fss-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-fss-mount.sh && (bash /var/run/oke-fss-mount.sh '%v' '%v' '%v' || echo 'Error mounting FSS' >&2)",
     local.fss_export_path, var.fss_mount_path, local.fss_mount_ip
   ) : ""

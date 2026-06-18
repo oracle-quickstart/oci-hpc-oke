@@ -18,16 +18,19 @@ locals {
   deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])
 
-  any_deployments_via_operator = alltrue([
-    local.deploy_from_operator,
-    anytrue([
-      var.install_monitoring,
-      var.install_node_problem_detector_kube_prometheus_stack,
-      var.install_mpi_operator,
-      var.install_kueue,
-      var.install_oci_hpc_oke_utils,
-      var.install_nvidia_dra_driver,
-    ])
+  any_deployments_via_operator = anytrue([
+    alltrue([
+      local.deploy_from_operator,
+      anytrue([
+        var.install_monitoring,
+        var.install_node_problem_detector_kube_prometheus_stack,
+        var.install_mpi_operator,
+        var.install_kueue,
+        var.install_oci_hpc_oke_utils,
+        var.install_nvidia_dra_driver,
+      ])
+    ]),
+    local.slinky_deploy_from_operator,
   ])
 
   vcn_name = format("%v-%v", var.vcn_name, local.state_id)
@@ -72,7 +75,7 @@ locals {
       workers  = { create = "auto" }
       pods     = { create = "auto" }
     },
-    var.create_fss ? {
+    local.create_fss_effective ? {
       fss = { create = "always" }
     } : {}
   )
@@ -160,7 +163,7 @@ locals {
         lookup(var.subnet_advanced_attrs, "bastion_service", {})
       )
     },
-    var.create_fss ? {
+    local.create_fss_effective ? {
       fss = merge(
         { create = "always" },
         (var.create_vcn && var.fss_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
@@ -302,7 +305,7 @@ module "oke" {
   kubeproxy_mode                    = var.kubeproxy_mode
   preferred_load_balancer           = var.preferred_kubernetes_services
   ssh_public_key                    = trimspace(local.ssh_public_key)
-  ssh_private_key                   = local.deploy_from_operator ? tls_private_key.stack_key.private_key_openssh : null
+  ssh_private_key                   = local.any_deployments_via_operator ? tls_private_key.stack_key.private_key_openssh : null
   use_defined_tags                  = false
   vcn_cidrs                         = split(",", var.vcn_cidrs)
   vcn_create_internet_gateway       = var.create_public_subnets ? "auto" : "never"

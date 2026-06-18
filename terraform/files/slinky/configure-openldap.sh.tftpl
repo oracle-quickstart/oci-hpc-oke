@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH=/home/${operator_user}/bin:/usr/local/bin:$PATH
+export OCI_CLI_AUTH=instance_principal
+
+WORKDIR="$(cd "$(dirname "$0")" && pwd)"
+
+OPENLDAP_NAMESPACE="${openldap_namespace}"
+SLURM_NAMESPACE="${slurm_namespace}"
+OPENLDAP_READONLY_REPLICAS="${openldap_readonly_replicas}"
+OPENLDAP_ADMIN_PASSWORD="${openldap_admin_password}"
+OPENLDAP_CONFIG_PASSWORD="${openldap_config_password}"
+OPENLDAP_BASE_DN="${openldap_base_dn}"
+OPENLDAP_DC="${openldap_dc}"
+OPENSSH_LPK_SCHEMA_FILTER='(|(cn=*openssh-lpk)(olcAttributeTypes=*1.3.6.1.4.1.24552.500.1.1.1.13*)(olcObjectClasses=*1.3.6.1.4.1.24552.500.1.1.2.0*))'
+
+openssh_lpk_schema_exists() {
+  local pod="$1"
+
+  kubectl -n "$OPENLDAP_NAMESPACE" exec "$pod" -- \
+    /opt/bitnami/openldap/bin/ldapsearch \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+      -b cn=schema,cn=config "$OPENSSH_LPK_SCHEMA_FILTER" dn | grep -q '^dn:'
+}
+
+ensure_openssh_lpk_schema() {
+  local pod="$1"
+  local output
+
+  if openssh_lpk_schema_exists "$pod"; then
+    echo "openssh-lpk schema already present on $pod"
+  else
+    if output=$(kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+      /opt/bitnami/openldap/bin/ldapadd \
+        -x -H ldap://127.0.0.1:1389 \
+        -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+      < "$WORKDIR/openssh-lpk-schema.ldif" 2>&1); then
+      echo "$output"
+    elif echo "$output" | grep -Eq 'Duplicate (attributeType|objectClass)|Already exists'; then
+      echo "$output"
+      echo "openssh-lpk schema already present on $pod"
+    else
+      echo "$output"
+      return 1
+    fi
+  fi
+}
+
+wait_for_openssh_lpk_schema() {
+  local pod="$1"
+
+  for i in $(seq 1 60); do
+    if openssh_lpk_schema_exists "$pod"; then
+      echo "openssh-lpk schema present on $pod"
+      return 0
+    fi
+    echo "Waiting for openssh-lpk schema on $pod ($i/60)"
+    sleep 2
+  done
+
+  echo "openssh-lpk schema did not appear on $pod; attempting local add"
+  return 1
+}
+
+ensure_readonly_openssh_lpk_schema() {
+  local pod="$1"
+  local output
+
+  if wait_for_openssh_lpk_schema "$pod"; then
+    return 0
+  fi
+
+  if output=$(kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+    /opt/bitnami/openldap/bin/ldapadd \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+    < "$WORKDIR/openssh-lpk-schema.ldif" 2>&1); then
+    echo "$output"
+  elif echo "$output" | grep -Eq 'Duplicate (attributeType|objectClass)|Already exists'; then
+    echo "$output"
+    echo "openssh-lpk schema already present on $pod"
+  else
+    echo "$output"
+    return 1
+  fi
+}
+
+echo "== Ensure OpenSSH LPK schema exists =="
+ensure_openssh_lpk_schema openldap-0
+if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
+  for i in $(seq 0 $((OPENLDAP_READONLY_REPLICAS - 1))); do
+    ensure_readonly_openssh_lpk_schema "openldap-readonly-$i"
+  done
+fi
+
+echo "== Apply OpenLDAP TLS cn=config settings =="
+kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+  /opt/bitnami/openldap/bin/ldapmodify \
+    -x -H ldap://127.0.0.1:1389 \
+    -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+  < "$WORKDIR/openldap-tls-config.ldif"
+if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
+  for i in $(seq 0 $((OPENLDAP_READONLY_REPLICAS - 1))); do
+    kubectl -n "$OPENLDAP_NAMESPACE" exec -i "openldap-readonly-$i" -- \
+      /opt/bitnami/openldap/bin/ldapmodify \
+        -x -H ldap://127.0.0.1:1389 \
+        -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+      < "$WORKDIR/openldap-tls-config.ldif"
+  done
+fi
+
+echo "== Ensure primary syncprov overlay exists =="
+if kubectl -n "$OPENLDAP_NAMESPACE" exec openldap-0 -- \
+  /opt/bitnami/openldap/bin/ldapsearch \
+    -x -H ldap://127.0.0.1:1389 \
+    -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+    -b 'olcDatabase={2}mdb,cn=config' \
+    olcOverlay=syncprov dn | grep -q '^dn:'; then
+  echo "syncprov already present"
+else
+  kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapadd \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" \
+    < "$WORKDIR/openldap-primary-syncprov.ldif"
+fi
+
+ldapsearch_primary() {
+  kubectl -n "$OPENLDAP_NAMESPACE" exec openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapsearch \
+      -x -H ldap://127.0.0.1:1389 \
+      -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD" "$@"
+}
+
+ldapadd_primary() {
+  kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapadd \
+      -x -H ldap://127.0.0.1:1389 \
+      -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD"
+}
+
+ldap_entry_exists() {
+  ldapsearch_primary -b "$1" -s base dn >/dev/null 2>&1
+}
+
+echo "== Ensure LDAP base tree exists =="
+if ! ldap_entry_exists "$OPENLDAP_BASE_DN"; then
+  printf "%s\n" \
+    "dn: $OPENLDAP_BASE_DN" \
+    "objectClass: top" \
+    "objectClass: dcObject" \
+    "objectClass: organization" \
+    "o: Slurm" \
+    "dc: $OPENLDAP_DC" | ldapadd_primary
+fi
+if ! ldap_entry_exists "ou=People,$OPENLDAP_BASE_DN"; then
+  printf "%s\n" \
+    "dn: ou=People,$OPENLDAP_BASE_DN" \
+    "objectClass: organizationalUnit" \
+    "ou: People" | ldapadd_primary
+fi
+if ! ldap_entry_exists "ou=Groups,$OPENLDAP_BASE_DN"; then
+  printf "%s\n" \
+    "dn: ou=Groups,$OPENLDAP_BASE_DN" \
+    "objectClass: organizationalUnit" \
+    "ou: Groups" | ldapadd_primary
+fi
+
+echo "== Copy OpenLDAP CA into the Slurm namespace =="
+CRT="$(kubectl -n "$OPENLDAP_NAMESPACE" get secret openldap-tls -o jsonpath='{.data.ca\.crt}')"
+if [ -z "$CRT" ]; then
+  CRT="$(kubectl -n "$OPENLDAP_NAMESPACE" get secret openldap-ca-root -o jsonpath='{.data.tls\.crt}')"
+fi
+kubectl -n "$SLURM_NAMESPACE" create secret generic openldap-ca \
+  --from-literal=ca.crt="$(printf '%s' "$CRT" | base64 -d)" \
+  --dry-run=client -o yaml | kubectl apply -f -

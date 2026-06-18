@@ -1,0 +1,10 @@
+dn: cn=config
+changetype: modify
+replace: olcTLSCACertificateFile
+olcTLSCACertificateFile: /opt/bitnami/openldap/certs/ca.crt
+-
+replace: olcTLSCertificateFile
+olcTLSCertificateFile: /opt/bitnami/openldap/certs/tls.crt
+-
+replace: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: /opt/bitnami/openldap/certs/tls.key

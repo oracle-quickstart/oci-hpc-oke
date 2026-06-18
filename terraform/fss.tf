@@ -2,8 +2,14 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  fss_export_path = format("/oke-gpu-%v", local.state_id)
-  fss_ad          = coalesce(var.fss_ad, var.worker_ops_ad)
+  slinky_needs_default_fss = alltrue([
+    var.install_slinky,
+    var.slinky_home_enabled,
+    var.slinky_home_pv_name == "fss-pv",
+  ])
+  create_fss_effective = var.create_fss || local.slinky_needs_default_fss
+  fss_export_path      = format("/oke-gpu-%v", local.state_id)
+  fss_ad               = coalesce(var.fss_ad != "" ? var.fss_ad : null, var.worker_ops_ad != "" ? var.worker_ops_ad : null)
 }
 
 #export path picked from user input 
@@ -12,32 +18,32 @@ locals {
 #}
 
 data "oci_file_storage_mount_targets" "fss" {
-  count               = var.create_fss ? 1 : 0
+  count               = local.create_fss_effective ? 1 : 0
   availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   id                  = oci_file_storage_mount_target.fss_mt.0.id
 }
 
 data "oci_file_storage_exports" "fss" {
-  count          = var.create_fss ? 1 : 0
+  count          = local.create_fss_effective ? 1 : 0
   compartment_id = var.compartment_ocid
   export_set_id  = oci_file_storage_mount_target.fss_mt.0.export_set_id
 }
 
 data "oci_core_private_ip" "fss_mt_ip" {
-  count         = var.create_fss ? 1 : 0
+  count         = local.create_fss_effective ? 1 : 0
   private_ip_id = data.oci_file_storage_mount_targets.fss.0.mount_targets[0].private_ip_ids[0]
 }
 
 resource "oci_file_storage_file_system" "fss" {
-  count               = var.create_fss ? 1 : 0
+  count               = local.create_fss_effective ? 1 : 0
   availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   display_name        = "${local.cluster_name}-fss"
 }
 
 resource "oci_file_storage_mount_target" "fss_mt" {
-  count               = var.create_fss ? 1 : 0
+  count               = local.create_fss_effective ? 1 : 0
   availability_domain = local.fss_ad
   compartment_id      = var.compartment_ocid
   subnet_id           = module.oke.fss_subnet_id
@@ -46,14 +52,14 @@ resource "oci_file_storage_mount_target" "fss_mt" {
 }
 
 resource "oci_file_storage_export" "FSSExport" {
-  count          = var.create_fss ? 1 : 0
+  count          = local.create_fss_effective ? 1 : 0
   export_set_id  = oci_file_storage_mount_target.fss_mt.0.export_set_id
   file_system_id = oci_file_storage_file_system.fss.0.id
   path           = local.fss_export_path
 }
 
 resource "kubernetes_persistent_volume_v1" "fss" {
-  count      = alltrue([var.create_fss, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count      = alltrue([local.create_fss_effective, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [oci_file_storage_mount_target.fss_mt, module.oke]
   metadata {
     name = "fss-pv"

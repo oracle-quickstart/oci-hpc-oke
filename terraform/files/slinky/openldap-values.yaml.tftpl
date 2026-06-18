@@ -1,0 +1,98 @@
+fullnameOverride: openldap
+
+global:
+  ldapDomain: ${openldap_domain}
+  adminUser: admin
+  adminPassword: ${openldap_admin_password}
+  configUser: admin
+  configPassword: ${openldap_config_password}
+
+replicaCount: ${openldap_primary_replicas}
+readOnlyReplicaCount: ${openldap_readonly_replicas}
+
+image:
+  repository: jpgouin/openldap
+  tag: 2.6.9-fix
+  pullPolicy: IfNotPresent
+
+nodeSelector:
+  node.kubernetes.io/instance-type: ${system_node_shape}
+
+ltb-passwd:
+  enabled: false
+
+phpldapadmin:
+  enabled: false
+
+service:
+  type: ClusterIP
+  enableLdapPort: true
+  enableSslLdapPort: true
+
+serviceReadOnly:
+  type: ClusterIP
+  enableLdapPort: true
+  enableSslLdapPort: true
+  headlessEnableLdapPort: true
+  headlessEnableSslLdapPort: true
+
+env:
+  BITNAMI_DEBUG: "false"
+  LDAP_LOGLEVEL: "256"
+  LDAP_REQUIRE_TLS: "false"
+  LDAPTLS_REQCERT: "demand"
+  LDAP_ENABLE_TLS: "yes"
+  LDAP_SKIP_DEFAULT_TREE: "yes"
+  LDAP_ALLOW_ANON_BINDING: "no"
+
+initialSchema: "cosine,inetorgperson,nis"
+
+customSchemaFiles:
+  openssh-lpk.ldif: |-
+    dn: cn=openssh-lpk,cn=schema,cn=config
+    objectClass: olcSchemaConfig
+    cn: openssh-lpk
+    olcAttributeTypes: ( 1.3.6.1.4.1.24552.500.1.1.1.13 NAME 'sshPublicKey' DESC 'OpenSSH public key' EQUALITY octetStringMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.40 )
+    olcObjectClasses: ( 1.3.6.1.4.1.24552.500.1.1.2.0 NAME 'ldapPublicKey' DESC 'OpenSSH public key object class' SUP top AUXILIARY MAY ( sshPublicKey $ uid ) )
+
+replication:
+  enabled: true
+  clusterName: "cluster.local"
+  retry: 60
+  timeout: 1
+  interval: 00:00:00:10
+  starttls: "critical"
+
+initTLSSecret:
+  tls_enabled: true
+  secret: openldap-tls
+
+persistence:
+  enabled: true
+  storageClass: oci-bv
+  accessModes:
+    - ReadWriteOnce
+  size: ${openldap_storage_size}
+
+pdb:
+  enabled: true
+  minAvailable: 2
+
+podAntiAffinityPreset: soft
+
+customLdifFiles:
+  00-root.ldif: |-
+    dn: ${openldap_base_dn}
+    objectClass: top
+    objectClass: dcObject
+    objectClass: organization
+    o: Slurm
+    dc: ${openldap_dc}
+
+    dn: ou=People,${openldap_base_dn}
+    objectClass: organizationalUnit
+    ou: People
+
+    dn: ou=Groups,${openldap_base_dn}
+    objectClass: organizationalUnit
+    ou: Groups
