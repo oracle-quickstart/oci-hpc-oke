@@ -1,5 +1,10 @@
 # Running RDMA GPU workloads on OKE with GB200s
 
+> [!IMPORTANT]
+> Starting with stack v26.5.0, you can create GPU Memory Clusters directly from the Terraform templates. The instructions below are kept for reference only and will no longer be updated.
+
+---
+
 ### Prerequisites
 - Your k8s version of the cluster must be at least v1.32.
 - If you're planning to use DRA, do not use k8s versions v1.34.0 and v1.34.1 as there's a bug that affects DRA. **Use v1.34.2**.
