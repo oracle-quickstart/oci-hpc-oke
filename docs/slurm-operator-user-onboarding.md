@@ -13,7 +13,58 @@ It was validated on a live test cluster with:
 
 LDAP SSH keys must use `sshPublicKey`, not `description`.
 
-## 1. Set Variables
+## Quick Start (script)
+
+The [`slurm-add-user.sh`](./files/slurm-add-user.sh) script performs every step
+in this runbook from a username and an SSH public key. Run it from the operator
+node or another shell with `kubectl` access to the cluster.
+
+```bash
+curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/slurm-add-user.sh
+chmod +x slurm-add-user.sh
+
+# create user "alice" with the given public key, in the default "users" account
+./slurm-add-user.sh alice --ssh-key-file ~/keys/alice.pub
+```
+
+The SSH key can also be passed inline with `--ssh-key "<key>"` or piped in with
+`--ssh-key-stdin`. Useful options:
+
+- `--account <name>` (default `users`): the Slurm account / LDAP project group.
+  The account and its project group are created automatically if they do not
+  exist.
+- `--full-name "<cn>"`: the `cn` for the LDAP entry (default: derived from the
+  username).
+- `--kube-context <ctx>`: the kubectl context to use.
+- `--dry-run`: print the exact LDAP and Slurm changes without applying them.
+
+The script:
+
+- allocates the next free UID/GID and creates a per-user primary group;
+- creates the LDAP user with `sshPublicKey` and adds it to the project group;
+- creates the FSS-backed home directory with the correct ownership and mode;
+- creates the SlurmDBD association;
+- validates identity resolution on the controller and login pods (and on a
+  worker, when one is ready), the SSH key actually served for the user, the home
+  directory, and the Slurm association before exiting.
+
+It is idempotent, so it is safe to re-run (for example to repair a
+partially-created user or to rotate an SSH key). It exits non-zero if any
+validation fails.
+
+If the FSS home export uses root squash, the script cannot set home-directory
+ownership from a pod. It stops before that step with a clear message; the LDAP
+user and Slurm association are already created, so create
+`/home/<username>` (owner `<uid>:<gid>`, mode `0700`) through the storage admin
+path and re-run.
+
+## How It Works / Manual Steps
+
+The sections below document each step the script performs, for reference and as
+a fallback when the script's assumptions do not hold. You do not need to run
+them if you used the Quick Start above.
+
+### 1. Set Variables
 
 Run from the operator node or another shell with `kubectl` access.
 
@@ -62,7 +113,7 @@ export LDAP_ADMIN_PASSWORD="$(
 Use stable UID/GID allocation. Do not reuse IDs while old files may exist on
 FSS, in backups, or in accounting history.
 
-## 2. Define LDAP Helpers
+### 2. Define LDAP Helpers
 
 These helpers run the Bitnami LDAP tools inside `openldap-0`, which avoids
 requiring LDAP client tools on the operator host.
@@ -94,7 +145,7 @@ ldap_entry_exists() {
 }
 ```
 
-## 3. Create the Project
+### 3. Create the Project
 
 Create the LDAP project group:
 
@@ -118,7 +169,7 @@ kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" 
   sacctmgr -i add account "$PROJECT" Organization="$PROJECT_ORG"
 ```
 
-## 4. Create the LDAP User
+### 4. Create the LDAP User
 
 Create the user's primary POSIX group:
 
@@ -170,7 +221,7 @@ if ! ldapsearch_primary -LLL -b "cn=${PROJECT},${LDAP_GROUPS_OU}" memberUid \
 fi
 ```
 
-## 5. Create the Home Directory
+### 5. Create the Home Directory
 
 Create or repair `/home/$USERNAME` on the FSS-backed home PVC:
 
@@ -197,7 +248,7 @@ kubectl -n "$SLURM_NAMESPACE" delete pod home-admin --wait=true
 If the FSS export uses root squash, create or repair ownership through the
 storage administration path instead of a Kubernetes pod.
 
-## 6. Create the Slurm Association
+### 6. Create the Slurm Association
 
 Create the SlurmDBD user association:
 
@@ -209,7 +260,7 @@ kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" 
   sacctmgr -i add user name="$USERNAME" account="$PROJECT" defaultaccount="$PROJECT"
 ```
 
-## 7. Validate
+### 7. Validate
 
 Find the login and worker pods:
 
@@ -288,7 +339,7 @@ kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" 
 If there is no ready worker pod yet, stop here and run the job test after a CPU
 or GPU worker pool exists.
 
-## 8. Test SSH and Submit a Job
+### 8. Test SSH and Submit a Job
 
 Set the private key that matches `SSH_PUBLIC_KEY`:
 
