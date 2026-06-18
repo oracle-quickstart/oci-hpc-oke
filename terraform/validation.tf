@@ -77,6 +77,7 @@ locals {
     var.slinky_worker_network_mode == "virtualFunctions",
     anytrue([
       !var.worker_rdma_enabled,
+      !contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
       trimspace(coalesce(var.slinky_worker_rdma_network, "")) == "",
       trimspace(coalesce(var.slinky_worker_rdma_resource, "")) == "",
       local.slinky_worker_rdma_vfs_per_node <= 0,
@@ -292,7 +293,7 @@ resource "null_resource" "validate_slinky_virtual_functions" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_virtual_functions
-      error_message = "slinky_worker_network_mode=virtualFunctions requires worker_rdma_enabled=true, non-empty slinky_worker_rdma_resource and slinky_worker_rdma_network, and slinky_worker_rdma_vfs_per_node > 0."
+      error_message = "slinky_worker_network_mode=virtualFunctions requires worker_rdma_enabled=true, a VF-capable RDMA worker shape, non-empty slinky_worker_rdma_resource and slinky_worker_rdma_network, and slinky_worker_rdma_vfs_per_node > 0."
     }
   }
 }

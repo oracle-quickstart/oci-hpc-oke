@@ -2574,9 +2574,9 @@ variables:
         - eq: [slinky_worker_network_mode, virtualFunctions]
   slinky_worker_rdma_vfs_per_node:
     title: Slurm worker RDMA VFs
-    description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker."
+    description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker. Leave unset to derive the safe default from the selected worker shape."
     type: integer
-    default: 16
+    required: false
     visible:
       and:
         - ${install_slinky}
