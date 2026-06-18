@@ -27,15 +27,20 @@ chmod +x slurm-add-user.sh
 ./slurm-add-user.sh alice --ssh-key-file ~/keys/alice.pub
 ```
 
-The SSH key can also be passed inline with `--ssh-key "<key>"` or piped in with
-`--ssh-key-stdin`. Useful options:
+The only required inputs are the `<username>` and one SSH key source
+(`--ssh-key`, `--ssh-key-file`, or `--ssh-key-stdin`). The SSH key can be passed
+inline with `--ssh-key "<key>"` or piped in with `--ssh-key-stdin`.
+
+All of the following flags are optional:
 
 - `--account <name>` (default `users`): the Slurm account / LDAP project group.
   The account and its project group are created automatically if they do not
   exist.
 - `--full-name "<cn>"`: the `cn` for the LDAP entry (default: derived from the
   username).
-- `--kube-context <ctx>`: the kubectl context to use.
+- `--kube-context <ctx>`: the kubectl context to use. Defaults to your current
+  kubectl context, so you only need this when your kubeconfig has multiple
+  contexts and you must target a specific cluster.
 - `--dry-run`: print the exact LDAP and Slurm changes without applying them.
 
 The script:

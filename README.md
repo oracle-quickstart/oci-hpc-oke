@@ -311,7 +311,7 @@ NCCL version 2.25.1+cuda12.8
 - [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
 - [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
 - [Running ib_write_bw Tests Between Nodes](./docs/running-ib-write-bw-test.md)
-- [Running NCCL Tests from Slurm](./docs/running-nccl-tests-from-slurm-operator.md)
+- [Running NCCL and RCCL Tests from Slurm](./docs/running-nccl-rccl-tests-from-slurm-operator.md)
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md)
 - [Upgrading OKE clusters](./docs/oke-hpc-upgrade.md)
 - [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
