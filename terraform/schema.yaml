@@ -2711,7 +2711,7 @@ variables:
   slinky_accounting_image_repository:
     title: SlurmDBD image repository
     type: string
-    default: "ghcr.io/slinkyproject/slurmdbd"
+    default: "auto"
     visible:
       and:
         - ${install_slinky}
@@ -2730,7 +2730,7 @@ variables:
   slinky_restapi_image_repository:
     title: Slurm REST API image repository
     type: string
-    default: "ghcr.io/slinkyproject/slurmrestd"
+    default: "auto"
     visible:
       and:
         - ${install_slinky}
@@ -2780,7 +2780,7 @@ variables:
   slinky_sssd_image_repository:
     title: SSSD sidecar image repository
     type: string
-    default: "ghcr.io/slinkyproject/login"
+    default: "auto"
     visible:
       and:
         - ${install_slinky}
