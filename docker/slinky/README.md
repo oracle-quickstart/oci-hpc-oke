@@ -64,6 +64,38 @@ the ROCm/RCCL base image is also moved to Ubuntu 24.04.
 | AMD worker with ROCm/RCCL and SSSD/NSS | `slurm-operator/workers/amd/slurmd-rocm-rccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0` | `linux/amd64` |
 | AMD worker with ROCm/RCCL plus Pyxis/Enroot | `slurm-operator/workers/amd/slurmd-rocm-rccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0` | `linux/amd64` |
 
+### Control-Plane Images Built from Upstream Source
+
+These otherwise come straight from `ghcr.io/slinkyproject`. They are rebuilt
+from upstream source into our registry so the whole stack comes from one place
+(the `build-images.sh` table above covers the layered custom images).
+`build-control-plane-images.sh` builds these on the image-builder, multi-platform
+(`linux/amd64`, `linux/arm64`):
+
+- `slurmdbd`, `slurmrestd`, and `login` build from the vendored upstream assets
+  in `slurm-operator/slurm-source/` (copied from `SlinkyProject/containers` @
+  `cea8fbea`; see `slurm-source/README.md`) via Docker Bake -- one multi-stage
+  Dockerfile with per-component `--target` stages. The upstream Dockerfile shares
+  the apt cache mount across arches, so each arch is built separately and combined
+  into a multi-arch manifest.
+- `operator` and `webhook` build from a pinned clone of
+  `SlinkyProject/slurm-operator` @ `v1.1.1` (its Dockerfile needs the Go source
+  tree, so it cannot be vendored standalone; a reference copy is at
+  `slurm-operator/operator/slurm-operator/Dockerfile`). Go cross-compile, both
+  arches in one pass.
+
+| Role | Upstream source / target | Target image | Platforms |
+| --- | --- | --- | --- |
+| SlurmDBD (accounting) | `containers` target `slurmdbd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmdbd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| slurmrestd (REST API) | `containers` target `slurmrestd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Login / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Slinky operator | `slurm-operator` target `manager` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:1.1.1` | `linux/amd64`, `linux/arm64` |
+| Slinky operator webhook | `slurm-operator` target `webhook` | `iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook:1.1.1` | `linux/amd64`, `linux/arm64` |
+
+The terraform `25.11.6-ubuntu24.04` image profile points SlurmDBD, slurmrestd,
+and the SSSD sidecar at these tags, and the operator Helm values use the custom
+operator/webhook images.
+
 ### Current OCIR Status
 
 OCIR now has the `25.11.6` tags listed above. The non-AMD images were built as

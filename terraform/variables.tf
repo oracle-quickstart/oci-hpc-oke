@@ -1137,9 +1137,9 @@ variable "slinky_mariadb_storage_size" {
 }
 
 variable "slinky_accounting_image_repository" {
-  default     = "ghcr.io/slinkyproject/slurmdbd"
+  default     = "auto"
   type        = string
-  description = "Container image repository for the SlurmDBD accounting pod."
+  description = "Container image repository for the SlurmDBD accounting pod. Use auto to select the repository from slinky_image_profile."
 }
 
 variable "slinky_accounting_image_tag" {
@@ -1149,9 +1149,9 @@ variable "slinky_accounting_image_tag" {
 }
 
 variable "slinky_restapi_image_repository" {
-  default     = "ghcr.io/slinkyproject/slurmrestd"
+  default     = "auto"
   type        = string
-  description = "Container image repository for the Slurm REST API pod."
+  description = "Container image repository for the Slurm REST API pod. Use auto to select the repository from slinky_image_profile."
 }
 
 variable "slinky_restapi_image_tag" {
@@ -1185,9 +1185,9 @@ variable "slinky_login_image_tag" {
 }
 
 variable "slinky_sssd_image_repository" {
-  default     = "ghcr.io/slinkyproject/login"
+  default     = "auto"
   type        = string
-  description = "Container image repository used for the SSSD sidecar."
+  description = "Container image repository used for the SSSD sidecar. Use auto to select the repository from slinky_image_profile."
 }
 
 variable "slinky_sssd_image_tag" {

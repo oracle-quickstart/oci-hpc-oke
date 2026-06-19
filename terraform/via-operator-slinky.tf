@@ -87,14 +87,14 @@ locals {
     identity_enabled               = var.slinky_identity_enabled
     home_enabled                   = var.slinky_home_enabled
     accounting_enabled             = var.slinky_accounting_enabled
-    accounting_image_repository    = var.slinky_accounting_image_repository
+    accounting_image_repository    = local.slinky_accounting_image_repository
     accounting_image_tag           = local.slinky_accounting_image_tag
-    restapi_image_repository       = var.slinky_restapi_image_repository
+    restapi_image_repository       = local.slinky_restapi_image_repository
     restapi_image_tag              = local.slinky_restapi_image_tag
     system_node_shape              = var.worker_ops_shape
     controller_image_repository    = var.slinky_controller_image_repository
     controller_image_tag           = local.slinky_controller_image_tag
-    sssd_image_repository          = var.slinky_sssd_image_repository
+    sssd_image_repository          = local.slinky_sssd_image_repository
     sssd_image_tag                 = local.slinky_sssd_image_tag
     login_image_repository         = var.slinky_login_image_repository
     login_image_tag                = local.slinky_login_image_tag
@@ -742,7 +742,7 @@ module "slinky_operator" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n"
+  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n${local.slinky_operator_image_values}"
   helm_user_values_override     = var.slinky_operator_values_override
 
   # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
