@@ -109,6 +109,12 @@ EOF
     systemctl enable "${mount_unit_name}" --now
 done
 
+# Cleanup stale Kubernetes certs if they exist because the node was set to do Quick Recycle
+if [[ -d /var/lib/kubelet/pki ]]; then
+  echo "Clearing stale kubelet certs from reused NVMe RAID" >&2
+  rm -rf /var/lib/kubelet/pki
+fi
+
 case "$ID" in
     ubuntu)
         MDADM_CONF="/etc/mdadm/mdadm.conf"
