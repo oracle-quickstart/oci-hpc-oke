@@ -761,7 +761,7 @@ variable "worker_gpu_node_cycling_mode" {
   type        = string
 }
 
-# Workers - GPU Cluster-network
+# Workers - GPU RDMA pool
 variable "worker_rdma_enabled" { default = false }
 variable "worker_rdma_ad" { default = "" }
 variable "worker_rdma_pool_size" { default = 4 }
@@ -797,6 +797,8 @@ variable "worker_rdma_kubernetes_version" {
   description = "Kubernetes version for the RDMA worker pool. Defaults to cluster version if not specified."
   type        = string
 }
+variable "worker_rdma_use_compute_cluster" { default = false }
+variable "worker_rdma_host_group_id" { default = "" }
 
 # Workers - GPU Memory Cluster
 variable "worker_gmc_enabled" {

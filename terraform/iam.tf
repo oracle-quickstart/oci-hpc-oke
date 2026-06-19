@@ -162,7 +162,15 @@ resource "oci_identity_policy" "oke_quickstart_all" {
 
 resource "oci_identity_policy" "services_policies" {
   provider       = oci.home
-  count          = alltrue([var.create_policies, local.create_fss_effective]) ? 1 : 0
+  count          = alltrue([
+    var.create_policies,
+    anytrue([
+      local.create_fss_effective,
+      var.worker_rdma_use_compute_cluster,
+      var.worker_rdma_host_group_id != ""
+    ])
+  ]) ? 1 : 0
+
   compartment_id = var.compartment_ocid
   name           = format("oke-service-policies-%v", local.state_id)
   description    = format("OKE service policies for OKE Terraform state %v", local.state_id)
@@ -170,6 +178,12 @@ resource "oci_identity_policy" "services_policies" {
     local.create_fss_effective ? [
       "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
       "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
+    ] : [],
+    var.worker_rdma_use_compute_cluster ? [
+      "Allow any-user to {COMPUTE_CLUSTER_LAUNCH_INSTANCE} in compartment id ${var.compartment_ocid} where request.principal.type = 'nodepool'"
+    ] : [],
+    var.worker_rdma_host_group_id != "" ? [
+      "Allow any-user to {HOST_GROUP_LAUNCH_INSTANCE} in compartment id ${var.compartment_ocid} where request.principal.type = 'nodepool'"
     ] : [],
     []
   ))

@@ -8,7 +8,7 @@ terraform {
     oci = {
       configuration_aliases = [oci.home]
       source                = "oracle/oci"
-      version               = ">= 8.2.0, < 8.16.1"
+      version               = ">= 8.19.0"
     }
     local = {
       source  = "hashicorp/local"
