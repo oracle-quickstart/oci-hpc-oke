@@ -40,6 +40,7 @@ shows both forms; pick one.
   - [Create the Slurm Batch Script](#create-the-slurm-batch-script)
   - [Submit the Job](#submit-the-job)
   - [Example Output](#example-output)
+  - [Running via Pyxis (containerized)](#running-via-pyxis-containerized)
 - [RCCL Tests (AMD GPU shapes)](#rccl-tests-amd-gpu-shapes)
   - [Set Variables](#set-variables-1)
   - [Validate Slurm and the Worker Image](#validate-slurm-and-the-worker-image-1)
@@ -561,6 +562,100 @@ NCCL version 2.29.3+cuda13.1
 #
 # Collective test concluded: all_reduce_perf
 ```
+
+### Running via Pyxis (containerized)
+
+The steps above run the baked-in `all_reduce_perf` directly on the worker
+filesystem. You can instead run the test inside a container with Pyxis/Enroot.
+This requires the Pyxis NVIDIA worker image (`slurmd-nvml-nccl-pyxis`, the
+default the Terraform `slinky_image_profile` selects for NVIDIA): on that image
+`srun` accepts `--container-image`, `--container-name`, and `--container-mounts`,
+and the image's `97-oke-nvidia-mounts.sh` Enroot hook injects the GPU driver
+userland.
+
+Validated on two `BM.GPU.B4.8` nodes (16 ranks) with a plain `ubuntu:24.04`
+container at ~187 GB/s avg bus bandwidth, at parity with the native run above.
+
+Key points:
+
+- Use a plain image (`ubuntu:24.04`) and mount the worker's NCCL test payload
+  (`/opt/nccl-tests`, `/opt/hpcx`) and RDMA verbs userland into it. NGC images
+  (for example `nvcr.io/nvidia/pytorch`) ship their own `rdma-core` and set
+  `NVIDIA_VISIBLE_DEVICES` themselves, so the RDMA-userland mounts can be dropped
+  for them.
+- Export `NVIDIA_VISIBLE_DEVICES=all` (activates the GPU hook; the Slurm cgroup
+  still restricts the container to the `--gres` GPUs) and
+  `MELLANOX_VISIBLE_DEVICES=all` (RDMA device hook).
+- Use `--container-name` so all tasks on a node share one container instance,
+  which UCX intra-node shared memory requires.
+- Pin the MPI control plane to IB UD (`UCX_TLS=ud,self,sm`,
+  `UCX_NET_DEVICES=mlx5_0:1`); UCX inter-node TCP otherwise picks the
+  `rdma0`-`rdma15` interfaces, which do not route TCP between nodes.
+
+From inside the login pod, write the job and submit it with
+`sbatch --partition=gpu --account=<account>`:
+
+```bash
+cat > "$HOME/nccl-pyxis.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=nccl-pyxis
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=2
+#SBATCH --gres=gpu:8
+
+set -euo pipefail
+
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-ubuntu:24.04}"
+
+M=/usr/lib/x86_64-linux-gnu
+RDMA_USERLAND_MOUNTS="$M/libibverbs.so.1:$M/libibverbs.so.1,$M/libmlx5.so.1:$M/libmlx5.so.1,$M/librdmacm.so.1:$M/librdmacm.so.1,$M/libnl-3.so.200:$M/libnl-3.so.200,$M/libnl-route-3.so.200:$M/libnl-route-3.so.200,$M/libibverbs:$M/libibverbs,/etc/libibverbs.d:/etc/libibverbs.d"
+PAYLOAD_MOUNTS="/opt/nccl-tests:/opt/nccl-tests,/opt/hpcx:/opt/hpcx"
+
+# Activate the GPU and RDMA Enroot hooks. The Slurm cgroup still restricts the
+# container to the GPUs allocated by --gres.
+export NVIDIA_VISIBLE_DEVICES=all
+export MELLANOX_VISIBLE_DEVICES=all
+
+# MPI control plane over IB UD on the frontend HCA.
+export UCX_TLS=ud,self,sm
+export UCX_NET_DEVICES=mlx5_0:1
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+export OMPI_MCA_coll=^hcoll
+
+# BM.GPU.B4.8 NCCL settings; the HCA list is shape-specific.
+export NCCL_DEBUG=WARN
+export NCCL_ALGO=Ring
+export NCCL_IGNORE_CPU_AFFINITY=1
+export NCCL_IB_SPLIT_DATA_ON_QPS=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IB_GID_INDEX=3
+export NCCL_IB_HCA="=mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12"
+export NCCL_IB_TC=41
+export NCCL_IB_SL=0
+export NCCL_IB_TIMEOUT=16
+
+# Mounted payload library paths and the HPCX relocation prefix.
+export LD_LIBRARY_PATH=/opt/nccl-tests/lib:/opt/hpcx/ucx/lib:/opt/hpcx/ompi/lib:/opt/hpcx/nccl_rdma_sharp_plugin/lib
+export OPAL_PREFIX=/opt/hpcx/ompi
+
+srun --mpi=pmix --export=ALL \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name=nccl \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS" \
+  /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+EOF
+chmod 755 "$HOME/nccl-pyxis.sh"
+
+sbatch --partition=gpu --account=project-a "$HOME/nccl-pyxis.sh"
+```
+
+The first run imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
+on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0` and reports
+an avg bus bandwidth close to the native run. For another NVIDIA shape, replace
+the `NCCL_IB_HCA` list (see
+[Create the Slurm Batch Script](#create-the-slurm-batch-script)).
 
 ## RCCL Tests (AMD GPU shapes)
 
