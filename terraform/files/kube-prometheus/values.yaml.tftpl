@@ -8,17 +8,19 @@ prometheus:
   prometheusSpec:
     enableAdminAPI: false
     retention: 30d
-    retentionSize: 450GB    
+    retentionSize: 450GB
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
     probeSelectorNilUsesHelmValues: false
     scrapeConfigSelectorNilUsesHelmValues: false
     remoteWriteDashboards: true
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Delete
     storageSpec:
       volumeClaimTemplate:
         metadata:
-          name: prometheus                
+          name: prometheus
         spec:
           storageClassName: oci-bv
           accessModes: ["ReadWriteOnce"]

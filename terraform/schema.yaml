@@ -60,6 +60,8 @@ variableGroups:
       - worker_gpu_node_cycling_max_surge
       - worker_gpu_node_cycling_max_unavailable
       - worker_gpu_node_cycling_mode
+      - worker_rdma_use_compute_cluster
+      - worker_rdma_host_group_id
       # Networking
       - subnet_advanced_attrs
       - allow_rules_lustre
@@ -201,7 +203,7 @@ variableGroups:
       - worker_ops_image_custom_uri
       - worker_ops_image_compartment
       - worker_ops_image_custom_id
-      
+
   - title: "Worker Pool: CPU"
     variables:
       - worker_cpu_enabled
@@ -222,7 +224,7 @@ variableGroups:
       - worker_cpu_image_custom_uri
       - worker_cpu_image_compartment
       - worker_cpu_image_custom_id
-      
+
   - title: "Worker Pool: GPU"
     variables:
       - worker_gpu_enabled
@@ -293,8 +295,8 @@ variableGroups:
     - monitoring_advanced_options
     - monitoring_namespace
     - install_node_problem_detector_kube_prometheus_stack
-    - install_amd_device_metrics_exporter     
-    - amd_device_metrics_exporter_chart_version 
+    - install_amd_device_metrics_exporter
+    - amd_device_metrics_exporter_chart_version
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
     - ingress_chart_version
@@ -384,7 +386,7 @@ variables:
     required: true
     title: Region
     type: oci:identity:region:name
-  
+
   # Provider auth variables
   oci_auth:
     default: null
@@ -481,17 +483,17 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
     visible: { not: [create_vcn] }
-  networking_advanced_options:  
+  networking_advanced_options:
     title: Subnets advanced settings
     type: boolean
     default: false
     required: false
-  custom_subnet_ids:  
+  custom_subnet_ids:
     title: Select existing subnets
     type: boolean
     default: true
     required: false
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - networking_advanced_options
@@ -502,7 +504,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -515,7 +517,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -527,7 +529,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -539,7 +541,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -551,7 +553,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -563,7 +565,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -575,7 +577,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -587,7 +589,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -599,7 +601,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -611,7 +613,7 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
       vcnId: ${vcn_id}
-    visible: 
+    visible:
       and:
       - { not: [create_vcn] }
       - custom_subnet_ids
@@ -1212,7 +1214,7 @@ variables:
       and:
         - ${create_operator}
         - ${operator_shape_config}
- 
+
   # Storage
   create_fss:
     title: Create a File Storage Service (FSS) file system
@@ -1300,7 +1302,7 @@ variables:
     description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector, and AMD device metrics exporter.
     default: true
     visible: true
-  monitoring_advanced_options:  
+  monitoring_advanced_options:
     title: Advanced options
     type: boolean
     default: false
@@ -1313,7 +1315,7 @@ variables:
     type: string
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"
     required: true
-    visible: 
+    visible:
       and:
       - install_monitoring
       - monitoring_advanced_options
@@ -1348,7 +1350,7 @@ variables:
     visible: false
       # and:
       # - monitoring_advanced_options
-      # - install_amd_device_metrics_exporter      
+      # - install_amd_device_metrics_exporter
   node_problem_detector_chart_version:
     title: Node Problem Detector chart version
     type: string
@@ -1357,7 +1359,7 @@ variables:
     visible: false
       # and:
       # - monitoring_advanced_options
-      # - install_node_problem_detector 
+      # - install_node_problem_detector
   prometheus_stack_chart_version:
     title: Prometheus stack chart version
     type: string
@@ -1441,7 +1443,7 @@ variables:
     title: Accelerate Oracle Notifications Service (ONS) topic deletion on stack destroy
     description: Terminate the topic asynchronously. Don't wait for 15 minutes until the topic is deleted. Supported only via Resource Manager.
     default: true
-    visible: 
+    visible:
       and:
         - install_monitoring
         - install_node_problem_detector_kube_prometheus_stack
@@ -1456,7 +1458,7 @@ variables:
           - install_monitoring
         - not:
           - create_bastion
-          - create_operator 
+          - create_operator
       type: boolean
       required: true
       default: true
@@ -1705,7 +1707,7 @@ variables:
         - eq: [worker_ops_shape, "VM.Standard.E3.Flex"]
   worker_ops_boot_volume_size:
     title: Boot volume size (GB)
-    type: integer      
+    type: integer
   worker_ops_image_type:
     title: Image type
     default: Custom
@@ -1797,7 +1799,7 @@ variables:
     visible: ${worker_cpu_enabled}
     default: worker_ops_ad
     dependsOn:
-      compartmentId: ${compartment_ocid}  
+      compartmentId: ${compartment_ocid}
   worker_cpu_pool_size:
     title: Number of worker nodes
     type: integer
@@ -2968,7 +2970,7 @@ outputGroups:
       - prometheus_adapter_version
       - metrics_server_version
       - dcgm_exporter_version
-      
+
 outputs:
   # Terraform
   state_id:
@@ -3115,7 +3117,7 @@ outputs:
     type: copyableString
   access_k8s_private_endpoint:
     title: OCI CLI command to access the kubeconfig for your cluster via the private endpoint
-    type: copyableString    
+    type: copyableString
 
   # Load balancers
   int_lb_subnet_id:
@@ -3163,7 +3165,7 @@ outputs:
     title: RDMA worker node pool OCID
     type: ocid
     visible: ${worker_rdma_enabled}
-  
+
   # Pods
   pod_subnet_id:
     title: Subnet
@@ -3198,7 +3200,7 @@ outputs:
     visible:
       and:
       - install_node_problem_detector_kube_prometheus_stack
-      - install_grafana        
+      - install_grafana
   grafana_admin_password:
     title: Grafana admin password
     type: copyableString
