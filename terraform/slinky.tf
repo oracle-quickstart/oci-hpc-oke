@@ -32,10 +32,13 @@ locals {
       restapi_image_tag           = "slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0"
       sssd_image_repository       = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
       sssd_image_tag              = "login-25.11.6-ubuntu24.04-2026-06-19.0"
-      controller_image_tag        = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-16.0"
-      login_image_tag             = "login-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
-      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
-      amd_worker_tag              = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
+      # Controller, login, and NVIDIA worker rebuilt FROM our from-source bases
+      # (build-base-images.sh) instead of ghcr.io/slinkyproject. AMD already
+      # builds from source, so its tag date is unchanged.
+      controller_image_tag = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-19.0"
+      login_image_tag      = "login-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
+      nvidia_worker_tag    = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
+      amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
       operator_chart_version      = "1.1.1"

@@ -19,10 +19,17 @@ Each `<minor>/<flavor>/Dockerfile` is a single multi-stage Dockerfile that build
 every Slurm component (`slurmctld`, `slurmd`, `slurmdbd`, `slurmrestd`, `sackd`,
 `login`) as separate `--target` stages; `docker-bake.hcl` defines the Bake
 targets and `<minor>/<flavor>/slurm.hcl` pins the Slurm micro version.
-`build-control-plane-images.sh` (one directory up) builds the `slurmdbd`,
-`slurmrestd`, and `login` targets; set `SLURM_VERSION` / `FLAVOR` to pick the
-profile. The `slurmctld` / `slurmd` targets are not used here: the controller and
-workers use the layered custom Dockerfiles built by `build-images.sh`.
+Two scripts one directory up build from these assets; set `SLURM_VERSION` /
+`FLAVOR` to pick the profile:
+
+- `build-control-plane-images.sh` builds the deployed `slurmdbd`, `slurmrestd`,
+  and `login` targets (plus the operator/webhook from a pinned clone).
+- `build-base-images.sh` builds the `slurmctld`, `slurmd`, `slurmd_pyxis`, and
+  `login_pyxis` targets as base images that the layered custom Dockerfiles in
+  `build-images.sh` (controller, login, NVIDIA workers) then build FROM, instead
+  of pulling them from `ghcr.io/slinkyproject`. The `login_pyxis` target is
+  tagged `login-pyxis-base` so it does not collide with the deployed
+  `login-pyxis` image that `build-images.sh` produces.
 
 To refresh or add a flavor: re-copy `docker-bake.hcl` and the relevant
 `<minor>/<flavor>/` directory from the upstream repo at the desired ref and
