@@ -38,7 +38,7 @@ locals {
       controller_image_tag = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-19.0"
       login_image_tag      = "login-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
       nvidia_worker_tag    = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
-      amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
+      amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
       operator_chart_version      = "1.1.1"
@@ -52,7 +52,7 @@ locals {
       controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05-ubuntu24.04-2026-06-15.0"
       login_image_tag             = "login-pyxis-26.05-ubuntu24.04-2026-06-15.0"
       nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0"
-      amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-2026-06-15.0"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
       operator_chart_version      = "1.1.1"
@@ -66,7 +66,7 @@ locals {
       controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
       login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
       nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
-      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-16.1"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-16.1"
     }
   }
 

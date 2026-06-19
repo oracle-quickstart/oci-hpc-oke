@@ -264,6 +264,11 @@ nodesets:
 %{ endif ~}
         - name: shm
           mountPath: /dev/shm
+        # Pyxis/enroot writes its image-import scratch under /tmp and, while
+        # flattening layers, creates OverlayFS whiteouts (device nodes). The pod
+        # overlay rootfs rejects mknod even for root, so /tmp must be a tmpfs.
+        - name: enroot-tmp
+          mountPath: /tmp
 %{ if home_enabled ~}
         - name: home
           mountPath: /home
@@ -333,6 +338,11 @@ ${worker_features_yaml}
           emptyDir:
             medium: Memory
             sizeLimit: 32Gi
+        # tmpfs /tmp for the Pyxis/enroot image import (see the volumeMount note).
+        - name: enroot-tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
 %{ if home_enabled ~}
         - name: home
           persistentVolumeClaim:
