@@ -48,6 +48,7 @@ shows both forms; pick one.
   - [Create the Slurm Batch Script](#create-the-slurm-batch-script-1)
   - [Submit the Job](#submit-the-job-1)
   - [Example Output](#example-output-1)
+  - [Running via Pyxis (containerized)](#running-via-pyxis-containerized-1)
 - [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
@@ -1045,6 +1046,97 @@ rccl-tests: Version develop:a52452e
 #
 # Collective test concluded: all_reduce_perf
 ```
+
+### Running via Pyxis (containerized)
+
+The steps above run the baked-in `all_reduce_perf` directly on the worker
+filesystem. You can instead run the test inside a container with Pyxis/Enroot.
+This requires the Pyxis AMD worker image (`slurmd-rocm-rccl-...-pyxis`) and a
+**tmpfs `/tmp`** on the worker pods: Enroot writes its image-import scratch under
+`/tmp`, and while flattening a multi-layer image it creates OverlayFS whiteouts
+(device nodes). The pod's overlay root filesystem rejects `mknod` (even for
+root), so the import fails with
+`enroot-aufs2ovlfs: ... Operation not permitted` unless `/tmp` is a tmpfs. On
+that image `srun` accepts `--container-image`, `--container-name`, and
+`--container-mounts`.
+
+Validated on two `BM.GPU.MI300X.8` nodes (16 ranks) with the self-contained
+`rccl-tests` image at ~354 GB/s, at parity with the native run above.
+
+Key points:
+
+- The `rccl-tests` image is self-contained for the ROCm/RCCL userland, so no
+  library mounts are needed (unlike the NVIDIA path).
+- Enroot has no AMD GPU hook, so bind the AMD GPU (`/dev/kfd`, `/dev/dri`) and
+  RDMA (`/dev/infiniband`) device nodes into the container with
+  `--container-mounts`. The Slurm cgroup (`ConstrainDevices=yes`) still restricts
+  the container to the GPUs allocated by `--gres`.
+- Use `--container-name` so all tasks on a node share one container instance,
+  which UCX intra-node shared memory requires.
+- Submit it as a plain `sbatch`. Do **not** "pre-warm" the import with a separate
+  interactive `srun --container-image` step: the Enroot import of the multi-GB
+  image runs longer than srun's message timeout, so that srun fails with
+  `Socket timed out on send/recv` and leaves a step stuck `COMPLETING` that holds
+  the nodes. The job's own `srun` imports the image inline (a few minutes on the
+  first run per node) and then runs.
+
+From inside the login pod, write the job and submit it with
+`sbatch --partition=gpu --account=<account>`:
+
+```bash
+cat > "$HOME/rccl-pyxis.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=rccl-pyxis
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:8
+#SBATCH --exclusive
+
+set -euo pipefail
+
+# The rccl-tests image is self-contained for the ROCm/RCCL userland.
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
+
+# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The Slurm
+# cgroup still restricts the container to the --gres GPUs.
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+
+# BM.GPU.MI300X.8 RCCL / UCX transport (RCCL reuses the NCCL_* names).
+export NCCL_CUMEM_ENABLE=0
+export NCCL_IB_TIMEOUT=22
+export NCCL_IB_SL=0
+export NCCL_IB_TC=41
+export NCCL_IB_GID_INDEX=3
+export NCCL_DEBUG=WARN
+export NCCL_IB_QPS_PER_CONNECTION=1
+export NCCL_IB_SPLIT_DATA_ON_QPS=0
+export NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9"
+export NCCL_PXN_DISABLE=0
+export NCCL_NET_PLUGIN=none
+export UCX_TLS=ud,self,sm
+export UCX_NET_DEVICES=mlx5_0:1
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+
+# --container-name: all tasks on a node share one container instance (UCX shm).
+srun --mpi=pmix --export=ALL \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name=rccl \
+  --container-mounts="$DEVICE_MOUNTS" \
+  /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -n 20
+EOF
+chmod 755 "$HOME/rccl-pyxis.sh"
+
+sbatch --partition=gpu --account=project-a "$HOME/rccl-pyxis.sh"
+```
+
+The first run imports the `rccl-tests` image (`pyxis: imported docker image: ...`
+on stderr) before the collective. A successful job ends `COMPLETED` with
+`ExitCode` `0:0` and reports an avg bus bandwidth close to the native run. Benign
+warnings: the container's OpenMPI prints `openib` "no device params found" (it
+falls back; RCCL uses its own IB transport) and `Missing "iommu=pt"` (a node
+kernel cmdline note). For another AMD shape, replace the `NCCL_IB_HCA` list (see
+[Create the Slurm Batch Script](#create-the-slurm-batch-script-1)).
 
 ## Troubleshooting
 
