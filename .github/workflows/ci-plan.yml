@@ -106,7 +106,7 @@ jobs:
             core.setOutput('head_sha', pr.data.head.sha);
             core.setOutput('base_ref', pr.data.base.ref);
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: >-
             ${{
@@ -163,7 +163,7 @@ jobs:
     if: needs.check-changes.outputs.run-tests == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: >-
             ${{
@@ -277,7 +277,7 @@ jobs:
             tfvars: tfvars/core/cluster-only.tfvars,tfvars/storage/lustre.tfvars
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: >-
             ${{
@@ -384,7 +384,7 @@ jobs:
       TOPOLOGY: ${{ matrix.topology }}
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: >-
             ${{
@@ -510,7 +510,7 @@ jobs:
             tfvars: tfvars/tf/private-fss-lustre-monitoring-tf.tfvars
 
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: >-
             ${{
