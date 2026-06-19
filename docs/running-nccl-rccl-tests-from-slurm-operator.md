@@ -1130,14 +1130,6 @@ chmod 755 "$HOME/rccl-pyxis.sh"
 sbatch --partition=gpu --account=project-a "$HOME/rccl-pyxis.sh"
 ```
 
-The first run imports the `rccl-tests` image (`pyxis: imported docker image: ...`
-on stderr) before the collective. A successful job ends `COMPLETED` with
-`ExitCode` `0:0` and reports an avg bus bandwidth close to the native run. Benign
-warnings: the container's OpenMPI prints `openib` "no device params found" (it
-falls back; RCCL uses its own IB transport) and `Missing "iommu=pt"` (a node
-kernel cmdline note). For another AMD shape, replace the `NCCL_IB_HCA` list (see
-[Create the Slurm Batch Script](#create-the-slurm-batch-script-1)).
-
 ## Troubleshooting
 
 The commands below are shown in the direct (login pod) form. From the operator
