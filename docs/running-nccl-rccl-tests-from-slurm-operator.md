@@ -282,15 +282,9 @@ NCCL_JOB_ID="$(sbatch --parsable \
   --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
   "$HOME/nccl-slurm.sh")"
 
-for _ in {1..60}; do
-  [[ -e "$HOME/nccl-slurm-${NCCL_JOB_ID}.out" ]] && break
-  sleep 5
-done
-
-if [[ ! -e "$HOME/nccl-slurm-${NCCL_JOB_ID}.out" ]]; then
-  exit 1
-fi
-
+timeout 300 bash -c \
+  'until [[ -e "$1" ]]; do sleep 5; done' \
+  bash "$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 tail -n 120 "$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 ```
 
@@ -541,17 +535,10 @@ export NCCL_JOB_ID="$(
         \$HOME/nccl-slurm.sh"
 )"
 
-for _ in {1..60}; do
-  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-    su - "$SLURM_USER" -c "test -e \$HOME/nccl-slurm-${NCCL_JOB_ID}.out" && break
-  sleep 5
-done
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c "test -e \$HOME/nccl-slurm-${NCCL_JOB_ID}.out" || {
-    exit 1
-  }
-
+  su - "$SLURM_USER" -c \
+    "timeout 300 bash -c 'until [[ -e \"\$1\" ]]; do sleep 5; done' bash \
+      \$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "tail -n 120 \$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 ```
@@ -838,15 +825,9 @@ RCCL_JOB_ID="$(sbatch --parsable \
   --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
   "$HOME/rccl-slurm.sh")"
 
-for _ in {1..60}; do
-  [[ -e "$HOME/rccl-slurm-${RCCL_JOB_ID}.out" ]] && break
-  sleep 5
-done
-
-if [[ ! -e "$HOME/rccl-slurm-${RCCL_JOB_ID}.out" ]]; then
-  exit 1
-fi
-
+timeout 300 bash -c \
+  'until [[ -e "$1" ]]; do sleep 5; done' \
+  bash "$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 tail -n 120 "$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 ```
 
@@ -1045,17 +1026,10 @@ export RCCL_JOB_ID="$(
         \$HOME/rccl-slurm.sh"
 )"
 
-for _ in {1..60}; do
-  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-    su - "$SLURM_USER" -c "test -e \$HOME/rccl-slurm-${RCCL_JOB_ID}.out" && break
-  sleep 5
-done
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c "test -e \$HOME/rccl-slurm-${RCCL_JOB_ID}.out" || {
-    exit 1
-  }
-
+  su - "$SLURM_USER" -c \
+    "timeout 300 bash -c 'until [[ -e \"\$1\" ]]; do sleep 5; done' bash \
+      \$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "tail -n 120 \$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 ```
