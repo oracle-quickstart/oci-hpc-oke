@@ -213,7 +213,8 @@ export SMOKE_JOB_ID="$(
 echo "$SMOKE_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
+  sacct -j "$SMOKE_JOB_ID" \
+    --format=JobID,JobName,Partition,Account,State,ExitCode -P
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "cat \$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
@@ -235,7 +236,8 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
 
 echo "$SMOKE_JOB_ID"
 
-sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
+sacct -j "$SMOKE_JOB_ID" \
+  --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
@@ -500,7 +502,7 @@ export NCCL_JOB_ID="$(
 echo "$NCCL_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  squeue -j "$NCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
+  squeue -j "$NCCL_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   sacct -j "$NCCL_JOB_ID" \
@@ -526,13 +528,19 @@ NCCL_JOB_ID="$(sbatch --parsable \
 
 echo "$NCCL_JOB_ID"
 
-squeue -j "$NCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
+squeue -j "$NCCL_JOB_ID"
 
 sacct -j "$NCCL_JOB_ID" \
   --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
 
 tail -n 120 "$HOME/nccl-slurm-${NCCL_JOB_ID}.out" \
             "$HOME/nccl-slurm-${NCCL_JOB_ID}.err"
+
+if [[ ! -e "$HOME/nccl-slurm-${NCCL_JOB_ID}.out" ]]; then
+  echo "Output files do not exist yet. The job is probably still pending or just starting."
+  squeue -j "$NCCL_JOB_ID"
+  scontrol show job "$NCCL_JOB_ID" | sed -n '1,25p'
+fi
 ```
 
 A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
@@ -790,7 +798,8 @@ export SMOKE_JOB_ID="$(
 echo "$SMOKE_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
+  sacct -j "$SMOKE_JOB_ID" \
+    --format=JobID,JobName,Partition,Account,State,ExitCode -P
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "cat \$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
@@ -812,7 +821,8 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
 
 echo "$SMOKE_JOB_ID"
 
-sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
+sacct -j "$SMOKE_JOB_ID" \
+  --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
@@ -981,7 +991,7 @@ export RCCL_JOB_ID="$(
 echo "$RCCL_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  squeue -j "$RCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
+  squeue -j "$RCCL_JOB_ID"
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   sacct -j "$RCCL_JOB_ID" \
@@ -1007,13 +1017,19 @@ RCCL_JOB_ID="$(sbatch --parsable \
 
 echo "$RCCL_JOB_ID"
 
-squeue -j "$RCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
+squeue -j "$RCCL_JOB_ID"
 
 sacct -j "$RCCL_JOB_ID" \
   --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
 
 tail -n 120 "$HOME/rccl-slurm-${RCCL_JOB_ID}.out" \
             "$HOME/rccl-slurm-${RCCL_JOB_ID}.err"
+
+if [[ ! -e "$HOME/rccl-slurm-${RCCL_JOB_ID}.out" ]]; then
+  echo "Output files do not exist yet. The job is probably still pending or just starting."
+  squeue -j "$RCCL_JOB_ID"
+  scontrol show job "$RCCL_JOB_ID" | sed -n '1,25p'
+fi
 ```
 
 A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
