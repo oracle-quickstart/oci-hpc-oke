@@ -23,7 +23,12 @@ the rebuilt plugins match the upstream 25.11.6 payloads.
 
 ### Upstream Images Available
 
-These images are published by Slinky and do not need to be built in this repo.
+These are the images Slinky publishes upstream. We no longer pull them at
+deploy time: the operator/webhook and the SlurmDBD/slurmrestd/login control-plane
+images are rebuilt from source (see "Control-Plane Images Built from Upstream
+Source"), and the controller/login/worker base layers are rebuilt from source
+(see "Base Images Built from Upstream Source"). The table is kept as a reference
+of the upstream equivalents we mirror.
 
 | Role | Image |
 | --- | --- |
@@ -43,16 +48,19 @@ one deployment.
 
 ### Derived Images Built
 
-These 25.11.6 custom images are built and pushed in OCIR.
+These 25.11.6 custom images are built and pushed in OCIR by `build-images.sh`.
+The controller, login, and NVIDIA worker images build FROM the from-source base
+images (see "Base Images Built from Upstream Source") instead of
+`ghcr.io/slinkyproject`, so the whole stack comes from one registry.
 
 | Role | Dockerfile | Target image | Platforms |
 | --- | --- | --- | --- |
-| Controller with PMIx | `slurm-operator/controller/slurmctld-pmix/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
-| Controller with PMIx plus SSSD/NSS | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
-| Login with Pyxis, Enroot, and login tools | `slurm-operator/login/login-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker base with NVML AutoDetect plugins | `slurm-operator/workers/nvidia/slurmd-nvml-core/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0` | `linux/amd64`, `linux/arm64` |
+| Controller with PMIx | `slurm-operator/controller/slurmctld-pmix/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Controller with PMIx plus SSSD/NSS | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Login with Pyxis, Enroot, and login tools | `slurm-operator/login/login-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker base with NVML AutoDetect plugins | `slurm-operator/workers/nvidia/slurmd-nvml-core/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
 
 The current AMD worker Dockerfiles build from the RCCL test image
 `iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1`.
@@ -63,6 +71,61 @@ the ROCm/RCCL base image is also moved to Ubuntu 24.04.
 | --- | --- | --- | --- |
 | AMD worker with ROCm/RCCL and SSSD/NSS | `slurm-operator/workers/amd/slurmd-rocm-rccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0` | `linux/amd64` |
 | AMD worker with ROCm/RCCL plus Pyxis/Enroot | `slurm-operator/workers/amd/slurmd-rocm-rccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0` | `linux/amd64` |
+
+### Control-Plane Images Built from Upstream Source
+
+These otherwise come straight from `ghcr.io/slinkyproject`. They are rebuilt
+from upstream source into our registry so the whole stack comes from one place
+(the `build-images.sh` table above covers the layered custom images).
+`build-control-plane-images.sh` builds these on the image-builder, multi-platform
+(`linux/amd64`, `linux/arm64`):
+
+- `slurmdbd`, `slurmrestd`, and `login` build from the vendored upstream assets
+  in `slurm-operator/slurm-source/` (copied from `SlinkyProject/containers` @
+  `cea8fbea`; see `slurm-source/README.md`) via Docker Bake -- one multi-stage
+  Dockerfile with per-component `--target` stages. The upstream Dockerfile shares
+  the apt cache mount across arches, so each arch is built separately and combined
+  into a multi-arch manifest.
+- `operator` and `webhook` build from a pinned clone of
+  `SlinkyProject/slurm-operator` @ `v1.1.1` (its Dockerfile needs the Go source
+  tree, so it cannot be vendored standalone; a reference copy is at
+  `slurm-operator/operator/slurm-operator/Dockerfile`). Go cross-compile, both
+  arches in one pass.
+
+| Role | Upstream source / target | Target image | Platforms |
+| --- | --- | --- | --- |
+| SlurmDBD (accounting) | `containers` target `slurmdbd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmdbd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| slurmrestd (REST API) | `containers` target `slurmrestd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Login / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Slinky operator | `slurm-operator` target `manager` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:1.1.1` | `linux/amd64`, `linux/arm64` |
+| Slinky operator webhook | `slurm-operator` target `webhook` | `iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook:1.1.1` | `linux/amd64`, `linux/arm64` |
+
+The terraform `25.11.6-ubuntu24.04` image profile points SlurmDBD, slurmrestd,
+and the SSSD sidecar at these tags, and the operator Helm values use the custom
+operator/webhook images.
+
+### Base Images Built from Upstream Source
+
+The layered controller/login/NVIDIA worker Dockerfiles in `build-images.sh`
+otherwise build FROM `ghcr.io/slinkyproject` base layers. These bases are rebuilt
+from the same vendored `slurm-source/` assets so the layered images come entirely
+from our registry. `build-base-images.sh` builds them on the image-builder,
+multi-platform (`linux/amd64`, `linux/arm64`), using the same per-arch build and
+combine as the control-plane script (the upstream Dockerfile shares the apt cache
+mount across arches). The `login` base is produced by `build-control-plane-images.sh`
+(it doubles as the deployed SSSD sidecar) and reused here.
+
+| Role | Upstream target | Base image | Platforms |
+| --- | --- | --- | --- |
+| Controller base | `containers` target `slurmctld` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Worker base | `containers` target `slurmd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Worker Pyxis payload | `containers` target `slurmd_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Login Pyxis payload | `containers` target `login_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-base-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Login base / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+
+The `login_pyxis` target is tagged `login-pyxis-base` so it does not collide with
+the deployed `login-pyxis` image. AMD workers already build entirely from source
+(custom RCCL base), so they have no upstream base layer to rebuild.
 
 ### Current OCIR Status
 
@@ -120,17 +183,21 @@ image, so their tags intentionally use `rocm7.1.1` instead of `ubuntu26.04`.
 
 ## Build Notes
 
-- Run `slurm-operator/build-images.sh` from `docker/slinky/slurm-operator` to
-  rebuild and push the derived runtime images. Set `REGISTRY`, `PLATFORM`, or
-  `OUTPUT=load` to override the defaults. Image tags use a dated build suffix;
-  set `BUILD_VERSION=YYYY-MM-DD.X` to increment it.
+- Build order on the image-builder (all from `docker/slinky/slurm-operator`):
+  1. `build-control-plane-images.sh` -- deployed SlurmDBD/slurmrestd/login plus
+     operator/webhook (the `login` image doubles as the layered login base).
+  2. `build-base-images.sh` -- the from-source `slurmctld`, `slurmd`,
+     `slurmd-pyxis`, and `login-pyxis-base` bases that the layered images build FROM.
+  3. `build-images.sh` -- the derived layered controller/login/NVIDIA/AMD images.
+- Set `REGISTRY`, `PLATFORM`, or `OUTPUT=load` to override `build-images.sh`
+  defaults. Image tags use a dated build suffix; set `BUILD_VERSION=YYYY-MM-DD.X`
+  to increment it. `BASE_BUILD_VERSION` selects which from-source base tags the
+  layered images build FROM; `AMD_BUILD_VERSION` pins the AMD worker tags.
 - `slurmctld-pmix-sssd-nss` builds on `slurmctld-pmix`.
 - `slurmd-nvml-nccl-pyxis` builds on `slurmd-nvml-nccl`, which builds on
   `slurmd-nvml-core`.
 - `slurmd-rocm-rccl-pyxis` builds on `slurmd-rocm-rccl`.
-- Upstream chart images such as `ghcr.io/slinkyproject/login`,
-  `ghcr.io/slinkyproject/slurmrestd`, `ghcr.io/slinkyproject/slurmdbd`, and
-  external images such as `jpgouin/openldap` are not copied here because their
+- External images such as `jpgouin/openldap` are not copied here because their
   Dockerfiles are not owned by this repository.
 - The operator Dockerfile is a reference copy and still expects the Slurm
   operator source tree as its build context.

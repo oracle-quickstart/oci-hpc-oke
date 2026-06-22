@@ -53,4 +53,10 @@ operator:
 YAML
 ```
 
-Pyxis/enroot container jobs require a Pyxis-capable login and worker image plus a Slurm plugstack config mounted into the controller, login, and worker pods. Keep that as a `slinky_slurm_values_override` until those images are the default for the stack. The validated setup used `PlugStackConfig=/opt/slurm/plugstack/plugstack.conf`, a `plugstack.conf` containing `include /usr/share/pyxis/*`, and mounted that file from a ConfigMap at `/opt/slurm/plugstack`.
+Pyxis/enroot container jobs are supported by default on the GPU NodeSets, so no `slinky_slurm_values_override` is needed for the default shapes. Three pieces make this work:
+
+- The default GPU worker images are the Pyxis variants (`slurmd-nvml-nccl-pyxis` for NVIDIA, `slurmd-rocm-rccl-...-pyxis` for AMD), so `enroot` and the Pyxis SPANK plugin are present on the worker.
+- The Slurm chart renders `plugstack.conf` with `include /usr/share/pyxis/*` through `configFiles`. The glob is loaded only by the login and worker pods that ship the Pyxis libraries, so it is a no-op in `slurmctld`.
+- The GPU NodeSet mounts a tmpfs `/tmp` (`enroot-tmp`). Enroot writes its image-import scratch under `/tmp` and creates OverlayFS whiteouts (device nodes) while flattening layers; the pod overlay rootfs rejects `mknod` even for root, so `/tmp` must be a tmpfs.
+
+For AMD GPU shapes, container jobs must also bind the AMD GPU and RDMA device nodes (`/dev/kfd`, `/dev/dri`, `/dev/infiniband`) with `srun --container-mounts`, because enroot has no AMD hook. The Slurm cgroup (`ConstrainDevices=yes`) still restricts the container to the GPUs allocated by `--gres`.

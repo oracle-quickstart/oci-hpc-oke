@@ -23,35 +23,50 @@ locals {
     "25.11.6-ubuntu24.04" = {
       operator_chart_version = "1.1.1"
       slurm_chart_version    = "1.1.1"
-      accounting_image_tag   = "25.11.6-ubuntu24.04"
-      restapi_image_tag      = "25.11.6-ubuntu24.04"
-      controller_image_tag   = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-16.0"
-      login_image_tag        = "login-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
-      sssd_image_tag         = "25.11.6-ubuntu24.04"
-      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-16.0"
-      amd_worker_tag         = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0"
+      # Custom slurmdbd/slurmrestd/login (SSSD) built from upstream source into
+      # our registry (build-control-plane-images.sh), so the whole stack comes
+      # from one registry.
+      accounting_image_repository = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      accounting_image_tag        = "slurmdbd-25.11.6-ubuntu24.04-2026-06-19.0"
+      restapi_image_repository    = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      restapi_image_tag           = "slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0"
+      sssd_image_repository       = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      sssd_image_tag              = "login-25.11.6-ubuntu24.04-2026-06-19.0"
+      # Controller, login, and NVIDIA worker rebuilt FROM our from-source bases
+      # (build-base-images.sh) instead of ghcr.io/slinkyproject. AMD already
+      # builds from source, so its tag date is unchanged.
+      controller_image_tag = "slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-19.0"
+      login_image_tag      = "login-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
+      nvidia_worker_tag    = "slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-19.0"
+      amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
-      operator_chart_version = "1.1.1"
-      slurm_chart_version    = "1.1.1"
-      accounting_image_tag   = "26.05-ubuntu24.04"
-      restapi_image_tag      = "26.05-ubuntu24.04"
-      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05-ubuntu24.04-2026-06-15.0"
-      login_image_tag        = "login-pyxis-26.05-ubuntu24.04-2026-06-15.0"
-      sssd_image_tag         = "26.05-ubuntu24.04"
-      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0"
-      amd_worker_tag         = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-2026-06-15.0"
+      operator_chart_version      = "1.1.1"
+      slurm_chart_version         = "1.1.1"
+      accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
+      accounting_image_tag        = "26.05-ubuntu24.04"
+      restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
+      restapi_image_tag           = "26.05-ubuntu24.04"
+      sssd_image_repository       = "ghcr.io/slinkyproject/login"
+      sssd_image_tag              = "26.05-ubuntu24.04"
+      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05-ubuntu24.04-2026-06-15.0"
+      login_image_tag             = "login-pyxis-26.05-ubuntu24.04-2026-06-15.0"
+      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05-ubuntu24.04-2026-06-15.0"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
-      operator_chart_version = "1.1.1"
-      slurm_chart_version    = "1.1.1"
-      accounting_image_tag   = "26.05-ubuntu24.04"
-      restapi_image_tag      = "26.05-ubuntu24.04"
-      controller_image_tag   = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
-      login_image_tag        = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
-      sssd_image_tag         = "26.05-ubuntu24.04"
-      nvidia_worker_tag      = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
-      amd_worker_tag         = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-06-16.1"
+      operator_chart_version      = "1.1.1"
+      slurm_chart_version         = "1.1.1"
+      accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
+      accounting_image_tag        = "26.05-ubuntu24.04"
+      restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
+      restapi_image_tag           = "26.05-ubuntu24.04"
+      sssd_image_repository       = "ghcr.io/slinkyproject/login"
+      sssd_image_tag              = "26.05-ubuntu24.04"
+      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
+      login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
+      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-16.1"
     }
   }
 
@@ -64,6 +79,24 @@ locals {
   slinky_controller_image_tag   = var.slinky_controller_image_tag == "auto" ? local.slinky_image_profile.controller_image_tag : var.slinky_controller_image_tag
   slinky_login_image_tag        = var.slinky_login_image_tag == "auto" ? local.slinky_image_profile.login_image_tag : var.slinky_login_image_tag
   slinky_sssd_image_tag         = var.slinky_sssd_image_tag == "auto" ? local.slinky_image_profile.sssd_image_tag : var.slinky_sssd_image_tag
+
+  slinky_accounting_image_repository = var.slinky_accounting_image_repository == "auto" ? local.slinky_image_profile.accounting_image_repository : var.slinky_accounting_image_repository
+  slinky_restapi_image_repository    = var.slinky_restapi_image_repository == "auto" ? local.slinky_image_profile.restapi_image_repository : var.slinky_restapi_image_repository
+  slinky_sssd_image_repository       = var.slinky_sssd_image_repository == "auto" ? local.slinky_image_profile.sssd_image_repository : var.slinky_sssd_image_repository
+
+  # Operator + webhook images custom-built from SlinkyProject/slurm-operator
+  # v1.1.1 into our registry (build-control-plane-images.sh). Merged into the
+  # operator Helm values so the operator pods also come from our registry.
+  slinky_operator_image_values = <<-EOT
+    operator:
+      image:
+        repository: iad.ocir.io/idxzjcdglx2s/slurm-operator
+        tag: "1.1.1"
+    webhook:
+      image:
+        repository: iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook
+        tag: "1.1.1"
+  EOT
 
   slinky_worker_image_tag = var.slinky_worker_image_tag == "auto" ? (
     local.slinky_is_amd ? local.slinky_image_profile.amd_worker_tag : local.slinky_image_profile.nvidia_worker_tag
