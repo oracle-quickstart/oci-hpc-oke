@@ -60,7 +60,6 @@ variableGroups:
       - worker_gpu_node_cycling_max_surge
       - worker_gpu_node_cycling_max_unavailable
       - worker_gpu_node_cycling_mode
-      - worker_rdma_use_compute_cluster
       - worker_rdma_host_group_id
       # Networking
       - subnet_advanced_attrs
@@ -245,6 +244,7 @@ variableGroups:
   - title: "Worker Pool: GPU with RDMA"
     variables:
       - worker_rdma_enabled
+      - worker_rdma_use_compute_cluster
       - worker_rdma_ad
       - worker_rdma_pool_size
       - worker_rdma_shape
@@ -2104,6 +2104,12 @@ variables:
     title: Create GPU with RDMA pool
     type: boolean
     description: Create a worker pool with Cluster Network placement for RDMA networking.
+  worker_rdma_use_compute_cluster:
+    title: Use compute cluster
+    description: Use a Compute Cluster instead of Cluster Network placement for the GPU with RDMA worker pool.
+    type: boolean
+    default: false
+    visible: ${worker_rdma_enabled}
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
