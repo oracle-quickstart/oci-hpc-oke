@@ -282,9 +282,9 @@ NCCL_JOB_ID="$(sbatch --parsable \
   --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
   "$HOME/nccl-slurm.sh")"
 
-timeout 300 bash -c \
-  'until [[ -e "$1" ]]; do sleep 5; done' \
-  bash "$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
+timeout 1800 bash -c \
+  'while [[ -n "$(squeue -h -j "$1" 2>/dev/null)" ]]; do echo "Waiting for job $1..."; sleep 5; done' \
+  bash "$NCCL_JOB_ID"
 tail -n 120 "$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 ```
 
@@ -537,8 +537,8 @@ export NCCL_JOB_ID="$(
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c \
-    "timeout 300 bash -c 'until [[ -e \"\$1\" ]]; do sleep 5; done' bash \
-      \$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
+    "timeout 1800 bash -c 'while [[ -n \"\$(squeue -h -j \"\$1\" 2>/dev/null)\" ]]; do echo \"Waiting for job \$1...\"; sleep 5; done' bash \
+      ${NCCL_JOB_ID}"
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "tail -n 120 \$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 ```
@@ -825,9 +825,9 @@ RCCL_JOB_ID="$(sbatch --parsable \
   --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
   "$HOME/rccl-slurm.sh")"
 
-timeout 300 bash -c \
-  'until [[ -e "$1" ]]; do sleep 5; done' \
-  bash "$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
+timeout 1800 bash -c \
+  'while [[ -n "$(squeue -h -j "$1" 2>/dev/null)" ]]; do echo "Waiting for job $1..."; sleep 5; done' \
+  bash "$RCCL_JOB_ID"
 tail -n 120 "$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 ```
 
@@ -1028,8 +1028,8 @@ export RCCL_JOB_ID="$(
 
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c \
-    "timeout 300 bash -c 'until [[ -e \"\$1\" ]]; do sleep 5; done' bash \
-      \$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
+    "timeout 1800 bash -c 'while [[ -n \"\$(squeue -h -j \"\$1\" 2>/dev/null)\" ]]; do echo \"Waiting for job \$1...\"; sleep 5; done' bash \
+      ${RCCL_JOB_ID}"
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "tail -n 120 \$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 ```
