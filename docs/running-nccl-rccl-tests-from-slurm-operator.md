@@ -123,8 +123,8 @@ sacctmgr -nP show user "$(whoami)" format=User,DefaultAccount,AdminLevel
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate a GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 SMOKE_JOB_ID="$(sbatch --wait --parsable \
@@ -138,15 +138,10 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
   --output="$HOME/nccl-smoke-%j.out" \
   --wrap='nvidia-smi')"
 
-echo "$SMOKE_JOB_ID"
-
-sacct -j "$SMOKE_JOB_ID" \
-  --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`nvidia-smi` table listing the allocated GPU.
+The output should be the `nvidia-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
@@ -383,8 +378,8 @@ kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate a GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 export SMOKE_JOB_ID="$(
@@ -402,18 +397,11 @@ export SMOKE_JOB_ID="$(
         --wrap='nvidia-smi'"
 )"
 
-echo "$SMOKE_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" \
-    --format=JobID,JobName,Partition,Account,State,ExitCode -P
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "cat \$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`nvidia-smi` table listing the allocated GPU.
+The output should be the `nvidia-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
@@ -754,8 +742,8 @@ sacctmgr -nP show user "$(whoami)" format=User,DefaultAccount,AdminLevel
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate an AMD GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 SMOKE_JOB_ID="$(sbatch --wait --parsable \
@@ -769,15 +757,10 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
   --output="$HOME/rccl-smoke-%j.out" \
   --wrap='rocm-smi')"
 
-echo "$SMOKE_JOB_ID"
-
-sacct -j "$SMOKE_JOB_ID" \
-  --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`rocm-smi` table listing the allocated GPU.
+The output should be the `rocm-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
@@ -962,8 +945,8 @@ kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate an AMD GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 export SMOKE_JOB_ID="$(
@@ -981,18 +964,11 @@ export SMOKE_JOB_ID="$(
         --wrap='rocm-smi'"
 )"
 
-echo "$SMOKE_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" \
-    --format=JobID,JobName,Partition,Account,State,ExitCode -P
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c "cat \$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`rocm-smi` table listing the allocated GPU.
+The output should be the `rocm-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
