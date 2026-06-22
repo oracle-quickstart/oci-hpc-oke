@@ -85,6 +85,11 @@ ssh <user>@<login-pod-external-ip>
 If you do not have a user account in the login pod yet, create one by following
 [Slurm User Onboarding](./slurm-operator-user-onboarding.md).
 
+The examples below match the onboarding quick start: user `alice` in the default
+Slurm account `users`. If you passed `--account <name>` to
+`slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
+steps, set `SLURM_ACCOUNT` to that account instead.
+
 ## NCCL Tests (NVIDIA GPU shapes)
 
 This section uses the NVIDIA GPU worker image, which ships `all_reduce_perf`
@@ -103,7 +108,7 @@ export LOGIN_CONTAINER=login
 export WORKER_CONTAINER=slurmd
 
 export SLURM_USER=alice
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export NCCL_NODES=2
@@ -125,7 +130,7 @@ export GPU_WORKER_POD="$(
 From inside the login pod you only need the job parameters:
 
 ```bash
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export NCCL_NODES=2
@@ -649,7 +654,7 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
 
-sbatch --partition=gpu --account=project-a "$HOME/nccl-pyxis.sh"
+sbatch --partition=gpu --account=users "$HOME/nccl-pyxis.sh"
 ```
 
 The first run imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
@@ -682,7 +687,7 @@ export LOGIN_CONTAINER=login
 export WORKER_CONTAINER=slurmd
 
 export SLURM_USER=alice
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export RCCL_NODES=2
@@ -704,7 +709,7 @@ export GPU_WORKER_POD="$(
 From inside the login pod you only need the job parameters:
 
 ```bash
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export RCCL_NODES=2
@@ -1127,7 +1132,7 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/rccl-pyxis.sh"
 
-sbatch --partition=gpu --account=project-a "$HOME/rccl-pyxis.sh"
+sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
 ```
 
 ## Troubleshooting
