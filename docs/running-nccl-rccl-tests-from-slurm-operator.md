@@ -548,11 +548,14 @@ A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 ### Example Output
 
 This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks
-(avg bus bandwidth ~189 GB/s):
+(avg bus bandwidth ~186 GB/s). Some `NCCL WARN NET/MLX5` /
+`Spectrum-X (SPCX)` warnings may appear before the table; the successful result
+is the final bandwidth table with `#wrong` equal to `0` and the collective
+conclusion line.
 
 ```text
 shape=BM.GPU.B4.8
-SLURM_JOB_NODELIST=inst-vfj93-oke-rdma,inst-e8gjz-oke-rdma
+SLURM_JOB_NODELIST=oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-[0-1]
 SLURM_NTASKS=16
 /opt/hpcx/ompi/bin/mpirun
 EXEC_CMD=/opt/nccl-tests/bin/all_reduce_perf
@@ -561,18 +564,19 @@ EXEC_CMD=/opt/nccl-tests/bin/all_reduce_perf
 # nThread 1 nGpus 1 minBytes 1073741824 maxBytes 10737418240 step: 9663676416(bytes) warmup iters: 1 iters: 100 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
-#  Rank  0 Group  0 Pid   1584 on inst-vfj93-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
-#  Rank  7 Group  0 Pid   1598 on inst-vfj93-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
-#  Rank  8 Group  0 Pid   1088 on inst-e8gjz-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
-#  Rank 15 Group  0 Pid   1100 on inst-e8gjz-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+#  Rank  0 Group  0 Pid   2574 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-0 device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank  7 Group  0 Pid   2581 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-0 device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+#  Rank  8 Group  0 Pid   2087 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-1 device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank 15 Group  0 Pid   2101 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-1 device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
 NCCL version 2.29.3+cuda13.1
 #
+#                                                              out-of-place                       in-place
 #       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
 #        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
-  1073741824     268435456     float     sum      -1  10785.4   99.56  186.67       0  10770.9   99.69  186.92       0
- 10737418240    2684354560     float     sum      -1   105287  101.98  191.22       0   105285  101.98  191.22       0
+  1073741824     268435456     float     sum      -1  10920.1   98.33  184.36       0  10940.7   98.14  184.02       0
+ 10737418240    2684354560     float     sum      -1   106972  100.38  188.21       0   106854  100.49  188.41       0
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 189.005
+# Avg bus bandwidth    : 186.25
 #
 # Collective test concluded: all_reduce_perf
 ```
