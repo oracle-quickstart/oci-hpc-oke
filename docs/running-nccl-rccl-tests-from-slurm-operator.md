@@ -27,26 +27,20 @@ You can run either test in two ways:
   run `sinfo`, `sbatch`, and friends directly. Use this for an interactive
   workflow once you are shelled into the pod.
 
-Both methods submit the same job and produce the same result. Each step below
-shows both forms; pick one.
+Each test is split into two complete workflows. Pick one workflow and run that
+path end to end; you do not need to run both.
 
 ## Contents
 
 - [Prerequisites](#prerequisites)
 - [NCCL Tests (NVIDIA GPU shapes)](#nccl-tests-nvidia-gpu-shapes)
-  - [Set Variables](#set-variables)
-  - [Validate Slurm and the Worker Image](#validate-slurm-and-the-worker-image)
-  - [Optional One-GPU Smoke Test (nvidia-smi)](#optional-one-gpu-smoke-test-nvidia-smi)
-  - [Create the Slurm Batch Script](#create-the-slurm-batch-script)
-  - [Submit the Job](#submit-the-job)
+  - [From the Login Pod](#from-the-login-pod)
+  - [From the Operator Node](#from-the-operator-node)
   - [Example Output](#example-output)
   - [Running via Pyxis (containerized)](#running-via-pyxis-containerized)
 - [RCCL Tests (AMD GPU shapes)](#rccl-tests-amd-gpu-shapes)
-  - [Set Variables](#set-variables-1)
-  - [Validate Slurm and the Worker Image](#validate-slurm-and-the-worker-image-1)
-  - [Optional One-GPU Smoke Test (rocm-smi)](#optional-one-gpu-smoke-test-rocm-smi)
-  - [Create the Slurm Batch Script](#create-the-slurm-batch-script-1)
-  - [Submit the Job](#submit-the-job-1)
+  - [From the Login Pod](#from-the-login-pod-1)
+  - [From the Operator Node](#from-the-operator-node-1)
   - [Example Output](#example-output-1)
   - [Running via Pyxis (containerized)](#running-via-pyxis-containerized-1)
 - [Troubleshooting](#troubleshooting)
@@ -85,68 +79,38 @@ ssh <user>@<login-pod-external-ip>
 If you do not have a user account in the login pod yet, create one by following
 [Slurm User Onboarding](./slurm-operator-user-onboarding.md).
 
+The examples below match the onboarding quick start: user `alice` in the default
+Slurm account `users`. If you passed `--account <name>` to
+`slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
+steps, set `SLURM_ACCOUNT` to that account instead.
+
 ## NCCL Tests (NVIDIA GPU shapes)
 
 This section uses the NVIDIA GPU worker image, which ships `all_reduce_perf`
 under `/opt/nccl-tests/bin` and OpenMPI for rank launch.
 
-### Set Variables
+Pick one workflow and run it end to end. Use **From the login pod** when you can
+SSH to the Slurm login service. Use **From the operator node** when you only have
+`kubectl` access to the cluster.
 
-From the operator host or another shell with `kubectl` access:
+### From the Login Pod
 
-```bash
-export PATH=/home/ubuntu/bin:$PATH
-export OCI_CLI_AUTH=instance_principal
+Run these commands after SSHing to the login pod as the Slurm user, for example
+`ssh alice@<login-pod-external-ip>`.
 
-export SLURM_NAMESPACE=slurm
-export LOGIN_CONTAINER=login
-export WORKER_CONTAINER=slurmd
-
-export SLURM_USER=alice
-export SLURM_ACCOUNT=project-a
-export SLURM_PARTITION=gpu
-
-export NCCL_NODES=2
-export GPUS_PER_NODE=8
-
-export LOGIN_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/name=login \
-    -o jsonpath='{.items[0].metadata.name}'
-)"
-
-export GPU_WORKER_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/instance=slurm-worker-gpu \
-    -o jsonpath='{.items[0].metadata.name}'
-)"
-```
-
-From inside the login pod you only need the job parameters:
+#### Set Variables
 
 ```bash
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export NCCL_NODES=2
 export GPUS_PER_NODE=8
 ```
 
-### Validate Slurm and the Worker Image
+#### Validate Slurm
 
 Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
-
-From the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sinfo -Nel
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  scontrol show partition "$SLURM_PARTITION"
-```
-
-From inside the login pod:
 
 ```bash
 sinfo -Nel
@@ -154,67 +118,13 @@ scontrol show partition "$SLURM_PARTITION"
 sacctmgr -nP show user "$(whoami)" format=User,DefaultAccount,AdminLevel
 ```
 
-Check that the worker image has the NCCL test binary, CUDA/NCCL libraries, and
-the RDMA device mount (this is a pod-level check that needs `kubectl` access to
-the worker pod, so run it from the operator node):
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$GPU_WORKER_POD" -c "$WORKER_CONTAINER" -- \
-  bash -lc '
-    command -v mpirun
-    command -v nvidia-smi
-    command -v jq
-    nvidia-smi -L
-    ls -ld /dev/infiniband
-    ls -l /opt/nccl-tests/bin/all_reduce_perf
-    ls -l /opt/nccl-tests/env.sh
-    ls -l /opt/nccl-tests/lib/libcudart.so* /opt/nccl-tests/lib/libnccl.so*
-  '
-```
-
-Check the Slurm user association from the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacctmgr -nP show user "$SLURM_USER" format=User,DefaultAccount,AdminLevel
-```
-
-### Optional One-GPU Smoke Test (nvidia-smi)
+#### Optional One-GPU Smoke Test (nvidia-smi)
 
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate a GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
-
-From the operator node:
-
-```bash
-export SMOKE_JOB_ID="$(
-  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-    su - "$SLURM_USER" -c \
-      "sbatch --wait --parsable \
-        --account=${SLURM_ACCOUNT} \
-        --partition=${SLURM_PARTITION} \
-        --nodes=1 \
-        --ntasks=1 \
-        --gres=gpu:1 \
-        --time=00:05:00 \
-        --job-name=nccl-smoke \
-        --output=\$HOME/nccl-smoke-%j.out \
-        --wrap='nvidia-smi'"
-)"
-
-echo "$SMOKE_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c "cat \$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
-```
-
-From inside the login pod:
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 SMOKE_JOB_ID="$(sbatch --wait --parsable \
@@ -228,16 +138,12 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
   --output="$HOME/nccl-smoke-%j.out" \
   --wrap='nvidia-smi')"
 
-echo "$SMOKE_JOB_ID"
-
-sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`nvidia-smi` table listing the allocated GPU.
+The output should be the `nvidia-smi` table listing the allocated GPU.
 
-### Create the Slurm Batch Script
+#### Create the Slurm Batch Script
 
 The following script uses Slurm for allocation and OpenMPI `mpirun` for rank
 launch inside that allocation. Do not run the MPI-enabled `all_reduce_perf`
@@ -260,116 +166,6 @@ in the worker image.
 
 Set `EXEC=all_gather_perf` (or another `*_perf` binary) in the job environment
 to run a different collective; it defaults to `all_reduce_perf`.
-
-The script body is the same for both run methods. From the operator node, write
-it with `kubectl exec ... su - "$SLURM_USER" -c 'cat > ...'`; from inside the
-login pod, write it directly with a heredoc.
-
-From the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c 'cat > "$HOME/nccl-slurm.sh" && chmod 755 "$HOME/nccl-slurm.sh"' <<'EOF'
-#!/bin/bash
-#SBATCH --job-name=nccl-slurm
-#SBATCH --time=00:20:00
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
-
-set -uxo pipefail
-: "${GPUS_PER_NODE:=8}"
-
-# NCCL + HPCX (OpenMPI/UCX) + nccl-tests paths from the worker image
-source /opt/nccl-tests/env.sh
-
-# all_reduce_perf by default; override with EXEC=all_gather_perf (binaries in $NCCL_TEST_HOME/bin)
-EXEC_CMD="${NCCL_TEST_HOME}/bin/${EXEC:-all_reduce_perf}"
-[[ -x "${EXEC_CMD}" ]] || { echo "Test executable ${EXEC_CMD} not found!"; exit 1; }
-
-# HPCX NCCL net plugin in the image (used by the H100/H200/B200/B300 profile)
-HPCX_NET_PLUGIN=/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
-[[ -f "${HPCX_NET_PLUGIN}" ]] || HPCX_NET_PLUGIN=none
-
-export NCCL_DEBUG=WARN
-
-# GPU worker pods use hostNetwork, so IMDS (169.254.169.254) is reachable and jq ships in the image.
-shape="$(curl -sH "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/ | jq -r .shape)"
-echo "shape=${shape}"
-
-case "${shape}" in
-  BM.GPU.B4.8|BM.GPU.A100-v2.8)
-    var_UCX_NET_DEVICES=mlx5_0:1
-    var_NCCL_IB_HCA="=mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12" ;;
-  BM.GPU4.8)
-    var_UCX_NET_DEVICES=mlx5_4:1
-    var_NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_6,mlx5_8,mlx5_10,mlx5_12,mlx5_14,mlx5_16,mlx5_1,mlx5_3,mlx5_7,mlx5_9,mlx5_11,mlx5_13,mlx5_15,mlx5_17" ;;
-  BM.GPU.H100.8)
-    var_UCX_NET_DEVICES=eth0
-    var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17" ;;
-  BM.GPU.H200.8|BM.GPU.B200.8)
-    var_UCX_NET_DEVICES=eth0
-    var_NCCL_IB_HCA="=mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11" ;;
-  BM.GPU.B300.8)
-    var_UCX_NET_DEVICES=eth0
-    var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_12,mlx5_13,mlx5_14,mlx5_16,mlx5_17,mlx5_18,mlx5_19,mlx5_20,mlx5_21" ;;
-  *)
-    echo "Unsupported shape ${shape}; set var_UCX_NET_DEVICES and var_NCCL_IB_HCA manually."; exit 1 ;;
-esac
-
-echo "date=$(date -Is)"
-echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
-echo "SLURM_NTASKS=${SLURM_NTASKS}"
-scontrol show hostnames "${SLURM_JOB_NODELIST}"
-which mpirun
-echo "EXEC_CMD=${EXEC_CMD}"
-
-case "${shape}" in
-  BM.GPU.B4.8|BM.GPU.A100-v2.8|BM.GPU4.8)
-    mpirun --mca pml ucx \
-      --bind-to numa \
-      --mca coll ^hcoll \
-      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
-      -x NCCL_DEBUG \
-      -x NCCL_IB_SL=0 \
-      -x NCCL_IB_TC=41 \
-      -x NCCL_IB_QPS_PER_CONNECTION=4 \
-      -x UCX_TLS=ud,self,sm \
-      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
-      -x HCOLL_ENABLE_MCAST_ALL=0 \
-      -x coll_hcoll_enable=0 \
-      -x NCCL_IB_GID_INDEX=3 \
-      -x NCCL_ALGO=Ring \
-      -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
-      "${EXEC_CMD}" -b 1G -e 10G -i $((1024*1024*1024*9)) -n 100 ;;
-  BM.GPU.H100.8|BM.GPU.H200.8|BM.GPU.B200.8|BM.GPU.B300.8)
-    mpirun --mca pml ucx \
-      --bind-to numa \
-      --mca coll ^hcoll \
-      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
-      -x NCCL_DEBUG \
-      -x NCCL_CUMEM_ENABLE=0 \
-      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-      -x NCCL_IB_QPS_PER_CONNECTION=1 \
-      -x NCCL_IB_GID_INDEX=3 \
-      -x NCCL_IB_TC=41 \
-      -x NCCL_IB_SL=0 \
-      -x NCCL_IB_TIMEOUT=22 \
-      -x NCCL_NET_PLUGIN=${HPCX_NET_PLUGIN} \
-      -x HCOLL_ENABLE_MCAST_ALL=0 \
-      -x coll_hcoll_enable=0 \
-      -x UCX_TLS=tcp \
-      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
-      -x RX_QUEUE_LEN=8192 \
-      -x IB_RX_QUEUE_LEN=8192 \
-      -x NCCL_SOCKET_IFNAME=${var_UCX_NET_DEVICES} \
-      -x NCCL_IGNORE_CPU_AFFINITY=1 \
-      -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
-      "${EXEC_CMD}" -b 1G -e 16G -f 2 -g 1 -n 50 ;;
-esac
-EOF
-```
-
-From inside the login pod:
 
 ```bash
 cat > "$HOME/nccl-slurm.sh" <<'EOF'
@@ -473,9 +269,256 @@ EOF
 chmod 755 "$HOME/nccl-slurm.sh"
 ```
 
-### Submit the Job
+#### Submit the Job
 
-From the operator node:
+```bash
+NCCL_JOB_ID="$(sbatch --parsable \
+  --account="${SLURM_ACCOUNT}" \
+  --partition="${SLURM_PARTITION}" \
+  --nodes="${NCCL_NODES}" \
+  --ntasks-per-node="${GPUS_PER_NODE}" \
+  --gres=gpu:"${GPUS_PER_NODE}" \
+  --exclusive \
+  --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
+  "$HOME/nccl-slurm.sh")"
+
+timeout 1800 bash -c \
+  'while [[ -n "$(squeue -h -j "$1" 2>/dev/null)" ]]; do echo "Waiting for job $1..."; sleep 5; done' \
+  bash "$NCCL_JOB_ID"
+tail -n 120 "$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
+```
+
+A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
+
+### From the Operator Node
+
+Run these commands from the operator node or another shell with `kubectl` access.
+Commands that act as the Slurm user are wrapped in `su - "$SLURM_USER" -c`.
+
+#### Set Variables
+
+```bash
+export PATH=/home/ubuntu/bin:$PATH
+export OCI_CLI_AUTH=instance_principal
+
+export SLURM_NAMESPACE=slurm
+export LOGIN_CONTAINER=login
+export WORKER_CONTAINER=slurmd
+
+export SLURM_USER=alice
+export SLURM_ACCOUNT=users
+export SLURM_PARTITION=gpu
+
+export NCCL_NODES=2
+export GPUS_PER_NODE=8
+
+export LOGIN_POD="$(
+  kubectl -n "$SLURM_NAMESPACE" get pods \
+    -l app.kubernetes.io/name=login \
+    -o jsonpath='{.items[0].metadata.name}'
+)"
+
+export GPU_WORKER_POD="$(
+  kubectl -n "$SLURM_NAMESPACE" get pods \
+    -l app.kubernetes.io/instance=slurm-worker-gpu \
+    -o jsonpath='{.items[0].metadata.name}'
+)"
+```
+
+#### Validate Slurm and the Worker Image
+
+Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sinfo -Nel
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  scontrol show partition "$SLURM_PARTITION"
+```
+
+Check that the worker image has the NCCL test binary, CUDA/NCCL libraries, and
+the RDMA device mount (this is a pod-level check that needs `kubectl` access to
+the worker pod, so run it from the operator node):
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$GPU_WORKER_POD" -c "$WORKER_CONTAINER" -- \
+  bash -lc '
+    command -v mpirun
+    command -v nvidia-smi
+    command -v jq
+    nvidia-smi -L
+    ls -ld /dev/infiniband
+    ls -l /opt/nccl-tests/bin/all_reduce_perf
+    ls -l /opt/nccl-tests/env.sh
+    ls -l /opt/nccl-tests/lib/libcudart.so* /opt/nccl-tests/lib/libnccl.so*
+  '
+```
+
+Check the Slurm user association from the operator node:
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sacctmgr -nP show user "$SLURM_USER" format=User,DefaultAccount,AdminLevel
+```
+
+#### Optional One-GPU Smoke Test (nvidia-smi)
+
+Run a small single-rank job before the full multi-node test. This proves Slurm
+can allocate a GPU and that the GPU is visible to the job.
+
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
+
+```bash
+export SMOKE_JOB_ID="$(
+  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+    su - "$SLURM_USER" -c \
+      "sbatch --wait --parsable \
+        --account=${SLURM_ACCOUNT} \
+        --partition=${SLURM_PARTITION} \
+        --nodes=1 \
+        --ntasks=1 \
+        --gres=gpu:1 \
+        --time=00:05:00 \
+        --job-name=nccl-smoke \
+        --output=\$HOME/nccl-smoke-%j.out \
+        --wrap='nvidia-smi'"
+)"
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c "cat \$HOME/nccl-smoke-${SMOKE_JOB_ID}.out"
+```
+
+The output should be the `nvidia-smi` table listing the allocated GPU.
+
+#### Create the Slurm Batch Script
+
+The following script uses Slurm for allocation and OpenMPI `mpirun` for rank
+launch inside that allocation. Do not run the MPI-enabled `all_reduce_perf`
+directly with `srun` unless your image's OpenMPI build is known to support the
+cluster's Slurm PMI/PMIx setup.
+
+The script sources `/opt/nccl-tests/env.sh` for the NCCL, HPCX (OpenMPI/UCX),
+and nccl-tests paths, then detects the OCI GPU shape and applies the matching
+`NCCL_IB_HCA` / `UCX_NET_DEVICES` tuning. It covers `BM.GPU.B4.8`,
+`BM.GPU.A100-v2.8`, `BM.GPU4.8`, `BM.GPU.H100.8`, `BM.GPU.H200.8`,
+`BM.GPU.B200.8`, and `BM.GPU.B300.8`, with two `mpirun` profiles: an A100-class
+profile (B4.8 / A100-v2.8 / GPU4.8) and an H100-and-newer profile
+(H100 / H200 / B200 / B300). The HCA lists match the per-shape manifests in
+[`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/); add a `case`
+arm there to support another shape.
+
+Shape detection reads the OCI instance metadata service at `169.254.169.254`.
+The GPU worker pods run with `hostNetwork`, so IMDS is reachable, and `jq` ships
+in the worker image.
+
+Set `EXEC=all_gather_perf` (or another `*_perf` binary) in the job environment
+to run a different collective; it defaults to `all_reduce_perf`.
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c 'cat > "$HOME/nccl-slurm.sh" && chmod 755 "$HOME/nccl-slurm.sh"' <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=nccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -uxo pipefail
+: "${GPUS_PER_NODE:=8}"
+
+# NCCL + HPCX (OpenMPI/UCX) + nccl-tests paths from the worker image
+source /opt/nccl-tests/env.sh
+
+# all_reduce_perf by default; override with EXEC=all_gather_perf (binaries in $NCCL_TEST_HOME/bin)
+EXEC_CMD="${NCCL_TEST_HOME}/bin/${EXEC:-all_reduce_perf}"
+[[ -x "${EXEC_CMD}" ]] || { echo "Test executable ${EXEC_CMD} not found!"; exit 1; }
+
+# HPCX NCCL net plugin in the image (used by the H100/H200/B200/B300 profile)
+HPCX_NET_PLUGIN=/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
+[[ -f "${HPCX_NET_PLUGIN}" ]] || HPCX_NET_PLUGIN=none
+
+export NCCL_DEBUG=WARN
+
+# GPU worker pods use hostNetwork, so IMDS (169.254.169.254) is reachable and jq ships in the image.
+shape="$(curl -sH "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/ | jq -r .shape)"
+echo "shape=${shape}"
+
+case "${shape}" in
+  BM.GPU.B4.8|BM.GPU.A100-v2.8)
+    var_UCX_NET_DEVICES=mlx5_0:1
+    var_NCCL_IB_HCA="=mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_14,mlx5_15,mlx5_16,mlx5_17,mlx5_9,mlx5_10,mlx5_11,mlx5_12" ;;
+  BM.GPU4.8)
+    var_UCX_NET_DEVICES=mlx5_4:1
+    var_NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_6,mlx5_8,mlx5_10,mlx5_12,mlx5_14,mlx5_16,mlx5_1,mlx5_3,mlx5_7,mlx5_9,mlx5_11,mlx5_13,mlx5_15,mlx5_17" ;;
+  BM.GPU.H100.8)
+    var_UCX_NET_DEVICES=eth0
+    var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17" ;;
+  BM.GPU.H200.8|BM.GPU.B200.8)
+    var_UCX_NET_DEVICES=eth0
+    var_NCCL_IB_HCA="=mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11" ;;
+  BM.GPU.B300.8)
+    var_UCX_NET_DEVICES=eth0
+    var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_12,mlx5_13,mlx5_14,mlx5_16,mlx5_17,mlx5_18,mlx5_19,mlx5_20,mlx5_21" ;;
+  *)
+    echo "Unsupported shape ${shape}; set var_UCX_NET_DEVICES and var_NCCL_IB_HCA manually."; exit 1 ;;
+esac
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+echo "EXEC_CMD=${EXEC_CMD}"
+
+case "${shape}" in
+  BM.GPU.B4.8|BM.GPU.A100-v2.8|BM.GPU4.8)
+    mpirun --mca pml ucx \
+      --bind-to numa \
+      --mca coll ^hcoll \
+      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+      -x NCCL_DEBUG \
+      -x NCCL_IB_SL=0 \
+      -x NCCL_IB_TC=41 \
+      -x NCCL_IB_QPS_PER_CONNECTION=4 \
+      -x UCX_TLS=ud,self,sm \
+      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
+      -x HCOLL_ENABLE_MCAST_ALL=0 \
+      -x coll_hcoll_enable=0 \
+      -x NCCL_IB_GID_INDEX=3 \
+      -x NCCL_ALGO=Ring \
+      -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
+      "${EXEC_CMD}" -b 1G -e 10G -i $((1024*1024*1024*9)) -n 100 ;;
+  BM.GPU.H100.8|BM.GPU.H200.8|BM.GPU.B200.8|BM.GPU.B300.8)
+    mpirun --mca pml ucx \
+      --bind-to numa \
+      --mca coll ^hcoll \
+      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+      -x NCCL_DEBUG \
+      -x NCCL_CUMEM_ENABLE=0 \
+      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+      -x NCCL_IB_QPS_PER_CONNECTION=1 \
+      -x NCCL_IB_GID_INDEX=3 \
+      -x NCCL_IB_TC=41 \
+      -x NCCL_IB_SL=0 \
+      -x NCCL_IB_TIMEOUT=22 \
+      -x NCCL_NET_PLUGIN=${HPCX_NET_PLUGIN} \
+      -x HCOLL_ENABLE_MCAST_ALL=0 \
+      -x coll_hcoll_enable=0 \
+      -x UCX_TLS=tcp \
+      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
+      -x RX_QUEUE_LEN=8192 \
+      -x IB_RX_QUEUE_LEN=8192 \
+      -x NCCL_SOCKET_IFNAME=${var_UCX_NET_DEVICES} \
+      -x NCCL_IGNORE_CPU_AFFINITY=1 \
+      -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
+      "${EXEC_CMD}" -b 1G -e 16G -f 2 -g 1 -n 50 ;;
+esac
+EOF
+```
+
+#### Submit the Job
 
 ```bash
 export NCCL_JOB_ID="$(
@@ -492,42 +535,12 @@ export NCCL_JOB_ID="$(
         \$HOME/nccl-slurm.sh"
 )"
 
-echo "$NCCL_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  squeue -j "$NCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$NCCL_JOB_ID" \
-    --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c \
-    "tail -n 120 \$HOME/nccl-slurm-${NCCL_JOB_ID}.out; tail -n 120 \$HOME/nccl-slurm-${NCCL_JOB_ID}.err"
-```
-
-From inside the login pod:
-
-```bash
-NCCL_JOB_ID="$(sbatch --parsable \
-  --account="${SLURM_ACCOUNT}" \
-  --partition="${SLURM_PARTITION}" \
-  --nodes="${NCCL_NODES}" \
-  --ntasks-per-node="${GPUS_PER_NODE}" \
-  --gres=gpu:"${GPUS_PER_NODE}" \
-  --exclusive \
-  --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
-  "$HOME/nccl-slurm.sh")"
-
-echo "$NCCL_JOB_ID"
-
-squeue -j "$NCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
-
-sacct -j "$NCCL_JOB_ID" \
-  --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
-
-tail -n 120 "$HOME/nccl-slurm-${NCCL_JOB_ID}.out" \
-            "$HOME/nccl-slurm-${NCCL_JOB_ID}.err"
+    "timeout 1800 bash -c 'while [[ -n \"\$(squeue -h -j \"\$1\" 2>/dev/null)\" ]]; do echo \"Waiting for job \$1...\"; sleep 5; done' bash \
+      ${NCCL_JOB_ID}"
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c "tail -n 120 \$HOME/nccl-slurm-${NCCL_JOB_ID}.out"
 ```
 
 A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
@@ -535,11 +548,14 @@ A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 ### Example Output
 
 This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks
-(avg bus bandwidth ~189 GB/s):
+(avg bus bandwidth ~186 GB/s). Some `NCCL WARN NET/MLX5` /
+`Spectrum-X (SPCX)` warnings may appear before the table; the successful result
+is the final bandwidth table with `#wrong` equal to `0` and the collective
+conclusion line.
 
 ```text
 shape=BM.GPU.B4.8
-SLURM_JOB_NODELIST=inst-vfj93-oke-rdma,inst-e8gjz-oke-rdma
+SLURM_JOB_NODELIST=oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-[0-1]
 SLURM_NTASKS=16
 /opt/hpcx/ompi/bin/mpirun
 EXEC_CMD=/opt/nccl-tests/bin/all_reduce_perf
@@ -548,18 +564,19 @@ EXEC_CMD=/opt/nccl-tests/bin/all_reduce_perf
 # nThread 1 nGpus 1 minBytes 1073741824 maxBytes 10737418240 step: 9663676416(bytes) warmup iters: 1 iters: 100 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
-#  Rank  0 Group  0 Pid   1584 on inst-vfj93-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
-#  Rank  7 Group  0 Pid   1598 on inst-vfj93-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
-#  Rank  8 Group  0 Pid   1088 on inst-e8gjz-oke-rdma device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
-#  Rank 15 Group  0 Pid   1100 on inst-e8gjz-oke-rdma device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+#  Rank  0 Group  0 Pid   2574 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-0 device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank  7 Group  0 Pid   2581 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-0 device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
+#  Rank  8 Group  0 Pid   2087 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-1 device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
+#  Rank 15 Group  0 Pid   2101 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-1 device  7 [0000:da:00] NVIDIA A100-SXM4-40GB
 NCCL version 2.29.3+cuda13.1
 #
+#                                                              out-of-place                       in-place
 #       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
 #        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
-  1073741824     268435456     float     sum      -1  10785.4   99.56  186.67       0  10770.9   99.69  186.92       0
- 10737418240    2684354560     float     sum      -1   105287  101.98  191.22       0   105285  101.98  191.22       0
+  1073741824     268435456     float     sum      -1  10920.1   98.33  184.36       0  10940.7   98.14  184.02       0
+ 10737418240    2684354560     float     sum      -1   106972  100.38  188.21       0   106854  100.49  188.41       0
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 189.005
+# Avg bus bandwidth    : 186.25
 #
 # Collective test concluded: all_reduce_perf
 ```
@@ -649,7 +666,7 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
 
-sbatch --partition=gpu --account=project-a "$HOME/nccl-pyxis.sh"
+sbatch --partition=gpu --account=users "$HOME/nccl-pyxis.sh"
 ```
 
 The first run imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
@@ -669,63 +686,28 @@ sets the ROCm, OpenMPI, and rccl-tests paths.
 RCCL reuses the `NCCL_*` environment variable names, so the tuning variables
 below look like the NCCL ones but apply to RCCL.
 
-### Set Variables
+Pick one workflow and run it end to end. Use **From the login pod** when you can
+SSH to the Slurm login service. Use **From the operator node** when you only have
+`kubectl` access to the cluster.
 
-From the operator host or another shell with `kubectl` access:
+### From the Login Pod
 
-```bash
-export PATH=/home/ubuntu/bin:$PATH
-export OCI_CLI_AUTH=instance_principal
+Run these commands after SSHing to the login pod as the Slurm user, for example
+`ssh alice@<login-pod-external-ip>`.
 
-export SLURM_NAMESPACE=slurm
-export LOGIN_CONTAINER=login
-export WORKER_CONTAINER=slurmd
-
-export SLURM_USER=alice
-export SLURM_ACCOUNT=project-a
-export SLURM_PARTITION=gpu
-
-export RCCL_NODES=2
-export GPUS_PER_NODE=8
-
-export LOGIN_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/name=login \
-    -o jsonpath='{.items[0].metadata.name}'
-)"
-
-export GPU_WORKER_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/instance=slurm-worker-gpu \
-    -o jsonpath='{.items[0].metadata.name}'
-)"
-```
-
-From inside the login pod you only need the job parameters:
+#### Set Variables
 
 ```bash
-export SLURM_ACCOUNT=project-a
+export SLURM_ACCOUNT=users
 export SLURM_PARTITION=gpu
 
 export RCCL_NODES=2
 export GPUS_PER_NODE=8
 ```
 
-### Validate Slurm and the Worker Image
+#### Validate Slurm
 
 Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
-
-From the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sinfo -Nel
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  scontrol show partition "$SLURM_PARTITION"
-```
-
-From inside the login pod:
 
 ```bash
 sinfo -Nel
@@ -733,65 +715,13 @@ scontrol show partition "$SLURM_PARTITION"
 sacctmgr -nP show user "$(whoami)" format=User,DefaultAccount,AdminLevel
 ```
 
-Check that the worker image has the RCCL test binary, the RCCL/ROCm libraries,
-and the RDMA device mount (a pod-level check that needs `kubectl` access to the
-worker pod, so run it from the operator node):
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$GPU_WORKER_POD" -c "$WORKER_CONTAINER" -- \
-  bash -lc '
-    command -v mpirun
-    command -v rocm-smi
-    ls -ld /dev/infiniband
-    ls -l /opt/oci-hpc/rccl-tests/bin/all_reduce_perf
-    ls -l /opt/oci-hpc/rccl-tests/env.sh
-    ldd /opt/oci-hpc/rccl-tests/bin/all_reduce_perf | grep -iE "rccl|rocm"
-  '
-```
-
-Check the Slurm user association from the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacctmgr -nP show user "$SLURM_USER" format=User,DefaultAccount,AdminLevel
-```
-
-### Optional One-GPU Smoke Test (rocm-smi)
+#### Optional One-GPU Smoke Test (rocm-smi)
 
 Run a small single-rank job before the full multi-node test. This proves Slurm
 can allocate an AMD GPU and that the GPU is visible to the job.
 
-`sbatch --parsable` prints only the job ID; the test output is written to the
-`--output` file, not the terminal. Capture the job ID so you can read it back.
-
-From the operator node:
-
-```bash
-export SMOKE_JOB_ID="$(
-  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-    su - "$SLURM_USER" -c \
-      "sbatch --wait --parsable \
-        --account=${SLURM_ACCOUNT} \
-        --partition=${SLURM_PARTITION} \
-        --nodes=1 \
-        --ntasks=1 \
-        --gres=gpu:1 \
-        --time=00:05:00 \
-        --job-name=rccl-smoke \
-        --output=\$HOME/rccl-smoke-%j.out \
-        --wrap='rocm-smi'"
-)"
-
-echo "$SMOKE_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c "cat \$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
-```
-
-From inside the login pod:
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
 
 ```bash
 SMOKE_JOB_ID="$(sbatch --wait --parsable \
@@ -805,16 +735,12 @@ SMOKE_JOB_ID="$(sbatch --wait --parsable \
   --output="$HOME/rccl-smoke-%j.out" \
   --wrap='rocm-smi')"
 
-echo "$SMOKE_JOB_ID"
-
-sacct -j "$SMOKE_JOB_ID" --format=JobID,JobName,Partition,Account,State,ExitCode -P
 cat "$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
 ```
 
-The job should be `COMPLETED` with `ExitCode` `0:0`, and the output should be the
-`rocm-smi` table listing the allocated GPU.
+The output should be the `rocm-smi` table listing the allocated GPU.
 
-### Create the Slurm Batch Script
+#### Create the Slurm Batch Script
 
 The script sources `/opt/oci-hpc/rccl-tests/env.sh` for the ROCm, OpenMPI, and
 rccl-tests paths, then runs `all_reduce_perf` over the Slurm allocation with
@@ -833,70 +759,6 @@ Keep the transport selection at `--mca pml ucx` only. In testing, adding
 hung the collective with no bandwidth output. The `openib` and `libvmw_pvrdma`
 warnings those flags would suppress are harmless because UCX provides the
 transport (see [Troubleshooting](#troubleshooting)).
-
-The script body is the same for both run methods. From the operator node, write
-it with `kubectl exec ... su - "$SLURM_USER" -c 'cat > ...'`; from inside the
-login pod, write it directly with a heredoc.
-
-From the operator node:
-
-```bash
-kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  su - "$SLURM_USER" -c 'cat > "$HOME/rccl-slurm.sh" && chmod 755 "$HOME/rccl-slurm.sh"' <<'EOF'
-#!/bin/bash
-#SBATCH --job-name=rccl-slurm
-#SBATCH --time=00:20:00
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
-
-set -euxo pipefail
-
-: "${GPUS_PER_NODE:=8}"
-
-# ROCm + OpenMPI + rccl-tests paths from the worker image
-source /opt/oci-hpc/rccl-tests/env.sh
-
-# BM.GPU.MI300X.8 RCCL / RDMA tuning (RCCL reuses the NCCL_* names)
-export NCCL_SOCKET_IFNAME=eth0
-export NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9"
-export NCCL_IB_SL=0
-export NCCL_IB_QPS_PER_CONNECTION=4
-export NCCL_IGNORE_CPU_AFFINITY=1
-export UCX_NET_DEVICES=mlx5_0:1
-export HCOLL_ENABLE_MCAST_ALL=0
-export RX_QUEUE_LEN=8192
-export IB_RX_QUEUE_LEN=8192
-
-echo "date=$(date -Is)"
-echo "SLURM_JOB_ID=${SLURM_JOB_ID}"
-echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
-echo "SLURM_NTASKS=${SLURM_NTASKS}"
-scontrol show hostnames "${SLURM_JOB_NODELIST}"
-which mpirun
-which all_reduce_perf
-
-mpirun \
-  -np "${SLURM_NTASKS}" \
-  -npernode "${GPUS_PER_NODE}" \
-  --bind-to numa \
-  --mca pml ucx \
-  -x PATH \
-  -x LD_LIBRARY_PATH \
-  -x NCCL_SOCKET_IFNAME \
-  -x NCCL_IB_HCA \
-  -x NCCL_IB_SL \
-  -x NCCL_IB_QPS_PER_CONNECTION \
-  -x NCCL_IGNORE_CPU_AFFINITY \
-  -x UCX_NET_DEVICES \
-  -x HCOLL_ENABLE_MCAST_ALL \
-  -x coll_hcoll_enable=0 \
-  -x RX_QUEUE_LEN \
-  -x IB_RX_QUEUE_LEN \
-  all_reduce_perf -b 1G -e 16G -f 2 -g 1
-EOF
-```
-
-From inside the login pod:
 
 ```bash
 cat > "$HOME/rccl-slurm.sh" <<'EOF'
@@ -954,9 +816,204 @@ EOF
 chmod 755 "$HOME/rccl-slurm.sh"
 ```
 
-### Submit the Job
+#### Submit the Job
 
-From the operator node:
+```bash
+RCCL_JOB_ID="$(sbatch --parsable \
+  --account="${SLURM_ACCOUNT}" \
+  --partition="${SLURM_PARTITION}" \
+  --nodes="${RCCL_NODES}" \
+  --ntasks-per-node="${GPUS_PER_NODE}" \
+  --gres=gpu:"${GPUS_PER_NODE}" \
+  --exclusive \
+  --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
+  "$HOME/rccl-slurm.sh")"
+
+timeout 1800 bash -c \
+  'while [[ -n "$(squeue -h -j "$1" 2>/dev/null)" ]]; do echo "Waiting for job $1..."; sleep 5; done' \
+  bash "$RCCL_JOB_ID"
+tail -n 120 "$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
+```
+
+A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
+
+### From the Operator Node
+
+Run these commands from the operator node or another shell with `kubectl` access.
+Commands that act as the Slurm user are wrapped in `su - "$SLURM_USER" -c`.
+
+#### Set Variables
+
+```bash
+export PATH=/home/ubuntu/bin:$PATH
+export OCI_CLI_AUTH=instance_principal
+
+export SLURM_NAMESPACE=slurm
+export LOGIN_CONTAINER=login
+export WORKER_CONTAINER=slurmd
+
+export SLURM_USER=alice
+export SLURM_ACCOUNT=users
+export SLURM_PARTITION=gpu
+
+export RCCL_NODES=2
+export GPUS_PER_NODE=8
+
+export LOGIN_POD="$(
+  kubectl -n "$SLURM_NAMESPACE" get pods \
+    -l app.kubernetes.io/name=login \
+    -o jsonpath='{.items[0].metadata.name}'
+)"
+
+export GPU_WORKER_POD="$(
+  kubectl -n "$SLURM_NAMESPACE" get pods \
+    -l app.kubernetes.io/instance=slurm-worker-gpu \
+    -o jsonpath='{.items[0].metadata.name}'
+)"
+```
+
+#### Validate Slurm and the Worker Image
+
+Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sinfo -Nel
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  scontrol show partition "$SLURM_PARTITION"
+```
+
+Check that the worker image has the RCCL test binary, the RCCL/ROCm libraries,
+and the RDMA device mount (a pod-level check that needs `kubectl` access to the
+worker pod, so run it from the operator node):
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$GPU_WORKER_POD" -c "$WORKER_CONTAINER" -- \
+  bash -lc '
+    command -v mpirun
+    command -v rocm-smi
+    ls -ld /dev/infiniband
+    ls -l /opt/oci-hpc/rccl-tests/bin/all_reduce_perf
+    ls -l /opt/oci-hpc/rccl-tests/env.sh
+    ldd /opt/oci-hpc/rccl-tests/bin/all_reduce_perf | grep -iE "rccl|rocm"
+  '
+```
+
+Check the Slurm user association from the operator node:
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sacctmgr -nP show user "$SLURM_USER" format=User,DefaultAccount,AdminLevel
+```
+
+#### Optional One-GPU Smoke Test (rocm-smi)
+
+Run a small single-rank job before the full multi-node test. This proves Slurm
+can allocate an AMD GPU and that the GPU is visible to the job.
+
+`sbatch --wait --parsable` waits for the smoke job to finish. The test output
+is written to the `--output` file, so read that file back after submission.
+
+```bash
+export SMOKE_JOB_ID="$(
+  kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+    su - "$SLURM_USER" -c \
+      "sbatch --wait --parsable \
+        --account=${SLURM_ACCOUNT} \
+        --partition=${SLURM_PARTITION} \
+        --nodes=1 \
+        --ntasks=1 \
+        --gres=gpu:1 \
+        --time=00:05:00 \
+        --job-name=rccl-smoke \
+        --output=\$HOME/rccl-smoke-%j.out \
+        --wrap='rocm-smi'"
+)"
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c "cat \$HOME/rccl-smoke-${SMOKE_JOB_ID}.out"
+```
+
+The output should be the `rocm-smi` table listing the allocated GPU.
+
+#### Create the Slurm Batch Script
+
+The script sources `/opt/oci-hpc/rccl-tests/env.sh` for the ROCm, OpenMPI, and
+rccl-tests paths, then runs `all_reduce_perf` over the Slurm allocation with
+`mpirun`.
+
+The `NCCL_IB_HCA` value and tuning below are for `BM.GPU.MI300X.8`. For another
+AMD GPU shape, copy the HCA list and tuning from the matching manifest in
+[`manifests/rccl-tests/kueue/`](../manifests/rccl-tests/kueue/). For example,
+`BM.GPU.MI355X-v1.8` uses
+`NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7"` with
+`NCCL_IB_QPS_PER_CONNECTION=1` and adds `NCCL_IB_GID_INDEX=3`, `NCCL_IB_TC=41`,
+and `NCCL_IB_TIMEOUT=22`.
+
+Keep the transport selection at `--mca pml ucx` only. In testing, adding
+`--mca btl ^openib` (and `--mca coll ^hcoll`) let the ranks initialize but then
+hung the collective with no bandwidth output. The `openib` and `libvmw_pvrdma`
+warnings those flags would suppress are harmless because UCX provides the
+transport (see [Troubleshooting](#troubleshooting)).
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c 'cat > "$HOME/rccl-slurm.sh" && chmod 755 "$HOME/rccl-slurm.sh"' <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=rccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euxo pipefail
+
+: "${GPUS_PER_NODE:=8}"
+
+# ROCm + OpenMPI + rccl-tests paths from the worker image
+source /opt/oci-hpc/rccl-tests/env.sh
+
+# BM.GPU.MI300X.8 RCCL / RDMA tuning (RCCL reuses the NCCL_* names)
+export NCCL_SOCKET_IFNAME=eth0
+export NCCL_IB_HCA="=mlx5_0,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_7,mlx5_8,mlx5_9"
+export NCCL_IB_SL=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IGNORE_CPU_AFFINITY=1
+export UCX_NET_DEVICES=mlx5_0:1
+export HCOLL_ENABLE_MCAST_ALL=0
+export RX_QUEUE_LEN=8192
+export IB_RX_QUEUE_LEN=8192
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_ID=${SLURM_JOB_ID}"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+which all_reduce_perf
+
+mpirun \
+  -np "${SLURM_NTASKS}" \
+  -npernode "${GPUS_PER_NODE}" \
+  --bind-to numa \
+  --mca pml ucx \
+  -x PATH \
+  -x LD_LIBRARY_PATH \
+  -x NCCL_SOCKET_IFNAME \
+  -x NCCL_IB_HCA \
+  -x NCCL_IB_SL \
+  -x NCCL_IB_QPS_PER_CONNECTION \
+  -x NCCL_IGNORE_CPU_AFFINITY \
+  -x UCX_NET_DEVICES \
+  -x HCOLL_ENABLE_MCAST_ALL \
+  -x coll_hcoll_enable=0 \
+  -x RX_QUEUE_LEN \
+  -x IB_RX_QUEUE_LEN \
+  all_reduce_perf -b 1G -e 16G -f 2 -g 1
+EOF
+```
+
+#### Submit the Job
 
 ```bash
 export RCCL_JOB_ID="$(
@@ -973,42 +1030,12 @@ export RCCL_JOB_ID="$(
         \$HOME/rccl-slurm.sh"
 )"
 
-echo "$RCCL_JOB_ID"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  squeue -j "$RCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sacct -j "$RCCL_JOB_ID" \
-    --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
-
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   su - "$SLURM_USER" -c \
-    "tail -n 120 \$HOME/rccl-slurm-${RCCL_JOB_ID}.out; tail -n 120 \$HOME/rccl-slurm-${RCCL_JOB_ID}.err"
-```
-
-From inside the login pod:
-
-```bash
-RCCL_JOB_ID="$(sbatch --parsable \
-  --account="${SLURM_ACCOUNT}" \
-  --partition="${SLURM_PARTITION}" \
-  --nodes="${RCCL_NODES}" \
-  --ntasks-per-node="${GPUS_PER_NODE}" \
-  --gres=gpu:"${GPUS_PER_NODE}" \
-  --exclusive \
-  --export=ALL,GPUS_PER_NODE="${GPUS_PER_NODE}" \
-  "$HOME/rccl-slurm.sh")"
-
-echo "$RCCL_JOB_ID"
-
-squeue -j "$RCCL_JOB_ID" -o "%.18i %.9P %.24j %.8u %.2t %.10M %.6D %R"
-
-sacct -j "$RCCL_JOB_ID" \
-  --format=JobID,JobName,Partition,Account,AllocNodes,State,ExitCode -P
-
-tail -n 120 "$HOME/rccl-slurm-${RCCL_JOB_ID}.out" \
-            "$HOME/rccl-slurm-${RCCL_JOB_ID}.err"
+    "timeout 1800 bash -c 'while [[ -n \"\$(squeue -h -j \"\$1\" 2>/dev/null)\" ]]; do echo \"Waiting for job \$1...\"; sleep 5; done' bash \
+      ${RCCL_JOB_ID}"
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c "tail -n 120 \$HOME/rccl-slurm-${RCCL_JOB_ID}.out"
 ```
 
 A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
@@ -1127,7 +1154,7 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/rccl-pyxis.sh"
 
-sbatch --partition=gpu --account=project-a "$HOME/rccl-pyxis.sh"
+sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
 ```
 
 ## Troubleshooting
