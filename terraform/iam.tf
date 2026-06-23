@@ -203,7 +203,8 @@ resource "oci_identity_policy" "gmc_tenancy" {
     "Allow any-user to manage instance-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
     "Allow any-user to use virtual-network-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
     "Allow any-user to read compute-management-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
-    "Allow any-user to use volume-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}"
+    "Allow any-user to use volume-family in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}",
+    "Allow any-user to use tag-namespaces in tenancy where all {request.principal.type = 'compute-gpu-memory-clusters'}"
   ]
   lifecycle {
     ignore_changes = [defined_tags]
