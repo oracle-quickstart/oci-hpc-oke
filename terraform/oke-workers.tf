@@ -177,8 +177,8 @@ locals {
       create                         = local.create_workers && var.worker_rdma_enabled && !local.invalid_worker_rdma_image
       description                    = "OKE pool with RDMA"
       placement_ads                  = [substr(var.worker_rdma_ad, -1, 0)]
-      mode                           = var.worker_rdma_use_compute_cluster ? "node-pool" : "cluster-network"
-      use_compute_cluster            = var.worker_rdma_use_compute_cluster
+      mode                           = var.worker_rdma_use_cluster_network ? "cluster-network" : "node-pool"
+      use_compute_cluster            = !var.worker_rdma_use_cluster_network
       host_group_id                  = var.worker_rdma_host_group_id
       size                           = var.worker_rdma_pool_size
       shape                          = var.worker_rdma_shape
