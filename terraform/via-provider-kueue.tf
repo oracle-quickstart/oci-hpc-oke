@@ -13,6 +13,7 @@ resource "helm_release" "kueue" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
+    helm_release.cert_manager,
     kubectl_manifest.cert_manager_webhook_probe,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
   ]
