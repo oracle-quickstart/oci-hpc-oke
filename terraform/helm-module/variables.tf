@@ -74,12 +74,6 @@ variable "deployment_extra_args" {
   description = "List of arguments to be appended to the helm upgrade --install command."
 }
 
-variable "uninstall_wait" {
-  type        = bool
-  default     = true
-  description = "Whether the destroy-time `helm uninstall` passes --wait. Set false for charts whose uninstall can block on finalizers/CRD cascades (e.g. Kueue)."
-}
-
 variable "bastion_host" {
   type        = string
   default     = null

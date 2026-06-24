@@ -47,15 +47,14 @@ resource "null_resource" "copy_chart_top_operator" {
 resource "null_resource" "helm_deployment_via_operator" {
 
   triggers = {
-    manifest_md5        = try(md5("${var.helm_template_values_override}-${var.helm_user_values_override}"), null)
-    deployment_name     = var.deployment_name
-    namespace           = var.namespace
-    bastion_host        = var.bastion_host
-    bastion_user        = var.bastion_user
-    ssh_private_key     = var.ssh_private_key
-    operator_host       = var.operator_host
-    operator_user       = var.operator_user
-    uninstall_wait_flag = var.uninstall_wait ? "--wait" : ""
+    manifest_md5    = try(md5("${var.helm_template_values_override}-${var.helm_user_values_override}"), null)
+    deployment_name = var.deployment_name
+    namespace       = var.namespace
+    bastion_host    = var.bastion_host
+    bastion_user    = var.bastion_user
+    ssh_private_key = var.ssh_private_key
+    operator_host   = var.operator_host
+    operator_user   = var.operator_user
   }
 
   connection {
@@ -128,7 +127,7 @@ resource "null_resource" "helm_deployment_via_operator" {
       "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
-    "helm uninstall ${self.triggers.deployment_name} --namespace ${self.triggers.namespace} ${try(self.triggers.uninstall_wait_flag, "--wait")}"]
+    "helm uninstall ${self.triggers.deployment_name} --namespace ${self.triggers.namespace} --wait"]
     on_failure = continue
   }
 
@@ -138,8 +137,7 @@ resource "null_resource" "helm_deployment_via_operator" {
       triggers["bastion_user"],
       triggers["ssh_private_key"],
       triggers["operator_host"],
-      triggers["operator_user"],
-      triggers["uninstall_wait_flag"]
+      triggers["operator_user"]
     ]
   }
 

@@ -25,15 +25,6 @@ module "kueue" {
 
   deployment_extra_args = ["--wait", "--timeout 300s", "--history-max 1"]
 
-  # Do not pass --wait on "helm uninstall": the Kueue chart templates its CRDs,
-  # so uninstall deletes them and cascade-deletes CR instances; an instance
-  # still holding the kueue.x-k8s.io/resource-in-use finalizer cannot be cleared
-  # once the controller is gone, which would otherwise hang the uninstall until
-  # the timeout ("context deadline exceeded") and fail the destroy. Orphaned
-  # CRDs are removed with the cluster. Matches wait = false on the provider-path
-  # helm_release.kueue in via-provider-kueue.tf.
-  uninstall_wait = false
-
   post_deployment_commands = flatten([
     join("\n", [
       "kueue_webhook_probe_success=false",
