@@ -22,9 +22,20 @@ resource "helm_release" "kueue" {
   chart            = "oci://registry.k8s.io/kueue/charts/kueue"
   version          = var.kueue_chart_version
   create_namespace = true
-  wait             = true
-  timeout          = 300
-  max_history      = 1
+  # wait = false so "helm uninstall" on destroy does not block on the Kueue CRD
+  # cascade. The chart templates its CRDs, so uninstall deletes them and
+  # cascade-deletes CR instances; any instance still holding the
+  # kueue.x-k8s.io/resource-in-use finalizer (an ad-hoc ResourceFlavor or an
+  # active Workload) cannot be cleared once the controller is gone, which would
+  # otherwise hang the uninstall until the timeout ("context deadline exceeded")
+  # and fail the destroy. Those orphaned CRDs are removed with the cluster. This
+  # is the ORM/local equivalent of the operator-path drain in
+  # kueue-predestroy-drain.tf (the ORM runner has no SSH path to the operator).
+  # Install readiness is gated by kubectl_manifest.kueue_webhook_probe below
+  # (kubectl apply with retries), not by helm wait.
+  wait        = false
+  timeout     = 300
+  max_history = 1
 }
 
 resource "kubectl_manifest" "kueue_webhook_probe" {

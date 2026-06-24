@@ -7,11 +7,15 @@
 # is gone, so the CRD deletion blocks and the uninstall times out
 # ("context deadline exceeded"), failing the destroy. This drains all Kueue CRs
 # (including ad-hoc ones Terraform does not manage) before the chart is
-# uninstalled, ordered before both the provider-path helm_release.kueue and the
-# operator-path module.kueue. It runs on the operator node, so it needs
-# create_bastion + create_operator; when those are disabled the drain is skipped.
+# uninstalled, ordered before the operator-path module.kueue.
+#
+# Operator path only: it drains over the bastion->operator SSH path. The ORM
+# runner has no SSH route to the operator (it reaches the cluster solely through
+# the ORM private endpoint), so for deploy_from_local/deploy_from_orm the
+# equivalent protection is wait = false on helm_release.kueue in
+# via-provider-kueue.tf instead.
 resource "null_resource" "kueue_predestroy_drain" {
-  count = alltrue([var.install_kueue, var.create_bastion, var.create_operator]) ? 1 : 0
+  count = alltrue([var.install_kueue, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
     bastion_host    = module.oke.bastion_public_ip
@@ -56,5 +60,5 @@ resource "null_resource" "kueue_predestroy_drain" {
     ]
   }
 
-  depends_on = [helm_release.kueue, module.kueue]
+  depends_on = [module.kueue]
 }
