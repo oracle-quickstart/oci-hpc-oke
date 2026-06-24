@@ -1,19 +1,9 @@
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
-# Kueue's Helm chart templates its CRDs, so "helm uninstall" deletes them and
-# cascade-deletes every CR instance. An instance still carrying the
-# kueue.x-k8s.io/resource-in-use finalizer cannot be cleared once the controller
-# is gone, so the CRD deletion blocks and the uninstall times out
-# ("context deadline exceeded"), failing the destroy. This drains all Kueue CRs
-# (including ad-hoc ones Terraform does not manage) before the chart is
-# uninstalled, ordered before the operator-path module.kueue.
-#
-# Operator path only: it drains over the bastion->operator SSH path. The ORM
-# runner has no SSH route to the operator (it reaches the cluster solely through
-# the ORM private endpoint), so for deploy_from_local/deploy_from_orm the
-# equivalent protection is wait = false on helm_release.kueue in
-# via-provider-kueue.tf instead.
+# Drain all Kueue CRs before the chart is uninstalled so the CRD cascade does not
+# hang on resource-in-use finalizers. Operator path only (drains over
+# bastion->operator SSH); ORM/local use wait = false on helm_release.kueue.
 resource "null_resource" "kueue_predestroy_drain" {
   count = alltrue([var.install_kueue, local.deploy_from_operator]) ? 1 : 0
 
