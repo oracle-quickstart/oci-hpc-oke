@@ -120,8 +120,9 @@ module "kube_prometheus_stack" {
   deployment_name     = "kube-prometheus-stack"
   helm_chart_name     = "kube-prometheus-stack"
   namespace           = var.monitoring_namespace
-  helm_repository_url = "https://prometheus-community.github.io/helm-charts"
-  helm_chart_version  = var.prometheus_stack_chart_version
+  # helm_repository_url = "https://prometheus-community.github.io/helm-charts"
+  # helm_chart_version  = var.prometheus_stack_chart_version
+  helm_chart_path     = "${path.module}/files/kube-prometheus/kube-prometheus-stack-86.2.2.tgz" # customized grafana chart with support for persistentVolumeClaimRetentionPolicy: https://github.com/grafana-community/helm-charts/pull/635/changes#diff-4ca0ec9c453f5f1f65d24210ec2e8068b2522937374dd462314125a8299ad5ae
 
   pre_deployment_commands = [
     "export PATH=$PATH:/home/${local.operator_user}/bin",

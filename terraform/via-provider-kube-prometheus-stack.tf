@@ -9,9 +9,10 @@ resource "helm_release" "prometheus" {
   ]
   namespace         = var.monitoring_namespace
   name              = "kube-prometheus-stack"
-  chart             = "kube-prometheus-stack"
-  repository        = "https://prometheus-community.github.io/helm-charts"
-  version           = var.prometheus_stack_chart_version
+  chart             = "${path.module}/files/kube-prometheus/kube-prometheus-stack-86.2.2.tgz" # customized grafana chart with support for persistentVolumeClaimRetentionPolicy: https://github.com/grafana-community/helm-charts/pull/635/changes#diff-4ca0ec9c453f5f1f65d24210ec2e8068b2522937374dd462314125a8299ad5ae
+  # chart             = "kube-prometheus-stack"
+  # repository        = "https://prometheus-community.github.io/helm-charts"
+  # version           = var.prometheus_stack_chart_version
   values            = ["${templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services })}"]
   create_namespace  = true
   recreate_pods     = false
