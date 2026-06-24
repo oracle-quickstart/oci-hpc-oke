@@ -29,6 +29,7 @@ kinds=(
   topologies
   admissionchecks
   cohorts
+  multikueueclusters
   multikueueconfigs
   workloadpriorityclasses
   provisioningrequestconfigs
