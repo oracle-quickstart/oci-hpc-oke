@@ -244,7 +244,6 @@ variableGroups:
   - title: "Worker Pool: GPU with RDMA"
     variables:
       - worker_rdma_enabled
-      - worker_rdma_use_compute_cluster
       - worker_rdma_ad
       - worker_rdma_pool_size
       - worker_rdma_shape
@@ -259,6 +258,8 @@ variableGroups:
       - worker_rdma_image_custom_uri
       - worker_rdma_image_compartment
       - worker_rdma_image_custom_id
+      - worker_rdma_advanced_options
+      - worker_rdma_use_cluster_network
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -2103,13 +2104,23 @@ variables:
   worker_rdma_enabled:
     title: Create GPU with RDMA pool
     type: boolean
-    description: Create a worker pool with Cluster Network placement for RDMA networking.
-  worker_rdma_use_compute_cluster:
-    title: Use compute cluster
-    description: Use a Compute Cluster instead of Cluster Network placement for the GPU with RDMA worker pool.
+    description: Create a worker pool for RDMA networking. Compute Cluster placement is the default.
+  worker_rdma_advanced_options:
+    title: GPU with RDMA advanced options
+    description: Show advanced GPU with RDMA worker pool options.
     type: boolean
     default: false
+    required: false
     visible: ${worker_rdma_enabled}
+  worker_rdma_use_cluster_network:
+    title: Use Cluster Network
+    description: Use Cluster Network placement instead of a Compute Cluster for the GPU with RDMA worker pool. Compute Cluster is the default.
+    type: boolean
+    default: false
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name

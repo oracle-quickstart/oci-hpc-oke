@@ -797,7 +797,7 @@ variable "worker_rdma_kubernetes_version" {
   description = "Kubernetes version for the RDMA worker pool. Defaults to cluster version if not specified."
   type        = string
 }
-variable "worker_rdma_use_compute_cluster" { default = false }
+variable "worker_rdma_use_cluster_network" { default = false }
 variable "worker_rdma_host_group_id" { default = "" }
 
 # Workers - GPU Memory Cluster

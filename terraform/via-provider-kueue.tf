@@ -13,6 +13,7 @@ resource "helm_release" "kueue" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
+    helm_release.cert_manager,
     kubectl_manifest.cert_manager_webhook_probe,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
   ]
@@ -21,9 +22,12 @@ resource "helm_release" "kueue" {
   chart            = "oci://registry.k8s.io/kueue/charts/kueue"
   version          = var.kueue_chart_version
   create_namespace = true
-  wait             = true
-  timeout          = 300
-  max_history      = 1
+  # wait = false so "helm uninstall" on destroy does not hang on the Kueue CRD
+  # cascade (resource-in-use finalizers). ORM/local equivalent of the operator
+  # drain in kueue-predestroy-drain.tf; readiness is gated by the webhook probe.
+  wait        = false
+  timeout     = 300
+  max_history = 1
 }
 
 resource "kubectl_manifest" "kueue_webhook_probe" {

@@ -161,12 +161,12 @@ resource "oci_identity_policy" "oke_quickstart_all" {
 }
 
 resource "oci_identity_policy" "services_policies" {
-  provider       = oci.home
-  count          = alltrue([
+  provider = oci.home
+  count = alltrue([
     var.create_policies,
     anytrue([
       local.create_fss_effective,
-      var.worker_rdma_use_compute_cluster,
+      var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network,
       var.worker_rdma_host_group_id != ""
     ])
   ]) ? 1 : 0
@@ -179,7 +179,7 @@ resource "oci_identity_policy" "services_policies" {
       "Allow any-user to manage file-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
       "Allow any-user to use virtual-network-family in compartment id ${var.compartment_ocid} where request.principal.type = 'cluster'",
     ] : [],
-    var.worker_rdma_use_compute_cluster ? [
+    var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? [
       "Allow any-user to {COMPUTE_CLUSTER_LAUNCH_INSTANCE} in compartment id ${var.compartment_ocid} where request.principal.type = 'nodepool'"
     ] : [],
     var.worker_rdma_host_group_id != "" ? [
