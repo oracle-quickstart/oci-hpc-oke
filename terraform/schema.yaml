@@ -1365,7 +1365,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "86.2.2"
+    default: "87.2.1"
     visible: false
       # and:
       # - monitoring_advanced_options

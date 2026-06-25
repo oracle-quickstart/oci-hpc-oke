@@ -4,7 +4,7 @@
 # Drain all Kueue CRs before the chart is uninstalled so the CRD cascade does not
 # hang on resource-in-use finalizers. Operator path only (drains over
 # bastion->operator SSH); ORM/local use wait = false on helm_release.kueue.
-resource "null_resource" "kueue_predestroy_drain" {
+resource "null_resource" "kueue_predestroy_drain_via_operator" {
   count = alltrue([var.install_kueue, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
