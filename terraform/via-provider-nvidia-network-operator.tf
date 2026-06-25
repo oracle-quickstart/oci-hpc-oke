@@ -40,7 +40,7 @@ locals {
     apiVersion = "sriovnetwork.openshift.io/v1"
     kind       = "SriovNetworkPoolConfig"
     metadata = {
-      name      = "sriov-rdma-vf"
+      name      = "rdma-vf"
       namespace = local.nvidia_network_operator_namespace
     }
     spec = {

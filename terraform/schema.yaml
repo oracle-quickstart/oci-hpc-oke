@@ -2566,7 +2566,7 @@ variables:
     title: Slurm worker RDMA VF resource
     description: "Extended resource requested by pod-networked Slinky RDMA workers."
     type: string
-    default: "nvidia.com/sriov-rdma-vf"
+    default: "nvidia.com/rdma-vf"
     visible:
       and:
         - ${install_slinky}
@@ -2590,7 +2590,7 @@ variables:
     title: Slurm worker RDMA network
     description: "Multus NetworkAttachmentDefinition for pod-networked Slinky RDMA workers. Use namespace/name when needed."
     type: string
-    default: "default/sriov-rdma-vf"
+    default: "default/rdma-vf"
     visible:
       and:
         - ${install_slinky}

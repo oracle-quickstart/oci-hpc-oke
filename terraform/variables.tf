@@ -1050,7 +1050,7 @@ variable "slinky_gpus_per_node" {
 }
 
 variable "slinky_worker_rdma_resource" {
-  default     = "nvidia.com/sriov-rdma-vf"
+  default     = "nvidia.com/rdma-vf"
   type        = string
   description = "Extended resource requested by virtualFunctions Slinky RDMA workers."
 }
@@ -1067,7 +1067,7 @@ variable "slinky_worker_rdma_vfs_per_node" {
 }
 
 variable "slinky_worker_rdma_network" {
-  default     = "default/sriov-rdma-vf"
+  default     = "default/rdma-vf"
   type        = string
   description = "Multus NetworkAttachmentDefinition used by pod-networked Slinky RDMA workers. Use namespace/name when the NAD is not in the Slurm namespace."
 }

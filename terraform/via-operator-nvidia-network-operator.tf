@@ -78,8 +78,8 @@ resource "null_resource" "nvidia_network_operator_manifests" {
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
-      "kubectl delete sriovnetworks.sriovnetwork.openshift.io sriov-rdma-vf --namespace ${self.triggers.namespace} --ignore-not-found",
-      "kubectl delete sriovnetworkpoolconfigs.sriovnetwork.openshift.io sriov-rdma-vf --namespace ${self.triggers.namespace} --ignore-not-found",
+      "kubectl delete sriovnetworks.sriovnetwork.openshift.io rdma-vf --namespace ${self.triggers.namespace} --ignore-not-found",
+      "kubectl delete sriovnetworkpoolconfigs.sriovnetwork.openshift.io rdma-vf --namespace ${self.triggers.namespace} --ignore-not-found",
       "kubectl delete sriovnetworknodepolicies.sriovnetwork.openshift.io ${self.triggers.policy_names} --namespace ${self.triggers.namespace} --ignore-not-found",
       "kubectl delete ippools.nv-ipam.nvidia.com sriov-pool --namespace ${self.triggers.namespace} --ignore-not-found"
     ]
