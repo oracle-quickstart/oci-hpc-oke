@@ -287,10 +287,6 @@ nodesets:
           mountPath: /etc/sssd/ca
           readOnly: true
 %{ endif ~}
-        # tmpfs /tmp for Enroot image import (overlay rejects the device-node
-        # whiteouts Enroot creates while flattening multi-layer images).
-        - name: enroot-tmp
-          mountPath: /tmp
     logfile:
       image:
         repository: docker.io/library/alpine
@@ -369,10 +365,6 @@ ${worker_features_yaml}
               - key: ca.crt
                 path: ca.crt
 %{ endif ~}
-        - name: enroot-tmp
-          emptyDir:
-            medium: Memory
-            sizeLimit: 64Gi
 %{ endif ~}
 %{ if cpu_nodeset_enabled ~}
 
