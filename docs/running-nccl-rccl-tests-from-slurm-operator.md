@@ -33,6 +33,7 @@ path end to end; you do not need to run both.
 ## Contents
 
 - [Prerequisites](#prerequisites)
+- [Worker Network Mode (hostNetwork vs SR-IOV VFs)](#worker-network-mode-hostnetwork-vs-sr-iov-vfs)
 - [NCCL Tests (NVIDIA GPU shapes)](#nccl-tests-nvidia-gpu-shapes)
   - [From the Login Pod](#from-the-login-pod)
   - [From the Operator Node](#from-the-operator-node)
@@ -83,6 +84,37 @@ The examples below match the onboarding quick start: user `alice` in the default
 Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
+
+## Worker Network Mode (hostNetwork vs SR-IOV VFs)
+
+The Slurm GPU worker pods reach the RDMA fabric in one of two ways, fixed when
+the cluster is deployed (`slinky_worker_network_mode`, which is forced to
+`virtualFunctions` when the NVIDIA Network Operator add-on is installed):
+
+- **hostNetwork** (default): the worker pod shares the node's network namespace
+  and uses the host's physical RDMA HCAs. Tuning is per-shape, because the
+  `NCCL_IB_HCA` device list differs per shape.
+- **SR-IOV virtualFunctions**: the worker pod runs in its own network namespace
+  with SR-IOV RDMA VFs attached (the `rdma-vf` Multus network and the
+  `nvidia.com/rdma-vf` resource). The VF HCAs appear inside the pod namespace as
+  `mlx5_*`, so `NCCL_IB_HCA=mlx5` matches them all, and the bootstrap/control
+  plane runs over the pod overlay interface `eth0`.
+
+Check which mode your cluster's GPU workers use:
+
+```bash
+kubectl -n slurm get nodeset slurm-worker-gpu \
+  -o jsonpath='{.spec.template.spec.hostNetwork}{"\n"}'
+# true        -> hostNetwork
+# false/empty -> SR-IOV VFs
+```
+
+Both modes share every step in this guide. Only the NCCL RDMA tuning in the
+batch script changes, and the Pyxis path needs one extra change. Each NCCL
+"Create the Slurm Batch Script" section below gives the hostNetwork tuning
+first and an **SR-IOV VF variant** after it; use the one that matches your
+cluster. The VF examples were validated on NVIDIA `BM.GPU.B4.8`; the VF tuning
+is shape-agnostic, so it applies to the other NVIDIA shapes unchanged.
 
 ## NCCL Tests (NVIDIA GPU shapes)
 
@@ -265,6 +297,66 @@ case "${shape}" in
       -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
       "${EXEC_CMD}" -b 1G -e 16G -f 2 -g 1 -n 50 ;;
 esac
+EOF
+chmod 755 "$HOME/nccl-slurm.sh"
+```
+
+##### SR-IOV VF variant
+
+If your GPU workers use SR-IOV VFs (see
+[Worker Network Mode](#worker-network-mode-hostnetwork-vs-sr-iov-vfs)), use this
+script instead. It writes the same `$HOME/nccl-slurm.sh`, so the **Submit the
+Job** step below is unchanged. The tuning is shape-agnostic: `NCCL_IB_HCA=mlx5`
+matches the VF HCAs in the pod namespace, and the control plane runs over the
+pod overlay interface `eth0` (TCP).
+
+```bash
+cat > "$HOME/nccl-slurm.sh" <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=nccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -uxo pipefail
+: "${GPUS_PER_NODE:=8}"
+
+# NCCL + HPCX (OpenMPI/UCX) + nccl-tests paths from the worker image
+source /opt/nccl-tests/env.sh
+
+EXEC_CMD="${NCCL_TEST_HOME}/bin/${EXEC:-all_reduce_perf}"
+[[ -x "${EXEC_CMD}" ]] || { echo "Test executable ${EXEC_CMD} not found!"; exit 1; }
+
+export NCCL_DEBUG=WARN
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+echo "EXEC_CMD=${EXEC_CMD}"
+
+# SR-IOV VF mode: the pod RDMA namespace exposes the VF HCAs (mlx5_*), matched by
+# NCCL_IB_HCA=mlx5. The pods are not hostNetwork, so the bootstrap/control plane
+# runs over the pod overlay interface eth0 (TCP). This tuning is shape-agnostic.
+mpirun --mca pml ucx \
+  --bind-to numa \
+  --mca coll ^hcoll \
+  -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+  -x NCCL_DEBUG \
+  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+  -x NCCL_IB_QPS_PER_CONNECTION=4 \
+  -x NCCL_IB_GID_INDEX=3 \
+  -x NCCL_IB_HCA=mlx5 \
+  -x NCCL_IB_TC=41 \
+  -x NCCL_IB_SL=0 \
+  -x NCCL_IB_TIMEOUT=22 \
+  -x HCOLL_ENABLE_MCAST_ALL=0 \
+  -x coll_hcoll_enable=0 \
+  -x UCX_TLS=tcp \
+  -x UCX_NET_DEVICES=eth0 \
+  -x NCCL_SOCKET_IFNAME=eth0 \
+  "${EXEC_CMD}" -b 1G -e 8G -f 2 -g 1 -n 50 -c 1
 EOF
 chmod 755 "$HOME/nccl-slurm.sh"
 ```
@@ -518,6 +610,65 @@ esac
 EOF
 ```
 
+##### SR-IOV VF variant
+
+If your GPU workers use SR-IOV VFs (see
+[Worker Network Mode](#worker-network-mode-hostnetwork-vs-sr-iov-vfs)), write
+this script instead with the same operator wrapper. It produces the same
+`$HOME/nccl-slurm.sh`, so the **Submit the Job** step below is unchanged. The
+tuning is shape-agnostic.
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c 'cat > "$HOME/nccl-slurm.sh" && chmod 755 "$HOME/nccl-slurm.sh"' <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=nccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -uxo pipefail
+: "${GPUS_PER_NODE:=8}"
+
+# NCCL + HPCX (OpenMPI/UCX) + nccl-tests paths from the worker image
+source /opt/nccl-tests/env.sh
+
+EXEC_CMD="${NCCL_TEST_HOME}/bin/${EXEC:-all_reduce_perf}"
+[[ -x "${EXEC_CMD}" ]] || { echo "Test executable ${EXEC_CMD} not found!"; exit 1; }
+
+export NCCL_DEBUG=WARN
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+echo "EXEC_CMD=${EXEC_CMD}"
+
+# SR-IOV VF mode: the pod RDMA namespace exposes the VF HCAs (mlx5_*), matched by
+# NCCL_IB_HCA=mlx5. The pods are not hostNetwork, so the bootstrap/control plane
+# runs over the pod overlay interface eth0 (TCP). This tuning is shape-agnostic.
+mpirun --mca pml ucx \
+  --bind-to numa \
+  --mca coll ^hcoll \
+  -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+  -x NCCL_DEBUG \
+  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+  -x NCCL_IB_QPS_PER_CONNECTION=4 \
+  -x NCCL_IB_GID_INDEX=3 \
+  -x NCCL_IB_HCA=mlx5 \
+  -x NCCL_IB_TC=41 \
+  -x NCCL_IB_SL=0 \
+  -x NCCL_IB_TIMEOUT=22 \
+  -x HCOLL_ENABLE_MCAST_ALL=0 \
+  -x coll_hcoll_enable=0 \
+  -x UCX_TLS=tcp \
+  -x UCX_NET_DEVICES=eth0 \
+  -x NCCL_SOCKET_IFNAME=eth0 \
+  "${EXEC_CMD}" -b 1G -e 8G -f 2 -g 1 -n 50 -c 1
+EOF
+```
+
 #### Submit the Job
 
 ```bash
@@ -674,6 +825,80 @@ on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0` and reports
 an avg bus bandwidth close to the native run. For another NVIDIA shape, replace
 the `NCCL_IB_HCA` list (see
 [Create the Slurm Batch Script](#create-the-slurm-batch-script)).
+
+#### Running Pyxis over SR-IOV VFs
+
+On SR-IOV VF workers the Pyxis steps are the same with two changes:
+
+- **Do not** set `MELLANOX_VISIBLE_DEVICES`. The image's RDMA Enroot hook
+  (`99-mellanox.sh`) fails on the VF layout (`ifaces[id]: unbound variable`,
+  which aborts container start). Bind the RDMA char devices directly instead by
+  adding `/dev/infiniband:/dev/infiniband` to `--container-mounts`. The
+  container shares the pod network namespace, so `/sys/class/infiniband` already
+  exposes the VF HCAs. Keep `NVIDIA_VISIBLE_DEVICES=all` (the GPU hook is fine).
+- Use the VF RDMA tuning instead of the per-shape host HCA list:
+  `NCCL_IB_HCA=mlx5`, `NCCL_SOCKET_IFNAME=eth0`, `UCX_TLS=tcp`,
+  `UCX_NET_DEVICES=eth0`.
+
+```bash
+cat > "$HOME/nccl-pyxis.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=nccl-pyxis
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=8
+#SBATCH --cpus-per-task=2
+#SBATCH --gres=gpu:8
+
+set -euo pipefail
+
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-ubuntu:24.04}"
+
+M=/usr/lib/x86_64-linux-gnu
+RDMA_USERLAND_MOUNTS="$M/libibverbs.so.1:$M/libibverbs.so.1,$M/libmlx5.so.1:$M/libmlx5.so.1,$M/librdmacm.so.1:$M/librdmacm.so.1,$M/libnl-3.so.200:$M/libnl-3.so.200,$M/libnl-route-3.so.200:$M/libnl-route-3.so.200,$M/libibverbs:$M/libibverbs,/etc/libibverbs.d:/etc/libibverbs.d"
+PAYLOAD_MOUNTS="/opt/nccl-tests:/opt/nccl-tests,/opt/hpcx:/opt/hpcx"
+# Bind the RDMA char devices directly; the Mellanox Enroot hook is skipped (see above).
+DEVICE_MOUNTS="/dev/infiniband:/dev/infiniband"
+
+# GPU hook only. Do NOT set MELLANOX_VISIBLE_DEVICES on VF workers.
+export NVIDIA_VISIBLE_DEVICES=all
+
+# VF control plane over the pod overlay interface eth0 (TCP); NCCL over the VF HCAs.
+export UCX_TLS=tcp
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+export OMPI_MCA_coll=^hcoll
+
+# Shape-agnostic VF NCCL settings.
+export NCCL_DEBUG=WARN
+export NCCL_ALGO=Ring
+export NCCL_IGNORE_CPU_AFFINITY=1
+export NCCL_IB_SPLIT_DATA_ON_QPS=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IB_GID_INDEX=3
+export NCCL_IB_HCA=mlx5
+export NCCL_IB_TC=41
+export NCCL_IB_SL=0
+export NCCL_IB_TIMEOUT=22
+export NCCL_SOCKET_IFNAME=eth0
+
+# Mounted payload library paths and the HPCX relocation prefix.
+export LD_LIBRARY_PATH=/opt/nccl-tests/lib:/opt/hpcx/ucx/lib:/opt/hpcx/ompi/lib:/opt/hpcx/nccl_rdma_sharp_plugin/lib
+export OPAL_PREFIX=/opt/hpcx/ompi
+
+srun --mpi=pmix --export=ALL \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name=nccl \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$DEVICE_MOUNTS" \
+  /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 8G -c 1
+EOF
+chmod 755 "$HOME/nccl-pyxis.sh"
+
+sbatch --partition=gpu --account=users "$HOME/nccl-pyxis.sh"
+```
+
+Validated on two `BM.GPU.B4.8` VF nodes (16 ranks) with `ubuntu:24.04` at
+~189 GB/s bus bandwidth (8 GiB), at parity with the hostNetwork Pyxis run.
 
 ## RCCL Tests (AMD GPU shapes)
 
@@ -1187,6 +1412,13 @@ bandwidth output. Leave the transport selection at `--mca pml ucx`.
 If direct `srun all_reduce_perf` fails during `MPI_Init` with an OpenMPI PMI or
 PMIx error, submit a Slurm allocation with `sbatch` and launch ranks with
 `mpirun` as shown above.
+
+If a Pyxis job on SR-IOV VF workers fails at container start with
+`/etc/enroot/hooks.d/99-mellanox.sh: line 88: ifaces[id]: unbound variable`, the
+image's RDMA Enroot hook cannot map the VF interfaces. Do not set
+`MELLANOX_VISIBLE_DEVICES`; bind `/dev/infiniband` into the container with
+`--container-mounts` instead. See
+[Running Pyxis over SR-IOV VFs](#running-pyxis-over-sr-iov-vfs).
 
 If the job remains pending, check GPU node availability and GRES:
 
