@@ -4,6 +4,8 @@
 
 Node Boot Volume Replacement brings significant operational benefits when managing bare metal worker nodes in OKE. It enables updates to key node attributes—like Kubernetes version, host image, and SSH keys—without terminating the underlying instance, preserving the instance OCID and network identity. This is especially valuable for bare metal nodes, where replacement times are longer and shape availability can be constrained. By eliminating the need to re-provision entire instances, the process becomes faster and more resource-efficient, reducing downtime and minimizing disruption to workloads. It also supports use cases like correcting configuration drift and applying critical security updates with minimal operational complexity.
 
+The script works on both self-managed nodes and OKE managed node pools. See the [Managed node pools](#managed-node-pools) section below for the differences.
+
 ## Script vs OKE Native BVR
 
 The [OKE Native BVR](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/replace-boot-volume-worker-node-top.htm) doesn't support cloud-init upgrade on the self-managed nodes. This is extremely important when working with BM nodes using the RDMA network.
