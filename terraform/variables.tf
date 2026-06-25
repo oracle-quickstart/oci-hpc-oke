@@ -362,7 +362,7 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "86.2.2"
+  default = "87.2.1"
   type    = string
 }
 

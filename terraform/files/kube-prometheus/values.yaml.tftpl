@@ -57,6 +57,8 @@ grafana:
     accessModes:
       - ReadWriteOnce
     size: 100Gi
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Delete
     finalizers:
       - kubernetes.io/pvc-protection
   sidecar:
