@@ -102,7 +102,11 @@ locals {
     local.slinky_is_amd ? local.slinky_image_profile.amd_worker_tag : local.slinky_image_profile.nvidia_worker_tag
   ) : var.slinky_worker_image_tag
 
-  slinky_worker_host_network = var.slinky_worker_network_mode == "hostNetwork"
+  # The NVIDIA Network Operator provisions the SR-IOV RDMA VFs, so enabling it
+  # forces the Slurm workers onto virtualFunctions (hostNetwork would leave the
+  # VFs unused). Otherwise honor the requested mode.
+  slinky_worker_network_mode_effective = var.deploy_nvidia_network_operator ? "virtualFunctions" : var.slinky_worker_network_mode
+  slinky_worker_host_network           = local.slinky_worker_network_mode_effective == "hostNetwork"
 
   # Per-shape SR-IOV RDMA VF count. Must match the number of rootDevices the
   # matching policy selects in files/nvidia-network-operator/sriov-network-node-policy.yaml

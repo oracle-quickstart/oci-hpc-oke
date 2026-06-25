@@ -314,6 +314,8 @@ variableGroups:
 
   - title: "Preview Features (not for production use)"
     variables:
+      - deploy_nvidia_network_operator
+      - nvidia_network_operator_addon_version
       - install_slinky
       - slinky_advanced_options
       - hostname_override
@@ -368,8 +370,6 @@ variableGroups:
       - slinky_cpu_nodeset_name
       - slinky_cpu_worker_image_repository
       - slinky_cpu_worker_image_tag
-      - deploy_nvidia_network_operator
-      - nvidia_network_operator_addon_version
 
 variables:
   # Injected by ORM
@@ -2518,7 +2518,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_network_mode:
     title: Slurm worker network mode
-    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs."
+    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed."
     type: enum
     enum:
       - hostNetwork
@@ -2571,7 +2571,9 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_worker_rdma_vfs_per_node:
     title: Slurm worker RDMA VFs
     description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker. Leave unset to derive the safe default from the selected worker shape."
@@ -2581,7 +2583,9 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_worker_rdma_network:
     title: Slurm worker RDMA network
     description: "Multus NetworkAttachmentDefinition for pod-networked Slinky RDMA workers. Use namespace/name when needed."
@@ -2591,7 +2595,9 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_gpu_autodetect:
     title: Slurm GPU AutoDetect
     description: "Use auto to select rsmi for AMD shapes and nvml for NVIDIA shapes."

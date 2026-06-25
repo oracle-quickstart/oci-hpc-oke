@@ -1017,7 +1017,7 @@ variable "slinky_login_enabled" {
 variable "slinky_worker_network_mode" {
   default     = "hostNetwork"
   type        = string
-  description = "Network mode for Slinky slurmd pods. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace."
+  description = "Network mode for Slinky slurmd pods. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace. Forced to virtualFunctions when deploy_nvidia_network_operator is true."
 
   validation {
     condition     = contains(["virtualFunctions", "hostNetwork"], var.slinky_worker_network_mode)

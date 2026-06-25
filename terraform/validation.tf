@@ -74,7 +74,7 @@ locals {
   invalid_slinky_virtual_functions = alltrue([
     var.install_slinky,
     local.slinky_gpu_nodeset_enabled,
-    var.slinky_worker_network_mode == "virtualFunctions",
+    local.slinky_worker_network_mode_effective == "virtualFunctions",
     anytrue([
       !var.worker_rdma_enabled,
       !contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
@@ -88,7 +88,7 @@ locals {
   invalid_slinky_rdma_vfs_per_node = alltrue([
     var.install_slinky,
     local.slinky_gpu_nodeset_enabled,
-    var.slinky_worker_network_mode == "virtualFunctions",
+    local.slinky_worker_network_mode_effective == "virtualFunctions",
     var.slinky_worker_rdma_vfs_per_node != null,
     contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
     coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0),
