@@ -59,6 +59,19 @@ NAME          STATUS   ROLES   AGE     VERSION
 uv run bvr-script.py -c ocid1.compartment.oc1..aaaaaaaaqi3if6t4n24qyabx5pjzlw6xovcbgugcmatavjvapyq3jfb4diqq --auth instance_principal --region eu-frankfurt-1 10.30.1.242 --desired-k8s-version v1.32.1
 ```
 
+### Managed node pools
+
+The script also works on OKE managed node pool nodes, with two differences from self-managed nodes:
+
+1. **Pass the OKE node name, not the IP.** Managed node pool nodes are named like `oke-cxhuk3rmsoq-nienmrznc6a-s6f372m3efa-0`, not by their IP. Use that name as the `nodes` argument. (The IP works only for self-managed nodes, whose Kubernetes node name is the IP.)
+
+2. **Managed behavior is auto-detected.** The script detects managed nodes via the `oci.oraclecloud.com/node.info.managed=true` label and adjusts automatically:
+   - It **preserves the Kubernetes Node object** (it does not delete it). The per-node `NativePodNetwork` (NPN) custom resource is owned by the Node, so deleting the Node would cascade-delete the NPN. Nothing recreates it, and the VCN-native IP CNI would then hang waiting for the NPN, leaving the node `NotReady`.
+   - It **refreshes the bootstrap token.** Replacing the boot volume wipes `/var/lib/kubelet`, forcing a fresh kubelet TLS bootstrap using the token in the instance's `bootstrap-kubelet-conf` metadata. That token may have expired, so the script mints a fresh kubeadm-style bootstrap token, registers it in `kube-system`, and swaps it into the metadata before the replacement.
+   - It **uncordons the node** once it rejoins (the node stays cordoned across the replacement because the Node object is preserved).
+
+Prerequisite: the kubeconfig used must be able to create secrets in the `kube-system` namespace (the OKE operator / a cluster-admin kubeconfig can).
+
 ### Notes
 
 If you need to execute other replacements in the existing cloud-init file, you can append new functions to the `cloud_init_change_functions` variable.
