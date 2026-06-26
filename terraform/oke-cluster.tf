@@ -233,7 +233,8 @@ data "oci_core_image" "operator_selected" {
 }
 
 module "oke" {
-  source = "git::https://github.com/oracle-terraform-modules/terraform-oci-oke.git//?ref=59683f325afb9b17fa9f1ab9de6ea448d59088b2"
+  source  = "oracle-terraform-modules/oke/oci"
+  version = "5.5.0"
 
   providers = { oci.home = oci.home }
 
