@@ -36,11 +36,6 @@ data:
   NCCL_IGNORE_CPU_AFFINITY: "1"
 ```
 
-The key benefit: `NCCL_IB_HCA` is set automatically based on whether SR-IOV
-virtual functions are enabled. When the network operator provisions VFs for the
-shape, the value is `mlx5`; otherwise it is the shape's full device list. The
-same manifest then works on both VF and non-VF clusters without edits.
-
 The ConfigMap is controlled by the `deploy_nccl_rccl_param_configmap` Terraform
 variable (default `true`). It is created only when `worker_rdma_enabled` or
 `worker_gmc_enabled` is true and the shape is covered by the parameter set.
