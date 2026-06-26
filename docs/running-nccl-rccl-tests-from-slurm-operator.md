@@ -109,12 +109,15 @@ kubectl -n slurm get nodeset slurm-worker-gpu \
 # false/empty -> SR-IOV VFs
 ```
 
-Both modes share every step in this guide. Only the NCCL RDMA tuning in the
-batch script changes, and the Pyxis path needs one extra change. Each NCCL
-"Create the Slurm Batch Script" section below gives the hostNetwork tuning
+Both modes share every step in this guide. Only the RDMA tuning in the batch
+script changes, and the Pyxis path needs one extra change. Each "Create the
+Slurm Batch Script" section below (NCCL and RCCL) gives the hostNetwork tuning
 first and an **SR-IOV VF variant** after it; use the one that matches your
-cluster. The VF examples were validated on NVIDIA `BM.GPU.B4.8`; the VF tuning
-is shape-agnostic, so it applies to the other NVIDIA shapes unchanged.
+cluster. The VF examples were validated on NVIDIA `BM.GPU.B4.8` (NCCL) and AMD
+`BM.GPU.MI300X.8` (RCCL); the VF tuning is shape-agnostic, so it applies to the
+other NVIDIA and AMD shapes unchanged. On AMD workers the VF control plane runs
+over TCP, which needs two extra `mpirun` flags; the RCCL VF variants below show
+them.
 
 ## NCCL Tests (NVIDIA GPU shapes)
 
@@ -1041,6 +1044,87 @@ EOF
 chmod 755 "$HOME/rccl-slurm.sh"
 ```
 
+##### SR-IOV VF variant
+
+If your GPU workers use SR-IOV VFs (see
+[Worker Network Mode](#worker-network-mode-hostnetwork-vs-sr-iov-vfs)), use this
+script instead. It writes the same `$HOME/rccl-slurm.sh`, so the **Submit the
+Job** step below is unchanged. The tuning is shape-agnostic: `NCCL_IB_HCA=mlx5`
+matches the VF HCAs in the pod namespace, and the MPI control plane runs over the
+pod overlay interface `eth0` (TCP).
+
+Because that control plane runs over TCP, pass `--mca pml_ucx_tls any --mca
+pml_ucx_devices any` to `mpirun`. The OpenMPI `ucx` PML otherwise only allows its
+default IB transports and disqualifies itself over TCP with `PML ucx cannot be
+selected` (see [Troubleshooting](#troubleshooting)).
+
+```bash
+cat > "$HOME/rccl-slurm.sh" <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=rccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euxo pipefail
+: "${GPUS_PER_NODE:=8}"
+
+# ROCm + OpenMPI + rccl-tests paths from the worker image
+source /opt/oci-hpc/rccl-tests/env.sh
+
+# SR-IOV VF mode: the pod RDMA namespace exposes the VF HCAs (mlx5_*), matched by
+# NCCL_IB_HCA=mlx5. The pods are not hostNetwork, so the MPI control plane runs
+# over the pod overlay interface eth0 (TCP). RCCL reuses the NCCL_* names.
+export NCCL_SOCKET_IFNAME=eth0
+export NCCL_IB_HCA=mlx5
+export NCCL_IB_SL=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IGNORE_CPU_AFFINITY=1
+export UCX_TLS=tcp,self,sm
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export RX_QUEUE_LEN=8192
+export IB_RX_QUEUE_LEN=8192
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_ID=${SLURM_JOB_ID}"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+which all_reduce_perf
+
+# pml_ucx_tls/devices any: the control plane runs over TCP (eth0). The vanilla
+# OpenMPI ucx PML defaults to IB-only transports and refuses TCP; any lets it run
+# on the pod overlay.
+mpirun \
+  -np "${SLURM_NTASKS}" \
+  -npernode "${GPUS_PER_NODE}" \
+  --bind-to numa \
+  --mca pml ucx \
+  --mca pml_ucx_tls any \
+  --mca pml_ucx_devices any \
+  -x PATH \
+  -x LD_LIBRARY_PATH \
+  -x NCCL_SOCKET_IFNAME \
+  -x NCCL_IB_HCA \
+  -x NCCL_IB_SL \
+  -x NCCL_IB_QPS_PER_CONNECTION \
+  -x NCCL_IGNORE_CPU_AFFINITY \
+  -x UCX_TLS \
+  -x UCX_NET_DEVICES \
+  -x HCOLL_ENABLE_MCAST_ALL \
+  -x coll_hcoll_enable=0 \
+  -x RX_QUEUE_LEN \
+  -x IB_RX_QUEUE_LEN \
+  all_reduce_perf -b 1G -e 8G -f 2 -g 1
+EOF
+chmod 755 "$HOME/rccl-slurm.sh"
+```
+
+Validated on two `BM.GPU.MI300X.8` VF nodes (16 ranks) at ~356 GB/s bus
+bandwidth (8 GiB), at parity with the hostNetwork run.
+
 #### Submit the Job
 
 ```bash
@@ -1238,6 +1322,82 @@ mpirun \
 EOF
 ```
 
+##### SR-IOV VF variant
+
+If your GPU workers use SR-IOV VFs (see
+[Worker Network Mode](#worker-network-mode-hostnetwork-vs-sr-iov-vfs)), write
+this script instead with the same operator wrapper. It produces the same
+`$HOME/rccl-slurm.sh`, so the **Submit the Job** step below is unchanged. The
+tuning is shape-agnostic: `NCCL_IB_HCA=mlx5` matches the VF HCAs in the pod
+namespace, the MPI control plane runs over the pod overlay interface `eth0`
+(TCP), and `--mca pml_ucx_tls any --mca pml_ucx_devices any` lets the OpenMPI
+`ucx` PML run over that TCP control plane (see
+[Troubleshooting](#troubleshooting)).
+
+```bash
+kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  su - "$SLURM_USER" -c 'cat > "$HOME/rccl-slurm.sh" && chmod 755 "$HOME/rccl-slurm.sh"' <<'EOF'
+#!/bin/bash
+#SBATCH --job-name=rccl-slurm
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euxo pipefail
+: "${GPUS_PER_NODE:=8}"
+
+# ROCm + OpenMPI + rccl-tests paths from the worker image
+source /opt/oci-hpc/rccl-tests/env.sh
+
+# SR-IOV VF mode: the pod RDMA namespace exposes the VF HCAs (mlx5_*), matched by
+# NCCL_IB_HCA=mlx5. The pods are not hostNetwork, so the MPI control plane runs
+# over the pod overlay interface eth0 (TCP). RCCL reuses the NCCL_* names.
+export NCCL_SOCKET_IFNAME=eth0
+export NCCL_IB_HCA=mlx5
+export NCCL_IB_SL=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IGNORE_CPU_AFFINITY=1
+export UCX_TLS=tcp,self,sm
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export RX_QUEUE_LEN=8192
+export IB_RX_QUEUE_LEN=8192
+
+echo "date=$(date -Is)"
+echo "SLURM_JOB_ID=${SLURM_JOB_ID}"
+echo "SLURM_JOB_NODELIST=${SLURM_JOB_NODELIST}"
+echo "SLURM_NTASKS=${SLURM_NTASKS}"
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+which mpirun
+which all_reduce_perf
+
+# pml_ucx_tls/devices any: the control plane runs over TCP (eth0). The vanilla
+# OpenMPI ucx PML defaults to IB-only transports and refuses TCP; any lets it run
+# on the pod overlay.
+mpirun \
+  -np "${SLURM_NTASKS}" \
+  -npernode "${GPUS_PER_NODE}" \
+  --bind-to numa \
+  --mca pml ucx \
+  --mca pml_ucx_tls any \
+  --mca pml_ucx_devices any \
+  -x PATH \
+  -x LD_LIBRARY_PATH \
+  -x NCCL_SOCKET_IFNAME \
+  -x NCCL_IB_HCA \
+  -x NCCL_IB_SL \
+  -x NCCL_IB_QPS_PER_CONNECTION \
+  -x NCCL_IGNORE_CPU_AFFINITY \
+  -x UCX_TLS \
+  -x UCX_NET_DEVICES \
+  -x HCOLL_ENABLE_MCAST_ALL \
+  -x coll_hcoll_enable=0 \
+  -x RX_QUEUE_LEN \
+  -x IB_RX_QUEUE_LEN \
+  all_reduce_perf -b 1G -e 8G -f 2 -g 1
+EOF
+```
+
 #### Submit the Job
 
 ```bash
@@ -1382,6 +1542,77 @@ chmod 755 "$HOME/rccl-pyxis.sh"
 sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
 ```
 
+#### Running Pyxis over SR-IOV VFs
+
+On SR-IOV VF workers the AMD Pyxis steps are the same with two changes:
+
+- The device mounts are unchanged (`/dev/kfd`, `/dev/dri`, `/dev/infiniband`).
+  The container shares the pod network namespace, so `/sys/class/infiniband`
+  already exposes the VF HCAs. The AMD path never sets
+  `MELLANOX_VISIBLE_DEVICES`, so the `99-mellanox.sh` Enroot hook failure that
+  affects the NVIDIA VF path does not apply here.
+- Use the VF RDMA tuning instead of the per-shape host HCA list:
+  `NCCL_IB_HCA=mlx5`, `NCCL_SOCKET_IFNAME=eth0`, `UCX_TLS=tcp,self,sm`,
+  `UCX_NET_DEVICES=eth0`. Because the control plane runs over TCP, also set
+  `OMPI_MCA_pml_ucx_tls=any` and `OMPI_MCA_pml_ucx_devices=any` (the env-var form
+  of the `mpirun` flags, since this path launches with `srun`); otherwise the
+  OpenMPI `ucx` PML refuses TCP with `PML ucx cannot be selected` (see
+  [Troubleshooting](#troubleshooting)).
+
+```bash
+cat > "$HOME/rccl-pyxis.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=rccl-pyxis
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=8
+#SBATCH --gres=gpu:8
+#SBATCH --exclusive
+
+set -euo pipefail
+
+# The rccl-tests image is self-contained for the ROCm/RCCL userland.
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
+
+# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The container
+# shares the pod network namespace, so /sys/class/infiniband exposes the VF HCAs.
+# The Slurm cgroup still restricts the container to the --gres GPUs.
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+
+# SR-IOV VF RCCL / transport (RCCL reuses the NCCL_* names). Control plane over
+# the pod overlay eth0 (TCP); RCCL over the VF HCAs matched by NCCL_IB_HCA=mlx5.
+export NCCL_DEBUG=WARN
+export NCCL_IB_HCA=mlx5
+export NCCL_SOCKET_IFNAME=eth0
+export NCCL_IB_SL=0
+export NCCL_IB_QPS_PER_CONNECTION=4
+export NCCL_IGNORE_CPU_AFFINITY=1
+export UCX_TLS=tcp,self,sm
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+
+# Control plane runs over TCP (eth0). The vanilla OpenMPI ucx PML defaults to
+# IB-only transports and refuses TCP; any lets it run on the pod overlay.
+export OMPI_MCA_pml=ucx
+export OMPI_MCA_pml_ucx_tls=any
+export OMPI_MCA_pml_ucx_devices=any
+
+# --container-name: all tasks on a node share one container instance (UCX shm).
+srun --mpi=pmix --export=ALL \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name=rccl \
+  --container-mounts="$DEVICE_MOUNTS" \
+  /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -n 20
+EOF
+chmod 755 "$HOME/rccl-pyxis.sh"
+
+sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
+```
+
+Validated on two `BM.GPU.MI300X.8` VF nodes (16 ranks) with the self-contained
+`rccl-tests` image at ~356 GB/s bus bandwidth (8 GiB), at parity with the
+hostNetwork Pyxis run.
+
 ## Troubleshooting
 
 The commands below are shown in the direct (login pod) form. From the operator
@@ -1419,6 +1650,15 @@ image's RDMA Enroot hook cannot map the VF interfaces. Do not set
 `MELLANOX_VISIBLE_DEVICES`; bind `/dev/infiniband` into the container with
 `--container-mounts` instead. See
 [Running Pyxis over SR-IOV VFs](#running-pyxis-over-sr-iov-vfs).
+
+On SR-IOV VF (AMD) workers, if the job aborts during `MPI_Init` with `PML ucx
+cannot be selected` and `No components were able to be opened in the pml
+framework`, the OpenMPI `ucx` PML is rejecting the TCP control plane: its
+allowed-transport list defaults to IB transports only, so over the pod overlay
+(`UCX_TLS=tcp,self,sm`, `UCX_NET_DEVICES=eth0`) it disqualifies itself. Allow TCP
+with `--mca pml_ucx_tls any --mca pml_ucx_devices any` (or the env-var form
+`OMPI_MCA_pml_ucx_tls=any` / `OMPI_MCA_pml_ucx_devices=any` for the `srun` Pyxis
+path), as the RCCL SR-IOV VF variants show.
 
 If the job remains pending, check GPU node availability and GRES:
 
