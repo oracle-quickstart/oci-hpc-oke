@@ -211,7 +211,7 @@ locals {
 
   # AMD shapes run RCCL, NVIDIA shapes run NCCL; name the ConfigMap accordingly.
   nccl_rccl_configmap_is_amd    = contains(local.amd_gpu_plugin_shapes, local.nccl_rccl_configmap_shape)
-  nccl_rccl_configmap_name      = local.nccl_rccl_configmap_is_amd ? "rccl-parameters" : "nccl-parameters"
+  nccl_rccl_configmap_name      = local.nccl_rccl_configmap_is_amd ? "oci-rccl-parameters" : "oci-nccl-parameters"
   nccl_rccl_configmap_namespace = "default"
 
   deploy_nccl_rccl_param_configmap = alltrue([

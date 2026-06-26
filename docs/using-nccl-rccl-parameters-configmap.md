@@ -10,18 +10,18 @@ one environment variable per key.
 
 The ConfigMap name depends on the GPU vendor:
 
-- `nccl-parameters` for NVIDIA shapes
-- `rccl-parameters` for AMD shapes
+- `oci-nccl-parameters` for NVIDIA shapes
+- `oci-rccl-parameters` for AMD shapes
 
 The examples below use an NVIDIA H100 cluster, so they reference
-`nccl-parameters`. On an AMD cluster use `rccl-parameters` instead; the structure
+`oci-nccl-parameters`. On an AMD cluster use `oci-rccl-parameters` instead; the structure
 is identical. An example ConfigMap (NVIDIA H100):
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nccl-parameters
+  name: oci-nccl-parameters
   namespace: default
 data:
   NCCL_DEBUG: "WARN"
@@ -43,7 +43,7 @@ variable (default `true`). It is created only when `worker_rdma_enabled` or
 Verify it exists:
 
 ```bash
-kubectl get configmap nccl-parameters -n default -o yaml
+kubectl get configmap oci-nccl-parameters -n default -o yaml
 ```
 
 ## Quickstart
@@ -57,7 +57,7 @@ containers:
   image: ...
   envFrom:
   - configMapRef:
-      name: nccl-parameters
+      name: oci-nccl-parameters
 ```
 
 For an MPIJob the ranks run in the **worker** pods (`mpirun` launches them over
@@ -71,7 +71,7 @@ all:
           - name: mpi-worker
             envFrom:
             - configMapRef:
-                name: nccl-parameters
+                name: oci-nccl-parameters
             command:
             - /bin/bash
             - -c
@@ -113,7 +113,7 @@ After:
             image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
             envFrom:
             - configMapRef:
-                name: nccl-parameters
+                name: oci-nccl-parameters
             command:
               - /bin/bash
               - -c
@@ -221,7 +221,7 @@ spec:
     image: ...
     envFrom:
     - configMapRef:
-        name: nccl-parameters
+        name: oci-nccl-parameters
     command: ["torchrun", "..."]
 ```
 
@@ -232,7 +232,7 @@ spec:
   job's namespace:
 
   ```bash
-  kubectl get configmap nccl-parameters -n default -o yaml \
+  kubectl get configmap oci-nccl-parameters -n default -o yaml \
     | sed 's/namespace: default/namespace: <your-namespace>/' \
     | kubectl apply -f -
   ```
@@ -257,6 +257,6 @@ spec:
   see exactly which keys are present:
 
   ```bash
-  kubectl get configmap nccl-parameters -n default \
+  kubectl get configmap oci-nccl-parameters -n default \
     -o jsonpath='{.data}' | tr ',' '\n'
   ```
