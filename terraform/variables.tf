@@ -267,6 +267,11 @@ variable "operator_image_use_uri" {
   description = "Import the operator custom image from an Object Storage URI."
   type        = bool
 }
+variable "operator_allow_image_drift" {
+  default     = true
+  description = "Allow the operator instance image to drift from the latest resolved image without forcing replacement."
+  type        = bool
+}
 variable "operator_user" {
   default     = "auto"
   description = "The user used to SSH into the operator instance. Set to 'auto' to use opc for Oracle Linux images and ubuntu for all other images, or override with your own username."
