@@ -173,8 +173,21 @@ locals {
     configurations = local.nvidia_gpu_operator_addon_configurations
   }))
 
+  # The NVIDIA network-operator defaults its NicClusterPolicy DaemonSets (multus,
+  # cni-plugins, nv-ipam-node) to tolerate only nvidia.com/gpu. AMD GPU nodes are
+  # tainted amd.com/gpu=present:NoSchedule, so without this the CNI DaemonSets
+  # never schedule there and SR-IOV VF attachment silently fails. Tolerate both;
+  # an explicit var override still wins.
   nvidia_network_operator_addon_configurations = [
-    for k, v in var.nvidia_network_operator_configuration : { key = k, value = v }
+    for k, v in merge(
+      {
+        "nicClusterPolicy.tolerations" = jsonencode([
+          { key = "nvidia.com/gpu", operator = "Exists" },
+          { key = "amd.com/gpu", operator = "Exists" },
+        ])
+      },
+      var.nvidia_network_operator_configuration,
+    ) : { key = k, value = v }
   ]
 }
 
