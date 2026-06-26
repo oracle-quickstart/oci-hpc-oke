@@ -4,6 +4,8 @@
 
 Node Boot Volume Replacement brings significant operational benefits when managing bare metal worker nodes in OKE. It enables updates to key node attributes—like Kubernetes version, host image, and SSH keys—without terminating the underlying instance, preserving the instance OCID and network identity. This is especially valuable for bare metal nodes, where replacement times are longer and shape availability can be constrained. By eliminating the need to re-provision entire instances, the process becomes faster and more resource-efficient, reducing downtime and minimizing disruption to workloads. It also supports use cases like correcting configuration drift and applying critical security updates with minimal operational complexity.
 
+The script works on both self-managed nodes and OKE managed node pools. See the [Managed node pools](#managed-node-pools) section below for the differences.
+
 ## Script vs OKE Native BVR
 
 The [OKE Native BVR](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/replace-boot-volume-worker-node-top.htm) doesn't support cloud-init upgrade on the self-managed nodes. This is extremely important when working with BM nodes using the RDMA network.
@@ -58,6 +60,19 @@ NAME          STATUS   ROLES   AGE     VERSION
 
 uv run bvr-script.py -c ocid1.compartment.oc1..aaaaaaaaqi3if6t4n24qyabx5pjzlw6xovcbgugcmatavjvapyq3jfb4diqq --auth instance_principal --region eu-frankfurt-1 10.30.1.242 --desired-k8s-version v1.32.1
 ```
+
+### Managed node pools
+
+The script also works on OKE managed node pool nodes, with two differences from self-managed nodes:
+
+1. **Pass the OKE node name, not the IP.** Managed node pool nodes are named like `oke-cxhuk3rmsoq-nienmrznc6a-s6f372m3efa-0`, not by their IP. Use that name as the `nodes` argument. (The IP works only for self-managed nodes, whose Kubernetes node name is the IP.)
+
+2. **Managed behavior is auto-detected.** The script detects managed nodes via the `oci.oraclecloud.com/node.info.managed=true` label and adjusts automatically:
+   - It **preserves the Kubernetes Node object** (it does not delete it). The per-node `NativePodNetwork` (NPN) custom resource is owned by the Node, so deleting the Node would cascade-delete the NPN. Nothing recreates it, and the VCN-native IP CNI would then hang waiting for the NPN, leaving the node `NotReady`.
+   - It **refreshes the bootstrap token.** Replacing the boot volume wipes `/var/lib/kubelet`, forcing a fresh kubelet TLS bootstrap using the token in the instance's `bootstrap-kubelet-conf` metadata. That token may have expired, so the script mints a fresh kubeadm-style bootstrap token, registers it in `kube-system`, and swaps it into the metadata before the replacement.
+   - It **uncordons the node** once it rejoins (the node stays cordoned across the replacement because the Node object is preserved).
+
+Prerequisite: the kubeconfig used must be able to create secrets in the `kube-system` namespace (the OKE operator / a cluster-admin kubeconfig can).
 
 ### Notes
 

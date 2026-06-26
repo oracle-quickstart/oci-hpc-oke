@@ -307,7 +307,7 @@ NCCL version 2.25.1+cuda12.8
 - [Deploying the Slurm Operator Full Suite](./docs/deploying-slurm-operator-full-suite.md)
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
 - [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
-- [Replacing the boot volume of self-managed nodes using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
+- [Replacing the boot volume of self-managed nodes and managed node pools using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
 - [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
 - [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
 - [Running ib_write_bw Tests Between Nodes](./docs/running-ib-write-bw-test.md)

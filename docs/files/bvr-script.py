@@ -6,8 +6,9 @@
 #   "oci==2.159.0"
 # ]
 # ///
-import argparse, base64, gzip, io, json, logging, os, re, sys, traceback
+import argparse, base64, gzip, io, json, logging, os, re, secrets, string, sys, traceback
 import concurrent.futures
+from datetime import datetime, timedelta, timezone
 
 from kubernetes import client as kubernetes_client
 from kubernetes import config as kubernetes_config
@@ -19,6 +20,11 @@ from oci.auth.signers import InstancePrincipalsSecurityTokenSigner
 from oci.signer import Signer
 
 logger = logging.getLogger(__name__)
+
+# Label set by OKE on managed node pool nodes. Self-managed nodes don't carry it.
+MANAGED_NODE_LABEL = "oci.oraclecloud.com/node.info.managed"
+# TTL for the bootstrap token minted to let a managed node re-bootstrap after BVR.
+BOOTSTRAP_TOKEN_TTL_MINUTES = 60
 
 class BootVolumeReplacer:
     # BVR will try to use the "DEFAULT" profile in the ~/.oci/config file and
@@ -136,15 +142,19 @@ class BootVolumeReplacer:
         return k8s_node_details
 
     def get_node_details(self, node):
-        
+
         ##  Fetch the OCI instance details based on Kubernetes node name.
         k8s_node_details = self._get_k8s_node_details(node)
-        
+
         is_k8s_node = False
+        is_managed = False
         if k8s_node_details:
             is_k8s_node = True
-            instance_display_name = k8s_node_details.metadata.labels.get('displayName', k8s_node_details.metadata.labels.get('hostname', ""))
-            
+            labels = k8s_node_details.metadata.labels or {}
+            # Managed node pool nodes need NPN preservation and a fresh bootstrap token.
+            is_managed = labels.get(MANAGED_NODE_LABEL) == "true"
+            instance_display_name = labels.get('displayName', labels.get('hostname', ""))
+
             core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
             if self.auth == "cloud_shell":
                 core_client.base_client.signer.delegation_token = self._get_delegation_token()
@@ -152,16 +162,16 @@ class BootVolumeReplacer:
                 compartment_id=self.compartment_id,
                 display_name=instance_display_name,
                 lifecycle_state="RUNNING")
-            
+
             if len(list_instances_response.data) == 0:
                 logger.error(f"No running instance found with display name {instance_display_name} in compartment {self.compartment_id} corresponding to the Kubernetes node {node} in state 'Running'.")
-                return None, is_k8s_node
+                return None, is_k8s_node, is_managed
             else:
                 logger.info(f"Identified instance {list_instances_response.data[0].id} for the kubernetes node {node}.")
                 response = input(f"Continue BVR for node {node}? [y/n]: \n") if self.interactive else "y"
                 if response.lower() != "y":
-                    return False, is_k8s_node
-                return list_instances_response.data[0], is_k8s_node
+                    return False, is_k8s_node, is_managed
+                return list_instances_response.data[0], is_k8s_node, is_managed
         else:
             if node.startswith("ocid1.instance"):
                 core_client = ComputeClient(config = self.oci_config, signer = self.oci_signer)
@@ -169,9 +179,9 @@ class BootVolumeReplacer:
                     core_client.base_client.signer.delegation_token = self._get_delegation_token()
                 get_instances_response = core_client.get_instance(
                     instance_id=node)
-                return get_instances_response.data, is_k8s_node
+                return get_instances_response.data, is_k8s_node, is_managed
         logger.error(f"Failed to fetch instance details for {node}.")
-        return None, is_k8s_node
+        return None, is_k8s_node, is_managed
 
 
     def check_image_compatibility(self, image_id, shape_name):
@@ -242,6 +252,60 @@ class BootVolumeReplacer:
             return True
         except Exception as e:
             raise Exception(f"Failed to delete node {kubernetes_node}:\n{traceback.format_exc()}")
+
+
+    def uncordon_node(self, kubernetes_node):
+        # Make the node schedulable again (managed nodes stay cordoned across BVR).
+        api_instance = kubernetes_client.CoreV1Api()
+        api_instance.patch_node(kubernetes_node, {"spec": {"unschedulable": False}})
+        logger.info(f"Uncordoned node: {kubernetes_node}.")
+
+
+    def _create_bootstrap_token_secret(self, token_id, token_secret):
+        # Create a kubeadm-style bootstrap token secret so the rebooted kubelet can
+        # TLS-bootstrap and have its CSR auto-approved (matches OKE's token layout).
+        api_instance = kubernetes_client.CoreV1Api()
+        expiration = (datetime.now(timezone.utc) + timedelta(minutes=BOOTSTRAP_TOKEN_TTL_MINUTES)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        secret = kubernetes_client.V1Secret(
+            metadata=kubernetes_client.V1ObjectMeta(name=f"bootstrap-token-{token_id}", namespace="kube-system"),
+            type="bootstrap.kubernetes.io/token",
+            string_data={
+                "token-id": token_id,
+                "token-secret": token_secret,
+                "expiration": expiration,
+                "usage-bootstrap-authentication": "true",
+                "usage-bootstrap-signing": "true",
+                "auth-extra-groups": "system:bootstrappers:kubeadm:default-node-token",
+                "description": "Token for BVR node re-bootstrap generated by bvr-script.",
+            },
+        )
+        try:
+            api_instance.create_namespaced_secret(namespace="kube-system", body=secret)
+        except Exception as e:
+            raise Exception(f"Failed to create bootstrap token secret bootstrap-token-{token_id}:\n{traceback.format_exc()}")
+
+
+    def _refresh_bootstrap_token(self, metadata, k8s_node):
+        # Managed nodes TLS-bootstrap kubelet using the token in the 'bootstrap-kubelet-conf'
+        # metadata. BVR wipes the boot volume, forcing a fresh bootstrap, but the embedded
+        # token may have expired. Mint a fresh one and swap it into the conf.
+        bootstrap_conf_b64 = metadata.get("bootstrap-kubelet-conf")
+        if not bootstrap_conf_b64:
+            logger.warning(f"No 'bootstrap-kubelet-conf' in metadata for node {k8s_node}; skipping bootstrap token refresh.")
+            return metadata
+
+        token_id = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
+        token_secret = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(16))
+        self._create_bootstrap_token_secret(token_id, token_secret)
+
+        bootstrap_conf = base64.standard_b64decode(bootstrap_conf_b64).decode("utf-8")
+        bootstrap_conf, replaced = re.subn(r"token:\s*[a-z0-9]{6}\.[a-z0-9]{16}", f"token: {token_id}.{token_secret}", bootstrap_conf)
+        if not replaced:
+            logger.warning(f"Could not find a bootstrap token to replace in 'bootstrap-kubelet-conf' for node {k8s_node}.")
+            return metadata
+        metadata["bootstrap-kubelet-conf"] = base64.standard_b64encode(bootstrap_conf.encode("utf-8")).decode("utf-8")
+        logger.info(f"Refreshed bootstrap token for node {k8s_node} (token id {token_id}, valid {BOOTSTRAP_TOKEN_TTL_MINUTES}m).")
+        return metadata
 
 
     def evict_pod(self, policy_v1, pod, kubernetes_node):
@@ -352,22 +416,34 @@ class BootVolumeReplacer:
         return True
     
 
-    def wait_for_completion(self, k8s_node, timeout_seconds=600):
+    def wait_for_completion(self, k8s_node, timeout_seconds=600, require_reboot=False):
         # Method to wait for the completion of the boot volume replacement process
         # wait for the node to join the Kubernetes cluster.
+        # When require_reboot is set (managed nodes, whose Node object is not deleted),
+        # the node must be seen NotReady (reboot) before Ready counts, otherwise a stale
+        # pre-reboot Ready=True would be reported as success.
         api_instance = kubernetes_client.CoreV1Api()
         w = kubernetes_watch.Watch()
-        
+        seen_not_ready = not require_reboot
+
         try:
             for event in w.stream(api_instance.list_node, timeout_seconds=timeout_seconds):
                 node = event['object']
-                if node.metadata.name == k8s_node:
-                    for condition in node.status.conditions:
-                        if condition.type == 'Ready' and condition.status == 'True':
-                            logger.info(f"Node {k8s_node} is ready.")
-                            w.stop()
-                            return True
-                        
+                if node.metadata.name != k8s_node:
+                    continue
+                ready_status = None
+                for condition in node.status.conditions or []:
+                    if condition.type == 'Ready':
+                        ready_status = condition.status
+                if ready_status != 'True':
+                    if not seen_not_ready:
+                        logger.info(f"Node {k8s_node} went NotReady; reboot in progress.")
+                    seen_not_ready = True
+                elif seen_not_ready:
+                    logger.info(f"Node {k8s_node} is ready.")
+                    w.stop()
+                    return True
+
             logger.error(f"The node has not rejoined the cluster in {timeout_seconds} seconds.")
             return False
         except Exception as e:
@@ -377,7 +453,7 @@ class BootVolumeReplacer:
     def upgrade_node(self, k8s_node):
         ## Method that brings together all the steps to replace the boot volume on a self managed instance.
         # Fetching the instance details
-        instance_details, is_k8s_node = self.get_node_details(k8s_node)
+        instance_details, is_k8s_node, is_managed = self.get_node_details(k8s_node)
         if instance_details is None:
             raise Exception(f"Failed to identify the instance details for node {k8s_node}")
         if instance_details is False:
@@ -417,18 +493,29 @@ class BootVolumeReplacer:
 
         if self.ssh_authorized_keys:
             new_metadata['ssh_authorized_keys'] = self.ssh_authorized_keys
-        
+
+        # Managed nodes re-bootstrap kubelet from the metadata bootstrap token after BVR.
+        # Refresh it before any destructive step so an expired token can't strand the node.
+        if is_managed:
+            new_metadata = self._refresh_bootstrap_token(new_metadata, k8s_node)
+
         if is_k8s_node:
             cordon_and_drain_result = self.cordon_and_drain_node(k8s_node)
             if cordon_and_drain_result:
                 logger.info(f"Successfuly drained the node {k8s_node}.")
-            
-            delete_node_result = self.delete_node(k8s_node)
-            if delete_node_result:
-                logger.info(f'Successfuly deleted the node {k8s_node} from the Kubernetes cluster.')
+
+            if is_managed:
+                # Deleting the Node object would cascade-delete its NativePodNetwork (NPN)
+                # CR (owned by the Node), and nothing recreates it, so the VCN-native CNI
+                # never configures and the node stays NotReady. Keep the Node instead.
+                logger.info(f"Node {k8s_node} is a managed node pool node; preserving the Node object to keep its NativePodNetwork. Skipping node deletion.")
             else:
-                logger.error(f"Failed to delete the node {k8s_node} from the Kubernetes cluster.")
-                return None, False
+                delete_node_result = self.delete_node(k8s_node)
+                if delete_node_result:
+                    logger.info(f'Successfuly deleted the node {k8s_node} from the Kubernetes cluster.')
+                else:
+                    logger.error(f"Failed to delete the node {k8s_node} from the Kubernetes cluster.")
+                    return None, False
         
         if self.bv_size:
             new_bv_size = self.bv_size
@@ -455,13 +542,21 @@ class BootVolumeReplacer:
         logger.info(f"Waiting {self.timeout_seconds} seconds for node {k8s_node} to be ready...")
 
         if is_k8s_node:
-            wait_for_completion_result = self.wait_for_completion(k8s_node, self.timeout_seconds)
+            # For managed nodes the Node object is never deleted, so its pre-reboot
+            # Ready=True can still be in the API. Require a NotReady->Ready transition.
+            wait_for_completion_result = self.wait_for_completion(k8s_node, self.timeout_seconds, require_reboot=is_managed)
             if wait_for_completion_result:
                 logger.info(f'The boot volume replacement for instance {instance_details.id} has been completed successfully.')
                 result = True
             else:
                 logger.error(f'The boot volume replacement for instance {instance_details.id} failed.')
                 result = False
+            if is_managed:
+                # Always restore schedulability: we cordoned the (preserved) Node for the
+                # drain, so undo it regardless of the wait result. Slow BM nodes can exceed
+                # the timeout yet still rejoin; a node that is still NotReady won't be
+                # scheduled anyway, so uncordoning is safe.
+                self.uncordon_node(k8s_node)
         else:
             result = True
         return result, instance_details.metadata['user_data'] != new_cloud_init
