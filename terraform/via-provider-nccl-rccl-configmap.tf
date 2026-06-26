@@ -163,7 +163,7 @@ locals {
       NCCL_IB_FIFO_TC                            = "185"
       NCCL_IGNORE_CPU_AFFINITY                   = "1"
       NCCL_PXN_DISABLE                           = "0"
-      NCCL_DMABUF_ENABLE                         = "1"
+      NCCL_DMABUF_ENABLE                         = "0"
       NCCL_DEBUG                                 = "WARN"
       NCCL_NET_OPTIONAL_RECV_COMPLETION          = "1"
       RCCL_IB_ABORT_ON_ERROR                     = "1"
