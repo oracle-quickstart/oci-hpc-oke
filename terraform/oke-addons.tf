@@ -127,6 +127,7 @@ locals {
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     var.deploy_nvidia_gpu_operator,
+    var.deploy_nvidia_network_operator,
   ])
 
   managed_addon_non_gpu_pool_ids = compact([
@@ -165,6 +166,27 @@ locals {
         "migManager.enabled"                    = tostring(var.nvidia_gpu_operator_mig_manager_enabled)
         "mig.strategy"                          = var.nvidia_gpu_operator_mig_strategy
       }
+    ) : { key = k, value = v }
+  ]
+  nvidia_gpu_operator_rollout_trigger = sha256(jsonencode({
+    version        = var.nvidia_gpu_operator_addon_version
+    configurations = local.nvidia_gpu_operator_addon_configurations
+  }))
+
+  # The NVIDIA network-operator defaults its NicClusterPolicy DaemonSets (multus,
+  # cni-plugins, nv-ipam-node) to tolerate only nvidia.com/gpu. AMD GPU nodes are
+  # tainted amd.com/gpu=present:NoSchedule, so without this the CNI DaemonSets
+  # never schedule there and SR-IOV VF attachment silently fails. Tolerate both;
+  # an explicit var override still wins.
+  nvidia_network_operator_addon_configurations = [
+    for k, v in merge(
+      {
+        "nicClusterPolicy.tolerations" = jsonencode([
+          { key = "nvidia.com/gpu", operator = "Exists" },
+          { key = "amd.com/gpu", operator = "Exists" },
+        ])
+      },
+      var.nvidia_network_operator_configuration,
     ) : { key = k, value = v }
   ]
 }
@@ -422,5 +444,116 @@ resource "oci_containerengine_addon" "nvidia_gpu_operator" {
     kubectl_manifest.nvidia_dcgm_exporter_metrics,
     null_resource.nvidia_dcgm_exporter_metrics_via_operator,
     oci_containerengine_addon.node_feature_discovery,
+  ]
+}
+
+# The GPU operator's container-toolkit installs the NVIDIA runtime and runs
+# "systemctl restart crio" on each GPU node. That restart tears down the
+# networking of pods the prior crio wired (nv-ipam controller/node), stranding
+# them. Gate the network operator install on the toolkit rollout so nv-ipam pods
+# are wired by the already-restarted crio. Operator path polls the daemonset;
+# local/ORM has no shell so it waits a fixed buffer.
+resource "null_resource" "wait_for_gpu_operator_toolkit" {
+  count = alltrue([
+    var.deploy_nvidia_gpu_operator,
+    var.nvidia_gpu_operator_toolkit_enabled,
+    var.deploy_nvidia_network_operator,
+    local.deploy_from_operator,
+  ]) ? 1 : 0
+
+  triggers = {
+    bastion_host                 = module.oke.bastion_public_ip
+    bastion_user                 = local.bastion_user
+    ssh_private_key              = tls_private_key.stack_key.private_key_openssh
+    operator_host                = module.oke.operator_private_ip
+    operator_user                = local.operator_user
+    gpu_operator_rollout_trigger = local.nvidia_gpu_operator_rollout_trigger
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
+      "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
+      "for i in $(seq 1 60); do if kubectl -n ${local.nvidia_gpu_operator_namespace} get daemonset nvidia-container-toolkit-daemonset >/dev/null 2>&1; then echo 'GPU toolkit daemonset is present.'; break; else echo \"Waiting for GPU toolkit daemonset... ($i/60)\"; sleep 10; fi; done",
+      "if ! kubectl -n ${local.nvidia_gpu_operator_namespace} get daemonset nvidia-container-toolkit-daemonset >/dev/null 2>&1; then echo 'ERROR: GPU toolkit daemonset not available after 10 minutes!'; exit 1; fi",
+      "echo 'Waiting for GPU toolkit rollout (crio restart) to settle...'; kubectl -n ${local.nvidia_gpu_operator_namespace} rollout status daemonset/nvidia-container-toolkit-daemonset --timeout=900s",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [
+    module.oke,
+    oci_containerengine_addon.nvidia_gpu_operator,
+  ]
+}
+
+resource "time_sleep" "wait_for_gpu_operator_toolkit" {
+  count = alltrue([
+    var.deploy_nvidia_gpu_operator,
+    var.nvidia_gpu_operator_toolkit_enabled,
+    var.deploy_nvidia_network_operator,
+    local.deploy_from_local || local.deploy_from_orm,
+  ]) ? 1 : 0
+
+  create_duration = "300s"
+
+  triggers = {
+    gpu_operator_rollout_trigger = local.nvidia_gpu_operator_rollout_trigger
+  }
+
+  depends_on = [
+    module.oke,
+    oci_containerengine_addon.nvidia_gpu_operator,
+  ]
+}
+
+resource "oci_containerengine_addon" "nvidia_network_operator" {
+  count = var.deploy_nvidia_network_operator ? 1 : 0
+
+  addon_name = "NvidiaNetworkOperator"
+  cluster_id = module.oke.cluster_id
+
+  override_existing                = true
+  remove_addon_resources_on_delete = true
+  version                          = var.nvidia_network_operator_addon_version
+
+  dynamic "configurations" {
+    for_each = local.nvidia_network_operator_addon_configurations
+
+    content {
+      key   = configurations.value.key
+      value = configurations.value.value
+    }
+  }
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+    oci_containerengine_addon.node_feature_discovery,
+    null_resource.wait_for_gpu_operator_toolkit,
+    time_sleep.wait_for_gpu_operator_toolkit,
   ]
 }

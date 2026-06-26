@@ -11,6 +11,12 @@ locals {
 
 resource "helm_release" "kueue" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  # cert-manager must finish installing before the Kueue chart registers its
+  # cluster-wide Deployment webhook, otherwise cert-manager's own Deployments
+  # are rejected with "no endpoints available for service
+  # kueue-webhook-service". The probe below can plan zero instances and
+  # ordering does not carry through a zero-instance resource, so cert-manager
+  # is listed directly.
   depends_on = [
     module.oke,
     helm_release.cert_manager,

@@ -112,7 +112,7 @@ locals {
     worker_host_network            = local.slinky_worker_host_network
     worker_sriov_enabled           = local.slinky_worker_sriov_enabled
     worker_rdma_resource           = var.slinky_worker_rdma_resource
-    worker_rdma_vfs_per_node       = var.slinky_worker_rdma_vfs_per_node
+    worker_rdma_vfs_per_node       = local.slinky_worker_rdma_vfs_per_node
     worker_rdma_networks           = local.slinky_worker_rdma_networks_annotation
     worker_slurmd_parameters       = local.slinky_worker_slurmd_parameters
     worker_numa_topology_enabled   = local.slinky_worker_numa_topology_enabled
@@ -747,12 +747,15 @@ module "slinky_operator" {
 
   # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
   # installing this chart while Kueue is still starting fails with "no
-  # endpoints available for service kueue-webhook-service".
+  # endpoints available for service kueue-webhook-service". The chart also
+  # ships cert-manager Certificates and Issuers whose admission needs the
+  # cert-manager webhook to have ready endpoints.
   depends_on = [
     module.slinky_operator_crds,
     module.kueue,
     helm_release.kueue,
     kubectl_manifest.kueue_webhook_probe,
+    helm_release.cert_manager,
   ]
 }
 

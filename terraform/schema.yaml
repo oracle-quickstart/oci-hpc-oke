@@ -314,6 +314,8 @@ variableGroups:
 
   - title: "Preview Features (not for production use)"
     variables:
+      - deploy_nvidia_network_operator
+      - nvidia_network_operator_addon_version
       - install_slinky
       - slinky_advanced_options
       - hostname_override
@@ -2516,7 +2518,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_network_mode:
     title: Slurm worker network mode
-    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs."
+    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed."
     type: enum
     enum:
       - hostNetwork
@@ -2564,32 +2566,38 @@ variables:
     title: Slurm worker RDMA VF resource
     description: "Extended resource requested by pod-networked Slinky RDMA workers."
     type: string
-    default: "nvidia.com/sriov-rdma-vf"
+    default: "nvidia.com/rdma-vf"
     visible:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_worker_rdma_vfs_per_node:
     title: Slurm worker RDMA VFs
-    description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker."
+    description: "Number of SR-IOV RDMA VFs requested by each pod-networked Slinky RDMA worker. Leave unset to derive the safe default from the selected worker shape."
     type: integer
-    default: 16
+    required: false
     visible:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_worker_rdma_network:
     title: Slurm worker RDMA network
     description: "Multus NetworkAttachmentDefinition for pod-networked Slinky RDMA workers. Use namespace/name when needed."
     type: string
-    default: "default/sriov-rdma-vf"
+    default: "default/rdma-vf"
     visible:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
-        - eq: [slinky_worker_network_mode, virtualFunctions]
+        - or:
+            - eq: [slinky_worker_network_mode, virtualFunctions]
+            - ${deploy_nvidia_network_operator}
   slinky_gpu_autodetect:
     title: Slurm GPU AutoDetect
     description: "Use auto to select rsmi for AMD shapes and nvml for NVIDIA shapes."
@@ -2860,6 +2868,54 @@ variables:
         - ${install_slinky}
         - ${slinky_advanced_options}
         - ${slinky_cpu_worker_enabled}
+
+  # NVIDIA Network Operator
+  deploy_nvidia_network_operator:
+    title: Install NVIDIA Network Operator add-on
+    type: boolean
+    description: "Install the NVIDIA Network Operator OKE add-on with the SR-IOV Network Operator enabled. Requires the Node Feature Discovery add-on. Currently supported shapes: BM.GPU4.8, BM.GPU.A100-v2.8, BM.GPU.B4.8, BM.GPU.B200.8, BM.GPU.B300.8, BM.GPU.H100.8, BM.GPU.H200.8, BM.GPU.MI300X.8, BM.GPU.MI355X-v1.8."
+    default: false
+    visible:
+      - deploy_node_feature_discovery
+  nvidia_network_operator_addon_version:
+    title: NVIDIA Network Operator add-on version
+    type: enum
+    description: Version of the NVIDIA Network Operator OKE add-on.
+    default: "v25.10.0"
+    required: true
+    enum:
+      - "v25.10.0"
+    visible: ${deploy_nvidia_network_operator}
+  nvidia_network_operator_configuration:
+    title: NVIDIA Network Operator add-on configurations
+    type: map(string)
+    description: Configuration key-value pairs for the NVIDIA Network Operator OKE add-on.
+    visible: false
+  nvidia_network_operator_ipam_subnet:
+    title: NVIDIA IPAM IP pool subnet
+    type: string
+    description: Subnet for the NVIDIA IPAM IP pool used by SR-IOV network interfaces.
+    default: "192.168.0.0/16"
+    visible: false
+  nvidia_network_operator_ipam_gateway:
+    title: NVIDIA IPAM IP pool gateway
+    type: string
+    description: Gateway for the NVIDIA IPAM IP pool used by SR-IOV network interfaces.
+    default: "192.168.0.1"
+    visible: false
+  nvidia_network_operator_ipam_per_node_block_size:
+    title: NVIDIA IPAM IPs per node
+    type: integer
+    description: Number of IPs allocated to each node from the NVIDIA IPAM IP pool.
+    default: 100
+    visible: false
+  nvidia_network_operator_sriov_max_unavailable:
+    title: SR-IOV maximum unavailable nodes
+    type: string
+    description: Percentage or number of nodes that can be drained or rebooted concurrently during SR-IOV VF configuration.
+    default: "100%"
+    visible: false
+
   # OCI HPC OKE Utils
   install_oci_hpc_oke_utils:
     title: Install OCI HPC OKE Utils

@@ -102,16 +102,44 @@ locals {
     local.slinky_is_amd ? local.slinky_image_profile.amd_worker_tag : local.slinky_image_profile.nvidia_worker_tag
   ) : var.slinky_worker_image_tag
 
-  slinky_worker_host_network = var.slinky_worker_network_mode == "hostNetwork"
+  # The NVIDIA Network Operator provisions the SR-IOV RDMA VFs, so enabling it
+  # forces the Slurm workers onto virtualFunctions (hostNetwork would leave the
+  # VFs unused). Otherwise honor the requested mode.
+  slinky_worker_network_mode_effective = var.deploy_nvidia_network_operator ? "virtualFunctions" : var.slinky_worker_network_mode
+  slinky_worker_host_network           = local.slinky_worker_network_mode_effective == "hostNetwork"
+
+  # Per-shape SR-IOV RDMA VF count. Must match the number of rootDevices the
+  # matching policy selects in files/nvidia-network-operator/sriov-network-node-policy.yaml
+  # (numVfs is 1, so advertised VFs/node equals the number of RDMA PFs the shape
+  # exposes). Single-port shapes (B200, H200, MI300X, MI355X) expose 8; dual-port
+  # shapes expose 16. Pods must not request more VFs than this or they stay
+  # unschedulable.
+  slinky_shape_rdma_vf_count = {
+    "BM.GPU4.8"          = 16
+    "BM.GPU.A100-v2.8"   = 16
+    "BM.GPU.B4.8"        = 16
+    "BM.GPU.B200.8"      = 8
+    "BM.GPU.H100.8"      = 16
+    "BM.GPU.H200.8"      = 8
+    "BM.GPU.MI300X.8"    = 8
+    "BM.GPU.MI355X-v1.8" = 8
+    "BM.GPU.B300.8"      = 16
+  }
+  # Effective VF request per worker: explicit override, else derive from the
+  # shape so the request never exceeds what the Network Operator advertises.
+  slinky_worker_rdma_vfs_per_node = coalesce(
+    var.slinky_worker_rdma_vfs_per_node,
+    lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0)
+  )
 
   slinky_worker_sriov_enabled = alltrue([
     !local.slinky_worker_host_network,
     trimspace(coalesce(var.slinky_worker_rdma_network, "")) != "",
     trimspace(coalesce(var.slinky_worker_rdma_resource, "")) != "",
-    coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > 0,
+    local.slinky_worker_rdma_vfs_per_node > 0,
   ])
   slinky_worker_rdma_networks_annotation = local.slinky_worker_sriov_enabled ? join(",", [
-    for _ in range(coalesce(var.slinky_worker_rdma_vfs_per_node, 0)) : var.slinky_worker_rdma_network
+    for _ in range(local.slinky_worker_rdma_vfs_per_node) : var.slinky_worker_rdma_network
   ]) : ""
 
   slinky_worker_numa_topology_enabled = contains(["BM.GPU.B4.8"], local.slinky_worker_shape)

@@ -71,6 +71,28 @@ locals {
     var.install_slinky,
     !local.create_fss_effective,
   ])
+  invalid_slinky_virtual_functions = alltrue([
+    var.install_slinky,
+    local.slinky_gpu_nodeset_enabled,
+    local.slinky_worker_network_mode_effective == "virtualFunctions",
+    anytrue([
+      !var.worker_rdma_enabled,
+      !contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
+      trimspace(coalesce(var.slinky_worker_rdma_network, "")) == "",
+      trimspace(coalesce(var.slinky_worker_rdma_resource, "")) == "",
+      local.slinky_worker_rdma_vfs_per_node <= 0,
+    ]),
+  ])
+  # An explicit VF request must not exceed what the chosen shape's SR-IOV policy
+  # advertises, or worker pods stay unschedulable.
+  invalid_slinky_rdma_vfs_per_node = alltrue([
+    var.install_slinky,
+    local.slinky_gpu_nodeset_enabled,
+    local.slinky_worker_network_mode_effective == "virtualFunctions",
+    var.slinky_worker_rdma_vfs_per_node != null,
+    contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
+    coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0),
+  ])
   invalid_slinky_openldap_topology = alltrue([
     var.install_slinky,
     var.slinky_identity_enabled,
@@ -80,8 +102,9 @@ locals {
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
 
-  invalid_gpu_operator_without_nfd = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
-  invalid_nvidia_dra_without_nfd   = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
+  invalid_gpu_operator_without_nfd     = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
+  invalid_network_operator_without_nfd = var.deploy_nvidia_network_operator && !var.deploy_node_feature_discovery
+  invalid_nvidia_dra_without_nfd       = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -264,6 +287,28 @@ resource "null_resource" "validate_slinky_fss" {
   }
 }
 
+resource "null_resource" "validate_slinky_virtual_functions" {
+  count = local.invalid_slinky_virtual_functions ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_virtual_functions
+      error_message = "slinky_worker_network_mode=virtualFunctions requires worker_rdma_enabled=true, a VF-capable RDMA worker shape, non-empty slinky_worker_rdma_resource and slinky_worker_rdma_network, and slinky_worker_rdma_vfs_per_node > 0."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_rdma_vfs_per_node" {
+  count = local.invalid_slinky_rdma_vfs_per_node ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_rdma_vfs_per_node
+      error_message = "slinky_worker_rdma_vfs_per_node (${coalesce(var.slinky_worker_rdma_vfs_per_node, 0)}) exceeds the SR-IOV VFs advertised for ${local.slinky_worker_shape} (${lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0)}). Lower it to that value or less, or leave it null to auto-derive."
+    }
+  }
+}
+
 resource "null_resource" "validate_slinky_openldap_topology" {
   count = local.invalid_slinky_openldap_topology ? 1 : 0
 
@@ -293,6 +338,17 @@ resource "null_resource" "validate_gpu_operator_requires_nfd" {
     precondition {
       condition     = !local.invalid_gpu_operator_without_nfd
       error_message = "NVIDIA GPU Operator addon requires Node Feature Discovery. Please set `deploy_node_feature_discovery=true` or set `deploy_nvidia_gpu_operator=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_network_operator_requires_nfd" {
+  count = local.invalid_network_operator_without_nfd ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_network_operator_without_nfd
+      error_message = "NVIDIA Network Operator addon requires Node Feature Discovery. Please set `deploy_node_feature_discovery=true` or set `deploy_nvidia_network_operator=false`."
     }
   }
 }
