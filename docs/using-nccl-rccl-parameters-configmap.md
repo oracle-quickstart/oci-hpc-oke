@@ -260,3 +260,61 @@ spec:
   kubectl get configmap oci-nccl-parameters -n default \
     -o jsonpath='{.data}' | tr ',' '\n'
   ```
+
+## Creating the ConfigMap manually
+
+Create it yourself when Terraform does not: `deploy_nccl_rccl_param_configmap`
+is `false`, the deployed shape is not in the parameter set, or you want the
+ConfigMap in a namespace other than `default`.
+
+1. Look up the parameters for your shape in
+   [recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md),
+   one environment variable per key.
+2. Name it `oci-nccl-parameters` on NVIDIA shapes or `oci-rccl-parameters` on
+   AMD shapes.
+3. For `NCCL_IB_HCA`, use the shape's full device list on a non-VF cluster, or
+   `mlx5` when SR-IOV virtual functions are enabled for that shape.
+
+Apply the manifest (NVIDIA H100 example; swap in your shape's keys and
+namespace):
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oci-nccl-parameters
+  namespace: default
+data:
+  NCCL_DEBUG: "WARN"
+  NCCL_CUMEM_ENABLE: "0"
+  NCCL_IB_SPLIT_DATA_ON_QPS: "0"
+  NCCL_IB_GID_INDEX: "3"
+  NCCL_IB_HCA: "=mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17"
+  NCCL_IB_TC: "41"
+  NCCL_IB_SL: "0"
+  NCCL_IB_TIMEOUT: "22"
+  NCCL_SOCKET_IFNAME: "eth0"
+  NCCL_IGNORE_CPU_AFFINITY: "1"
+EOF
+```
+
+Or build it from literals without writing YAML:
+
+```bash
+kubectl create configmap oci-nccl-parameters -n default \
+  --from-literal=NCCL_DEBUG=WARN \
+  --from-literal=NCCL_CUMEM_ENABLE=0 \
+  --from-literal=NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+  --from-literal=NCCL_IB_GID_INDEX=3 \
+  --from-literal=NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_12,mlx5_13,mlx5_14,mlx5_15,mlx5_16,mlx5_17 \
+  --from-literal=NCCL_IB_TC=41 \
+  --from-literal=NCCL_IB_SL=0 \
+  --from-literal=NCCL_IB_TIMEOUT=22 \
+  --from-literal=NCCL_SOCKET_IFNAME=eth0 \
+  --from-literal=NCCL_IGNORE_CPU_AFFINITY=1
+```
+
+The leading `=` in `NCCL_IB_HCA` is the NCCL exact-name-match prefix, not a typo;
+keep it. For a VF cluster, replace the whole device list with the single value
+`mlx5`.
