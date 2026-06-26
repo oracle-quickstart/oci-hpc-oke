@@ -294,6 +294,7 @@ module "oke" {
   operator_install_oci_cli_from_repo = true
   operator_install_k9s               = true
   operator_install_kubectx           = true
+  operator_allow_image_drift         = var.operator_allow_image_drift
   operator_shape = {
     shape            = var.operator_shape_name
     ocpus            = lookup(local.operator_denseio_ocpus, var.operator_shape_name, var.operator_shape_ocpus)
