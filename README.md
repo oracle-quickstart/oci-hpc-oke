@@ -317,6 +317,7 @@ NCCL version 2.25.1+cuda12.8
 - [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./docs/using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md)
 - [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
+- [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./docs/using-nccl-rccl-parameters-configmap.md)
 - [CVE-2026-31431 ("Copy Fail")](./docs/copy-fail.md)
 - [Dirty Frag: CVE-2026-43284, CVE-2026-43500](./docs/dirty-frag.md)
 
