@@ -744,20 +744,21 @@ module "slinky_operator" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n${local.slinky_operator_image_values}"
+  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n${local.slinky_operator_generated_values}"
   helm_user_values_override     = var.slinky_operator_values_override
 
   # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
   # installing this chart while Kueue is still starting fails with "no
   # endpoints available for service kueue-webhook-service". The chart also
-  # ships cert-manager Certificates and Issuers whose admission needs the
-  # cert-manager webhook to have ready endpoints.
+  # ships cert-manager Certificates and Issuers when cert-manager issuance is
+  # enabled, whose admission needs the cert-manager webhook to have ready
+  # endpoints.
   depends_on = [
     module.slinky_operator_crds,
     module.kueue,
     helm_release.kueue,
     kubectl_manifest.kueue_webhook_probe,
-    helm_release.cert_manager,
+    module.certmanager,
   ]
 }
 

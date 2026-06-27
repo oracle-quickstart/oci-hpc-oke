@@ -3,6 +3,13 @@
 
 locals {
   slinky_deploy_from_operator = alltrue([var.install_slinky, var.create_bastion, var.create_operator, !var.deploy_to_oke_from_orm])
+  slinky_cert_manager_required = alltrue([
+    var.install_slinky,
+    anytrue([
+      var.slinky_identity_enabled,
+      var.slinky_operator_cert_manager_enabled,
+    ]),
+  ])
 
   slinky_amd_shapes = [
     "BM.GPU.MI300X.8",
@@ -87,7 +94,9 @@ locals {
   # Operator + webhook images custom-built from SlinkyProject/slurm-operator
   # v1.1.1 into our registry (build-control-plane-images.sh). Merged into the
   # operator Helm values so the operator pods also come from our registry.
-  slinky_operator_image_values = <<-EOT
+  slinky_operator_generated_values = <<-EOT
+    certManager:
+      enabled: ${var.slinky_operator_cert_manager_enabled}
     operator:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator
