@@ -393,7 +393,7 @@ resource "null_resource" "slinky_openldap_config_via_operator" {
 }
 
 resource "null_resource" "slinky_home_pvc_via_operator" {
-  count = alltrue([local.slinky_deploy_from_operator, var.slinky_home_enabled]) ? 1 : 0
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster, var.slinky_home_enabled]) ? 1 : 0
 
   triggers = {
     manifest_md5    = md5(local.slinky_home_pvc_yaml)
