@@ -232,8 +232,17 @@ spec:
   job's namespace:
 
   ```bash
-  kubectl get configmap oci-nccl-parameters -n default -o yaml \
-    | sed 's/namespace: default/namespace: <your-namespace>/' \
+  kubectl get configmap oci-nccl-parameters -n default -o json \
+    | jq '
+        del(
+          .metadata.uid,
+          .metadata.resourceVersion,
+          .metadata.creationTimestamp,
+          .metadata.managedFields,
+          .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration"
+        )
+        | .metadata.namespace = "<your-namespace>"
+      ' \
     | kubectl apply -f -
   ```
 
