@@ -1125,6 +1125,12 @@ variable "slinky_accounting_enabled" {
   description = "Deploy MariaDB Operator and a MariaDB instance for SlurmDBD accounting."
 }
 
+variable "slinky_mariadb_operator_chart_version" {
+  default     = "26.6.0"
+  type        = string
+  description = "MariaDB Operator and CRD Helm chart version."
+}
+
 variable "slinky_openldap_namespace" {
   default     = "identity"
   type        = string

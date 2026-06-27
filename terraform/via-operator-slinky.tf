@@ -552,6 +552,7 @@ module "slinky_mariadb_operator_crds" {
   helm_chart_name     = "mariadb-operator-crds"
   namespace           = "mariadb"
   helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+  helm_chart_version  = var.slinky_mariadb_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -582,6 +583,7 @@ module "slinky_mariadb_operator" {
   helm_chart_name     = "mariadb-operator"
   namespace           = "mariadb"
   helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+  helm_chart_version  = var.slinky_mariadb_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",

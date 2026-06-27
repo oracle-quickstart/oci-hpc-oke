@@ -348,6 +348,7 @@ variableGroups:
       - slinky_operator_cert_manager_enabled
       - slinky_operator_values_override
       - slinky_slurm_values_override
+      - slinky_mariadb_operator_chart_version
       - slinky_openldap_chart_version
       - slinky_openldap_admin_password
       - slinky_openldap_config_password
@@ -2672,6 +2673,15 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_mariadb_operator_chart_version:
+    title: MariaDB Operator chart version
+    type: string
+    default: "26.6.0"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_accounting_enabled}
   slinky_openldap_chart_version:
     title: OpenLDAP chart version
     type: string
