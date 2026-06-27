@@ -173,6 +173,15 @@ locals {
     configurations = local.nvidia_gpu_operator_addon_configurations
   }))
 
+  # Terraform replaces a map variable's default when the caller supplies any
+  # value. Merge the required SR-IOV default back in so unrelated configuration
+  # overrides do not silently disable the VF resources. An explicit caller
+  # value still wins.
+  nvidia_network_operator_configuration_effective = merge(
+    { "sriovNetworkOperator.enabled" = "true" },
+    var.nvidia_network_operator_configuration,
+  )
+
   # The NVIDIA network-operator defaults its NicClusterPolicy DaemonSets (multus,
   # cni-plugins, nv-ipam-node) to tolerate only nvidia.com/gpu. AMD GPU nodes are
   # tainted amd.com/gpu=present:NoSchedule, so without this the CNI DaemonSets
@@ -186,7 +195,7 @@ locals {
           { key = "amd.com/gpu", operator = "Exists" },
         ])
       },
-      var.nvidia_network_operator_configuration,
+      local.nvidia_network_operator_configuration_effective,
     ) : { key = k, value = v }
   ]
 }

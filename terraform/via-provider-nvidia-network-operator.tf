@@ -4,7 +4,7 @@
 locals {
   deploy_nvidia_network_operator_manifests = alltrue([
     var.deploy_nvidia_network_operator,
-    lookup(var.nvidia_network_operator_configuration, "sriovNetworkOperator.enabled", "false") == "true",
+    lookup(local.nvidia_network_operator_configuration_effective, "sriovNetworkOperator.enabled", "false") == "true",
   ])
 
   nvidia_network_operator_namespace = "nvidia-network-operator"
