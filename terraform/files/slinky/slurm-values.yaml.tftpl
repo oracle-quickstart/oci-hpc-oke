@@ -331,8 +331,10 @@ ${worker_features_yaml}
       hostNetwork: false
       dnsPolicy: ClusterFirst
 %{ endif ~}
+      # Select the configured pool rather than the instance type: GPU and RDMA
+      # pools can use the same shape, but only one should run this NodeSet.
       nodeSelector:
-        node.kubernetes.io/instance-type: ${worker_shape}
+        oke.oraclecloud.com/pool.name: ${worker_pool_name}
       tolerations:
         - key: ${gpu_resource}
           operator: Exists

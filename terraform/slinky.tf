@@ -18,6 +18,7 @@ locals {
   ]
 
   slinky_worker_shape     = var.worker_rdma_enabled ? var.worker_rdma_shape : var.worker_gpu_shape
+  slinky_worker_pool_name = var.worker_rdma_enabled ? "oke-rdma" : "oke-gpu"
   slinky_worker_pool_size = var.worker_rdma_enabled ? var.worker_rdma_pool_size : (var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0)
   slinky_is_amd           = contains(local.slinky_amd_shapes, local.slinky_worker_shape)
   slinky_gpu_resource     = local.slinky_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"

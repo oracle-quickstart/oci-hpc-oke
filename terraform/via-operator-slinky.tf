@@ -117,7 +117,7 @@ locals {
     worker_slurmd_parameters       = local.slinky_worker_slurmd_parameters
     worker_numa_topology_enabled   = local.slinky_worker_numa_topology_enabled
     worker_features_yaml           = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
-    worker_shape                   = local.slinky_worker_shape
+    worker_pool_name               = local.slinky_worker_pool_name
     gpu_nodeset_enabled            = local.slinky_gpu_nodeset_enabled
     cpu_nodeset_enabled            = local.slinky_cpu_nodeset_enabled
     cpu_nodeset_name               = var.slinky_cpu_nodeset_name
