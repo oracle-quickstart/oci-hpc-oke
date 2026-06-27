@@ -311,7 +311,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "sum(max by (instance) (DCGM_FI_DEV_COUNT))",
+          "expr": "(count(amd_gpu_health) or vector(0)) + (sum(max by (instance) (DCGM_FI_DEV_COUNT)) or vector(0))",
           "refId": "A"
         }
       ],
@@ -370,7 +370,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum(max by (hostname) (DCGM_FI_DEV_COUNT) * on(hostname) group_left() (node_health_status == 1))",
+          "expr": "(count(amd_gpu_health == 1) or vector(0)) + (sum(max by (hostname) (DCGM_FI_DEV_COUNT) * on(hostname) group_left() (node_health_status == 1)) or vector(0))",
           "range": true,
           "refId": "A"
         }

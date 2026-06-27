@@ -21,35 +21,9 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
 resource "kubernetes_config_map_v1" "grafana_nvidia_dashboards" {
   for_each = (
     (
-      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) ||
-      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape))
+      (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
+      (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))))
     ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_nvidia_dashboards : {}
-  )
-
-  depends_on = [helm_release.prometheus]
-
-  metadata {
-    name      = format("dashboard-%s", trimsuffix(each.key, ".json"))
-    namespace = var.monitoring_namespace
-    annotations = {
-      grafana_dashboard_folder = "GPU Nodes"
-    }
-    labels = {
-      grafana_dashboard = "1"
-    }
-  }
-
-  data = {
-    (each.key) = each.value
-  }
-}
-
-resource "kubernetes_config_map_v1" "grafana_amd_dashboards" {
-  for_each = (
-    (
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape) ||
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)
-    ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_amd_dashboards : {}
   )
 
   depends_on = [helm_release.prometheus]

@@ -154,7 +154,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_GPU_UTIL)",
+          "expr": "avg(amd_gpu_gfx_activity or DCGM_FI_DEV_GPU_UTIL)",
           "range": true,
           "refId": "A"
         }
@@ -629,7 +629,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "avg by (instance_shape) (DCGM_FI_DEV_GPU_UTIL)",
+          "expr": "avg by (instance_shape) (amd_gpu_gfx_activity or DCGM_FI_DEV_GPU_UTIL)",
           "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
@@ -729,7 +729,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "max by (instance_shape) (DCGM_FI_DEV_GPU_TEMP)",
+          "expr": "max by (instance_shape) (amd_gpu_junction_temperature or DCGM_FI_DEV_GPU_TEMP)",
           "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"
@@ -829,7 +829,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (instance_shape) (DCGM_FI_DEV_POWER_USAGE)",
+          "expr": "sum by (instance_shape) (amd_gpu_package_power or DCGM_FI_DEV_POWER_USAGE)",
           "legendFormat": "{{ instance_shape }}",
           "range": true,
           "refId": "A"

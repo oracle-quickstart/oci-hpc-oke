@@ -334,7 +334,7 @@ variable "install_grafana_dashboards" {
 }
 
 variable "install_amd_device_metrics_exporter" {
-  default = false
+  default = true
   type    = bool
 }
 

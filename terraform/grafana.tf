@@ -3,28 +3,23 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
+  # The historical "nvidia" path now contains dashboards shared by AMD and NVIDIA clusters.
+  # Keep the path and resource names stable to avoid unnecessary Terraform state churn.
   grafana_common_dashboard_dir = "${path.module}/files/grafana/dashboards/common"
-  grafana_amd_dashboard_dir    = "${path.module}/files/grafana/dashboards/amd"
   grafana_nvidia_dashboard_dir = "${path.module}/files/grafana/dashboards/nvidia"
   grafana_oci_dashboard_dir    = "${path.module}/files/grafana/dashboards/oci"
 
   grafana_common_dashboard_files = fileset("${local.grafana_common_dashboard_dir}", "*.json")
-  grafana_amd_dashboard_files    = fileset("${local.grafana_amd_dashboard_dir}", "*.json")
   grafana_nvidia_dashboard_files = fileset("${local.grafana_nvidia_dashboard_dir}", "*.json")
   grafana_oci_dashboard_files    = fileset("${local.grafana_oci_dashboard_dir}", "*.json")
 
   grafana_common_dashboard_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_common_dashboard_files : join("/", ["${local.grafana_common_dashboard_dir}", f])] : []
-  grafana_amd_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_amd_dashboard_files : join("/", ["${local.grafana_amd_dashboard_dir}", f])] : []
   grafana_nvidia_dashboard_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_nvidia_dashboard_files : join("/", ["${local.grafana_nvidia_dashboard_dir}", f])] : []
   grafana_oci_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? [for f in local.grafana_oci_dashboard_files : join("/", ["${local.grafana_oci_dashboard_dir}", f])] : []
 
   grafana_common_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
     for f in local.grafana_common_dashboard_files :
     f => file(join("/", ["${local.grafana_common_dashboard_dir}", f]))
-  } : {}
-  grafana_amd_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
-    for f in local.grafana_amd_dashboard_files :
-    f => file(join("/", ["${local.grafana_amd_dashboard_dir}", f]))
   } : {}
   grafana_nvidia_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
     for f in local.grafana_nvidia_dashboard_files :
