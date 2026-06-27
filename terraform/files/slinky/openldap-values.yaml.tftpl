@@ -3,9 +3,9 @@ fullnameOverride: openldap
 global:
   ldapDomain: ${openldap_domain}
   adminUser: admin
-  adminPassword: ${openldap_admin_password}
+  adminPassword: ${jsonencode(openldap_admin_password)}
   configUser: admin
-  configPassword: ${openldap_config_password}
+  configPassword: ${jsonencode(openldap_config_password)}
 
 replicaCount: ${openldap_primary_replicas}
 readOnlyReplicaCount: ${openldap_readonly_replicas}

@@ -1154,6 +1154,11 @@ variable "slinky_openldap_admin_password" {
   type        = string
   description = "OpenLDAP admin password. Override this for non-disposable deployments."
   sensitive   = true
+
+  validation {
+    condition     = length(regexall("[\\r\\n]", var.slinky_openldap_admin_password)) == 0
+    error_message = "slinky_openldap_admin_password must not contain newline characters."
+  }
 }
 
 variable "slinky_openldap_config_password" {
@@ -1161,6 +1166,11 @@ variable "slinky_openldap_config_password" {
   type        = string
   description = "OpenLDAP cn=config admin password. Override this for non-disposable deployments."
   sensitive   = true
+
+  validation {
+    condition     = length(regexall("[\\r\\n]", var.slinky_openldap_config_password)) == 0
+    error_message = "slinky_openldap_config_password must not contain newline characters."
+  }
 }
 
 variable "slinky_openldap_primary_replicas" {

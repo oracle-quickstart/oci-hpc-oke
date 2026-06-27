@@ -25,14 +25,14 @@ locals {
   })
 
   slinky_configure_openldap_script = templatefile("${path.module}/files/slinky/configure-openldap.sh.tftpl", {
-    operator_user              = local.operator_user
-    openldap_namespace         = var.slinky_openldap_namespace
-    slurm_namespace            = var.slinky_slurm_namespace
-    openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
-    openldap_admin_password    = var.slinky_openldap_admin_password
-    openldap_config_password   = var.slinky_openldap_config_password
-    openldap_base_dn           = var.slinky_openldap_base_dn
-    openldap_dc                = local.slinky_openldap_dc
+    operator_user                   = local.operator_user
+    openldap_namespace              = var.slinky_openldap_namespace
+    slurm_namespace                 = var.slinky_slurm_namespace
+    openldap_readonly_replicas      = var.slinky_openldap_readonly_replicas
+    openldap_admin_password_base64  = base64encode(var.slinky_openldap_admin_password)
+    openldap_config_password_base64 = base64encode(var.slinky_openldap_config_password)
+    openldap_base_dn                = var.slinky_openldap_base_dn
+    openldap_dc                     = local.slinky_openldap_dc
   })
 
   slinky_home_pvc_yaml = templatefile("${path.module}/files/slinky/slurm-home-pvc.yaml.tftpl", {
