@@ -249,8 +249,7 @@ kubectl get servicemonitor -n ${MONITORING_NAMESPACE} | grep node-problem-detect
 
 The repository includes pre-configured dashboards for:
 - **Common**: Kubernetes API server, CoreDNS, Kubelet, Pods, PVs, Prometheus, Scheduling
-- **NVIDIA GPU**: Cluster metrics, Command Center, GPU health, GPU metrics, Host metrics, Node Problem Detector
-- **AMD GPU**: Job metrics, GPU metrics, Node metrics, Overview
+- **GPU**: Cluster metrics, Command Center, GPU health, GPU metrics, and host metrics for AMD and NVIDIA clusters
 
 ### 5.1 Deploy Kubernetes Dashboards
 
@@ -270,11 +269,11 @@ for dashboard in ${DASHBOARD_PATH}/common/*.json; do
 done
 ```
 
-### 5.2 Deploy NVIDIA GPU Dashboards (if applicable)
+### 5.2 Deploy GPU Dashboards (if applicable)
 
 ```bash
-# Deploy each NVIDIA GPU dashboard as a ConfigMap
-for dashboard in ${DASHBOARD_PATH}/nvidia/*.json; do
+# Deploy each AMD/NVIDIA GPU dashboard as a ConfigMap
+for dashboard in ${DASHBOARD_PATH}/gpu/*.json; do
   kubectl create configmap "dashboard-$(basename $dashboard .json)" \
     --from-file="$(basename $dashboard)=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \
@@ -285,22 +284,7 @@ for dashboard in ${DASHBOARD_PATH}/nvidia/*.json; do
 done
 ```
 
-### 5.3 Deploy AMD GPU Dashboards (if applicable)
-
-```bash
-# Deploy each AMD GPU dashboard as a ConfigMap
-for dashboard in ${DASHBOARD_PATH}/amd/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
-    --namespace ${MONITORING_NAMESPACE} \
-    --dry-run=client -o yaml | \
-  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
-  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
-  kubectl apply -f -
-done
-```
-
-### 5.4 Verify Dashboards
+### 5.3 Verify Dashboards
 
 ```bash
 # List all dashboard ConfigMaps
@@ -759,8 +743,7 @@ You have two options:
 
    # Remove dashboard and alert ConfigMaps from state
    terraform state rm 'kubernetes_config_map_v1.grafana_common_dashboards'
-   terraform state rm 'kubernetes_config_map_v1.grafana_nvidia_dashboards'
-   terraform state rm 'kubernetes_config_map_v1.grafana_amd_dashboards'
+   terraform state rm 'kubernetes_config_map_v1.grafana_gpu_dashboards'
    terraform state rm 'kubernetes_config_map_v1.grafana_alerts'
    ```
 
@@ -861,19 +844,8 @@ for dashboard in ${DASHBOARD_PATH}/common/*.json; do
   kubectl apply -f -
 done
 
-# Update NVIDIA GPU dashboards (if applicable)
-for dashboard in ${DASHBOARD_PATH}/nvidia/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
-    --namespace ${MONITORING_NAMESPACE} \
-    --dry-run=client -o yaml | \
-  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
-  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
-  kubectl apply -f -
-done
-
-# Update AMD GPU dashboards (if applicable)
-for dashboard in ${DASHBOARD_PATH}/amd/*.json; do
+# Update AMD/NVIDIA GPU dashboards (if applicable)
+for dashboard in ${DASHBOARD_PATH}/gpu/*.json; do
   kubectl create configmap "dashboard-$(basename $dashboard .json)" \
     --from-file="$(basename $dashboard)=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \

@@ -18,12 +18,12 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
   data = { (each.key) = each.value }
 }
 
-resource "kubernetes_config_map_v1" "grafana_nvidia_dashboards" {
+resource "kubernetes_config_map_v1" "grafana_gpu_dashboards" {
   for_each = (
     (
       (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
       (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))))
-    ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_nvidia_dashboards : {}
+    ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_gpu_dashboards : {}
   )
 
   depends_on = [helm_release.prometheus]
@@ -42,6 +42,11 @@ resource "kubernetes_config_map_v1" "grafana_nvidia_dashboards" {
   data = {
     (each.key) = each.value
   }
+}
+
+moved {
+  from = kubernetes_config_map_v1.grafana_nvidia_dashboards
+  to   = kubernetes_config_map_v1.grafana_gpu_dashboards
 }
 
 resource "kubernetes_config_map_v1" "grafana_oci_dashboards" {
