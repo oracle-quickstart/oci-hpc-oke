@@ -22,31 +22,13 @@ locals {
           }
         }
       ],
-      (can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) ||
-      (can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)) ?
-      [for cdk, cdv in local.grafana_nvidia_dashboards :
+      (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
+      (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, "")))) ?
+      [for cdk, cdv in local.grafana_gpu_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
           namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/nvidia", cdk])]
-          options = {
-            labels = {
-              grafana_dashboard = "1"
-            }
-            annotations = {
-              grafana_dashboard_folder = "GPU Nodes"
-            }
-            disableNameSuffixHash = true
-          }
-        }
-      ] : [],
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape) ||
-      contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape) ?
-      [for cdk, cdv in local.grafana_amd_dashboards :
-        {
-          name      = "dashboard-${trimsuffix(cdk, ".json")}",
-          namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/amd", cdk])]
+          files     = [join("/", ["/home/${local.operator_user}/grafana/dashboards/gpu", cdk])]
           options = {
             labels = {
               grafana_dashboard = "1"
@@ -96,13 +78,14 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
-    manifest_md5    = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_amd_dashboard_files_path, local.grafana_nvidia_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
-    namespace       = var.monitoring_namespace
-    bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = local.bastion_user
-    ssh_private_key = tls_private_key.stack_key.private_key_openssh
-    operator_host   = module.oke.operator_private_ip
-    operator_user   = local.operator_user
+    manifest_md5     = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_gpu_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
+    dashboard_layout = "gpu"
+    namespace        = var.monitoring_namespace
+    bastion_host     = module.oke.bastion_public_ip
+    bastion_user     = local.bastion_user
+    ssh_private_key  = tls_private_key.stack_key.private_key_openssh
+    operator_host    = module.oke.operator_private_ip
+    operator_user    = local.operator_user
   }
 
 
@@ -120,8 +103,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   provisioner "remote-exec" {
     inline = compact(flatten([
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/common",
-      "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/amd",
-      "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/nvidia",
+      "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/gpu",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/dashboards/oci",
       "mkdir -p /home/${self.triggers.operator_user}/grafana/alerts",
     ]))
@@ -133,13 +115,8 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   }
 
   provisioner "file" {
-    source      = "${local.grafana_amd_dashboard_dir}/"
-    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/amd"
-  }
-
-  provisioner "file" {
-    source      = "${local.grafana_nvidia_dashboard_dir}/"
-    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/nvidia"
+    source      = "${local.grafana_gpu_dashboard_dir}/"
+    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu"
   }
 
   provisioner "file" {
@@ -162,6 +139,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
       "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "kubectl delete configmap dashboard-gpu dashboard-job dashboard-node dashboard-overview --namespace ${var.monitoring_namespace} --ignore-not-found",
       "cd /home/${self.triggers.operator_user}/grafana/",
       "kubectl apply -k .",
     ]))

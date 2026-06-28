@@ -645,13 +645,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_EXP_XID_ERRORS_COUNT[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "min by (hostname) (\n  (amd_gpu_health == bool 1)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_EXP_XID_ERRORS_COUNT[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Xid",
+      "title": "GPU Health",
       "type": "stat"
     },
     {
@@ -724,13 +724,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_ppt_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Power Violation",
+      "title": "Power Throttle / Violation",
       "type": "stat"
     },
     {
@@ -803,13 +803,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_processor_hot_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Board Limit Violation",
+      "title": "Processor Hot / Board Limit",
       "type": "stat"
     },
     {
@@ -882,7 +882,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_socket_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -961,13 +961,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_hbm_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Sync Boost Violation",
+      "title": "HBM Thermal / Sync Boost",
       "type": "stat"
     },
     {
@@ -1040,13 +1040,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_vr_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Reliability Violation",
+      "title": "VR Thermal / Reliability",
       "type": "stat"
     },
     {
