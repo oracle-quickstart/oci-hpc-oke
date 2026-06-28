@@ -23,6 +23,7 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
 	workerValues := readRepositoryFile(t, "terraform", "files", "slinky", "worker-nodeset-values.yaml.tftpl")
 	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
 
 	require.Contains(t, prereqs, "ldap_default_bind_dn = ${openldap_sssd_bind_dn}")
 	require.Contains(t, prereqs, "ldap_default_authtok = ${openldap_sssd_bind_password}")
@@ -34,6 +35,12 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	require.Contains(t, configure, `by dn.exact="$OPENLDAP_SSSD_BIND_DN" read`)
 	require.Contains(t, configure, "assert_sssd_write_denied openldap-0")
 	require.GreaterOrEqual(t, strings.Count(slurmValues, "oci-hpc-oke.oracle.com/sssd-config-hash")+strings.Count(workerValues, "oci-hpc-oke.oracle.com/sssd-config-hash"), 4)
+	require.Contains(t, viaOperator, `slinky_openldap_sssd_uris = join(",", concat(`)
+	require.Contains(t, viaOperator, `var.slinky_openldap_readonly_replicas > 0 ? ["ldaps://openldap-readonly.`)
+	require.Contains(t, viaOperator, `["ldaps://openldap.${var.slinky_openldap_namespace}.svc.cluster.local:636"],`)
+	require.Contains(t, viaOperator, `openldap_sssd_uris          = local.slinky_openldap_sssd_uris`)
+	require.Contains(t, prereqs, `ldap_uri = ${openldap_sssd_uris}`)
+	require.NotContains(t, prereqs, `ldap_uri = ldaps://openldap-readonly.`)
 }
 
 func TestSlinkyOpenLDAPProtectsWritablePrimary(t *testing.T) {

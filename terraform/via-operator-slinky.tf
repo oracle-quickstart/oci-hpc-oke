@@ -3,6 +3,10 @@
 
 locals {
   slinky_workdir = "/home/${local.operator_user}/tf-slinky"
+  slinky_openldap_sssd_uris = join(",", concat(
+    var.slinky_openldap_readonly_replicas > 0 ? ["ldaps://openldap-readonly.${var.slinky_openldap_namespace}.svc.cluster.local:636"] : [],
+    ["ldaps://openldap.${var.slinky_openldap_namespace}.svc.cluster.local:636"],
+  ))
 
   slinky_openldap_prereqs_yaml = templatefile("${path.module}/files/slinky/openldap-prereqs.yaml.tftpl", {
     openldap_namespace          = var.slinky_openldap_namespace
@@ -10,6 +14,7 @@ locals {
     openldap_base_dn            = var.slinky_openldap_base_dn
     openldap_sssd_bind_dn       = local.slinky_openldap_sssd_bind_dn
     openldap_sssd_bind_password = local.slinky_openldap_sssd_bind_password
+    openldap_sssd_uris          = local.slinky_openldap_sssd_uris
     readonly_replica_dns_names  = local.slinky_readonly_replica_dns_names
   })
 

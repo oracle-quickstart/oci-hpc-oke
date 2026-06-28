@@ -108,7 +108,7 @@ stringData:
     access_provider = permit
     entry_cache_timeout = 60
 
-    ldap_uri = ldaps://openldap-readonly.${openldap_namespace}.svc.cluster.local:636,ldaps://openldap.${openldap_namespace}.svc.cluster.local:636
+    ldap_uri = ${openldap_sssd_uris}
     ldap_search_base = ${openldap_base_dn}
     ldap_user_search_base = ou=People,${openldap_base_dn}
     ldap_group_search_base = ou=Groups,${openldap_base_dn}
