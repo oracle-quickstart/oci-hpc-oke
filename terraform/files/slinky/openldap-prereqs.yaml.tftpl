@@ -109,9 +109,9 @@ stringData:
     ldap_id_mapping = false
     ldap_tls_reqcert = demand
     ldap_tls_cacert = /etc/sssd/ca/ca.crt
-    ldap_default_bind_dn = cn=admin,${openldap_base_dn}
+    ldap_default_bind_dn = ${openldap_sssd_bind_dn}
     ldap_default_authtok_type = password
-    ldap_default_authtok = ${openldap_admin_password}
+    ldap_default_authtok = ${openldap_sssd_bind_password}
 
     ldap_user_object_class = posixAccount
     ldap_user_name = uid

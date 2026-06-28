@@ -5,11 +5,12 @@ locals {
   slinky_workdir = "/home/${local.operator_user}/tf-slinky"
 
   slinky_openldap_prereqs_yaml = templatefile("${path.module}/files/slinky/openldap-prereqs.yaml.tftpl", {
-    openldap_namespace         = var.slinky_openldap_namespace
-    slurm_namespace            = var.slinky_slurm_namespace
-    openldap_base_dn           = var.slinky_openldap_base_dn
-    openldap_admin_password    = local.slinky_openldap_admin_password
-    readonly_replica_dns_names = local.slinky_readonly_replica_dns_names
+    openldap_namespace          = var.slinky_openldap_namespace
+    slurm_namespace             = var.slinky_slurm_namespace
+    openldap_base_dn            = var.slinky_openldap_base_dn
+    openldap_sssd_bind_dn       = local.slinky_openldap_sssd_bind_dn
+    openldap_sssd_bind_password = local.slinky_openldap_sssd_bind_password
+    readonly_replica_dns_names  = local.slinky_readonly_replica_dns_names
   })
 
   slinky_openldap_values_yaml = templatefile("${path.module}/files/slinky/openldap-values.yaml.tftpl", {
@@ -28,9 +29,12 @@ locals {
     operator_user                   = local.operator_user
     openldap_namespace              = var.slinky_openldap_namespace
     slurm_namespace                 = var.slinky_slurm_namespace
+    openldap_primary_replicas       = var.slinky_openldap_primary_replicas
     openldap_readonly_replicas      = var.slinky_openldap_readonly_replicas
     openldap_admin_password_base64  = base64encode(local.slinky_openldap_admin_password)
     openldap_config_password_base64 = base64encode(local.slinky_openldap_config_password)
+    openldap_sssd_bind_dn_base64    = base64encode(local.slinky_openldap_sssd_bind_dn)
+    openldap_sssd_password_base64   = base64encode(local.slinky_openldap_sssd_bind_password)
     openldap_base_dn                = var.slinky_openldap_base_dn
     openldap_dc                     = local.slinky_openldap_dc
   })
@@ -126,6 +130,7 @@ locals {
     cpu_worker_image_tag           = local.slinky_cpu_worker_image_tag
     cpu_worker_features_yaml       = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
     cpu_partition_default          = local.slinky_gpu_nodeset_enabled ? "NO" : "YES"
+    sssd_config_hash               = nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))
   })
 }
 
@@ -318,7 +323,8 @@ module "slinky_openldap" {
 }
 
 # LDAP settings that require exec into the OpenLDAP pods: TLS cn=config,
-# syncprov overlay, base tree, and copying the CA into the Slurm namespace.
+# syncprov overlay, base tree, the read-only SSSD account and ACL, and copying
+# the CA into the Slurm namespace.
 resource "null_resource" "slinky_openldap_config_via_operator" {
   count = alltrue([local.slinky_deploy_from_operator, var.slinky_identity_enabled]) ? 1 : 0
 

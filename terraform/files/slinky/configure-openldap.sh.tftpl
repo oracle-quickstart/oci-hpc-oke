@@ -8,11 +8,15 @@ WORKDIR="$(cd "$(dirname "$0")" && pwd)"
 
 OPENLDAP_NAMESPACE="${openldap_namespace}"
 SLURM_NAMESPACE="${slurm_namespace}"
+OPENLDAP_PRIMARY_REPLICAS="${openldap_primary_replicas}"
 OPENLDAP_READONLY_REPLICAS="${openldap_readonly_replicas}"
 OPENLDAP_ADMIN_PASSWORD="$(printf '%s' '${openldap_admin_password_base64}' | base64 --decode)"
 OPENLDAP_CONFIG_PASSWORD="$(printf '%s' '${openldap_config_password_base64}' | base64 --decode)"
+OPENLDAP_SSSD_BIND_DN="$(printf '%s' '${openldap_sssd_bind_dn_base64}' | base64 --decode)"
+OPENLDAP_SSSD_BIND_PASSWORD="$(printf '%s' '${openldap_sssd_password_base64}' | base64 --decode)"
 OPENLDAP_BASE_DN="${openldap_base_dn}"
 OPENLDAP_DC="${openldap_dc}"
+OPENLDAP_SERVICE_ACCOUNTS_OU="ou=ServiceAccounts,$OPENLDAP_BASE_DN"
 OPENSSH_LPK_SCHEMA_FILTER='(|(cn=*openssh-lpk)(olcAttributeTypes=*1.3.6.1.4.1.24552.500.1.1.1.13*)(olcObjectClasses=*1.3.6.1.4.1.24552.500.1.1.2.0*))'
 
 openssh_lpk_schema_exists() {
@@ -141,6 +145,13 @@ ldapadd_primary() {
       -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD"
 }
 
+ldapmodify_primary() {
+  kubectl -n "$OPENLDAP_NAMESPACE" exec -i openldap-0 -- \
+    /opt/bitnami/openldap/bin/ldapmodify \
+      -x -H ldap://127.0.0.1:1389 \
+      -D "cn=admin,$OPENLDAP_BASE_DN" -w "$OPENLDAP_ADMIN_PASSWORD"
+}
+
 ldap_entry_exists() {
   ldapsearch_primary -b "$1" -s base dn >/dev/null 2>&1
 }
@@ -166,6 +177,160 @@ if ! ldap_entry_exists "ou=Groups,$OPENLDAP_BASE_DN"; then
     "dn: ou=Groups,$OPENLDAP_BASE_DN" \
     "objectClass: organizationalUnit" \
     "ou: Groups" | ldapadd_primary
+fi
+
+echo "== Ensure the read-only SSSD bind account exists =="
+if ! ldap_entry_exists "$OPENLDAP_SERVICE_ACCOUNTS_OU"; then
+  printf "%s\n" \
+    "dn: $OPENLDAP_SERVICE_ACCOUNTS_OU" \
+    "objectClass: organizationalUnit" \
+    "ou: ServiceAccounts" | ldapadd_primary
+fi
+
+SSSD_BIND_PASSWORD_HASH="$(
+  # The single-quoted script must expand inside the pod, not in this shell.
+  # shellcheck disable=SC2016
+  kubectl -n "$OPENLDAP_NAMESPACE" exec openldap-0 -- sh -c '
+    tool="$(command -v slappasswd || true)"
+    if [ -z "$tool" ] && [ -x /opt/bitnami/openldap/sbin/slappasswd ]; then
+      tool=/opt/bitnami/openldap/sbin/slappasswd
+    fi
+    if [ -z "$tool" ]; then
+      echo "slappasswd was not found" >&2
+      exit 1
+    fi
+    exec "$tool" -s "$1"
+  ' sh "$OPENLDAP_SSSD_BIND_PASSWORD"
+)"
+
+if ! ldap_entry_exists "$OPENLDAP_SSSD_BIND_DN"; then
+  printf "%s\n" \
+    "dn: $OPENLDAP_SSSD_BIND_DN" \
+    "objectClass: top" \
+    "objectClass: organizationalRole" \
+    "objectClass: simpleSecurityObject" \
+    "cn: sssd" \
+    "description: Read-only bind account for Slurm SSSD clients" \
+    "userPassword: $SSSD_BIND_PASSWORD_HASH" | ldapadd_primary
+else
+  printf "%s\n" \
+    "dn: $OPENLDAP_SSSD_BIND_DN" \
+    "changetype: modify" \
+    "replace: userPassword" \
+    "userPassword: $SSSD_BIND_PASSWORD_HASH" | ldapmodify_primary
+fi
+
+apply_sssd_readonly_acl() {
+  local pod="$1"
+
+  kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+    /opt/bitnami/openldap/bin/ldapmodify \
+      -x -H ldap://127.0.0.1:1389 \
+      -D cn=admin,cn=config -w "$OPENLDAP_CONFIG_PASSWORD" <<EOF
+dn: olcDatabase={2}mdb,cn=config
+changetype: modify
+replace: olcAccess
+olcAccess: {0}to *
+  by dn.exact=gidNumber=0+uidNumber=1001,cn=peercred,cn=external,cn=auth manage
+  by * break
+olcAccess: {1}to attrs=userPassword,shadowLastChange
+  by dn.exact="$OPENLDAP_SSSD_BIND_DN" none
+  by self write
+  by dn="cn=admin,$OPENLDAP_BASE_DN" write
+  by anonymous auth
+  by * none
+olcAccess: {2}to *
+  by dn="cn=admin,$OPENLDAP_BASE_DN" write
+  by dn.exact="$OPENLDAP_SSSD_BIND_DN" read
+  by self read
+  by * none
+EOF
+}
+
+ldapsearch_as_sssd() {
+  local pod="$1"
+  shift
+
+  kubectl -n "$OPENLDAP_NAMESPACE" exec "$pod" -- \
+    /opt/bitnami/openldap/bin/ldapsearch \
+      -LLL -x -H ldap://127.0.0.1:1389 \
+      -D "$OPENLDAP_SSSD_BIND_DN" -w "$OPENLDAP_SSSD_BIND_PASSWORD" "$@"
+}
+
+wait_for_sssd_read_access() {
+  local pod="$1"
+
+  for i in $(seq 1 60); do
+    if ldapsearch_as_sssd "$pod" \
+      -b "ou=People,$OPENLDAP_BASE_DN" -s base dn 2>/dev/null | grep -q '^dn:'; then
+      echo "Read-only SSSD bind works on $pod"
+      return 0
+    fi
+    echo "Waiting for the SSSD account and ACL on $pod ($i/60)"
+    sleep 2
+  done
+
+  return 1
+}
+
+ensure_sssd_read_access() {
+  local pod="$1"
+
+  if wait_for_sssd_read_access "$pod"; then
+    return 0
+  fi
+
+  echo "SSSD ACL did not replicate to $pod; applying it locally"
+  apply_sssd_readonly_acl "$pod"
+  wait_for_sssd_read_access "$pod"
+}
+
+assert_sssd_write_denied() {
+  local pod="$1"
+  local output
+
+  if output="$(printf "%s\n" \
+    "dn: $OPENLDAP_SSSD_BIND_DN" \
+    "changetype: modify" \
+    "replace: description" \
+    "description: Read-only bind account for Slurm SSSD clients" | \
+    kubectl -n "$OPENLDAP_NAMESPACE" exec -i "$pod" -- \
+      /opt/bitnami/openldap/bin/ldapmodify \
+        -x -H ldap://127.0.0.1:1389 \
+        -D "$OPENLDAP_SSSD_BIND_DN" -w "$OPENLDAP_SSSD_BIND_PASSWORD" 2>&1)"; then
+    echo "ERROR: the SSSD bind account unexpectedly modified LDAP on $pod"
+    return 1
+  fi
+
+  if ! grep -qi 'Insufficient access' <<<"$output"; then
+    echo "$output"
+    echo "ERROR: the SSSD write check failed for an unexpected reason on $pod"
+    return 1
+  fi
+
+  echo "SSSD writes are denied on $pod"
+}
+
+echo "== Apply and validate the read-only SSSD ACL =="
+apply_sssd_readonly_acl openldap-0
+for i in $(seq 0 $((OPENLDAP_PRIMARY_REPLICAS - 1))); do
+  ensure_sssd_read_access "openldap-$i"
+done
+assert_sssd_write_denied openldap-0
+
+if ldapsearch_as_sssd openldap-0 \
+  -b "$OPENLDAP_SSSD_BIND_DN" -s base userPassword | grep -qi '^userPassword:'; then
+  echo "ERROR: the SSSD bind account can read password hashes"
+  exit 1
+fi
+echo "SSSD password-attribute reads are denied"
+
+if [ "$OPENLDAP_READONLY_REPLICAS" -gt 0 ]; then
+  for i in $(seq 0 $((OPENLDAP_READONLY_REPLICAS - 1))); do
+    pod="openldap-readonly-$i"
+    apply_sssd_readonly_acl "$pod"
+    ensure_sssd_read_access "$pod"
+  done
 fi
 
 echo "== Copy OpenLDAP CA into the Slurm namespace =="

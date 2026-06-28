@@ -121,6 +121,10 @@ outputs (`slinky_openldap_admin_password` and
 `slinky_openldap_config_password`). The admin password can also be retrieved
 from the `openldap` Secret as shown above.
 
+SSSD clients do not receive either administrator password. The stack creates a
+separate `cn=sssd,ou=ServiceAccounts,<base DN>` account whose ACL permits LDAP
+reads but denies writes and access to password attributes.
+
 Use stable UID/GID allocation. Do not reuse IDs while old files may exist on
 FSS, in backups, or in accounting history.
 

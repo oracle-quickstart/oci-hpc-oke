@@ -20,6 +20,11 @@ sssd:
 
 %{ endif ~}
 controller:
+%{ if identity_enabled ~}
+  metadata:
+    annotations:
+      oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
   slurmctld:
     image:
       repository: ${controller_image_repository}
@@ -156,6 +161,9 @@ loginsets:
     replicas: 1
     rootSshAuthorizedKeys: ${login_root_ssh_authorized_keys}
 %{ if identity_enabled ~}
+    metadata:
+      annotations:
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
     extraSshdConfig: |
       AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
       AuthorizedKeysCommandUser nobody
@@ -217,10 +225,15 @@ nodesets:
   ${nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
-%{ if worker_sriov_enabled ~}
+%{ if worker_sriov_enabled || (identity_enabled && worker_ssh_enabled) ~}
     metadata:
       annotations:
+%{ if identity_enabled && worker_ssh_enabled ~}
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
+%{ if worker_sriov_enabled ~}
         k8s.v1.cni.cncf.io/networks: ${worker_rdma_networks}
+%{ endif ~}
 %{ endif ~}
     # Ignored in DaemonSet mode (pod count follows matching nodes); only used
     # if the nodeset is overridden to StatefulSet scaling.
@@ -373,6 +386,11 @@ ${worker_features_yaml}
   ${cpu_nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
+%{ if identity_enabled && worker_ssh_enabled ~}
+    metadata:
+      annotations:
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
     # Ignored in DaemonSet mode (pod count follows matching nodes); only used
     # if the nodeset is overridden to StatefulSet scaling.
     replicas: ${cpu_worker_replicas}

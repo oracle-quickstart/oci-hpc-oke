@@ -192,6 +192,14 @@ locals {
     var.slinky_openldap_config_password,
     one(random_password.slinky_openldap_config[*].result),
   ), "")
+
+  # Slurm workloads receive only this independently generated, read-only bind
+  # credential. Administrator credentials stay in the identity namespace.
+  slinky_openldap_sssd_bind_dn = "cn=sssd,ou=ServiceAccounts,${var.slinky_openldap_base_dn}"
+  slinky_openldap_sssd_bind_password = try(
+    one(random_password.slinky_openldap_sssd_bind[*].result),
+    "",
+  )
 }
 
 resource "random_password" "slinky_openldap_admin" {
@@ -205,6 +213,16 @@ resource "random_password" "slinky_openldap_admin" {
 }
 
 resource "random_password" "slinky_openldap_config" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
+}
+
+resource "random_password" "slinky_openldap_sssd_bind" {
   count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
 
   length      = 32
