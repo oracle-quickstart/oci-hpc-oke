@@ -1024,7 +1024,7 @@ variable "slinky_slurm_values_override" {
 variable "slinky_login_enabled" {
   default     = true
   type        = bool
-  description = "Enable a Slinky LoginSet with a LoadBalancer service. The stack SSH public key is used for root access when provided."
+  description = "Enable a Slinky LoginSet with a LoadBalancer service. Requires slinky_identity_enabled=true so login users resolve through the managed OpenLDAP SSSD configuration."
 }
 
 variable "slinky_worker_network_mode" {

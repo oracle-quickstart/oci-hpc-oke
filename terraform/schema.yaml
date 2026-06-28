@@ -2514,6 +2514,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_login_enabled:
     title: Enable Slurm login service
+    description: "Deploy a LoginSet and LoadBalancer for LDAP users. Requires HA OpenLDAP and SSSD to be enabled."
     type: boolean
     default: true
     visible:

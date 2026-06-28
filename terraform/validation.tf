@@ -155,6 +155,12 @@ locals {
     var.slinky_identity_enabled,
     var.slinky_openldap_primary_replicas != 1,
   ])
+  invalid_slinky_login_without_identity = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_login_enabled,
+    !var.slinky_identity_enabled,
+  ])
 
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
@@ -411,6 +417,17 @@ resource "null_resource" "validate_slinky_openldap_topology" {
     precondition {
       condition     = !local.invalid_slinky_openldap_topology
       error_message = "The bundled HA OpenLDAP topology supports exactly one writable primary plus read replicas. Keep slinky_openldap_primary_replicas=1."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_login_identity" {
+  count = local.invalid_slinky_login_without_identity ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_login_without_identity
+      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise Slinky chart 1.1.1 configures the LoginSet with its placeholder ldap://ldap.example.com SSSD domain. Enable managed identity or disable the Slurm login service."
     }
   }
 }

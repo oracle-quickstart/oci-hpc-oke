@@ -84,6 +84,22 @@ func TestSlinkyLoginDisablesRootSSH(t *testing.T) {
 	require.Contains(t, slurmValues, "AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys")
 }
 
+func TestSlinkyLoginRequiresManagedIdentity(t *testing.T) {
+	validation := readRepositoryFile(t, "terraform", "validation.tf")
+	variables := readRepositoryFile(t, "terraform", "variables.tf")
+	schema := readRepositoryFile(t, "terraform", "schema.yaml")
+
+	require.Contains(t, validation, `invalid_slinky_login_without_identity = alltrue([`)
+	require.Contains(t, validation, `var.slinky_install_slurm_cluster,`)
+	require.Contains(t, validation, `var.slinky_login_enabled,`)
+	require.Contains(t, validation, `!var.slinky_identity_enabled,`)
+	require.Contains(t, validation, `resource "null_resource" "validate_slinky_login_identity"`)
+	require.Contains(t, validation, `slinky_login_enabled=true requires slinky_identity_enabled=true`)
+	require.Contains(t, validation, `ldap://ldap.example.com`)
+	require.Contains(t, variables, `Requires slinky_identity_enabled=true`)
+	require.Contains(t, schema, `Requires HA OpenLDAP and SSSD to be enabled.`)
+}
+
 func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
 	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
 	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
