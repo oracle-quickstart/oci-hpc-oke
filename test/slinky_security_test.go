@@ -57,3 +57,17 @@ func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
 	require.Contains(t, okeCluster, `"Allow TCP ingress from anywhere to Slurm login SSH port"`)
 	require.Contains(t, okeCluster, `protocol = local.tcp_protocol, port = 22, source = local.anywhere`)
 }
+
+func TestSlinkyControlPlaneUsesSystemPool(t *testing.T) {
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+	openldapValues := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-values.yaml.tftpl")
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
+	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
+
+	require.Contains(t, slinky, `slinky_system_pool_name = "oke-system"`)
+	require.Contains(t, viaOperator, `system_node_pool_name`)
+	require.Equal(t, 4, strings.Count(slurmValues, `oke.oraclecloud.com/pool.name: ${system_node_pool_name}`))
+	require.Contains(t, openldapValues, `oke.oraclecloud.com/pool.name: ${system_node_pool_name}`)
+	require.NotContains(t, slurmValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
+	require.NotContains(t, openldapValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
+}

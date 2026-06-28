@@ -22,7 +22,7 @@ locals {
     openldap_primary_replicas  = var.slinky_openldap_primary_replicas
     openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
     openldap_storage_size      = var.slinky_openldap_storage_size
-    system_node_shape          = var.worker_ops_shape
+    system_node_pool_name      = local.slinky_system_pool_name
   })
 
   slinky_configure_openldap_script = templatefile("${path.module}/files/slinky/configure-openldap.sh.tftpl", {
@@ -95,7 +95,7 @@ locals {
     accounting_image_tag         = local.slinky_accounting_image_tag
     restapi_image_repository     = local.slinky_restapi_image_repository
     restapi_image_tag            = local.slinky_restapi_image_tag
-    system_node_shape            = var.worker_ops_shape
+    system_node_pool_name        = local.slinky_system_pool_name
     controller_image_repository  = var.slinky_controller_image_repository
     controller_image_tag         = local.slinky_controller_image_tag
     sssd_image_repository        = local.slinky_sssd_image_repository

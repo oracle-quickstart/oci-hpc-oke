@@ -16,7 +16,7 @@ image:
   pullPolicy: IfNotPresent
 
 nodeSelector:
-  node.kubernetes.io/instance-type: ${system_node_shape}
+  oke.oraclecloud.com/pool.name: ${system_node_pool_name}
 
 ltb-passwd:
   enabled: false
