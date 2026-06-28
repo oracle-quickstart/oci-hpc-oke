@@ -2546,6 +2546,7 @@ variables:
         - ${worker_rdma_enabled}
   slinky_worker_ssh_enabled:
     title: Enable SSH on Slurm workers
+    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky 1.1.1 couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
     type: boolean
     default: true
     visible:

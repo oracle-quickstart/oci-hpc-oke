@@ -1047,7 +1047,7 @@ variable "slinky_worker_mount_infiniband" {
 variable "slinky_worker_ssh_enabled" {
   default     = true
   type        = bool
-  description = "Enable sshd in Slinky slurmd pods. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
+  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because Slinky chart 1.1.1 couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
 }
 
 variable "slinky_worker_replicas" {
