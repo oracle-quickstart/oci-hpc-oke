@@ -153,6 +153,16 @@ func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
 	require.Contains(t, okeCluster, `protocol = local.tcp_protocol, port = 22, source = local.anywhere`)
 }
 
+func TestSlinkyLoginOutputRequiresLoginSet(t *testing.T) {
+	outputs := readRepositoryFile(t, "terraform", "output.tf")
+
+	require.Contains(t, outputs, `output "slinky_login_fetch_ip_command"`)
+	require.Contains(t, outputs, `var.install_slinky,`)
+	require.Contains(t, outputs, `var.slinky_install_slurm_cluster,`)
+	require.Contains(t, outputs, `var.slinky_login_enabled,`)
+	require.Contains(t, outputs, `]) ? format("kubectl -n %s get svc slurm-login-slinky`)
+}
+
 func TestSlinkyControlPlaneUsesSystemPool(t *testing.T) {
 	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
 	openldapValues := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-values.yaml.tftpl")

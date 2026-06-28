@@ -159,7 +159,11 @@ output "grafana_admin_username" {
 }
 
 output "slinky_login_fetch_ip_command" {
-  value = var.install_slinky ? format("kubectl -n %s get svc slurm-login-slinky -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", var.slinky_slurm_namespace) : "N/A"
+  value = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_login_enabled,
+  ]) ? format("kubectl -n %s get svc slurm-login-slinky -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", var.slinky_slurm_namespace) : "N/A"
 }
 
 output "slinky_openldap_admin_password" {
