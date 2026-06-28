@@ -42,3 +42,18 @@ func TestSlinkyLoginDisablesRootSSH(t *testing.T) {
 	require.Contains(t, slurmValues, "PermitRootLogin no")
 	require.Contains(t, slurmValues, "AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys")
 }
+
+func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
+	okeCluster := readRepositoryFile(t, "terraform", "oke-cluster.tf")
+
+	require.Contains(t, viaOperator, `login_load_balancer_internal = var.preferred_kubernetes_services == "internal"`)
+	require.Contains(t, viaOperator, `login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id`)
+	require.Contains(t, slurmValues, `%{ if login_load_balancer_internal ~}`)
+	require.Contains(t, slurmValues, `service.beta.kubernetes.io/oci-load-balancer-internal: "true"`)
+	require.Contains(t, slurmValues, `oci.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}`)
+	require.Contains(t, slurmValues, `service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"`)
+	require.Contains(t, okeCluster, `"Allow TCP ingress from anywhere to Slurm login SSH port"`)
+	require.Contains(t, okeCluster, `protocol = local.tcp_protocol, port = 22, source = local.anywhere`)
+}

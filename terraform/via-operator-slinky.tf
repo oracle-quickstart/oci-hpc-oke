@@ -102,6 +102,8 @@ locals {
     sssd_image_tag               = local.slinky_sssd_image_tag
     login_image_repository       = var.slinky_login_image_repository
     login_image_tag              = local.slinky_login_image_tag
+    login_load_balancer_internal = var.preferred_kubernetes_services == "internal"
+    login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
     gpu_autodetect               = local.slinky_gpu_autodetect
     login_enabled                = var.slinky_login_enabled
     nodeset_name                 = var.slinky_nodeset_name

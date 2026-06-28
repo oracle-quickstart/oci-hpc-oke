@@ -165,7 +165,7 @@ loginsets:
         oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
 %{ endif ~}
     # Administrative access uses kubectl/operator paths, not root SSH into the
-    # public login service. LDAP users continue to use the SSSD key command.
+    # login service. LDAP users continue to use the SSSD key command.
     extraSshdConfig: |
       PermitRootLogin no
 %{ if identity_enabled ~}
@@ -218,6 +218,14 @@ loginsets:
             medium: Memory
             sizeLimit: 16Gi
     service:
+      metadata:
+        annotations:
+          oci.oraclecloud.com/load-balancer-type: "lb"
+          service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
+%{ if login_load_balancer_internal ~}
+          service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+%{ endif ~}
+          oci.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
       spec:
         type: LoadBalancer
 
