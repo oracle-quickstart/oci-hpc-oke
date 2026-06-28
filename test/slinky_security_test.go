@@ -36,6 +36,14 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	require.GreaterOrEqual(t, strings.Count(slurmValues, "oci-hpc-oke.oracle.com/sssd-config-hash")+strings.Count(workerValues, "oci-hpc-oke.oracle.com/sssd-config-hash"), 4)
 }
 
+func TestSlinkyOpenLDAPProtectsWritablePrimary(t *testing.T) {
+	openldapValues := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-values.yaml.tftpl")
+
+	require.Contains(t, openldapValues, "minAvailable: 1")
+	require.Contains(t, openldapValues, `maxUnavailable: ""`)
+	require.NotContains(t, openldapValues, "maxUnavailable: 1")
+}
+
 func TestSlinkyUsesIndependentAcceleratorNodeSets(t *testing.T) {
 	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
 	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")

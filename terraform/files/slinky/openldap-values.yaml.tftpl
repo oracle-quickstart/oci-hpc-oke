@@ -76,8 +76,10 @@ persistence:
 
 pdb:
   enabled: true
-  minAvailable: ""
-  maxUnavailable: 1
+  # The chart's PDB selects only the writable StatefulSet, not read-only
+  # replicas. Protect the sole primary from voluntary eviction.
+  minAvailable: 1
+  maxUnavailable: ""
 
 podAntiAffinityPreset: soft
 
