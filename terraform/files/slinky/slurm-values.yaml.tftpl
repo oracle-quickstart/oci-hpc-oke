@@ -159,12 +159,16 @@ loginsets:
   slinky:
     enabled: ${login_enabled}
     replicas: 1
-    rootSshAuthorizedKeys: ${login_root_ssh_authorized_keys}
 %{ if identity_enabled ~}
     metadata:
       annotations:
         oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
+    # Administrative access uses kubectl/operator paths, not root SSH into the
+    # public login service. LDAP users continue to use the SSSD key command.
     extraSshdConfig: |
+      PermitRootLogin no
+%{ if identity_enabled ~}
       AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
       AuthorizedKeysCommandUser nobody
       AuthorizedKeysFile none

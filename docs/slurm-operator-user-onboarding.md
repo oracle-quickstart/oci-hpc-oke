@@ -13,6 +13,10 @@ It was validated on a live test cluster with:
 
 LDAP SSH keys must use `sshPublicKey`, not `description`.
 
+Root SSH access to the Slurm login service is intentionally disabled. Use the
+operator or `kubectl exec` for administration; the login service accepts
+regular LDAP users through SSSD.
+
 ## Quick Start (script)
 
 The [`slurm-add-user.sh`](./files/slurm-add-user.sh) script performs every step

@@ -34,3 +34,11 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	require.Contains(t, configure, "assert_sssd_write_denied openldap-0")
 	require.GreaterOrEqual(t, strings.Count(slurmValues, "oci-hpc-oke.oracle.com/sssd-config-hash"), 4)
 }
+
+func TestSlinkyLoginDisablesRootSSH(t *testing.T) {
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+
+	require.NotContains(t, slurmValues, "rootSshAuthorizedKeys")
+	require.Contains(t, slurmValues, "PermitRootLogin no")
+	require.Contains(t, slurmValues, "AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys")
+}
