@@ -8,7 +8,7 @@ locals {
     openldap_namespace         = var.slinky_openldap_namespace
     slurm_namespace            = var.slinky_slurm_namespace
     openldap_base_dn           = var.slinky_openldap_base_dn
-    openldap_admin_password    = var.slinky_openldap_admin_password
+    openldap_admin_password    = local.slinky_openldap_admin_password
     readonly_replica_dns_names = local.slinky_readonly_replica_dns_names
   })
 
@@ -16,8 +16,8 @@ locals {
     openldap_domain            = var.slinky_openldap_domain
     openldap_base_dn           = var.slinky_openldap_base_dn
     openldap_dc                = local.slinky_openldap_dc
-    openldap_admin_password    = var.slinky_openldap_admin_password
-    openldap_config_password   = var.slinky_openldap_config_password
+    openldap_admin_password    = local.slinky_openldap_admin_password
+    openldap_config_password   = local.slinky_openldap_config_password
     openldap_primary_replicas  = var.slinky_openldap_primary_replicas
     openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
     openldap_storage_size      = var.slinky_openldap_storage_size
@@ -29,8 +29,8 @@ locals {
     openldap_namespace              = var.slinky_openldap_namespace
     slurm_namespace                 = var.slinky_slurm_namespace
     openldap_readonly_replicas      = var.slinky_openldap_readonly_replicas
-    openldap_admin_password_base64  = base64encode(var.slinky_openldap_admin_password)
-    openldap_config_password_base64 = base64encode(var.slinky_openldap_config_password)
+    openldap_admin_password_base64  = base64encode(local.slinky_openldap_admin_password)
+    openldap_config_password_base64 = base64encode(local.slinky_openldap_config_password)
     openldap_base_dn                = var.slinky_openldap_base_dn
     openldap_dc                     = local.slinky_openldap_dc
   })

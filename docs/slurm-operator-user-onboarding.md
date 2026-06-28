@@ -115,6 +115,12 @@ export LDAP_ADMIN_PASSWORD="$(
 )"
 ```
 
+The stack generates unique OpenLDAP admin and `cn=config` passwords when they
+are not supplied explicitly. They are available as sensitive Resource Manager
+outputs (`slinky_openldap_admin_password` and
+`slinky_openldap_config_password`). The admin password can also be retrieved
+from the `openldap` Secret as shown above.
+
 Use stable UID/GID allocation. Do not reuse IDs while old files may exist on
 FSS, in backups, or in accounting history.
 

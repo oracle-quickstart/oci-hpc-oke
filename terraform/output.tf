@@ -162,6 +162,18 @@ output "slinky_login_fetch_ip_command" {
   value = var.install_slinky ? format("kubectl -n %s get svc slurm-login-slinky -o jsonpath='{.status.loadBalancer.ingress[0].ip}'", var.slinky_slurm_namespace) : "N/A"
 }
 
+output "slinky_openldap_admin_password" {
+  description = "OpenLDAP adminPassword used by the Slinky identity deployment."
+  value       = var.install_slinky && var.slinky_identity_enabled ? local.slinky_openldap_admin_password : null
+  sensitive   = true
+}
+
+output "slinky_openldap_config_password" {
+  description = "OpenLDAP configPassword used by the Slinky identity deployment."
+  value       = var.install_slinky && var.slinky_identity_enabled ? local.slinky_openldap_config_password : null
+  sensitive   = true
+}
+
 output "prom_server_port_forward" {
   value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
 }

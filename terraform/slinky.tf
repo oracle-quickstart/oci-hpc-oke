@@ -181,4 +181,35 @@ locals {
   ])
 
   slinky_login_root_ssh_authorized_keys = jsonencode(trimspace(local.ssh_public_key))
+
+  # Explicit non-empty values remain supported for existing deployments. New
+  # stacks receive independent passwords that persist in Terraform state.
+  slinky_openldap_admin_password = try(coalesce(
+    var.slinky_openldap_admin_password,
+    one(random_password.slinky_openldap_admin[*].result),
+  ), "")
+  slinky_openldap_config_password = try(coalesce(
+    var.slinky_openldap_config_password,
+    one(random_password.slinky_openldap_config[*].result),
+  ), "")
+}
+
+resource "random_password" "slinky_openldap_admin" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
+}
+
+resource "random_password" "slinky_openldap_config" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
 }

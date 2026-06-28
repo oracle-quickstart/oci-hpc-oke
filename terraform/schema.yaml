@@ -2694,7 +2694,8 @@ variables:
   slinky_openldap_admin_password:
     title: OpenLDAP admin password
     type: password
-    default: "adminpassword"
+    description: Leave unset to generate a unique per-stack password.
+    required: false
     visible:
       and:
         - ${install_slinky}
@@ -2703,7 +2704,8 @@ variables:
   slinky_openldap_config_password:
     title: OpenLDAP config password
     type: password
-    default: "configpassword"
+    description: Leave unset to generate a unique per-stack password.
+    required: false
     visible:
       and:
         - ${install_slinky}
@@ -3039,6 +3041,11 @@ outputGroups:
       - worker_rdma_pool_id
       - worker_rdma_image_id
 
+  - title: Slurm Operator
+    outputs:
+      - slinky_openldap_admin_password
+      - slinky_openldap_config_password
+
   - title: Monitoring
     outputs:
       - grafana_url
@@ -3262,6 +3269,24 @@ outputs:
     title: Network security group
     type: ocid
     visible: false
+
+  # Slurm Operator
+  slinky_openldap_admin_password:
+    title: OpenLDAP adminPassword
+    type: copyableString
+    sensitive: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_identity_enabled}
+  slinky_openldap_config_password:
+    title: OpenLDAP configPassword
+    type: copyableString
+    sensitive: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_identity_enabled}
 
   # Monitoring
   grafana_url:

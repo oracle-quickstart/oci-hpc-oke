@@ -1156,25 +1156,25 @@ variable "slinky_openldap_base_dn" {
 }
 
 variable "slinky_openldap_admin_password" {
-  default     = "adminpassword"
+  default     = null
   type        = string
-  description = "OpenLDAP admin password. Override this for non-disposable deployments."
+  description = "OpenLDAP admin password. Leave unset to generate a unique per-stack password."
   sensitive   = true
 
   validation {
-    condition     = length(regexall("[\\r\\n]", var.slinky_openldap_admin_password)) == 0
+    condition     = var.slinky_openldap_admin_password == null ? true : length(regexall("[\\r\\n]", var.slinky_openldap_admin_password)) == 0
     error_message = "slinky_openldap_admin_password must not contain newline characters."
   }
 }
 
 variable "slinky_openldap_config_password" {
-  default     = "configpassword"
+  default     = null
   type        = string
-  description = "OpenLDAP cn=config admin password. Override this for non-disposable deployments."
+  description = "OpenLDAP cn=config admin password. Leave unset to generate a unique per-stack password."
   sensitive   = true
 
   validation {
-    condition     = length(regexall("[\\r\\n]", var.slinky_openldap_config_password)) == 0
+    condition     = var.slinky_openldap_config_password == null ? true : length(regexall("[\\r\\n]", var.slinky_openldap_config_password)) == 0
     error_message = "slinky_openldap_config_password must not contain newline characters."
   }
 }
