@@ -255,7 +255,6 @@ ${worker_nodesets_yaml}
     # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
     # evict workers while Slurm jobs are running on them
     workloadDisruptionProtection: true
-    useResourceLimits: false
     slurmd:
       image:
         repository: ${cpu_worker_image_repository}

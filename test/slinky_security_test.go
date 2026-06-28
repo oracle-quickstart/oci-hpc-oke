@@ -56,6 +56,14 @@ func TestSlinkyUsesIndependentAcceleratorNodeSets(t *testing.T) {
 	require.Contains(t, okeCluster, `var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0`)
 }
 
+func TestSlinkyNodeSetsUseSupportedResourceConfiguration(t *testing.T) {
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+	workerValues := readRepositoryFile(t, "terraform", "files", "slinky", "worker-nodeset-values.yaml.tftpl")
+
+	require.NotContains(t, slurmValues, "useResourceLimits")
+	require.NotContains(t, workerValues, "useResourceLimits")
+}
+
 func TestSlinkyGMCUsesPerFabricIMEXComputeDomains(t *testing.T) {
 	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
 	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")

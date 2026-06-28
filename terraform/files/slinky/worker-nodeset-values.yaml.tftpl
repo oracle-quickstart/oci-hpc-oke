@@ -15,7 +15,6 @@
     # if the nodeset is overridden to StatefulSet scaling.
     replicas: ${replicas}
     workloadDisruptionProtection: true
-    useResourceLimits: false
     slurmd:
       image:
         repository: ${image_repository}
