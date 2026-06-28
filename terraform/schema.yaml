@@ -367,6 +367,9 @@ variableGroups:
       - slinky_sssd_image_repository
       - slinky_sssd_image_tag
       - slinky_nodeset_name
+      - slinky_rdma_nodeset_name
+      - slinky_gmc_nodeset_name
+      - slinky_default_partition
       - slinky_cpu_worker_enabled
       - slinky_cpu_nodeset_name
       - slinky_cpu_worker_image_repository
@@ -2384,7 +2387,7 @@ variables:
   # Slinky / Slurm Operator
   install_slinky:
     title: Install Slurm Operator
-    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Worker nodesets are added when the corresponding CPU, GPU, or RDMA worker pools are enabled."
+    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Independent NodeSets are added for enabled CPU, standard GPU, GPU with RDMA, and GPU Memory Cluster worker pools."
     type: boolean
     default: false
   slinky_advanced_options:
@@ -2518,8 +2521,8 @@ variables:
         - ${install_slinky}
         - ${slinky_advanced_options}
   slinky_worker_network_mode:
-    title: Slurm worker network mode
-    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed."
+    title: GPU with RDMA Slurm network mode
+    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed. Standard GPU workers use pod networking and GMC workers use hostNetwork."
     type: enum
     enum:
       - hostNetwork
@@ -2529,14 +2532,17 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
   slinky_worker_mount_infiniband:
-    title: Mount /dev/infiniband into Slurm workers
+    title: Mount /dev/infiniband into GPU with RDMA Slurm workers
+    description: GMC workers always mount /dev/infiniband; standard GPU workers do not.
     type: boolean
     default: true
     visible:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
   slinky_worker_ssh_enabled:
     title: Enable SSH on Slurm workers
     type: boolean
@@ -2556,7 +2562,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_gpus_per_node:
     title: GPUs per Slurm worker
-    description: "Defaults to the final numeric component of the selected GPU shape."
+    description: "Defaults independently to the final numeric component of each accelerator pool's GPU shape."
     type: integer
     required: false
     visible:
@@ -2624,7 +2630,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_image_tag:
     title: Slurm worker image tag
-    description: "Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL."
+    description: "Use auto to select NVIDIA NCCL with Pyxis or AMD RCCL. All enabled accelerator pools must use the same GPU vendor."
     type: string
     default: "auto"
     visible:
@@ -2835,9 +2841,38 @@ variables:
         - ${slinky_advanced_options}
         - ${slinky_identity_enabled}
   slinky_nodeset_name:
-    title: Slurm worker nodeset name
+    title: Standard GPU Slurm NodeSet name
     type: string
     default: "gpu"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_gpu_enabled}
+  slinky_rdma_nodeset_name:
+    title: GPU with RDMA Slurm NodeSet name
+    type: string
+    default: "rdma"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
+  slinky_gmc_nodeset_name:
+    title: GPU Memory Cluster Slurm NodeSet prefix
+    description: A fabric suffix is added when multiple GPU memory fabrics are configured.
+    type: string
+    default: "gmc"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_gmc_enabled}
+  slinky_default_partition:
+    title: Default Slurm partition
+    description: auto prefers standard GPU, then RDMA, GMC, and CPU. With multiple GMC fabrics, gmc selects the aggregate gmc-all partition so jobs can span fabrics over RDMA. The all partition or an exact generated partition name is also accepted.
+    type: string
+    default: "auto"
     visible:
       and:
         - ${install_slinky}

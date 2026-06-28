@@ -21,6 +21,7 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	prereqs := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-prereqs.yaml.tftpl")
 	configure := readRepositoryFile(t, "terraform", "files", "slinky", "configure-openldap.sh.tftpl")
 	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+	workerValues := readRepositoryFile(t, "terraform", "files", "slinky", "worker-nodeset-values.yaml.tftpl")
 	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
 
 	require.Contains(t, prereqs, "ldap_default_bind_dn = ${openldap_sssd_bind_dn}")
@@ -32,7 +33,47 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	require.Contains(t, configure, `by dn.exact="$OPENLDAP_SSSD_BIND_DN" none`)
 	require.Contains(t, configure, `by dn.exact="$OPENLDAP_SSSD_BIND_DN" read`)
 	require.Contains(t, configure, "assert_sssd_write_denied openldap-0")
-	require.GreaterOrEqual(t, strings.Count(slurmValues, "oci-hpc-oke.oracle.com/sssd-config-hash"), 4)
+	require.GreaterOrEqual(t, strings.Count(slurmValues, "oci-hpc-oke.oracle.com/sssd-config-hash")+strings.Count(workerValues, "oci-hpc-oke.oracle.com/sssd-config-hash"), 4)
+}
+
+func TestSlinkyUsesIndependentAcceleratorNodeSets(t *testing.T) {
+	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
+	workerValues := readRepositoryFile(t, "terraform", "files", "slinky", "worker-nodeset-values.yaml.tftpl")
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+	okeCluster := readRepositoryFile(t, "terraform", "oke-cluster.tf")
+
+	require.Contains(t, slinky, `slinky_gpu_worker_nodesets`)
+	require.Contains(t, slinky, `pool_name           = "oke-gpu"`)
+	require.Contains(t, slinky, `slinky_rdma_worker_nodesets`)
+	require.Contains(t, slinky, `pool_name           = "oke-rdma"`)
+	require.Contains(t, slinky, `slinky_gmc_worker_nodesets`)
+	require.Contains(t, slinky, `pool_name           = "oke-gmc"`)
+	require.Contains(t, slinky, `slinky_worker_nodesets = merge(`)
+	require.Contains(t, workerValues, `oke.oraclecloud.com/pool.name: ${pool_name}`)
+	require.Contains(t, slurmValues, `${worker_nodesets_yaml}`)
+	require.Contains(t, viaOperator, `sort(keys(local.slinky_worker_nodesets))`)
+	require.Contains(t, okeCluster, `var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0`)
+}
+
+func TestSlinkyGMCUsesPerFabricIMEXComputeDomains(t *testing.T) {
+	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
+	workerValues := readRepositoryFile(t, "terraform", "files", "slinky", "worker-nodeset-values.yaml.tftpl")
+	slurmValues := readRepositoryFile(t, "terraform", "files", "slinky", "slurm-values.yaml.tftpl")
+
+	require.Contains(t, slinky, `slinky_gmc_nodeset_fabrics`)
+	require.Contains(t, workerValues, `oci.oraclecloud.com/host.gpu_memory_fabric_id: ${fabric_label}`)
+	require.Contains(t, slinky, `apiVersion = "resource.nvidia.com/v1beta1"`)
+	require.Contains(t, slinky, `kind       = "ComputeDomain"`)
+	require.Contains(t, slinky, `allocationMode = "All"`)
+	require.Contains(t, workerValues, `resourceClaimTemplateName: ${imex_claim_template}`)
+	require.Contains(t, workerValues, `claims:`)
+	require.Contains(t, slurmValues, `SwitchType: switch/nvidia_imex`)
+	require.Contains(t, slurmValues, `${gmc_partition_name}:`)
+	require.Contains(t, slurmValues, `${gmc_partition_nodesets_yaml}`)
+	require.Contains(t, slinky, `slinky_gmc_aggregate_partition_name`)
+	require.Contains(t, viaOperator, `resource "null_resource" "slinky_gmc_compute_domains_via_operator"`)
 }
 
 func TestSlinkyLoginDisablesRootSSH(t *testing.T) {

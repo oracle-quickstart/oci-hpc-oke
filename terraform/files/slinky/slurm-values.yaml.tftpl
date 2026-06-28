@@ -51,6 +51,11 @@ controller:
     SelectType: select/cons_tres
     SelectTypeParameters: CR_CORE_MEMORY
     PropagateResourceLimitsExcept: MEMLOCK
+%{ if gmc_nodeset_enabled ~}
+    # This is global Slurm configuration. On non-GMC workers the plugin sees
+    # no nvidia-caps-imex-channels device major and disables itself locally.
+    SwitchType: switch/nvidia_imex
+%{ endif ~}
 %{ if accounting_enabled ~}
     AccountingStorageEnforce: associations,limits,qos
     AccountingStorageTRES: gres/gpu
@@ -233,166 +238,7 @@ nodesets:
   slinky:
     enabled: false
 
-%{ if gpu_nodeset_enabled ~}
-  ${nodeset_name}:
-    enabled: true
-    scalingMode: DaemonSet
-%{ if worker_sriov_enabled || (identity_enabled && worker_ssh_enabled) ~}
-    metadata:
-      annotations:
-%{ if identity_enabled && worker_ssh_enabled ~}
-        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
-%{ endif ~}
-%{ if worker_sriov_enabled ~}
-        k8s.v1.cni.cncf.io/networks: ${worker_rdma_networks}
-%{ endif ~}
-%{ endif ~}
-    # Ignored in DaemonSet mode (pod count follows matching nodes); only used
-    # if the nodeset is overridden to StatefulSet scaling.
-    replicas: ${worker_replicas}
-    # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
-    # evict workers while Slurm jobs are running on them
-    workloadDisruptionProtection: true
-    useResourceLimits: false
-    slurmd:
-      image:
-        repository: ${worker_image_repository}
-        tag: ${worker_image_tag}
-      args:
-        - -N
-        - $(KUBE_NODE_NAME)
-%{ if worker_slurmd_parameters != "" ~}
-        - --parameters
-        - ${worker_slurmd_parameters}
-%{ endif ~}
-      env:
-        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
-        # hostname_override=true on the stack so nodes register by hostname
-        # instead of private IP and Slurm node names stay clean.
-        - name: KUBE_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-      lifecycle:
-        preStop:
-          exec:
-            command:
-              - /usr/bin/sh
-              - -c
-              - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
-      resources:
-        limits:
-          ${gpu_resource}: ${gpus_per_node}
-%{ if worker_sriov_enabled ~}
-          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
-%{ endif ~}
-        requests:
-          ${gpu_resource}: ${gpus_per_node}
-%{ if worker_sriov_enabled ~}
-          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
-%{ endif ~}
-      volumeMounts:
-%{ if mount_infiniband ~}
-        - name: devinf
-          mountPath: /dev/infiniband
-%{ endif ~}
-        - name: shm
-          mountPath: /dev/shm
-        # Pyxis/enroot writes its image-import scratch under /tmp and, while
-        # flattening layers, creates OverlayFS whiteouts (device nodes). The pod
-        # overlay rootfs rejects mknod even for root, so /tmp must be a tmpfs.
-        - name: enroot-tmp
-          mountPath: /tmp
-%{ if home_enabled ~}
-        - name: home
-          mountPath: /home
-%{ endif ~}
-%{ if identity_enabled ~}
-        - name: ldap-ca
-          mountPath: /etc/sssd/ca
-          readOnly: true
-%{ endif ~}
-    logfile:
-      image:
-        repository: docker.io/library/alpine
-        tag: latest
-    ssh:
-      enabled: ${worker_ssh_enabled}
-%{ if worker_host_network ~}
-      extraSshdConfig: |
-        Port 2222
-%{ endif ~}
-    extraConfMap:
-%{ if worker_numa_topology_enabled ~}
-      Boards: 1
-      CPUs: 128
-      SocketsPerBoard: 8
-      CoresPerSocket: 16
-      ThreadsPerCore: 1
-%{ endif ~}
-%{ if worker_slurmd_parameters != "" ~}
-      Parameters: ${worker_slurmd_parameters}
-%{ endif ~}
-      Gres:
-        - gpu:${gpus_per_node}
-      Features:
-${worker_features_yaml}
-      Weight: 1
-    partition:
-      enabled: true
-      configMap:
-        State: UP
-        Default: "YES"
-        MaxTime: UNLIMITED
-    updateStrategy:
-      type: RollingUpdate
-      rollingUpdate:
-        maxUnavailable: ${worker_replicas}
-    podSpec:
-%{ if worker_host_network ~}
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-%{ else ~}
-      hostNetwork: false
-      dnsPolicy: ClusterFirst
-%{ endif ~}
-      # Select the configured pool rather than the instance type: GPU and RDMA
-      # pools can use the same shape, but only one should run this NodeSet.
-      nodeSelector:
-        oke.oraclecloud.com/pool.name: ${worker_pool_name}
-      tolerations:
-        - key: ${gpu_resource}
-          operator: Exists
-          effect: NoSchedule
-      volumes:
-%{ if mount_infiniband ~}
-        - name: devinf
-          hostPath:
-            path: /dev/infiniband
-%{ endif ~}
-        - name: shm
-          emptyDir:
-            medium: Memory
-            sizeLimit: 32Gi
-        # tmpfs /tmp for the Pyxis/enroot image import (see the volumeMount note).
-        - name: enroot-tmp
-          emptyDir:
-            medium: Memory
-            sizeLimit: 64Gi
-%{ if home_enabled ~}
-        - name: home
-          persistentVolumeClaim:
-            claimName: slurm-home
-%{ endif ~}
-%{ if identity_enabled ~}
-        - name: ldap-ca
-          secret:
-            secretName: openldap-ca
-            items:
-              - key: ca.crt
-                path: ca.crt
-%{ endif ~}
-%{ endif ~}
+${worker_nodesets_yaml}
 %{ if cpu_nodeset_enabled ~}
 
   ${cpu_nodeset_name}:
@@ -494,7 +340,20 @@ partitions:
       - ALL
     configMap:
       State: UP
+      Default: "${all_partition_default}"
       MaxTime: UNLIMITED
+%{ if gmc_partition_enabled ~}
+  ${gmc_partition_name}:
+    enabled: true
+    # GMC NodeSets remain fabric-specific for IMEX, while this aggregate
+    # partition lets one Slurm job span fabrics over RDMA.
+    nodesets:
+${gmc_partition_nodesets_yaml}
+    configMap:
+      State: UP
+      Default: "${gmc_partition_default}"
+      MaxTime: UNLIMITED
+%{ endif ~}
 
 accounting:
   enabled: ${accounting_enabled}

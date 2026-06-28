@@ -12,6 +12,7 @@ locals {
     var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0,
     var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0,
     var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0,
+    var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0,
   ])
 
   deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])

@@ -86,6 +86,34 @@ locals {
     }
   })
 
+  slinky_worker_nodesets_yaml = join("\n", [
+    for nodeset_name in sort(keys(local.slinky_worker_nodesets)) : templatefile("${path.module}/files/slinky/worker-nodeset-values.yaml.tftpl", {
+      nodeset_name        = nodeset_name
+      replicas            = local.slinky_worker_nodesets[nodeset_name].replicas
+      image_repository    = var.slinky_worker_image_repository
+      image_tag           = local.slinky_worker_nodesets[nodeset_name].image_tag
+      gpu_resource        = local.slinky_worker_nodesets[nodeset_name].gpu_resource
+      gpus_per_node       = local.slinky_worker_nodesets[nodeset_name].gpus_per_node
+      mount_infiniband    = local.slinky_worker_nodesets[nodeset_name].mount_infiniband
+      worker_ssh_enabled  = var.slinky_worker_ssh_enabled
+      host_network        = local.slinky_worker_nodesets[nodeset_name].host_network
+      sriov_enabled       = local.slinky_worker_nodesets[nodeset_name].sriov_enabled
+      rdma_resource       = local.slinky_worker_nodesets[nodeset_name].rdma_resource
+      rdma_vfs_per_node   = local.slinky_worker_nodesets[nodeset_name].rdma_vfs_per_node
+      rdma_networks       = local.slinky_worker_nodesets[nodeset_name].rdma_networks
+      slurmd_parameters   = local.slinky_worker_nodesets[nodeset_name].slurmd_parameters
+      numa_topology       = local.slinky_worker_nodesets[nodeset_name].numa_topology
+      features_yaml       = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}"])
+      pool_name           = local.slinky_worker_nodesets[nodeset_name].pool_name
+      fabric_label        = local.slinky_worker_nodesets[nodeset_name].fabric_label
+      imex_claim_template = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
+      partition_default   = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
+      identity_enabled    = var.slinky_identity_enabled
+      home_enabled        = var.slinky_home_enabled
+      sssd_config_hash    = nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))
+    })
+  ])
+
   slinky_slurm_values_yaml = templatefile("${path.module}/files/slinky/slurm-values.yaml.tftpl", {
     cluster_name                 = local.cluster_name
     identity_enabled             = var.slinky_identity_enabled
@@ -106,31 +134,21 @@ locals {
     login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
     gpu_autodetect               = local.slinky_gpu_autodetect
     login_enabled                = var.slinky_login_enabled
-    nodeset_name                 = var.slinky_nodeset_name
-    worker_replicas              = local.slinky_worker_replicas
-    worker_image_repository      = var.slinky_worker_image_repository
-    worker_image_tag             = local.slinky_worker_image_tag
-    gpu_resource                 = local.slinky_gpu_resource
-    gpus_per_node                = local.slinky_gpus_per_node
-    mount_infiniband             = var.slinky_worker_mount_infiniband
+    worker_nodesets_yaml         = local.slinky_worker_nodesets_yaml
     worker_ssh_enabled           = var.slinky_worker_ssh_enabled
-    worker_host_network          = local.slinky_worker_host_network
-    worker_sriov_enabled         = local.slinky_worker_sriov_enabled
-    worker_rdma_resource         = var.slinky_worker_rdma_resource
-    worker_rdma_vfs_per_node     = local.slinky_worker_rdma_vfs_per_node
-    worker_rdma_networks         = local.slinky_worker_rdma_networks_annotation
-    worker_slurmd_parameters     = local.slinky_worker_slurmd_parameters
-    worker_numa_topology_enabled = local.slinky_worker_numa_topology_enabled
-    worker_features_yaml         = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
-    worker_pool_name             = local.slinky_worker_pool_name
-    gpu_nodeset_enabled          = local.slinky_gpu_nodeset_enabled
+    gmc_nodeset_enabled          = length(local.slinky_gmc_worker_nodesets) > 0
+    gmc_partition_enabled        = local.slinky_gmc_aggregate_partition_enabled
+    gmc_partition_name           = local.slinky_gmc_aggregate_partition_name
+    gmc_partition_nodesets_yaml  = join("\n", [for name in sort(keys(local.slinky_gmc_worker_nodesets)) : "      - ${name}"])
+    gmc_partition_default        = local.slinky_default_partition_name == local.slinky_gmc_aggregate_partition_name ? "YES" : "NO"
+    all_partition_default        = local.slinky_default_partition_name == "all" ? "YES" : "NO"
     cpu_nodeset_enabled          = local.slinky_cpu_nodeset_enabled
     cpu_nodeset_name             = var.slinky_cpu_nodeset_name
     cpu_worker_replicas          = var.worker_cpu_pool_size
     cpu_worker_image_repository  = local.slinky_cpu_worker_image_repository
     cpu_worker_image_tag         = local.slinky_cpu_worker_image_tag
     cpu_worker_features_yaml     = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
-    cpu_partition_default        = local.slinky_gpu_nodeset_enabled ? "NO" : "YES"
+    cpu_partition_default        = local.slinky_default_partition_name == var.slinky_cpu_nodeset_name ? "YES" : "NO"
     sssd_config_hash             = nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))
   })
 }
@@ -769,6 +787,87 @@ module "slinky_operator" {
   ]
 }
 
+# One NVIDIA IMEX ComputeDomain per GPU memory fabric. The generated
+# ResourceClaimTemplate is consumed by the matching long-running GMC slurmd
+# pods; GPU allocation itself remains nvidia.com/gpu and Slurm GRES.
+resource "null_resource" "slinky_gmc_compute_domains_via_operator" {
+  count = alltrue([
+    local.slinky_deploy_from_operator,
+    var.slinky_install_slurm_cluster,
+    length(local.slinky_gmc_compute_domains) > 0,
+  ]) ? 1 : 0
+
+  triggers = {
+    manifest_md5    = nonsensitive(md5(local.slinky_gmc_compute_domains_yaml))
+    workdir         = local.slinky_workdir
+    slurm_namespace = var.slinky_slurm_namespace
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
+  }
+
+  provisioner "file" {
+    content     = local.slinky_gmc_compute_domains_yaml
+    destination = "${local.slinky_workdir}/gmc-compute-domains.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl apply -f ${local.slinky_workdir}/gmc-compute-domains.yaml",
+    ]
+  }
+
+  provisioner "remote-exec" {
+    when       = destroy
+    on_failure = continue
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl delete -f ${self.triggers.workdir}/gmc-compute-domains.yaml --ignore-not-found=true || true",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+      triggers["slurm_namespace"],
+      triggers["workdir"],
+    ]
+  }
+
+  depends_on = [
+    null_resource.slinky_auth_secrets_via_operator,
+    module.nvidia_dra_driver,
+  ]
+}
+
 module "slinky_slurm" {
   count  = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? 1 : 0
   source = "./helm-module"
@@ -799,7 +898,7 @@ module "slinky_slurm" {
     # not fail the Slurm control-plane install when a NodeSet is not ready yet.
     [
       for nodeset in concat(
-        local.slinky_gpu_nodeset_enabled ? [var.slinky_nodeset_name] : [],
+        sort(keys(local.slinky_worker_nodesets)),
         local.slinky_cpu_nodeset_enabled ? [var.slinky_cpu_nodeset_name] : [],
         ) : join("\n", [
           "echo '== Slurm worker nodeset ${nodeset} status =='",
@@ -826,7 +925,9 @@ module "slinky_slurm" {
 
   depends_on = [
     module.slinky_operator,
+    module.oci_hpc_oke_utils,
     null_resource.slinky_auth_secrets_via_operator,
+    null_resource.slinky_gmc_compute_domains_via_operator,
     null_resource.slinky_openldap_config_via_operator,
     null_resource.slinky_home_pvc_via_operator,
     null_resource.slinky_mariadb_via_operator,

@@ -902,6 +902,14 @@ variable "worker_gmc_gpu_memory_fabric_ids" {
     ])
     error_message = "GPU Memory Fabric OCIDs must be provided one per line."
   }
+  validation {
+    condition = length(compact([
+      for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+      ])) == length(toset(compact([
+        for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+    ])))
+    error_message = "GPU Memory Fabric OCIDs must be unique."
+  }
 }
 variable "worker_gmc_scale_target_size" {
   default     = 18
@@ -1022,7 +1030,7 @@ variable "slinky_login_enabled" {
 variable "slinky_worker_network_mode" {
   default     = "hostNetwork"
   type        = string
-  description = "Network mode for Slinky slurmd pods. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace. Forced to virtualFunctions when deploy_nvidia_network_operator is true."
+  description = "Network mode for the Slinky RDMA NodeSet. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace. Forced to virtualFunctions when deploy_nvidia_network_operator is true. Standard GPU workers always use pod networking; GMC workers always use hostNetwork."
 
   validation {
     condition     = contains(["virtualFunctions", "hostNetwork"], var.slinky_worker_network_mode)
@@ -1033,7 +1041,7 @@ variable "slinky_worker_network_mode" {
 variable "slinky_worker_mount_infiniband" {
   default     = true
   type        = bool
-  description = "Mount /dev/infiniband into Slinky slurmd pods."
+  description = "Mount /dev/infiniband into Slinky RDMA slurmd pods. GMC workers always mount it and standard GPU workers do not."
 }
 
 variable "slinky_worker_ssh_enabled" {
@@ -1051,7 +1059,7 @@ variable "slinky_worker_replicas" {
 variable "slinky_gpus_per_node" {
   default     = null
   type        = number
-  description = "GPUs per Slinky slurmd pod. Defaults to the final numeric component of the selected GPU worker shape."
+  description = "GPUs per Slinky accelerator slurmd pod. Defaults independently to the final numeric component of each pool's worker shape."
 }
 
 variable "slinky_worker_rdma_resource" {
@@ -1086,7 +1094,7 @@ variable "slinky_worker_image_repository" {
 variable "slinky_worker_image_tag" {
   default     = "auto"
   type        = string
-  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL with Pyxis."
+  description = "Container image tag for Slinky accelerator slurmd pods. Use auto to select NVIDIA NCCL with Pyxis or AMD RCCL with Pyxis. All enabled accelerator pools must use the same GPU vendor."
 }
 
 variable "slinky_gpu_autodetect" {
@@ -1266,7 +1274,25 @@ variable "slinky_sssd_image_tag" {
 variable "slinky_nodeset_name" {
   default     = "gpu"
   type        = string
-  description = "Slinky nodeset name used for the shape-specific Slurm worker pool."
+  description = "Slinky NodeSet and partition name used for the standard GPU worker pool."
+}
+
+variable "slinky_rdma_nodeset_name" {
+  default     = "rdma"
+  type        = string
+  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool."
+}
+
+variable "slinky_gmc_nodeset_name" {
+  default     = "gmc"
+  type        = string
+  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured."
+}
+
+variable "slinky_default_partition" {
+  default     = "auto"
+  type        = string
+  description = "Default Slinky partition. Use auto, gpu, rdma, gmc, cpu, all, or an exact generated partition name. With multiple GMC fabrics, gmc selects the aggregate <slinky_gmc_nodeset_name>-all partition. auto prefers GPU, then RDMA, GMC, and CPU."
 }
 
 variable "slinky_cpu_worker_enabled" {
@@ -1297,14 +1323,14 @@ variable "slinky_cpu_worker_image_tag" {
 variable "install_oci_hpc_oke_utils" {
   default     = true
   type        = bool
-  description = "Install the OCI HPC OKE Utils Helm chart (includes RDMA topology labeler and image prepuller)."
+  description = "Install the OCI HPC OKE Utils Helm chart (includes the RDMA/GMC node labeler and image prepuller)."
 }
 
 # RDMA topology labeler
 variable "install_rdma_labeler" {
   default     = true
   type        = bool
-  description = "Deploy the RDMA topology labeler DaemonSet to populate node labels required for Topology Aware Scheduling."
+  description = "Deploy the RDMA/GMC labeler DaemonSet to populate topology labels and the GPU memory fabric label used by Slurm GMC NodeSets."
 }
 
 # Image prepuller
