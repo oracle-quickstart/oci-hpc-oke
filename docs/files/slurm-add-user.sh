@@ -107,6 +107,10 @@ derive_surname() { awk '{print $NF}' <<<"$1"; }
 # colons, non-ASCII characters, and other data that cannot safely follow `attr:`.
 ldif_base64() { printf '%s' "$1" | base64 | tr -d '\r\n'; }
 
+# Kubernetes coordination.k8s.io/v1 Lease timestamps use metav1.MicroTime,
+# whose JSON parser requires exactly six fractional-second digits.
+lease_timestamp() { date -u +%Y-%m-%dT%H:%M:%S.000000Z; }
+
 # next_free_id <floor>: read used numeric ids (one per line) on stdin,
 # print the smallest integer >= floor not in the list.
 next_free_id() {
@@ -266,7 +270,7 @@ acquire_allocation_lock() {
   ALLOCATION_LOCK_ID="slurm-add-user-$$-$(date +%s)-${RANDOM}"
   deadline=$((SECONDS + USER_ALLOCATION_LOCK_WAIT_SECONDS))
   while true; do
-    now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    now="$(lease_timestamp)"
     if output="$(kc -n "$IDENTITY_NAMESPACE" create -f - 2>&1 <<EOF
 apiVersion: coordination.k8s.io/v1
 kind: Lease

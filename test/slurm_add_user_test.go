@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -71,4 +72,13 @@ func TestSlurmAddUserSerializesIdentifierAllocation(t *testing.T) {
 	require.Contains(t, script, `sn:: ${surname_b64}`)
 	require.NotContains(t, script, `cn: ${FULL_NAME}`)
 	require.NotContains(t, script, `sn: ${FULL_NAME##* }`)
+}
+
+func TestSlurmAddUserLeaseTimestampUsesMicroTimeFormat(t *testing.T) {
+	timestamp, err := runSlurmAddUserHelper(t, "lease_timestamp")
+	require.NoError(t, err)
+	require.Regexp(t,
+		regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$`),
+		strings.TrimSpace(timestamp),
+	)
 }
