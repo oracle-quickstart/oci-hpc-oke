@@ -290,7 +290,9 @@ This means:
 - A 60-second check becomes stale after 180 seconds.
 - A 300-second check becomes stale after 660 seconds.
 
-GPU dashboards and the missing-NPD fallback use `kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}` as their GPU node inventory. This metric is independent of NPD, so a GPU node remains visible and the stale alert can detect it when NPD publishes no conditions or freshness metrics.
+GPU dashboards and the stale alert use `kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}` as their GPU node inventory. This metric is independent of NPD, so a GPU node remains visible when NPD publishes no conditions or freshness metrics.
+
+The stale alert expands each AMD GPU node into 13 expected `(hostname, check)` pairs and each NVIDIA GPU node into 19 expected pairs. It compares those pairs with the published freshness metrics. A single missing check alerts even when other checks on the node continue to publish. Published metrics are also restricted to the expected vendor set, so old or test-only check metrics do not create false stale alerts.
 
 The `node_health_status` recording rule evaluates all 13 AMD or 19 NVIDIA conditions configured for the node. It records `0` for Failed, `1` for Healthy, and `2` for Unknown. A missing expected condition is Unknown, and confirmed failures take priority over Unknown. Command Center healthy node and GPU totals count only value `1`.
 
