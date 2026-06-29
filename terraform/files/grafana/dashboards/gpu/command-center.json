@@ -441,11 +441,15 @@
               "options": {
                 "0": {
                   "color": "red",
-                  "text": "down"
+                  "text": "Failed"
                 },
                 "1": {
                   "color": "green",
-                  "text": "up"
+                  "text": "Healthy"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -551,11 +555,15 @@
               "options": {
                 "0": {
                   "color": "red",
-                  "text": "down"
+                  "text": "Failed"
                 },
                 "1": {
                   "color": "green",
-                  "text": "up"
+                  "text": "Healthy"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"

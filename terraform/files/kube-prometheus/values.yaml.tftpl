@@ -290,32 +290,107 @@ additionalPrometheusRulesMap:
             expr: (xid_error_check) * on (hostname) (xid_error_check)
           - record: node_up_check
             expr: (min by (hostname) (up{instance=~".*:9100$"}))
-          - record: node_health_status
+          - record: node_npd_failed
             expr: |
-              (
-                node_rttcc_ok or node_up_check
+              max by(hostname) (
+                label_replace(
+                  (
+                    (
+                      max by(node) (
+                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="true"} == bool 1)
+                        and on(node)
+                        (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0))
+                    )
+                    or
+                    (
+                      max by(node) (
+                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="true"} == bool 1)
+                        and on(node)
+                        (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0))
+                    )
+                  ),
+                  "hostname", "$1", "node", "(.*)"
+                )
               )
-              *
-              (
-                node_oca_ver_ok or node_up_check
+          - record: node_npd_unknown_condition
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  (
+                    (
+                      max by(node) (
+                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="unknown"} == bool 1)
+                        and on(node)
+                        (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0))
+                    )
+                    or
+                    (
+                      max by(node) (
+                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="unknown"} == bool 1)
+                        and on(node)
+                        (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0))
+                    )
+                  ),
+                  "hostname", "$1", "node", "(.*)"
+                )
               )
-              *
-              (
-                node_rdma_device_status_ok or node_up_check
+          - record: node_npd_condition_count
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  (
+                    (
+                      count by(node) (
+                        max by(node, condition) (
+                          kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo"}
+                          and on(node)
+                          (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
+                        )
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0))
+                    )
+                    or
+                    (
+                      count by(node) (
+                        max by(node, condition) (
+                          kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"}
+                          and on(node)
+                          (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
+                        )
+                      )
+                      or
+                      (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0))
+                    )
+                  ),
+                  "hostname", "$1", "node", "(.*)"
+                )
               )
-              *
-              (
-                node_check_bus_issue_count_ok or node_up_check
+          - record: node_npd_expected_condition_count
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  (
+                    (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0) + 13)
+                    or
+                    (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0) + 19)
+                  ),
+                  "hostname", "$1", "node", "(.*)"
+                )
               )
-              *
-              (
-                node_rdma_link_flapping_ok or node_up_check
-              )
-              *
-              (
-                node_ecc_error_check_ok or node_up_check
-              )
-              *
-              (
-                node_gpu_row_remap_error_check or node_up_check
-              )
+          - record: node_npd_unknown
+            expr: clamp_max(node_npd_unknown_condition + (node_npd_condition_count < bool node_npd_expected_condition_count), 1)
+          - record: node_health_status
+            expr: (1 - node_npd_failed) * (1 + node_npd_unknown)
