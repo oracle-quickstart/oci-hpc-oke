@@ -755,7 +755,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|NodeHasPcieErrors|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth\", status=\"true\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|NodeHasPcieErrors|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth\", status=\"unknown\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
+          "expr": "0 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|DcgmiHealth|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth|Rocminfo\", status=\"true\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|DcgmiHealth|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth|Rocminfo\", status=\"unknown\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}} / {{condition}}",
           "range": true,
           "refId": "A"

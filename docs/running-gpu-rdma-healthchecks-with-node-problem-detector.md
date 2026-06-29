@@ -294,6 +294,8 @@ GPU dashboards and the missing-NPD fallback use `kube_node_status_capacity{resou
 
 The `node_health_status` recording rule evaluates all 13 AMD or 19 NVIDIA conditions configured for the node. It records `0` for Failed, `1` for Healthy, and `2` for Unknown. A missing expected condition is Unknown, and confirmed failures take priority over Unknown. Command Center healthy node and GPU totals count only value `1`.
 
+The Command Center `Historical Cluster Node Issues` timeline tracks all 22 known GPU and RDMA condition names. This is the union of the AMD and NVIDIA custom conditions plus `NodeHasPcieErrors`. Conditions that do not apply to the cluster vendor do not create timeline series.
+
 If NPD kills a command at the outer plugin timeout, NPD can retain the previous node condition. The initial heartbeat stops updating, allowing the stale alert to detect the hung check.
 
 ## Migrating from the Generic Release
