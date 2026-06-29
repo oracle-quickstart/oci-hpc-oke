@@ -115,7 +115,7 @@ locals {
       partition_default   = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
       identity_enabled    = var.slinky_identity_enabled
       home_enabled        = var.slinky_home_enabled
-      sssd_config_hash    = nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))
+      sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
     })
   ])
 
@@ -154,7 +154,7 @@ locals {
     cpu_worker_image_tag         = local.slinky_cpu_worker_image_tag
     cpu_worker_features_yaml     = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
     cpu_partition_default        = local.slinky_default_partition_name == var.slinky_cpu_nodeset_name ? "YES" : "NO"
-    sssd_config_hash             = nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))
+    sssd_config_hash             = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
   })
 }
 

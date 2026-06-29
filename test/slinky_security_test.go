@@ -51,6 +51,13 @@ func TestSlinkySSSDBindPasswordAllowsDisabledInstall(t *testing.T) {
   ), "")`)
 }
 
+func TestSlinkySSSDHashHandlesDisabledInstall(t *testing.T) {
+	viaOperator := readRepositoryFile(t, "terraform", "via-operator-slinky.tf")
+
+	require.Equal(t, 2, strings.Count(viaOperator, `nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))`))
+	require.NotContains(t, viaOperator, `nonsensitive(sha256(local.slinky_openldap_prereqs_yaml))`)
+}
+
 func TestSlinkyOpenLDAPProtectsWritablePrimary(t *testing.T) {
 	openldapValues := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-values.yaml.tftpl")
 
