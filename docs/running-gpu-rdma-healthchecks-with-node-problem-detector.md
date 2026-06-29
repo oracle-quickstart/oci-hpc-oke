@@ -99,6 +99,10 @@ Every invocation uses a unique root-owned work directory under:
 /var/lib/oke-npd/run
 ```
 
+The wrapper stores one root-owned Python runner at `/var/lib/oke-npd/bin/uv` and stages it atomically once per NPD pod. It does not copy the runner into every work directory.
+
+Each invocation removes abandoned work directories and incomplete runner staging files older than ten minutes. This cleanup handles directories left behind when NPD ends a check with `SIGKILL`, which cannot run the wrapper's exit trap.
+
 Executable code is not copied to or executed from shared `/tmp`.
 
 The wrapper publishes detailed logs atomically under:
@@ -186,7 +190,7 @@ Check the releases and DaemonSets:
 helm list -n monitoring | grep node-problem-detector
 kubectl get daemonset -n monitoring | grep node-problem-detector
 kubectl get pods -n monitoring \
-  -l app.kubernetes.io/name=node-problem-detector \
+  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o wide
 ```
 
@@ -194,7 +198,7 @@ Check the image and pulled digest:
 
 ```bash
 kubectl get pods -n monitoring \
-  -l app.kubernetes.io/name=node-problem-detector \
+  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o json | jq -r '.items[] |
     [.metadata.name, .spec.nodeName, .spec.containers[0].image,
      .status.containerStatuses[0].imageID] | @tsv'

@@ -289,14 +289,15 @@ The base values contain the protected wrapper, image, logs, and freshness metric
 
 ```bash
 # Check if node problem detector pods are running
-kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=node-problem-detector
+kubectl get pods -n ${MONITORING_NAMESPACE} \
+  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)'
 
 # Check metrics endpoint
 kubectl get servicemonitor -n ${MONITORING_NAMESPACE} | grep node-problem-detector
 
 # Confirm the pulled image and digest
 kubectl get pods -n ${MONITORING_NAMESPACE} \
-  -l app.kubernetes.io/name=node-problem-detector \
+  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o json | jq -r '.items[] |
     [.metadata.name, .spec.nodeName, .spec.containers[0].image,
      .status.containerStatuses[0].imageID] | @tsv'

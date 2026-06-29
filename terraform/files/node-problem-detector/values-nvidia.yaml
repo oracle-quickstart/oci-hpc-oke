@@ -1,3 +1,4 @@
+nameOverride: gpu-rdma-node-problem-detector-nvidia
 fullnameOverride: gpu-rdma-node-problem-detector-nvidia
 
 settings:

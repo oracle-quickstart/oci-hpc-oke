@@ -633,9 +633,13 @@ settings:
         umask 077
         start_time=$(date +%s)
         run_dir=/host/var/lib/oke-npd/run
+        bin_dir=/host/var/lib/oke-npd/bin
         cache_dir=/host/var/cache/oke-npd/uv
         log_dir=/host/var/log/oke-npd
         metrics_dir=/host/var/lib/node_exporter/textfile_collector
+        container_state_dir=/run/oke-npd
+        uv_source=/root/.local/bin/uv
+        uv_path=$bin_dir/uv
         healthcheck_log_file=$log_dir/latest-${healthcheck_type}.log
         metrics_file=$metrics_dir/oke_npd_${healthcheck_type}.prom
 
@@ -657,8 +661,50 @@ settings:
             chmod 0644 "$metrics_tmp" && mv -f "$metrics_tmp" "$metrics_file"
         }
 
-        install -d -m 0700 "$run_dir" "$cache_dir" "$log_dir" || exit "$UNKNOWN"
+        cleanup_abandoned_runs() {
+            if ! find "$run_dir" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type d \
+                -mmin +10 \
+                -exec rm -rf -- {} +
+            then
+                return 1
+            fi
+            find "$bin_dir" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type f \
+                -name '.uv.*' \
+                -mmin +10 \
+                -exec rm -f -- {} +
+        }
+
+        stage_uv() {
+            marker=$container_state_dir/uv-staged
+            if [ -e "$marker" ] && [ -x "$uv_path" ]; then
+                return 0
+            fi
+
+            uv_tmp=$(mktemp "$bin_dir/.uv.XXXXXX") || return 1
+            if ! cp "$uv_source" "$uv_tmp" || ! chmod 0700 "$uv_tmp" || ! mv -f "$uv_tmp" "$uv_path"; then
+                rm -f "$uv_tmp"
+                return 1
+            fi
+            touch "$marker"
+        }
+
+        install -d -m 0700 "$run_dir" "$bin_dir" "$cache_dir" "$log_dir" "$container_state_dir" || exit "$UNKNOWN"
         install -d -m 0755 "$metrics_dir" || exit "$UNKNOWN"
+        if ! cleanup_abandoned_runs; then
+            echo "Unable to clean abandoned NPD run directories"
+            exit "$UNKNOWN"
+        fi
+        if ! stage_uv; then
+            echo "Unable to stage the NPD Python runner"
+            exit "$UNKNOWN"
+        fi
+
         work_dir=$(mktemp -d "$run_dir/${healthcheck_type}.XXXXXX") || exit "$UNKNOWN"
         trap 'rm -rf "$work_dir"' EXIT
 
@@ -674,11 +720,6 @@ settings:
             echo "Unable to stage NPD health-check files"
             exit "$UNKNOWN"
         fi
-        if ! cp /root/.local/bin/uv "$work_dir/uv"; then
-            echo "Unable to stage the NPD Python runner"
-            exit "$UNKNOWN"
-        fi
-        chmod 0700 "$work_dir/uv"
 
         if ! publish_metrics "$start_time" 0 "$UNKNOWN"; then
             echo "Unable to publish NPD start metrics"
@@ -686,11 +727,12 @@ settings:
         fi
 
         host_work_dir=${work_dir#/host}
+        host_uv_path=${uv_path#/host}
         work_log="$work_dir/output.log"
         if nsenter -n/host/proc/1/ns/net \
             chroot /host \
             env UV_CACHE_DIR=/var/cache/oke-npd/uv \
-            "$host_work_dir/uv" run \
+            "$host_uv_path" run \
             "$host_work_dir/check_gpu_setup.py" \
             --dry-run \
             "--$healthcheck_type" >"$work_log" 2>&1
