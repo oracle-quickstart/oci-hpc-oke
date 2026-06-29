@@ -43,6 +43,14 @@ func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
 	require.NotContains(t, prereqs, `ldap_uri = ldaps://openldap-readonly.`)
 }
 
+func TestSlinkySSSDBindPasswordAllowsDisabledInstall(t *testing.T) {
+	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
+
+	require.Contains(t, slinky, `slinky_openldap_sssd_bind_password = try(coalesce(
+    one(random_password.slinky_openldap_sssd_bind[*].result),
+  ), "")`)
+}
+
 func TestSlinkyOpenLDAPProtectsWritablePrimary(t *testing.T) {
 	openldapValues := readRepositoryFile(t, "terraform", "files", "slinky", "openldap-values.yaml.tftpl")
 
