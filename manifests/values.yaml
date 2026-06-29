@@ -1,0 +1,19 @@
+nfd:
+  # GPU Operator already owns NFD in this cluster.
+  enabled: false
+
+sriovNetworkOperator:
+  enabled: true
+
+sriov-network-operator:
+  sriovOperatorConfig:
+    deploy: true
+    # Draining is allowed, but a reboot is not. The pool configuration limits
+    # disruption to one BM.GPU.B4.8 node at a time.
+    disableDrain: false
+    configurationMode: daemon
+    # OCI image provisioning/OCA owns PF firmware. Disabling this plugin keeps
+    # the SR-IOV operator from attempting firmware changes or requesting a
+    # reboot while the generic plugin manages sriov_numvfs.
+    disablePlugins:
+      - mellanox
