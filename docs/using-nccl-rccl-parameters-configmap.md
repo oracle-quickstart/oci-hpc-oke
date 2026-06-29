@@ -2,26 +2,27 @@
 
 ## Overview
 
-When the cluster is deployed with an RDMA or GMC GPU worker pool, Terraform
-creates a ConfigMap in the `default` namespace holding the recommended NCCL/RCCL
-tuning parameters for the deployed shape (from
+When the cluster is deployed with RDMA or GMC GPU worker pools, Terraform
+creates one ConfigMap in the `default` namespace for each distinct supported
+shape. Each ConfigMap holds the recommended NCCL/RCCL tuning parameters from
 [recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md)),
 one environment variable per key.
 
-The ConfigMap name depends on the GPU vendor:
+The ConfigMap name includes the GPU vendor and normalized shape:
 
-- `oci-nccl-parameters` for NVIDIA shapes
-- `oci-rccl-parameters` for AMD shapes
+- `oci-nccl-parameters-<shape>` for NVIDIA shapes
+- `oci-rccl-parameters-<shape>` for AMD shapes
 
-The examples below use an NVIDIA H100 cluster, so they reference
-`oci-nccl-parameters`. On an AMD cluster use `oci-rccl-parameters` instead; the structure
-is identical. An example ConfigMap (NVIDIA H100):
+The shape is lowercase with dots replaced by hyphens. For example,
+`BM.GPU.H100.8` uses `oci-nccl-parameters-bm-gpu-h100-8`, while
+`BM.GPU.MI300X.8` uses `oci-rccl-parameters-bm-gpu-mi300x-8`. The examples below
+use an NVIDIA H100 cluster.
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: oci-nccl-parameters
+  name: oci-nccl-parameters-bm-gpu-h100-8
   namespace: default
 data:
   NCCL_DEBUG: "WARN"
@@ -36,14 +37,15 @@ data:
   NCCL_IGNORE_CPU_AFFINITY: "1"
 ```
 
-The ConfigMap is controlled by the `deploy_nccl_rccl_param_configmap` Terraform
-variable (default `true`). It is created only when `worker_rdma_enabled` or
-`worker_gmc_enabled` is true and the shape is covered by the parameter set.
+The ConfigMaps are controlled by the `deploy_nccl_rccl_param_configmap`
+Terraform variable (default `true`). A ConfigMap is created for every distinct
+enabled RDMA or GMC shape covered by the parameter set. If both pools use the
+same shape, Terraform creates one ConfigMap for that shape.
 
 Verify it exists:
 
 ```bash
-kubectl get configmap oci-nccl-parameters -n default -o yaml
+kubectl get configmap oci-nccl-parameters-bm-gpu-h100-8 -n default -o yaml
 ```
 
 ## Quickstart
@@ -57,7 +59,7 @@ containers:
   image: ...
   envFrom:
   - configMapRef:
-      name: oci-nccl-parameters
+      name: oci-nccl-parameters-bm-gpu-h100-8
 ```
 
 For an MPIJob the ranks run in the **worker** pods (`mpirun` launches them over
@@ -71,7 +73,7 @@ all:
           - name: mpi-worker
             envFrom:
             - configMapRef:
-                name: oci-nccl-parameters
+                name: oci-nccl-parameters-bm-gpu-h100-8
             command:
             - /bin/bash
             - -c
@@ -113,7 +115,7 @@ After:
             image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
             envFrom:
             - configMapRef:
-                name: oci-nccl-parameters
+                name: oci-nccl-parameters-bm-gpu-h100-8
             command:
               - /bin/bash
               - -c
@@ -221,18 +223,18 @@ spec:
     image: ...
     envFrom:
     - configMapRef:
-        name: oci-nccl-parameters
+        name: oci-nccl-parameters-bm-gpu-h100-8
     command: ["torchrun", "..."]
 ```
 
 ## Notes and caveats
 
-- Namespace. The ConfigMap lives in `default`. A `configMapRef` only resolves in
-  the same namespace, so run the job in `default`, or copy the ConfigMap into the
-  job's namespace:
+- Namespace. The ConfigMaps live in `default`. A `configMapRef` only resolves in
+  the same namespace, so run the job in `default`, or copy the required ConfigMap
+  into the job's namespace:
 
   ```bash
-  kubectl get configmap oci-nccl-parameters -n default -o json \
+  kubectl get configmap oci-nccl-parameters-bm-gpu-h100-8 -n default -o json \
     | jq '
         del(
           .metadata.uid,
@@ -266,21 +268,22 @@ spec:
   see exactly which keys are present:
 
   ```bash
-  kubectl get configmap oci-nccl-parameters -n default \
+  kubectl get configmap oci-nccl-parameters-bm-gpu-h100-8 -n default \
     -o jsonpath='{.data}' | tr ',' '\n'
   ```
 
 ## Creating the ConfigMap manually
 
 Create it yourself when Terraform does not: `deploy_nccl_rccl_param_configmap`
-is `false`, the deployed shape is not in the parameter set, or you want the
-ConfigMap in a namespace other than `default`.
+is `false`, the shape is not in the parameter set, or you want the ConfigMap in
+a namespace other than `default`.
 
 1. Look up the parameters for your shape in
    [recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md),
    one environment variable per key.
-2. Name it `oci-nccl-parameters` on NVIDIA shapes or `oci-rccl-parameters` on
-   AMD shapes.
+2. Name it `oci-nccl-parameters-<shape>` on NVIDIA shapes or
+   `oci-rccl-parameters-<shape>` on AMD shapes. Convert the shape to lowercase
+   and replace dots with hyphens.
 3. For `NCCL_IB_HCA`, use the shape's full device list on a non-VF cluster, or
    `mlx5` when SR-IOV virtual functions are enabled for that shape.
 
@@ -292,7 +295,7 @@ kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: oci-nccl-parameters
+  name: oci-nccl-parameters-bm-gpu-h100-8
   namespace: default
 data:
   NCCL_DEBUG: "WARN"
@@ -311,7 +314,7 @@ EOF
 Or build it from literals without writing YAML:
 
 ```bash
-kubectl create configmap oci-nccl-parameters -n default \
+kubectl create configmap oci-nccl-parameters-bm-gpu-h100-8 -n default \
   --from-literal=NCCL_DEBUG=WARN \
   --from-literal=NCCL_CUMEM_ENABLE=0 \
   --from-literal=NCCL_IB_SPLIT_DATA_ON_QPS=0 \

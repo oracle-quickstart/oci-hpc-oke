@@ -2371,8 +2371,8 @@ variables:
     default: true
 
   deploy_nccl_rccl_param_configmap:
-    title: Create NCCL/RCCL parameters ConfigMap
-    description: Create a ConfigMap with the recommended NCCL/RCCL parameters for the deployed GPU shape (named oci-nccl-parameters for NVIDIA shapes, oci-rccl-parameters for AMD shapes). NCCL_IB_HCA is set to 'mlx5' when SR-IOV virtual functions are enabled, otherwise the shape's full device list.
+    title: Create NCCL/RCCL parameters ConfigMaps
+    description: Create a shape-specific ConfigMap with the recommended NCCL/RCCL parameters for each enabled RDMA or GMC GPU shape. Names use oci-nccl-parameters-<shape> for NVIDIA and oci-rccl-parameters-<shape> for AMD, with the shape converted to lowercase and dots replaced by hyphens. NCCL_IB_HCA is set to 'mlx5' when SR-IOV virtual functions are enabled, otherwise the shape's full device list.
     type: boolean
     default: true
     visible:

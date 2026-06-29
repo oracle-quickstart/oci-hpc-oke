@@ -183,58 +183,59 @@ locals {
     }
   }
 
-  # The deployed GPU shape: the RDMA pool shape when that pool is enabled,
-  # otherwise the GMC (GPU Memory Cluster) pool shape. Empty when neither pool
-  # is enabled.
-  nccl_rccl_configmap_shape = (
-    var.worker_rdma_enabled ? var.worker_rdma_shape :
-    var.worker_gmc_enabled ? var.worker_gmc_shape :
-    ""
-  )
+  nccl_rccl_configmap_shapes = distinct(concat(
+    var.worker_rdma_enabled ? [var.worker_rdma_shape] : [],
+    var.worker_gmc_enabled ? [var.worker_gmc_shape] : [],
+  ))
 
-  # Recommended parameters for the deployed shape (empty for shapes the doc does
-  # not cover, which disables the ConfigMap).
-  nccl_rccl_configmap_shape_params = lookup(local.nccl_rccl_parameters, local.nccl_rccl_configmap_shape, {})
+  nccl_rccl_configmap_shape_params = {
+    for shape in local.nccl_rccl_configmap_shapes :
+    shape => lookup(local.nccl_rccl_parameters, shape, {})
+    if length(lookup(local.nccl_rccl_parameters, shape, {})) > 0
+  }
 
-  # SR-IOV virtual functions are in use when the network operator deploys its
-  # SR-IOV manifests and the deployed shape is one that gets a VF policy.
-  nccl_rccl_configmap_use_vf = alltrue([
-    local.deploy_nvidia_network_operator_manifests,
-    contains(local.nvidia_network_operator_sriov_shapes, local.nccl_rccl_configmap_shape),
-  ])
-
-  # When using virtual functions, NCCL_IB_HCA becomes "mlx5" (per the doc).
-  nccl_rccl_configmap_data = merge(
-    local.nccl_rccl_configmap_shape_params,
-    local.nccl_rccl_configmap_use_vf ? { NCCL_IB_HCA = "mlx5" } : {},
-  )
-
-  # AMD shapes run RCCL, NVIDIA shapes run NCCL; name the ConfigMap accordingly.
-  nccl_rccl_configmap_is_amd    = contains(local.amd_gpu_plugin_shapes, local.nccl_rccl_configmap_shape)
-  nccl_rccl_configmap_name      = local.nccl_rccl_configmap_is_amd ? "oci-rccl-parameters" : "oci-nccl-parameters"
-  nccl_rccl_configmap_namespace = "default"
+  nccl_rccl_configmaps = {
+    for shape, params in local.nccl_rccl_configmap_shape_params :
+    shape => {
+      name = format(
+        "oci-%s-parameters-%s",
+        contains(local.amd_gpu_plugin_shapes, shape) ? "rccl" : "nccl",
+        lower(replace(shape, ".", "-")),
+      )
+      namespace = "default"
+      data = merge(
+        params,
+        alltrue([
+          local.deploy_nvidia_network_operator_manifests,
+          contains(local.nvidia_network_operator_sriov_shapes, shape),
+        ]) ? { NCCL_IB_HCA = "mlx5" } : {},
+      )
+    }
+  }
 
   deploy_nccl_rccl_param_configmap = alltrue([
     var.deploy_nccl_rccl_param_configmap,
-    anytrue([var.worker_rdma_enabled, var.worker_gmc_enabled]),
-    length(local.nccl_rccl_configmap_shape_params) > 0,
+    length(local.nccl_rccl_configmaps) > 0,
   ])
 
-  nccl_rccl_configmap_manifest = yamlencode({
-    apiVersion = "v1"
-    kind       = "ConfigMap"
-    metadata = {
-      name      = local.nccl_rccl_configmap_name
-      namespace = local.nccl_rccl_configmap_namespace
-    }
-    data = local.nccl_rccl_configmap_data
-  })
+  nccl_rccl_configmap_manifests = {
+    for shape, configmap in local.nccl_rccl_configmaps :
+    shape => yamlencode({
+      apiVersion = "v1"
+      kind       = "ConfigMap"
+      metadata = {
+        name      = configmap.name
+        namespace = configmap.namespace
+      }
+      data = configmap.data
+    })
+  }
 }
 
 resource "kubectl_manifest" "nccl_rccl_configmap" {
-  count = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? local.nccl_rccl_configmap_manifests : {}
 
-  yaml_body         = local.nccl_rccl_configmap_manifest
+  yaml_body         = each.value
   server_side_apply = true
   wait_for_rollout  = false
 
