@@ -22,8 +22,7 @@ locals {
           }
         }
       ],
-      (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
-      (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, "")))) ?
+      local.grafana_has_amd_gpu || local.grafana_has_nvidia_gpu ?
       [for cdk, cdv in local.grafana_gpu_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",

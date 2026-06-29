@@ -8,7 +8,8 @@ locals {
   )
   npd_has_nvidia_gpu = (
     (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
-    (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape))
+    (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
+    (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
   )
 }
 
