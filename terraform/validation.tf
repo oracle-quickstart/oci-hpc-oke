@@ -36,11 +36,13 @@ locals {
   pods_required_cpu  = var.worker_cpu_enabled ? var.worker_cpu_pool_size * local.worker_cpu_max_pods_per_node : 0
   pods_required_gpu  = var.worker_gpu_enabled ? var.worker_gpu_pool_size * var.worker_gpu_max_pods_per_node : 0
   pods_required_rdma = var.worker_rdma_enabled ? var.worker_rdma_pool_size * var.worker_rdma_max_pods_per_node : 0
+  pods_required_gmc  = var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size * var.worker_gmc_max_pods_per_node : 0
   total_pods_required = (
     local.pods_required_ops +
     local.pods_required_cpu +
     local.pods_required_gpu +
-    local.pods_required_rdma
+    local.pods_required_rdma +
+    local.pods_required_gmc
   )
 
   # Calculate pods subnet capacity (IPs available minus 3 reserved IPs)
@@ -67,36 +69,103 @@ locals {
     var.slinky_cpu_worker_enabled,
     !var.worker_cpu_enabled,
   ])
-  invalid_slinky_without_fss = alltrue([
-    var.install_slinky,
-    !local.create_fss_effective,
-  ])
   invalid_slinky_virtual_functions = alltrue([
     var.install_slinky,
-    local.slinky_gpu_nodeset_enabled,
-    local.slinky_worker_network_mode_effective == "virtualFunctions",
+    var.worker_rdma_enabled,
+    local.slinky_rdma_network_mode_effective == "virtualFunctions",
     anytrue([
-      !var.worker_rdma_enabled,
-      !contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
+      !contains(keys(local.slinky_shape_rdma_vf_count), var.worker_rdma_shape),
       trimspace(coalesce(var.slinky_worker_rdma_network, "")) == "",
       trimspace(coalesce(var.slinky_worker_rdma_resource, "")) == "",
-      local.slinky_worker_rdma_vfs_per_node <= 0,
+      local.slinky_rdma_vfs_per_node <= 0,
     ]),
   ])
   # An explicit VF request must not exceed what the chosen shape's SR-IOV policy
   # advertises, or worker pods stay unschedulable.
   invalid_slinky_rdma_vfs_per_node = alltrue([
     var.install_slinky,
-    local.slinky_gpu_nodeset_enabled,
-    local.slinky_worker_network_mode_effective == "virtualFunctions",
+    var.worker_rdma_enabled,
+    local.slinky_rdma_network_mode_effective == "virtualFunctions",
     var.slinky_worker_rdma_vfs_per_node != null,
-    contains(keys(local.slinky_shape_rdma_vf_count), local.slinky_worker_shape),
-    coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0),
+    contains(keys(local.slinky_shape_rdma_vf_count), var.worker_rdma_shape),
+    coalesce(var.slinky_worker_rdma_vfs_per_node, 0) > lookup(local.slinky_shape_rdma_vf_count, var.worker_rdma_shape, 0),
+  ])
+  slinky_expected_accelerator_nodeset_count = (
+    (var.worker_gpu_enabled ? 1 : 0) +
+    (var.worker_rdma_enabled ? 1 : 0) +
+    (var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) : 0)
+  )
+  slinky_enabled_nodeset_names = concat(
+    sort(keys(local.slinky_worker_nodesets)),
+    local.slinky_cpu_nodeset_enabled ? [var.slinky_cpu_nodeset_name] : [],
+  )
+  slinky_enabled_partition_names = concat(
+    ["all"],
+    local.slinky_enabled_nodeset_names,
+    local.slinky_gmc_aggregate_partition_enabled ? [local.slinky_gmc_aggregate_partition_name] : [],
+  )
+  invalid_slinky_nodeset_name_collision = alltrue([
+    var.install_slinky,
+    anytrue([
+      length(local.slinky_worker_nodesets) != local.slinky_expected_accelerator_nodeset_count,
+      local.slinky_cpu_nodeset_enabled && contains(keys(local.slinky_worker_nodesets), var.slinky_cpu_nodeset_name),
+      local.slinky_gmc_aggregate_partition_enabled && contains(local.slinky_enabled_nodeset_names, local.slinky_gmc_aggregate_partition_name),
+    ]),
+  ])
+  invalid_slinky_nodeset_names = alltrue([
+    var.install_slinky,
+    anytrue([
+      for name in local.slinky_enabled_nodeset_names :
+      length(name) > 50 || !can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", name))
+    ]),
+  ])
+  invalid_slinky_gmc_resource_names = alltrue([
+    var.install_slinky,
+    anytrue([for name in keys(local.slinky_gmc_worker_nodesets) : length(name) > 43]),
+  ])
+  invalid_slinky_default_partition = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    anytrue([
+      var.slinky_default_partition != "auto" && !contains(local.slinky_enabled_partition_names, local.slinky_default_partition_name),
+      var.slinky_default_partition == "auto" && length(local.slinky_enabled_nodeset_names) > 0 && !contains(local.slinky_enabled_partition_names, local.slinky_default_partition_name),
+    ]),
+  ])
+  invalid_slinky_mixed_gpu_vendors = alltrue([
+    var.install_slinky,
+    length(local.slinky_enabled_worker_vendors) > 1,
+  ])
+  invalid_slinky_gmc_fabrics = alltrue([
+    var.install_slinky,
+    var.worker_gmc_enabled,
+    length(local.worker_gmc_gpu_memory_fabric_ids) == 0,
+  ])
+  invalid_slinky_gmc_dra = alltrue([
+    var.install_slinky,
+    var.worker_gmc_enabled,
+    !var.install_nvidia_dra_driver,
+  ])
+  invalid_slinky_gmc_labeler = alltrue([
+    var.install_slinky,
+    var.worker_gmc_enabled,
+    anytrue([!var.install_oci_hpc_oke_utils, !var.install_rdma_labeler]),
   ])
   invalid_slinky_openldap_topology = alltrue([
     var.install_slinky,
     var.slinky_identity_enabled,
     var.slinky_openldap_primary_replicas != 1,
+  ])
+  invalid_slinky_login_without_identity = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_login_enabled,
+    !var.slinky_identity_enabled,
+  ])
+  invalid_slinky_worker_identity_without_ssh = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_identity_enabled,
+    !var.slinky_worker_ssh_enabled,
   ])
 
   # Check if the ssh_public_key has comment
@@ -233,6 +302,7 @@ resource "null_resource" "validate_pods_capacity" {
           - oke-cpu: ${local.pods_required_cpu} (${var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0} nodes × ${var.worker_cpu_max_pods_per_node} pods)
           - oke-gpu: ${local.pods_required_gpu} (${var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0} nodes × ${var.worker_gpu_max_pods_per_node} pods)
           - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
+          - oke-gmc: ${local.pods_required_gmc} (${var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0} nodes × ${var.worker_gmc_max_pods_per_node} pods)
         Consider increasing the pods subnet size or reducing max_pods_per_node/pool_size values.
       EOT
     }
@@ -276,17 +346,6 @@ resource "null_resource" "validate_slinky_cpu_workers" {
   }
 }
 
-resource "null_resource" "validate_slinky_fss" {
-  count = local.invalid_slinky_without_fss ? 1 : 0
-
-  lifecycle {
-    precondition {
-      condition     = !local.invalid_slinky_without_fss
-      error_message = "install_slinky=true requires FSS: set create_fss=true, or keep slinky_home_enabled=true with the default slinky_home_pv_name so FSS is provisioned automatically."
-    }
-  }
-}
-
 resource "null_resource" "validate_slinky_virtual_functions" {
   count = local.invalid_slinky_virtual_functions ? 1 : 0
 
@@ -304,7 +363,55 @@ resource "null_resource" "validate_slinky_rdma_vfs_per_node" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_rdma_vfs_per_node
-      error_message = "slinky_worker_rdma_vfs_per_node (${coalesce(var.slinky_worker_rdma_vfs_per_node, 0)}) exceeds the SR-IOV VFs advertised for ${local.slinky_worker_shape} (${lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0)}). Lower it to that value or less, or leave it null to auto-derive."
+      error_message = "slinky_worker_rdma_vfs_per_node (${coalesce(var.slinky_worker_rdma_vfs_per_node, 0)}) exceeds the SR-IOV VFs advertised for ${var.worker_rdma_shape} (${lookup(local.slinky_shape_rdma_vf_count, var.worker_rdma_shape, 0)}). Lower it to that value or less, or leave it null to auto-derive."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_nodesets" {
+  count = anytrue([
+    local.invalid_slinky_nodeset_name_collision,
+    local.invalid_slinky_nodeset_names,
+    local.invalid_slinky_gmc_resource_names,
+    local.invalid_slinky_default_partition,
+    local.invalid_slinky_mixed_gpu_vendors,
+    local.invalid_slinky_gmc_fabrics,
+    local.invalid_slinky_gmc_dra,
+    local.invalid_slinky_gmc_labeler,
+  ]) ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_nodeset_name_collision
+      error_message = "Every enabled Slurm worker pool and GPU memory fabric must have a unique NodeSet name. Change slinky_nodeset_name, slinky_rdma_nodeset_name, slinky_gmc_nodeset_name, or slinky_cpu_nodeset_name."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_nodeset_names
+      error_message = "Slurm NodeSet names must be valid lowercase DNS labels no longer than 50 characters."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_gmc_resource_names
+      error_message = "Generated GMC NodeSet names must be no longer than 43 characters so their IMEX ComputeDomain names fit the Kubernetes 63-character limit. Shorten slinky_gmc_nodeset_name."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_default_partition
+      error_message = "slinky_default_partition must select an enabled Slurm partition using auto, gpu, rdma, gmc, cpu, all, or an exact generated partition name."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_mixed_gpu_vendors
+      error_message = "A Slurm cluster cannot currently mix AMD and NVIDIA accelerator NodeSets because gres.conf has one global AutoDetect backend. Use pools from one GPU vendor."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_gmc_fabrics
+      error_message = "Slurm GPU Memory Cluster workers require at least one worker_gmc_gpu_memory_fabric_ids OCID."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_gmc_dra
+      error_message = "Slurm GPU Memory Cluster workers require install_nvidia_dra_driver=true for their IMEX ComputeDomain claims."
+    }
+    precondition {
+      condition     = !local.invalid_slinky_gmc_labeler
+      error_message = "Slurm GPU Memory Cluster workers require install_oci_hpc_oke_utils=true and install_rdma_labeler=true so each NodeSet can select its GPU memory fabric."
     }
   }
 }
@@ -316,6 +423,28 @@ resource "null_resource" "validate_slinky_openldap_topology" {
     precondition {
       condition     = !local.invalid_slinky_openldap_topology
       error_message = "The bundled HA OpenLDAP topology supports exactly one writable primary plus read replicas. Keep slinky_openldap_primary_replicas=1."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_login_identity" {
+  count = local.invalid_slinky_login_without_identity ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_login_without_identity
+      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise Slinky chart 1.1.1 configures the LoginSet with its placeholder ldap://ldap.example.com SSSD domain. Enable managed identity or disable the Slurm login service."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_worker_identity" {
+  count = local.invalid_slinky_worker_identity_without_ssh ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_worker_identity_without_ssh
+      error_message = "slinky_worker_ssh_enabled=false is incompatible with slinky_identity_enabled=true in Slinky chart 1.1.1 because disabling worker SSH also removes the worker SSSD configuration. Keep worker SSH enabled or disable managed identity."
     }
   }
 }

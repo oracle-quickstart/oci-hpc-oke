@@ -13,6 +13,10 @@ It was validated on a live test cluster with:
 
 LDAP SSH keys must use `sshPublicKey`, not `description`.
 
+Root SSH access to the Slurm login service is intentionally disabled. Use the
+operator or `kubectl exec` for administration; the login service accepts
+regular LDAP users through SSSD.
+
 ## Quick Start (script)
 
 The [`slurm-add-user.sh`](./files/slurm-add-user.sh) script performs every step
@@ -114,6 +118,16 @@ export LDAP_ADMIN_PASSWORD="$(
     -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d
 )"
 ```
+
+The stack generates unique OpenLDAP admin and `cn=config` passwords when they
+are not supplied explicitly. They are available as sensitive Resource Manager
+outputs (`slinky_openldap_admin_password` and
+`slinky_openldap_config_password`). The admin password can also be retrieved
+from the `openldap` Secret as shown above.
+
+SSSD clients do not receive either administrator password. The stack creates a
+separate `cn=sssd,ou=ServiceAccounts,<base DN>` account whose ACL permits LDAP
+reads but denies writes and access to password attributes.
 
 Use stable UID/GID allocation. Do not reuse IDs while old files may exist on
 FSS, in backups, or in accounting history.

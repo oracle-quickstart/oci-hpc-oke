@@ -348,6 +348,7 @@ variableGroups:
       - slinky_operator_cert_manager_enabled
       - slinky_operator_values_override
       - slinky_slurm_values_override
+      - slinky_mariadb_operator_chart_version
       - slinky_openldap_chart_version
       - slinky_openldap_admin_password
       - slinky_openldap_config_password
@@ -366,6 +367,9 @@ variableGroups:
       - slinky_sssd_image_repository
       - slinky_sssd_image_tag
       - slinky_nodeset_name
+      - slinky_rdma_nodeset_name
+      - slinky_gmc_nodeset_name
+      - slinky_default_partition
       - slinky_cpu_worker_enabled
       - slinky_cpu_nodeset_name
       - slinky_cpu_worker_image_repository
@@ -2383,7 +2387,7 @@ variables:
   # Slinky / Slurm Operator
   install_slinky:
     title: Install Slurm Operator
-    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Worker nodesets are added when the corresponding CPU, GPU, or RDMA worker pools are enabled."
+    description: "Deploy Slinky Slurm Operator, Slurm, HA OpenLDAP, SSSD integration, FSS-backed /home, Slurm accounting, and login service. Independent NodeSets are added for enabled CPU, standard GPU, GPU with RDMA, and GPU Memory Cluster worker pools."
     type: boolean
     default: false
   slinky_advanced_options:
@@ -2510,6 +2514,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_login_enabled:
     title: Enable Slurm login service
+    description: "Deploy a LoginSet and LoadBalancer for LDAP users. Requires HA OpenLDAP and SSSD to be enabled."
     type: boolean
     default: true
     visible:
@@ -2517,8 +2522,8 @@ variables:
         - ${install_slinky}
         - ${slinky_advanced_options}
   slinky_worker_network_mode:
-    title: Slurm worker network mode
-    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed."
+    title: GPU with RDMA Slurm network mode
+    description: "Choose hostNetwork for direct host networking, or virtualFunctions for pod networking with SR-IOV RDMA VFs. Forced to virtualFunctions when the NVIDIA Network Operator add-on is installed. Standard GPU workers use pod networking and GMC workers use hostNetwork."
     type: enum
     enum:
       - hostNetwork
@@ -2528,16 +2533,20 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
   slinky_worker_mount_infiniband:
-    title: Mount /dev/infiniband into Slurm workers
+    title: Mount /dev/infiniband into GPU with RDMA Slurm workers
+    description: GMC workers always mount /dev/infiniband; standard GPU workers do not.
     type: boolean
     default: true
     visible:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
   slinky_worker_ssh_enabled:
     title: Enable SSH on Slurm workers
+    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky 1.1.1 couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
     type: boolean
     default: true
     visible:
@@ -2555,7 +2564,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_gpus_per_node:
     title: GPUs per Slurm worker
-    description: "Defaults to the final numeric component of the selected GPU shape."
+    description: "Defaults independently to the final numeric component of each accelerator pool's GPU shape."
     type: integer
     required: false
     visible:
@@ -2623,7 +2632,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_worker_image_tag:
     title: Slurm worker image tag
-    description: "Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL."
+    description: "Use auto to select NVIDIA NCCL with Pyxis or AMD RCCL. All enabled accelerator pools must use the same GPU vendor."
     type: string
     default: "auto"
     visible:
@@ -2672,6 +2681,15 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_mariadb_operator_chart_version:
+    title: MariaDB Operator chart version
+    type: string
+    default: "26.6.0"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_accounting_enabled}
   slinky_openldap_chart_version:
     title: OpenLDAP chart version
     type: string
@@ -2684,7 +2702,8 @@ variables:
   slinky_openldap_admin_password:
     title: OpenLDAP admin password
     type: password
-    default: "adminpassword"
+    description: Leave unset to generate a unique per-stack password.
+    required: false
     visible:
       and:
         - ${install_slinky}
@@ -2693,7 +2712,8 @@ variables:
   slinky_openldap_config_password:
     title: OpenLDAP config password
     type: password
-    default: "configpassword"
+    description: Leave unset to generate a unique per-stack password.
+    required: false
     visible:
       and:
         - ${install_slinky}
@@ -2823,9 +2843,38 @@ variables:
         - ${slinky_advanced_options}
         - ${slinky_identity_enabled}
   slinky_nodeset_name:
-    title: Slurm worker nodeset name
+    title: Standard GPU Slurm NodeSet name
     type: string
     default: "gpu"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_gpu_enabled}
+  slinky_rdma_nodeset_name:
+    title: GPU with RDMA Slurm NodeSet name
+    type: string
+    default: "rdma"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_rdma_enabled}
+  slinky_gmc_nodeset_name:
+    title: GPU Memory Cluster Slurm NodeSet prefix
+    description: A fabric suffix is added when multiple GPU memory fabrics are configured.
+    type: string
+    default: "gmc"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${worker_gmc_enabled}
+  slinky_default_partition:
+    title: Default Slurm partition
+    description: auto prefers standard GPU, then RDMA, GMC, and CPU. With multiple GMC fabrics, gmc selects the aggregate gmc-all partition so jobs can span fabrics over RDMA. The all partition or an exact generated partition name is also accepted.
+    type: string
+    default: "auto"
     visible:
       and:
         - ${install_slinky}
@@ -3028,6 +3077,11 @@ outputGroups:
       - worker_gpu_image_id
       - worker_rdma_pool_id
       - worker_rdma_image_id
+
+  - title: Slurm Operator
+    outputs:
+      - slinky_openldap_admin_password
+      - slinky_openldap_config_password
 
   - title: Monitoring
     outputs:
@@ -3252,6 +3306,24 @@ outputs:
     title: Network security group
     type: ocid
     visible: false
+
+  # Slurm Operator
+  slinky_openldap_admin_password:
+    title: OpenLDAP adminPassword
+    type: copyableString
+    sensitive: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_identity_enabled}
+  slinky_openldap_config_password:
+    title: OpenLDAP configPassword
+    type: copyableString
+    sensitive: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_identity_enabled}
 
   # Monitoring
   grafana_url:

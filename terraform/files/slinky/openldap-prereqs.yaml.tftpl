@@ -25,6 +25,10 @@ spec:
   secretName: openldap-ca-root
   isCA: true
   commonName: openldap-ca-root
+  # Keep the private CA valid well beyond the long-lived OpenLDAP serving
+  # certificate so the leaf can never outlive its signer.
+  duration: 262800h
+  renewBefore: 87600h
   issuerRef:
     name: openldap-root-selfsigned
     kind: Issuer
@@ -52,6 +56,10 @@ metadata:
 spec:
   secretName: openldap-tls
   commonName: openldap.${openldap_namespace}.svc.cluster.local
+  # This is an internal-only certificate. A ten-year lifetime avoids routine
+  # certificate replacement for this deployment.
+  duration: 87600h
+  renewBefore: 8760h
   dnsNames:
     - openldap.${openldap_namespace}.svc
     - openldap.${openldap_namespace}.svc.cluster.local
@@ -100,7 +108,7 @@ stringData:
     access_provider = permit
     entry_cache_timeout = 60
 
-    ldap_uri = ldaps://openldap-readonly.${openldap_namespace}.svc.cluster.local:636,ldaps://openldap.${openldap_namespace}.svc.cluster.local:636
+    ldap_uri = ${openldap_sssd_uris}
     ldap_search_base = ${openldap_base_dn}
     ldap_user_search_base = ou=People,${openldap_base_dn}
     ldap_group_search_base = ou=Groups,${openldap_base_dn}
@@ -109,9 +117,9 @@ stringData:
     ldap_id_mapping = false
     ldap_tls_reqcert = demand
     ldap_tls_cacert = /etc/sssd/ca/ca.crt
-    ldap_default_bind_dn = cn=admin,${openldap_base_dn}
+    ldap_default_bind_dn = ${openldap_sssd_bind_dn}
     ldap_default_authtok_type = password
-    ldap_default_authtok = ${openldap_admin_password}
+    ldap_default_authtok = ${openldap_sssd_bind_password}
 
     ldap_user_object_class = posixAccount
     ldap_user_name = uid

@@ -8,7 +8,7 @@ module "certmanager" {
       var.install_kueue,
       var.install_nvidia_dra_driver,
       alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack]),
-      alltrue([var.install_slinky, var.slinky_identity_enabled])
+      local.slinky_cert_manager_required,
     ]),
     local.deploy_from_operator
   ]) ? 1 : 0

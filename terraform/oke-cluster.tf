@@ -12,6 +12,7 @@ locals {
     var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0,
     var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0,
     var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0,
+    var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0,
   ])
 
   deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
@@ -330,14 +331,26 @@ module "oke" {
     }
   }
 
-  allow_rules_public_lb = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? {
-    "Allow TCP ingress from anywhere to HTTP port" = {
-      protocol = local.tcp_protocol, port = 80, source = local.anywhere, source_type = local.rule_type_cidr,
-    },
-    "Allow TCP ingress from anywhere to HTTPS port" = {
-      protocol = local.tcp_protocol, port = 443, source = local.anywhere, source_type = local.rule_type_cidr,
-    }
-  } : {}
+  allow_rules_public_lb = merge(
+    alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? {
+      "Allow TCP ingress from anywhere to HTTP port" = {
+        protocol = local.tcp_protocol, port = 80, source = local.anywhere, source_type = local.rule_type_cidr,
+      },
+      "Allow TCP ingress from anywhere to HTTPS port" = {
+        protocol = local.tcp_protocol, port = 443, source = local.anywhere, source_type = local.rule_type_cidr,
+      }
+    } : {},
+    alltrue([
+      var.install_slinky,
+      var.slinky_install_slurm_cluster,
+      var.slinky_login_enabled,
+      var.preferred_kubernetes_services == "public",
+      ]) ? {
+      "Allow TCP ingress from anywhere to Slurm login SSH port" = {
+        protocol = local.tcp_protocol, port = 22, source = local.anywhere, source_type = local.rule_type_cidr,
+      }
+    } : {},
+  )
 
   allow_rules_workers = var.create_lustre ? {
     "Allow ingress from Lustre to OKE Workers" = {

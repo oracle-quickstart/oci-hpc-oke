@@ -902,6 +902,14 @@ variable "worker_gmc_gpu_memory_fabric_ids" {
     ])
     error_message = "GPU Memory Fabric OCIDs must be provided one per line."
   }
+  validation {
+    condition = length(compact([
+      for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+      ])) == length(toset(compact([
+        for line in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(line)
+    ])))
+    error_message = "GPU Memory Fabric OCIDs must be unique."
+  }
 }
 variable "worker_gmc_scale_target_size" {
   default     = 18
@@ -1016,13 +1024,13 @@ variable "slinky_slurm_values_override" {
 variable "slinky_login_enabled" {
   default     = true
   type        = bool
-  description = "Enable a Slinky LoginSet with a LoadBalancer service. The stack SSH public key is used for root access when provided."
+  description = "Enable a Slinky LoginSet with a LoadBalancer service. Requires slinky_identity_enabled=true so login users resolve through the managed OpenLDAP SSSD configuration."
 }
 
 variable "slinky_worker_network_mode" {
   default     = "hostNetwork"
   type        = string
-  description = "Network mode for Slinky slurmd pods. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace. Forced to virtualFunctions when deploy_nvidia_network_operator is true."
+  description = "Network mode for the Slinky RDMA NodeSet. Use virtualFunctions for pod networking with SR-IOV RDMA VFs, or hostNetwork to share the Kubernetes node network namespace. Forced to virtualFunctions when deploy_nvidia_network_operator is true. Standard GPU workers always use pod networking; GMC workers always use hostNetwork."
 
   validation {
     condition     = contains(["virtualFunctions", "hostNetwork"], var.slinky_worker_network_mode)
@@ -1033,13 +1041,13 @@ variable "slinky_worker_network_mode" {
 variable "slinky_worker_mount_infiniband" {
   default     = true
   type        = bool
-  description = "Mount /dev/infiniband into Slinky slurmd pods."
+  description = "Mount /dev/infiniband into Slinky RDMA slurmd pods. GMC workers always mount it and standard GPU workers do not."
 }
 
 variable "slinky_worker_ssh_enabled" {
   default     = true
   type        = bool
-  description = "Enable sshd in Slinky slurmd pods. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
+  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because Slinky chart 1.1.1 couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
 }
 
 variable "slinky_worker_replicas" {
@@ -1051,7 +1059,7 @@ variable "slinky_worker_replicas" {
 variable "slinky_gpus_per_node" {
   default     = null
   type        = number
-  description = "GPUs per Slinky slurmd pod. Defaults to the final numeric component of the selected GPU worker shape."
+  description = "GPUs per Slinky accelerator slurmd pod. Defaults independently to the final numeric component of each pool's worker shape."
 }
 
 variable "slinky_worker_rdma_resource" {
@@ -1086,7 +1094,7 @@ variable "slinky_worker_image_repository" {
 variable "slinky_worker_image_tag" {
   default     = "auto"
   type        = string
-  description = "Container image tag for Slinky slurmd pods. Use auto to select the tested image for the selected worker shape: NVIDIA NCCL with Pyxis, or AMD RCCL with Pyxis."
+  description = "Container image tag for Slinky accelerator slurmd pods. Use auto to select NVIDIA NCCL with Pyxis or AMD RCCL with Pyxis. All enabled accelerator pools must use the same GPU vendor."
 }
 
 variable "slinky_gpu_autodetect" {
@@ -1125,6 +1133,12 @@ variable "slinky_accounting_enabled" {
   description = "Deploy MariaDB Operator and a MariaDB instance for SlurmDBD accounting."
 }
 
+variable "slinky_mariadb_operator_chart_version" {
+  default     = "26.6.0"
+  type        = string
+  description = "MariaDB Operator and CRD Helm chart version."
+}
+
 variable "slinky_openldap_namespace" {
   default     = "identity"
   type        = string
@@ -1150,17 +1164,27 @@ variable "slinky_openldap_base_dn" {
 }
 
 variable "slinky_openldap_admin_password" {
-  default     = "adminpassword"
+  default     = null
   type        = string
-  description = "OpenLDAP admin password. Override this for non-disposable deployments."
+  description = "OpenLDAP admin password. Leave unset to generate a unique per-stack password."
   sensitive   = true
+
+  validation {
+    condition     = var.slinky_openldap_admin_password == null ? true : length(regexall("[\\r\\n]", var.slinky_openldap_admin_password)) == 0
+    error_message = "slinky_openldap_admin_password must not contain newline characters."
+  }
 }
 
 variable "slinky_openldap_config_password" {
-  default     = "configpassword"
+  default     = null
   type        = string
-  description = "OpenLDAP cn=config admin password. Override this for non-disposable deployments."
+  description = "OpenLDAP cn=config admin password. Leave unset to generate a unique per-stack password."
   sensitive   = true
+
+  validation {
+    condition     = var.slinky_openldap_config_password == null ? true : length(regexall("[\\r\\n]", var.slinky_openldap_config_password)) == 0
+    error_message = "slinky_openldap_config_password must not contain newline characters."
+  }
 }
 
 variable "slinky_openldap_primary_replicas" {
@@ -1250,7 +1274,25 @@ variable "slinky_sssd_image_tag" {
 variable "slinky_nodeset_name" {
   default     = "gpu"
   type        = string
-  description = "Slinky nodeset name used for the shape-specific Slurm worker pool."
+  description = "Slinky NodeSet and partition name used for the standard GPU worker pool."
+}
+
+variable "slinky_rdma_nodeset_name" {
+  default     = "rdma"
+  type        = string
+  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool."
+}
+
+variable "slinky_gmc_nodeset_name" {
+  default     = "gmc"
+  type        = string
+  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured."
+}
+
+variable "slinky_default_partition" {
+  default     = "auto"
+  type        = string
+  description = "Default Slinky partition. Use auto, gpu, rdma, gmc, cpu, all, or an exact generated partition name. With multiple GMC fabrics, gmc selects the aggregate <slinky_gmc_nodeset_name>-all partition. auto prefers GPU, then RDMA, GMC, and CPU."
 }
 
 variable "slinky_cpu_worker_enabled" {
@@ -1281,14 +1323,14 @@ variable "slinky_cpu_worker_image_tag" {
 variable "install_oci_hpc_oke_utils" {
   default     = true
   type        = bool
-  description = "Install the OCI HPC OKE Utils Helm chart (includes RDMA topology labeler and image prepuller)."
+  description = "Install the OCI HPC OKE Utils Helm chart (includes the RDMA/GMC node labeler and image prepuller)."
 }
 
 # RDMA topology labeler
 variable "install_rdma_labeler" {
   default     = true
   type        = bool
-  description = "Deploy the RDMA topology labeler DaemonSet to populate node labels required for Topology Aware Scheduling."
+  description = "Deploy the RDMA/GMC labeler DaemonSet to populate topology labels and the GPU memory fabric label used by Slurm GMC NodeSets."
 }
 
 # Image prepuller

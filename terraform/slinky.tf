@@ -3,6 +3,13 @@
 
 locals {
   slinky_deploy_from_operator = alltrue([var.install_slinky, var.create_bastion, var.create_operator, !var.deploy_to_oke_from_orm])
+  slinky_cert_manager_required = alltrue([
+    var.install_slinky,
+    anytrue([
+      var.slinky_identity_enabled,
+      var.slinky_operator_cert_manager_enabled,
+    ]),
+  ])
 
   slinky_amd_shapes = [
     "BM.GPU.MI300X.8",
@@ -10,14 +17,19 @@ locals {
     "BM.GPU.MI355X.8",
   ]
 
-  slinky_worker_shape     = var.worker_rdma_enabled ? var.worker_rdma_shape : var.worker_gpu_shape
-  slinky_worker_pool_size = var.worker_rdma_enabled ? var.worker_rdma_pool_size : (var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0)
-  slinky_is_amd           = contains(local.slinky_amd_shapes, local.slinky_worker_shape)
-  slinky_gpu_resource     = local.slinky_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
-  slinky_gpu_autodetect   = var.slinky_gpu_autodetect == "auto" ? (local.slinky_is_amd ? "rsmi" : "nvml") : var.slinky_gpu_autodetect
-  slinky_gpus_per_node    = coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", local.slinky_worker_shape), length(split(".", local.slinky_worker_shape)) - 1)), 1))
-  slinky_worker_replicas  = coalesce(var.slinky_worker_replicas, local.slinky_worker_pool_size)
-  slinky_openldap_dc      = split(".", var.slinky_openldap_domain)[0]
+  slinky_system_pool_name = "oke-system"
+  slinky_gpu_is_amd       = contains(local.slinky_amd_shapes, var.worker_gpu_shape)
+  slinky_rdma_is_amd      = contains(local.slinky_amd_shapes, var.worker_rdma_shape)
+  slinky_enabled_worker_vendors = distinct(compact([
+    var.worker_gpu_enabled ? (local.slinky_gpu_is_amd ? "amd" : "nvidia") : "",
+    var.worker_rdma_enabled ? (local.slinky_rdma_is_amd ? "amd" : "nvidia") : "",
+    var.worker_gmc_enabled ? "nvidia" : "",
+  ]))
+  # gres.conf is shared by every NodeSet, so the first implementation supports
+  # one GPU vendor per Slurm cluster. validation.tf rejects mixed vendors.
+  slinky_is_amd         = try(one(local.slinky_enabled_worker_vendors), "nvidia") == "amd"
+  slinky_gpu_autodetect = var.slinky_gpu_autodetect == "auto" ? (local.slinky_is_amd ? "rsmi" : "nvml") : var.slinky_gpu_autodetect
+  slinky_openldap_dc    = split(".", var.slinky_openldap_domain)[0]
 
   slinky_image_profiles = {
     "25.11.6-ubuntu24.04" = {
@@ -87,7 +99,9 @@ locals {
   # Operator + webhook images custom-built from SlinkyProject/slurm-operator
   # v1.1.1 into our registry (build-control-plane-images.sh). Merged into the
   # operator Helm values so the operator pods also come from our registry.
-  slinky_operator_image_values = <<-EOT
+  slinky_operator_generated_values = <<-EOT
+    certManager:
+      enabled: ${var.slinky_operator_cert_manager_enabled}
     operator:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator
@@ -102,11 +116,11 @@ locals {
     local.slinky_is_amd ? local.slinky_image_profile.amd_worker_tag : local.slinky_image_profile.nvidia_worker_tag
   ) : var.slinky_worker_image_tag
 
-  # The NVIDIA Network Operator provisions the SR-IOV RDMA VFs, so enabling it
-  # forces the Slurm workers onto virtualFunctions (hostNetwork would leave the
-  # VFs unused). Otherwise honor the requested mode.
-  slinky_worker_network_mode_effective = var.deploy_nvidia_network_operator ? "virtualFunctions" : var.slinky_worker_network_mode
-  slinky_worker_host_network           = local.slinky_worker_network_mode_effective == "hostNetwork"
+  # The NVIDIA Network Operator provisions SR-IOV RDMA VFs for the RDMA pool.
+  # Standard GPU workers keep pod networking, while GMC workers use hostNetwork
+  # for IMEX and the physical RDMA fabric.
+  slinky_rdma_network_mode_effective = var.deploy_nvidia_network_operator ? "virtualFunctions" : var.slinky_worker_network_mode
+  slinky_rdma_host_network           = local.slinky_rdma_network_mode_effective == "hostNetwork"
 
   # Per-shape SR-IOV RDMA VF count. Must match the number of rootDevices the
   # matching policy selects in files/nvidia-network-operator/sriov-network-node-policy.yaml
@@ -127,34 +141,151 @@ locals {
   }
   # Effective VF request per worker: explicit override, else derive from the
   # shape so the request never exceeds what the Network Operator advertises.
-  slinky_worker_rdma_vfs_per_node = coalesce(
+  slinky_rdma_vfs_per_node = coalesce(
     var.slinky_worker_rdma_vfs_per_node,
-    lookup(local.slinky_shape_rdma_vf_count, local.slinky_worker_shape, 0)
+    lookup(local.slinky_shape_rdma_vf_count, var.worker_rdma_shape, 0)
   )
 
-  slinky_worker_sriov_enabled = alltrue([
-    !local.slinky_worker_host_network,
+  slinky_rdma_sriov_enabled = alltrue([
+    var.worker_rdma_enabled,
+    !local.slinky_rdma_host_network,
     trimspace(coalesce(var.slinky_worker_rdma_network, "")) != "",
     trimspace(coalesce(var.slinky_worker_rdma_resource, "")) != "",
-    local.slinky_worker_rdma_vfs_per_node > 0,
+    local.slinky_rdma_vfs_per_node > 0,
   ])
-  slinky_worker_rdma_networks_annotation = local.slinky_worker_sriov_enabled ? join(",", [
-    for _ in range(local.slinky_worker_rdma_vfs_per_node) : var.slinky_worker_rdma_network
+  slinky_rdma_networks_annotation = local.slinky_rdma_sriov_enabled ? join(",", [
+    for _ in range(local.slinky_rdma_vfs_per_node) : var.slinky_worker_rdma_network
   ]) : ""
 
-  slinky_worker_numa_topology_enabled = contains(["BM.GPU.B4.8"], local.slinky_worker_shape)
-  slinky_worker_slurmd_parameters     = local.slinky_worker_numa_topology_enabled ? "numa_node_as_socket" : ""
+  slinky_gpu_numa_topology_enabled  = contains(["BM.GPU.B4.8"], var.worker_gpu_shape)
+  slinky_rdma_numa_topology_enabled = contains(["BM.GPU.B4.8"], var.worker_rdma_shape)
 
-  slinky_worker_features = distinct(compact(concat(
-    [lower(replace(replace(replace(local.slinky_worker_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))],
-    local.slinky_is_amd ? ["amd", "rocm"] : ["nvidia"],
-    var.worker_rdma_enabled ? ["rdma"] : [],
-    local.slinky_worker_host_network ? ["hostnetwork"] : [],
-    local.slinky_worker_sriov_enabled ? ["sriov"] : []
-  )))
+  # A GPU memory pool can fan out into multiple independent GPU memory fabrics.
+  # Give each fabric its own NodeSet, partition, ComputeDomain, and IMEX claim so
+  # IMEX remains scoped to its NVLink fabric. An aggregate partition separately
+  # allows jobs to span fabrics over RDMA.
+  slinky_gmc_nodeset_fabrics = var.worker_gmc_enabled ? {
+    for fabric_id in local.worker_gmc_gpu_memory_fabric_ids :
+    (length(local.worker_gmc_gpu_memory_fabric_ids) == 1 ? var.slinky_gmc_nodeset_name : "${var.slinky_gmc_nodeset_name}-${substr(fabric_id, -11, 11)}") => fabric_id
+  } : {}
 
-  slinky_gpu_nodeset_enabled = anytrue([var.worker_rdma_enabled, var.worker_gpu_enabled])
-  slinky_cpu_nodeset_enabled = alltrue([var.slinky_cpu_worker_enabled, var.worker_cpu_enabled])
+  slinky_cpu_nodeset_enabled             = alltrue([var.slinky_cpu_worker_enabled, var.worker_cpu_enabled])
+  slinky_gmc_aggregate_partition_enabled = length(local.slinky_gmc_nodeset_fabrics) > 1
+  slinky_gmc_aggregate_partition_name    = "${var.slinky_gmc_nodeset_name}-all"
+
+  slinky_auto_default_partition_name = (
+    var.worker_gpu_enabled ? var.slinky_nodeset_name :
+    var.worker_rdma_enabled ? var.slinky_rdma_nodeset_name :
+    local.slinky_gmc_aggregate_partition_enabled ? local.slinky_gmc_aggregate_partition_name :
+    length(local.slinky_gmc_nodeset_fabrics) == 1 ? try(element(sort(keys(local.slinky_gmc_nodeset_fabrics)), 0), "") :
+    local.slinky_cpu_nodeset_enabled ? var.slinky_cpu_nodeset_name : ""
+  )
+  slinky_default_partition_name = (
+    var.slinky_default_partition == "auto" ? local.slinky_auto_default_partition_name :
+    var.slinky_default_partition == "gpu" ? var.slinky_nodeset_name :
+    var.slinky_default_partition == "rdma" ? var.slinky_rdma_nodeset_name :
+    var.slinky_default_partition == "gmc" ? (
+      local.slinky_gmc_aggregate_partition_enabled ? local.slinky_gmc_aggregate_partition_name :
+      try(element(sort(keys(local.slinky_gmc_nodeset_fabrics)), 0), "")
+    ) :
+    var.slinky_default_partition == "cpu" ? var.slinky_cpu_nodeset_name : var.slinky_default_partition
+  )
+
+  slinky_gpu_worker_nodesets = var.worker_gpu_enabled ? {
+    (var.slinky_nodeset_name) = {
+      shape               = var.worker_gpu_shape
+      pool_name           = "oke-gpu"
+      fabric_label        = ""
+      replicas            = coalesce(var.slinky_worker_replicas, var.worker_gpu_pool_size)
+      image_tag           = local.slinky_worker_image_tag
+      gpu_resource        = local.slinky_gpu_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
+      gpus_per_node       = coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", var.worker_gpu_shape), length(split(".", var.worker_gpu_shape)) - 1)), 1))
+      mount_infiniband    = false
+      host_network        = false
+      sriov_enabled       = false
+      rdma_resource       = ""
+      rdma_vfs_per_node   = 0
+      rdma_networks       = ""
+      slurmd_parameters   = local.slinky_gpu_numa_topology_enabled ? "numa_node_as_socket" : ""
+      numa_topology       = local.slinky_gpu_numa_topology_enabled
+      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_gpu_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_gpu_is_amd ? ["amd", "rocm"] : ["nvidia"])))
+      imex_claim_template = ""
+    }
+  } : {}
+
+  slinky_rdma_worker_nodesets = var.worker_rdma_enabled ? {
+    (var.slinky_rdma_nodeset_name) = {
+      shape               = var.worker_rdma_shape
+      pool_name           = "oke-rdma"
+      fabric_label        = ""
+      replicas            = coalesce(var.slinky_worker_replicas, var.worker_rdma_pool_size)
+      image_tag           = local.slinky_worker_image_tag
+      gpu_resource        = local.slinky_rdma_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
+      gpus_per_node       = coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", var.worker_rdma_shape), length(split(".", var.worker_rdma_shape)) - 1)), 1))
+      mount_infiniband    = var.slinky_worker_mount_infiniband
+      host_network        = local.slinky_rdma_host_network
+      sriov_enabled       = local.slinky_rdma_sriov_enabled
+      rdma_resource       = var.slinky_worker_rdma_resource
+      rdma_vfs_per_node   = local.slinky_rdma_vfs_per_node
+      rdma_networks       = local.slinky_rdma_networks_annotation
+      slurmd_parameters   = local.slinky_rdma_numa_topology_enabled ? "numa_node_as_socket" : ""
+      numa_topology       = local.slinky_rdma_numa_topology_enabled
+      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_rdma_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
+      imex_claim_template = ""
+    }
+  } : {}
+
+  slinky_gmc_worker_nodesets = var.worker_gmc_enabled ? {
+    for nodeset_name, fabric_id in local.slinky_gmc_nodeset_fabrics : nodeset_name => {
+      shape               = var.worker_gmc_shape
+      pool_name           = "oke-gmc"
+      fabric_label        = substr(fabric_id, -11, 11)
+      replicas            = coalesce(var.slinky_worker_replicas, var.worker_gmc_scale_target_size)
+      image_tag           = local.slinky_worker_image_tag
+      gpu_resource        = "nvidia.com/gpu"
+      gpus_per_node       = coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", var.worker_gmc_shape), length(split(".", var.worker_gmc_shape)) - 1)), 1))
+      mount_infiniband    = true
+      host_network        = true
+      sriov_enabled       = false
+      rdma_resource       = ""
+      rdma_vfs_per_node   = 0
+      rdma_networks       = ""
+      slurmd_parameters   = ""
+      numa_topology       = false
+      features            = [lower(replace(replace(replace(var.worker_gmc_shape, "BM.GPU.", ""), ".", "-"), "_", "-")), "nvidia", "rdma", "gmc", "imex", "hostnetwork"]
+      imex_claim_template = "${nodeset_name}-imex-channel"
+    }
+  } : {}
+
+  slinky_worker_nodesets = merge(local.slinky_gpu_worker_nodesets, local.slinky_rdma_worker_nodesets, local.slinky_gmc_worker_nodesets)
+
+  slinky_gmc_compute_domains = {
+    for nodeset_name, nodeset in local.slinky_gmc_worker_nodesets : nodeset_name => {
+      apiVersion = "resource.nvidia.com/v1beta1"
+      kind       = "ComputeDomain"
+      metadata = {
+        name      = "${nodeset_name}-imex-compute-domain"
+        namespace = var.slinky_slurm_namespace
+        labels = {
+          "app.kubernetes.io/managed-by" = "terraform"
+          "app.kubernetes.io/part-of"    = "slurm"
+          "slinky.slurm.net/nodeset"     = nodeset_name
+        }
+      }
+      spec = {
+        numNodes = 0
+        channel = {
+          allocationMode = "All"
+          resourceClaimTemplate = {
+            name = nodeset.imex_claim_template
+          }
+        }
+      }
+    }
+  }
+  slinky_gmc_compute_domains_yaml = join("\n---\n", [
+    for nodeset_name in sort(keys(local.slinky_gmc_compute_domains)) : yamlencode(local.slinky_gmc_compute_domains[nodeset_name])
+  ])
 
   slinky_cpu_worker_image_repository = var.slinky_cpu_worker_image_repository != "" ? var.slinky_cpu_worker_image_repository : var.slinky_worker_image_repository
   slinky_cpu_worker_image_tag        = var.slinky_cpu_worker_image_tag == "auto" ? local.slinky_worker_image_tag : var.slinky_cpu_worker_image_tag
@@ -170,5 +301,51 @@ locals {
     "    - openldap-readonly-${i}.openldap-headless-readonly.${var.slinky_openldap_namespace}.svc.cluster.local"
   ])
 
-  slinky_login_root_ssh_authorized_keys = jsonencode(trimspace(local.ssh_public_key))
+  # Explicit non-empty values remain supported for existing deployments. New
+  # stacks receive independent passwords that persist in Terraform state.
+  slinky_openldap_admin_password = try(coalesce(
+    var.slinky_openldap_admin_password,
+    one(random_password.slinky_openldap_admin[*].result),
+  ), "")
+  slinky_openldap_config_password = try(coalesce(
+    var.slinky_openldap_config_password,
+    one(random_password.slinky_openldap_config[*].result),
+  ), "")
+
+  # Slurm workloads receive only this independently generated, read-only bind
+  # credential. Administrator credentials stay in the identity namespace.
+  slinky_openldap_sssd_bind_dn = "cn=sssd,ou=ServiceAccounts,${var.slinky_openldap_base_dn}"
+  slinky_openldap_sssd_bind_password = try(coalesce(
+    one(random_password.slinky_openldap_sssd_bind[*].result),
+  ), "")
+}
+
+resource "random_password" "slinky_openldap_admin" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
+}
+
+resource "random_password" "slinky_openldap_config" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
+}
+
+resource "random_password" "slinky_openldap_sssd_bind" {
+  count = var.install_slinky && var.slinky_identity_enabled ? 1 : 0
+
+  length      = 32
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+  special     = false
 }

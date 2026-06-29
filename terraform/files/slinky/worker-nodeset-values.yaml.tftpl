@@ -1,0 +1,153 @@
+  ${nodeset_name}:
+    enabled: true
+    scalingMode: DaemonSet
+%{ if sriov_enabled || (identity_enabled && worker_ssh_enabled) ~}
+    metadata:
+      annotations:
+%{ if identity_enabled && worker_ssh_enabled ~}
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
+%{ if sriov_enabled ~}
+        k8s.v1.cni.cncf.io/networks: ${rdma_networks}
+%{ endif ~}
+%{ endif ~}
+    # Ignored in DaemonSet mode (pod count follows matching nodes); only used
+    # if the nodeset is overridden to StatefulSet scaling.
+    replicas: ${replicas}
+    workloadDisruptionProtection: true
+    slurmd:
+      image:
+        repository: ${image_repository}
+        tag: ${image_tag}
+      args:
+        - -N
+        - $(KUBE_NODE_NAME)
+%{ if slurmd_parameters != "" ~}
+        - --parameters
+        - ${slurmd_parameters}
+%{ endif ~}
+      env:
+        - name: KUBE_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+      resources:
+        limits:
+          ${gpu_resource}: ${gpus_per_node}
+%{ if sriov_enabled ~}
+          ${rdma_resource}: ${rdma_vfs_per_node}
+%{ endif ~}
+        requests:
+          ${gpu_resource}: ${gpus_per_node}
+%{ if sriov_enabled ~}
+          ${rdma_resource}: ${rdma_vfs_per_node}
+%{ endif ~}
+%{ if imex_claim_template != "" ~}
+        claims:
+          - name: imex-channel
+%{ endif ~}
+      volumeMounts:
+%{ if mount_infiniband ~}
+        - name: devinf
+          mountPath: /dev/infiniband
+%{ endif ~}
+        - name: shm
+          mountPath: /dev/shm
+        - name: enroot-tmp
+          mountPath: /tmp
+%{ if home_enabled ~}
+        - name: home
+          mountPath: /home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          mountPath: /etc/sssd/ca
+          readOnly: true
+%{ endif ~}
+    logfile:
+      image:
+        repository: docker.io/library/alpine
+        tag: latest
+    ssh:
+      enabled: ${worker_ssh_enabled}
+%{ if host_network ~}
+      extraSshdConfig: |
+        Port 2222
+%{ endif ~}
+    extraConfMap:
+%{ if numa_topology ~}
+      Boards: 1
+      CPUs: 128
+      SocketsPerBoard: 8
+      CoresPerSocket: 16
+      ThreadsPerCore: 1
+%{ endif ~}
+%{ if slurmd_parameters != "" ~}
+      Parameters: ${slurmd_parameters}
+%{ endif ~}
+      Gres:
+        - gpu:${gpus_per_node}
+      Features:
+${features_yaml}
+      Weight: 1
+    partition:
+      enabled: true
+      configMap:
+        State: UP
+        Default: "${partition_default}"
+        MaxTime: UNLIMITED
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: ${replicas}
+    podSpec:
+      hostNetwork: ${host_network}
+      dnsPolicy: ${host_network ? "ClusterFirstWithHostNet" : "ClusterFirst"}
+      nodeSelector:
+        oke.oraclecloud.com/pool.name: ${pool_name}
+%{ if fabric_label != "" ~}
+        oci.oraclecloud.com/host.gpu_memory_fabric_id: ${fabric_label}
+%{ endif ~}
+      tolerations:
+        - key: ${gpu_resource}
+          operator: Exists
+          effect: NoSchedule
+%{ if imex_claim_template != "" ~}
+      resourceClaims:
+        - name: imex-channel
+          resourceClaimTemplateName: ${imex_claim_template}
+%{ endif ~}
+      volumes:
+%{ if mount_infiniband ~}
+        - name: devinf
+          hostPath:
+            path: /dev/infiniband
+%{ endif ~}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi
+        - name: enroot-tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Gi
+%{ if home_enabled ~}
+        - name: home
+          persistentVolumeClaim:
+            claimName: slurm-home
+%{ endif ~}
+%{ if identity_enabled ~}
+        - name: ldap-ca
+          secret:
+            secretName: openldap-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+%{ endif ~}

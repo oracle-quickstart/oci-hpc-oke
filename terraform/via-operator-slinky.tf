@@ -3,36 +3,45 @@
 
 locals {
   slinky_workdir = "/home/${local.operator_user}/tf-slinky"
+  slinky_openldap_sssd_uris = join(",", concat(
+    var.slinky_openldap_readonly_replicas > 0 ? ["ldaps://openldap-readonly.${var.slinky_openldap_namespace}.svc.cluster.local:636"] : [],
+    ["ldaps://openldap.${var.slinky_openldap_namespace}.svc.cluster.local:636"],
+  ))
 
   slinky_openldap_prereqs_yaml = templatefile("${path.module}/files/slinky/openldap-prereqs.yaml.tftpl", {
-    openldap_namespace         = var.slinky_openldap_namespace
-    slurm_namespace            = var.slinky_slurm_namespace
-    openldap_base_dn           = var.slinky_openldap_base_dn
-    openldap_admin_password    = var.slinky_openldap_admin_password
-    readonly_replica_dns_names = local.slinky_readonly_replica_dns_names
+    openldap_namespace          = var.slinky_openldap_namespace
+    slurm_namespace             = var.slinky_slurm_namespace
+    openldap_base_dn            = var.slinky_openldap_base_dn
+    openldap_sssd_bind_dn       = local.slinky_openldap_sssd_bind_dn
+    openldap_sssd_bind_password = local.slinky_openldap_sssd_bind_password
+    openldap_sssd_uris          = local.slinky_openldap_sssd_uris
+    readonly_replica_dns_names  = local.slinky_readonly_replica_dns_names
   })
 
   slinky_openldap_values_yaml = templatefile("${path.module}/files/slinky/openldap-values.yaml.tftpl", {
     openldap_domain            = var.slinky_openldap_domain
     openldap_base_dn           = var.slinky_openldap_base_dn
     openldap_dc                = local.slinky_openldap_dc
-    openldap_admin_password    = var.slinky_openldap_admin_password
-    openldap_config_password   = var.slinky_openldap_config_password
+    openldap_admin_password    = local.slinky_openldap_admin_password
+    openldap_config_password   = local.slinky_openldap_config_password
     openldap_primary_replicas  = var.slinky_openldap_primary_replicas
     openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
     openldap_storage_size      = var.slinky_openldap_storage_size
-    system_node_shape          = var.worker_ops_shape
+    system_node_pool_name      = local.slinky_system_pool_name
   })
 
   slinky_configure_openldap_script = templatefile("${path.module}/files/slinky/configure-openldap.sh.tftpl", {
-    operator_user              = local.operator_user
-    openldap_namespace         = var.slinky_openldap_namespace
-    slurm_namespace            = var.slinky_slurm_namespace
-    openldap_readonly_replicas = var.slinky_openldap_readonly_replicas
-    openldap_admin_password    = var.slinky_openldap_admin_password
-    openldap_config_password   = var.slinky_openldap_config_password
-    openldap_base_dn           = var.slinky_openldap_base_dn
-    openldap_dc                = local.slinky_openldap_dc
+    operator_user                   = local.operator_user
+    openldap_namespace              = var.slinky_openldap_namespace
+    slurm_namespace                 = var.slinky_slurm_namespace
+    openldap_primary_replicas       = var.slinky_openldap_primary_replicas
+    openldap_readonly_replicas      = var.slinky_openldap_readonly_replicas
+    openldap_admin_password_base64  = base64encode(local.slinky_openldap_admin_password)
+    openldap_config_password_base64 = base64encode(local.slinky_openldap_config_password)
+    openldap_sssd_bind_dn_base64    = base64encode(local.slinky_openldap_sssd_bind_dn)
+    openldap_sssd_password_base64   = base64encode(local.slinky_openldap_sssd_bind_password)
+    openldap_base_dn                = var.slinky_openldap_base_dn
+    openldap_dc                     = local.slinky_openldap_dc
   })
 
   slinky_home_pvc_yaml = templatefile("${path.module}/files/slinky/slurm-home-pvc.yaml.tftpl", {
@@ -82,50 +91,70 @@ locals {
     }
   })
 
+  slinky_worker_nodesets_yaml = join("\n", [
+    for nodeset_name in sort(keys(local.slinky_worker_nodesets)) : templatefile("${path.module}/files/slinky/worker-nodeset-values.yaml.tftpl", {
+      nodeset_name        = nodeset_name
+      replicas            = local.slinky_worker_nodesets[nodeset_name].replicas
+      image_repository    = var.slinky_worker_image_repository
+      image_tag           = local.slinky_worker_nodesets[nodeset_name].image_tag
+      gpu_resource        = local.slinky_worker_nodesets[nodeset_name].gpu_resource
+      gpus_per_node       = local.slinky_worker_nodesets[nodeset_name].gpus_per_node
+      mount_infiniband    = local.slinky_worker_nodesets[nodeset_name].mount_infiniband
+      worker_ssh_enabled  = var.slinky_worker_ssh_enabled
+      host_network        = local.slinky_worker_nodesets[nodeset_name].host_network
+      sriov_enabled       = local.slinky_worker_nodesets[nodeset_name].sriov_enabled
+      rdma_resource       = local.slinky_worker_nodesets[nodeset_name].rdma_resource
+      rdma_vfs_per_node   = local.slinky_worker_nodesets[nodeset_name].rdma_vfs_per_node
+      rdma_networks       = local.slinky_worker_nodesets[nodeset_name].rdma_networks
+      slurmd_parameters   = local.slinky_worker_nodesets[nodeset_name].slurmd_parameters
+      numa_topology       = local.slinky_worker_nodesets[nodeset_name].numa_topology
+      features_yaml       = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}"])
+      pool_name           = local.slinky_worker_nodesets[nodeset_name].pool_name
+      fabric_label        = local.slinky_worker_nodesets[nodeset_name].fabric_label
+      imex_claim_template = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
+      partition_default   = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
+      identity_enabled    = var.slinky_identity_enabled
+      home_enabled        = var.slinky_home_enabled
+      sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
+    })
+  ])
+
   slinky_slurm_values_yaml = templatefile("${path.module}/files/slinky/slurm-values.yaml.tftpl", {
-    cluster_name                   = local.cluster_name
-    identity_enabled               = var.slinky_identity_enabled
-    home_enabled                   = var.slinky_home_enabled
-    accounting_enabled             = var.slinky_accounting_enabled
-    accounting_image_repository    = local.slinky_accounting_image_repository
-    accounting_image_tag           = local.slinky_accounting_image_tag
-    restapi_image_repository       = local.slinky_restapi_image_repository
-    restapi_image_tag              = local.slinky_restapi_image_tag
-    system_node_shape              = var.worker_ops_shape
-    controller_image_repository    = var.slinky_controller_image_repository
-    controller_image_tag           = local.slinky_controller_image_tag
-    sssd_image_repository          = local.slinky_sssd_image_repository
-    sssd_image_tag                 = local.slinky_sssd_image_tag
-    login_image_repository         = var.slinky_login_image_repository
-    login_image_tag                = local.slinky_login_image_tag
-    gpu_autodetect                 = local.slinky_gpu_autodetect
-    login_enabled                  = var.slinky_login_enabled
-    login_root_ssh_authorized_keys = local.slinky_login_root_ssh_authorized_keys
-    nodeset_name                   = var.slinky_nodeset_name
-    worker_replicas                = local.slinky_worker_replicas
-    worker_image_repository        = var.slinky_worker_image_repository
-    worker_image_tag               = local.slinky_worker_image_tag
-    gpu_resource                   = local.slinky_gpu_resource
-    gpus_per_node                  = local.slinky_gpus_per_node
-    mount_infiniband               = var.slinky_worker_mount_infiniband
-    worker_ssh_enabled             = var.slinky_worker_ssh_enabled
-    worker_host_network            = local.slinky_worker_host_network
-    worker_sriov_enabled           = local.slinky_worker_sriov_enabled
-    worker_rdma_resource           = var.slinky_worker_rdma_resource
-    worker_rdma_vfs_per_node       = local.slinky_worker_rdma_vfs_per_node
-    worker_rdma_networks           = local.slinky_worker_rdma_networks_annotation
-    worker_slurmd_parameters       = local.slinky_worker_slurmd_parameters
-    worker_numa_topology_enabled   = local.slinky_worker_numa_topology_enabled
-    worker_features_yaml           = join("\n", [for feature in local.slinky_worker_features : "        - ${feature}"])
-    worker_shape                   = local.slinky_worker_shape
-    gpu_nodeset_enabled            = local.slinky_gpu_nodeset_enabled
-    cpu_nodeset_enabled            = local.slinky_cpu_nodeset_enabled
-    cpu_nodeset_name               = var.slinky_cpu_nodeset_name
-    cpu_worker_replicas            = var.worker_cpu_pool_size
-    cpu_worker_image_repository    = local.slinky_cpu_worker_image_repository
-    cpu_worker_image_tag           = local.slinky_cpu_worker_image_tag
-    cpu_worker_features_yaml       = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
-    cpu_partition_default          = local.slinky_gpu_nodeset_enabled ? "NO" : "YES"
+    cluster_name                 = local.cluster_name
+    identity_enabled             = var.slinky_identity_enabled
+    home_enabled                 = var.slinky_home_enabled
+    accounting_enabled           = var.slinky_accounting_enabled
+    accounting_image_repository  = local.slinky_accounting_image_repository
+    accounting_image_tag         = local.slinky_accounting_image_tag
+    restapi_image_repository     = local.slinky_restapi_image_repository
+    restapi_image_tag            = local.slinky_restapi_image_tag
+    system_node_pool_name        = local.slinky_system_pool_name
+    controller_image_repository  = var.slinky_controller_image_repository
+    controller_image_tag         = local.slinky_controller_image_tag
+    sssd_image_repository        = local.slinky_sssd_image_repository
+    sssd_image_tag               = local.slinky_sssd_image_tag
+    login_image_repository       = var.slinky_login_image_repository
+    login_image_tag              = local.slinky_login_image_tag
+    login_load_balancer_internal = var.preferred_kubernetes_services == "internal"
+    login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
+    gpu_autodetect               = local.slinky_gpu_autodetect
+    login_enabled                = var.slinky_login_enabled
+    worker_nodesets_yaml         = local.slinky_worker_nodesets_yaml
+    worker_ssh_enabled           = var.slinky_worker_ssh_enabled
+    gmc_nodeset_enabled          = length(local.slinky_gmc_worker_nodesets) > 0
+    gmc_partition_enabled        = local.slinky_gmc_aggregate_partition_enabled
+    gmc_partition_name           = local.slinky_gmc_aggregate_partition_name
+    gmc_partition_nodesets_yaml  = join("\n", [for name in sort(keys(local.slinky_gmc_worker_nodesets)) : "      - ${name}"])
+    gmc_partition_default        = local.slinky_default_partition_name == local.slinky_gmc_aggregate_partition_name ? "YES" : "NO"
+    all_partition_default        = local.slinky_default_partition_name == "all" ? "YES" : "NO"
+    cpu_nodeset_enabled          = local.slinky_cpu_nodeset_enabled
+    cpu_nodeset_name             = var.slinky_cpu_nodeset_name
+    cpu_worker_replicas          = var.worker_cpu_pool_size
+    cpu_worker_image_repository  = local.slinky_cpu_worker_image_repository
+    cpu_worker_image_tag         = local.slinky_cpu_worker_image_tag
+    cpu_worker_features_yaml     = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
+    cpu_partition_default        = local.slinky_default_partition_name == var.slinky_cpu_nodeset_name ? "YES" : "NO"
+    sssd_config_hash             = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
   })
 }
 
@@ -318,7 +347,8 @@ module "slinky_openldap" {
 }
 
 # LDAP settings that require exec into the OpenLDAP pods: TLS cn=config,
-# syncprov overlay, base tree, and copying the CA into the Slurm namespace.
+# syncprov overlay, base tree, the read-only SSSD account and ACL, and copying
+# the CA into the Slurm namespace.
 resource "null_resource" "slinky_openldap_config_via_operator" {
   count = alltrue([local.slinky_deploy_from_operator, var.slinky_identity_enabled]) ? 1 : 0
 
@@ -393,7 +423,7 @@ resource "null_resource" "slinky_openldap_config_via_operator" {
 }
 
 resource "null_resource" "slinky_home_pvc_via_operator" {
-  count = alltrue([local.slinky_deploy_from_operator, var.slinky_home_enabled]) ? 1 : 0
+  count = alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster, var.slinky_home_enabled]) ? 1 : 0
 
   triggers = {
     manifest_md5    = md5(local.slinky_home_pvc_yaml)
@@ -552,6 +582,7 @@ module "slinky_mariadb_operator_crds" {
   helm_chart_name     = "mariadb-operator-crds"
   namespace           = "mariadb"
   helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+  helm_chart_version  = var.slinky_mariadb_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -582,6 +613,7 @@ module "slinky_mariadb_operator" {
   helm_chart_name     = "mariadb-operator"
   namespace           = "mariadb"
   helm_repository_url = "https://helm.mariadb.com/mariadb-operator"
+  helm_chart_version  = var.slinky_mariadb_operator_chart_version
 
   pre_deployment_commands = [
     "set -e",
@@ -742,20 +774,102 @@ module "slinky_operator" {
 
   # The chart version comment line is part of the values hash, so version bumps
   # trigger a redeploy.
-  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n${local.slinky_operator_image_values}"
+  helm_template_values_override = "# slurm-operator chart ${local.slinky_operator_chart_version}\n${local.slinky_operator_generated_values}"
   helm_user_values_override     = var.slinky_operator_values_override
 
   # Kueue's mutating webhook intercepts all Deployment creates cluster-wide;
   # installing this chart while Kueue is still starting fails with "no
   # endpoints available for service kueue-webhook-service". The chart also
-  # ships cert-manager Certificates and Issuers whose admission needs the
-  # cert-manager webhook to have ready endpoints.
+  # ships cert-manager Certificates and Issuers when cert-manager issuance is
+  # enabled, whose admission needs the cert-manager webhook to have ready
+  # endpoints.
   depends_on = [
     module.slinky_operator_crds,
     module.kueue,
     helm_release.kueue,
     kubectl_manifest.kueue_webhook_probe,
-    helm_release.cert_manager,
+    module.certmanager,
+  ]
+}
+
+# One NVIDIA IMEX ComputeDomain per GPU memory fabric. The generated
+# ResourceClaimTemplate is consumed by the matching long-running GMC slurmd
+# pods; GPU allocation itself remains nvidia.com/gpu and Slurm GRES.
+resource "null_resource" "slinky_gmc_compute_domains_via_operator" {
+  count = alltrue([
+    local.slinky_deploy_from_operator,
+    var.slinky_install_slurm_cluster,
+    length(local.slinky_gmc_compute_domains) > 0,
+  ]) ? 1 : 0
+
+  triggers = {
+    manifest_md5    = nonsensitive(md5(local.slinky_gmc_compute_domains_yaml))
+    workdir         = local.slinky_workdir
+    slurm_namespace = var.slinky_slurm_namespace
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "mkdir -p ${local.slinky_workdir}",
+      "chmod 700 ${local.slinky_workdir}",
+    ]
+  }
+
+  provisioner "file" {
+    content     = local.slinky_gmc_compute_domains_yaml
+    destination = "${local.slinky_workdir}/gmc-compute-domains.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=$PATH:/usr/local/bin:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl apply -f ${local.slinky_workdir}/gmc-compute-domains.yaml",
+    ]
+  }
+
+  provisioner "remote-exec" {
+    when       = destroy
+    on_failure = continue
+    inline = [
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl delete -f ${self.triggers.workdir}/gmc-compute-domains.yaml --ignore-not-found=true || true",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+      triggers["slurm_namespace"],
+      triggers["workdir"],
+    ]
+  }
+
+  depends_on = [
+    null_resource.slinky_auth_secrets_via_operator,
+    module.nvidia_dra_driver,
   ]
 }
 
@@ -789,7 +903,7 @@ module "slinky_slurm" {
     # not fail the Slurm control-plane install when a NodeSet is not ready yet.
     [
       for nodeset in concat(
-        local.slinky_gpu_nodeset_enabled ? [var.slinky_nodeset_name] : [],
+        sort(keys(local.slinky_worker_nodesets)),
         local.slinky_cpu_nodeset_enabled ? [var.slinky_cpu_nodeset_name] : [],
         ) : join("\n", [
           "echo '== Slurm worker nodeset ${nodeset} status =='",
@@ -816,7 +930,9 @@ module "slinky_slurm" {
 
   depends_on = [
     module.slinky_operator,
+    module.oci_hpc_oke_utils,
     null_resource.slinky_auth_secrets_via_operator,
+    null_resource.slinky_gmc_compute_domains_via_operator,
     null_resource.slinky_openldap_config_via_operator,
     null_resource.slinky_home_pvc_via_operator,
     null_resource.slinky_mariadb_via_operator,

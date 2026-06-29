@@ -4,6 +4,7 @@
 locals {
   slinky_needs_default_fss = alltrue([
     var.install_slinky,
+    var.slinky_install_slurm_cluster,
     var.slinky_home_enabled,
     var.slinky_home_pv_name == "fss-pv",
   ])

@@ -20,6 +20,11 @@ sssd:
 
 %{ endif ~}
 controller:
+%{ if identity_enabled ~}
+  metadata:
+    annotations:
+      oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
   slurmctld:
     image:
       repository: ${controller_image_repository}
@@ -46,13 +51,18 @@ controller:
     SelectType: select/cons_tres
     SelectTypeParameters: CR_CORE_MEMORY
     PropagateResourceLimitsExcept: MEMLOCK
+%{ if gmc_nodeset_enabled ~}
+    # This is global Slurm configuration. On non-GMC workers the plugin sees
+    # no nvidia-caps-imex-channels device major and disables itself locally.
+    SwitchType: switch/nvidia_imex
+%{ endif ~}
 %{ if accounting_enabled ~}
     AccountingStorageEnforce: associations,limits,qos
     AccountingStorageTRES: gres/gpu
 %{ endif ~}
   podSpec:
     nodeSelector:
-      node.kubernetes.io/instance-type: ${system_node_shape}
+      oke.oraclecloud.com/pool.name: ${system_node_pool_name}
 %{ if identity_enabled ~}
     securityContext:
       runAsNonRoot: false
@@ -148,15 +158,22 @@ restapi:
       tag: ${restapi_image_tag}
   podSpec:
     nodeSelector:
-      node.kubernetes.io/instance-type: ${system_node_shape}
+      oke.oraclecloud.com/pool.name: ${system_node_pool_name}
 
 loginsets:
   slinky:
     enabled: ${login_enabled}
     replicas: 1
-    rootSshAuthorizedKeys: ${login_root_ssh_authorized_keys}
 %{ if identity_enabled ~}
+    metadata:
+      annotations:
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
+    # Administrative access uses kubectl/operator paths, not root SSH into the
+    # login service. LDAP users continue to use the SSSD key command.
     extraSshdConfig: |
+      PermitRootLogin no
+%{ if identity_enabled ~}
       AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
       AuthorizedKeysCommandUser nobody
       AuthorizedKeysFile none
@@ -186,7 +203,7 @@ loginsets:
           mountPath: /tmp
     podSpec:
       nodeSelector:
-        node.kubernetes.io/instance-type: ${system_node_shape}
+        oke.oraclecloud.com/pool.name: ${system_node_pool_name}
       volumes:
 %{ if home_enabled ~}
         - name: home
@@ -206,6 +223,14 @@ loginsets:
             medium: Memory
             sizeLimit: 16Gi
     service:
+      metadata:
+        annotations:
+          oci.oraclecloud.com/load-balancer-type: "lb"
+          service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
+%{ if login_load_balancer_internal ~}
+          service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+%{ endif ~}
+          oci.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
       spec:
         type: LoadBalancer
 
@@ -213,171 +238,23 @@ nodesets:
   slinky:
     enabled: false
 
-%{ if gpu_nodeset_enabled ~}
-  ${nodeset_name}:
-    enabled: true
-    scalingMode: DaemonSet
-%{ if worker_sriov_enabled ~}
-    metadata:
-      annotations:
-        k8s.v1.cni.cncf.io/networks: ${worker_rdma_networks}
-%{ endif ~}
-    # Ignored in DaemonSet mode (pod count follows matching nodes); only used
-    # if the nodeset is overridden to StatefulSet scaling.
-    replicas: ${worker_replicas}
-    # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
-    # evict workers while Slurm jobs are running on them
-    workloadDisruptionProtection: true
-    useResourceLimits: false
-    slurmd:
-      image:
-        repository: ${worker_image_repository}
-        tag: ${worker_image_tag}
-      args:
-        - -N
-        - $(KUBE_NODE_NAME)
-%{ if worker_slurmd_parameters != "" ~}
-        - --parameters
-        - ${worker_slurmd_parameters}
-%{ endif ~}
-      env:
-        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
-        # hostname_override=true on the stack so nodes register by hostname
-        # instead of private IP and Slurm node names stay clean.
-        - name: KUBE_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-      lifecycle:
-        preStop:
-          exec:
-            command:
-              - /usr/bin/sh
-              - -c
-              - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
-      resources:
-        limits:
-          ${gpu_resource}: ${gpus_per_node}
-%{ if worker_sriov_enabled ~}
-          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
-%{ endif ~}
-        requests:
-          ${gpu_resource}: ${gpus_per_node}
-%{ if worker_sriov_enabled ~}
-          ${worker_rdma_resource}: ${worker_rdma_vfs_per_node}
-%{ endif ~}
-      volumeMounts:
-%{ if mount_infiniband ~}
-        - name: devinf
-          mountPath: /dev/infiniband
-%{ endif ~}
-        - name: shm
-          mountPath: /dev/shm
-        # Pyxis/enroot writes its image-import scratch under /tmp and, while
-        # flattening layers, creates OverlayFS whiteouts (device nodes). The pod
-        # overlay rootfs rejects mknod even for root, so /tmp must be a tmpfs.
-        - name: enroot-tmp
-          mountPath: /tmp
-%{ if home_enabled ~}
-        - name: home
-          mountPath: /home
-%{ endif ~}
-%{ if identity_enabled ~}
-        - name: ldap-ca
-          mountPath: /etc/sssd/ca
-          readOnly: true
-%{ endif ~}
-    logfile:
-      image:
-        repository: docker.io/library/alpine
-        tag: latest
-    ssh:
-      enabled: ${worker_ssh_enabled}
-%{ if worker_host_network ~}
-      extraSshdConfig: |
-        Port 2222
-%{ endif ~}
-    extraConfMap:
-%{ if worker_numa_topology_enabled ~}
-      Boards: 1
-      CPUs: 128
-      SocketsPerBoard: 8
-      CoresPerSocket: 16
-      ThreadsPerCore: 1
-%{ endif ~}
-%{ if worker_slurmd_parameters != "" ~}
-      Parameters: ${worker_slurmd_parameters}
-%{ endif ~}
-      Gres:
-        - gpu:${gpus_per_node}
-      Features:
-${worker_features_yaml}
-      Weight: 1
-    partition:
-      enabled: true
-      configMap:
-        State: UP
-        Default: "YES"
-        MaxTime: UNLIMITED
-    updateStrategy:
-      type: RollingUpdate
-      rollingUpdate:
-        maxUnavailable: ${worker_replicas}
-    podSpec:
-%{ if worker_host_network ~}
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-%{ else ~}
-      hostNetwork: false
-      dnsPolicy: ClusterFirst
-%{ endif ~}
-      nodeSelector:
-        node.kubernetes.io/instance-type: ${worker_shape}
-      tolerations:
-        - key: ${gpu_resource}
-          operator: Exists
-          effect: NoSchedule
-      volumes:
-%{ if mount_infiniband ~}
-        - name: devinf
-          hostPath:
-            path: /dev/infiniband
-%{ endif ~}
-        - name: shm
-          emptyDir:
-            medium: Memory
-            sizeLimit: 32Gi
-        # tmpfs /tmp for the Pyxis/enroot image import (see the volumeMount note).
-        - name: enroot-tmp
-          emptyDir:
-            medium: Memory
-            sizeLimit: 64Gi
-%{ if home_enabled ~}
-        - name: home
-          persistentVolumeClaim:
-            claimName: slurm-home
-%{ endif ~}
-%{ if identity_enabled ~}
-        - name: ldap-ca
-          secret:
-            secretName: openldap-ca
-            items:
-              - key: ca.crt
-                path: ca.crt
-%{ endif ~}
-%{ endif ~}
+${worker_nodesets_yaml}
 %{ if cpu_nodeset_enabled ~}
 
   ${cpu_nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
+%{ if identity_enabled && worker_ssh_enabled ~}
+    metadata:
+      annotations:
+        oci-hpc-oke.oracle.com/sssd-config-hash: "${sssd_config_hash}"
+%{ endif ~}
     # Ignored in DaemonSet mode (pod count follows matching nodes); only used
     # if the nodeset is overridden to StatefulSet scaling.
     replicas: ${cpu_worker_replicas}
     # Keep the Pod Disruption Budget so node drains and pool upgrades cannot
     # evict workers while Slurm jobs are running on them
     workloadDisruptionProtection: true
-    useResourceLimits: false
     slurmd:
       image:
         repository: ${cpu_worker_image_repository}
@@ -462,7 +339,20 @@ partitions:
       - ALL
     configMap:
       State: UP
+      Default: "${all_partition_default}"
       MaxTime: UNLIMITED
+%{ if gmc_partition_enabled ~}
+  ${gmc_partition_name}:
+    enabled: true
+    # GMC NodeSets remain fabric-specific for IMEX, while this aggregate
+    # partition lets one Slurm job span fabrics over RDMA.
+    nodesets:
+${gmc_partition_nodesets_yaml}
+    configMap:
+      State: UP
+      Default: "${gmc_partition_default}"
+      MaxTime: UNLIMITED
+%{ endif ~}
 
 accounting:
   enabled: ${accounting_enabled}
@@ -481,7 +371,7 @@ accounting:
       key: password
   podSpec:
     nodeSelector:
-      node.kubernetes.io/instance-type: ${system_node_shape}
+      oke.oraclecloud.com/pool.name: ${system_node_pool_name}
 %{ endif ~}
 
 vendor:
