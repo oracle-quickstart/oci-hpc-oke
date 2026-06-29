@@ -1,0 +1,81 @@
+fullnameOverride: gpu-rdma-node-problem-detector-amd
+
+settings:
+  custom_monitor_definitions:
+    oke-amd-fast.json: |
+      {
+        "plugin": "custom",
+        "pluginConfig": {
+          "invoke_interval": "60s",
+          "timeout": "60s",
+          "max_output_length": 512,
+          "concurrency": 2,
+          "enable_message_change_based_condition_update": true,
+          "skip_initial_status": true
+        },
+        "source": "oke-amd-fast",
+        "metricsReporting": true,
+        "conditions": [
+          {"type": "GpuEcc", "reason": "GpuEccHasNoIssues", "message": "No ECC issues detected with GPUs"},
+          {"type": "GpuBus", "reason": "GpuBusHasNoIssues", "message": "No GPU bus issues detected"},
+          {"type": "GpuCount", "reason": "GpuCountHasNoIssues", "message": "Node has the expected number of GPUs"},
+          {"type": "GpuPcie", "reason": "GpuPcieHasNoIssues", "message": "Node has the expected PCIe bandwidth"},
+          {"type": "GpuBadPages", "reason": "GpuBadPagesHasNoIssues", "message": "No GPU bad pages detected"},
+          {"type": "Rocminfo", "reason": "RocminfoHasNoIssues", "message": "Rocminfo health check passed"},
+          {"type": "RdmaLink", "reason": "RdmaLinkHasNoIssues", "message": "All RDMA links are up"},
+          {"type": "RdmaLinkFlapping", "reason": "RdmaLinkFlappingHasNoIssues", "message": "No flapping RDMA links"},
+          {"type": "RdmaWpaAuth", "reason": "RdmaWpaAuthHasNoIssues", "message": "All RDMA links are authenticated"},
+          {"type": "RdmaRttcc", "reason": "RdmaRttccHasNoIssues", "message": "RTTCC is disabled on all RDMA interfaces"},
+          {"type": "IpAddress", "reason": "IpAddressHasNoIssues", "message": "All required interfaces have an IP address"}
+        ],
+        "rules": [
+          {"type": "permanent", "condition": "GpuEcc", "reason": "GpuEccHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["ecc-err", "60"], "timeout": "45s"},
+          {"type": "permanent", "condition": "GpuBus", "reason": "GpuBusHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["bus-stat", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "GpuCount", "reason": "GpuCountHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["gpu-count", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "GpuPcie", "reason": "GpuPcieHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["gpu-pcie", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "GpuBadPages", "reason": "GpuBadPagesHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["bad-page", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "Rocminfo", "reason": "RocminfoHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rocminfo-check", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "RdmaLink", "reason": "RdmaLinkHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdmalink-stat", "60"], "timeout": "45s"},
+          {"type": "permanent", "condition": "RdmaLinkFlapping", "reason": "RdmaLinkFlappingHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdmalink-flap", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "RdmaWpaAuth", "reason": "RdmaWpaAuthHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["wpa-auth", "60"], "timeout": "40s"},
+          {"type": "permanent", "condition": "RdmaRttcc", "reason": "RdmaRttccHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rttcc-stat", "60"], "timeout": "30s"},
+          {"type": "permanent", "condition": "IpAddress", "reason": "IpAddressHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["ip-address", "60"], "timeout": "30s"}
+        ]
+      }
+    oke-amd-slow.json: |
+      {
+        "plugin": "custom",
+        "pluginConfig": {
+          "invoke_interval": "300s",
+          "timeout": "60s",
+          "max_output_length": 512,
+          "concurrency": 1,
+          "enable_message_change_based_condition_update": true,
+          "skip_initial_status": true
+        },
+        "source": "oke-amd-slow",
+        "metricsReporting": true,
+        "conditions": [
+          {"type": "OcaVersion", "reason": "OcaVersionHasNoIssues", "message": "OCA version is up to date"},
+          {"type": "CpuProfile", "reason": "CpuProfileHasNoIssues", "message": "CPU profile is set to performance"}
+        ],
+        "rules": [
+          {"type": "permanent", "condition": "OcaVersion", "reason": "OcaVersionHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["oca-ver", "300"], "timeout": "30s"},
+          {"type": "permanent", "condition": "CpuProfile", "reason": "CpuProfileHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["cpu-profile", "300"], "timeout": "45s"}
+        ]
+      }
+  custom_plugin_monitors:
+    - /custom-config/oke-amd-fast.json
+    - /custom-config/oke-amd-slow.json
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+                - BM.GPU.MI300X.8
+                - BM.GPU.MI355X-v1.8
+                - BM.GPU.MI355X.8

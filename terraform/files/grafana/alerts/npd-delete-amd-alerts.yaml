@@ -1,0 +1,4 @@
+apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: oke_npd_gpu_bad_pages

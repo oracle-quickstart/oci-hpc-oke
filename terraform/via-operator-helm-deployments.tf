@@ -182,8 +182,8 @@ module "kube_prometheus_stack" {
 }
 
 
-module "node_problem_detector" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
+module "node_problem_detector_amd" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.npd_has_amd_gpu]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -192,7 +192,7 @@ module "node_problem_detector" {
   operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
-  deployment_name     = "gpu-rdma-node-problem-detector"
+  deployment_name     = "gpu-rdma-node-problem-detector-amd"
   helm_chart_name     = "node-problem-detector"
   namespace           = var.monitoring_namespace
   helm_repository_url = "oci://ghcr.io/deliveryhero/helm-charts"
@@ -206,7 +206,36 @@ module "node_problem_detector" {
   post_deployment_commands = []
 
   helm_template_values_override = file("${path.module}/files/node-problem-detector/values.yaml")
-  helm_user_values_override     = ""
+  helm_user_values_override     = file("${path.module}/files/node-problem-detector/values-amd.yaml")
+
+  depends_on = [module.kube_prometheus_stack]
+}
+
+module "node_problem_detector_nvidia" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.npd_has_nvidia_gpu]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "gpu-rdma-node-problem-detector-nvidia"
+  helm_chart_name     = "node-problem-detector"
+  namespace           = var.monitoring_namespace
+  helm_repository_url = "oci://ghcr.io/deliveryhero/helm-charts"
+  helm_chart_version  = var.node_problem_detector_chart_version
+
+  pre_deployment_commands = [
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal"
+  ]
+  deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
+  post_deployment_commands = []
+
+  helm_template_values_override = file("${path.module}/files/node-problem-detector/values.yaml")
+  helm_user_values_override     = file("${path.module}/files/node-problem-detector/values-nvidia.yaml")
 
   depends_on = [module.kube_prometheus_stack]
 }

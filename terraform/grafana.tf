@@ -59,12 +59,32 @@ locals {
 
   grafana_alert_dir   = "${path.module}/files/grafana/alerts"
   grafana_alert_files = fileset(local.grafana_alert_dir, "*.yaml")
+  grafana_amd_alert_files = [
+    "gpu-bad-pages.yaml",
+  ]
+  grafana_nvidia_alert_files = [
+    "dcgm-health.yaml",
+    "gpu-fabric-manager.yaml",
+    "gpu-imex.yaml",
+    "gpu-row-remap.yaml",
+    "gpu-xid.yaml",
+    "nvlink-speed.yaml",
+    "rdma-vf-counters.yaml",
+    "rdma-vf-routes.yaml",
+  ]
+  grafana_alert_files_filtered = [
+    for f in local.grafana_alert_files : f
+    if(!contains(local.grafana_amd_alert_files, f) || local.grafana_has_amd_gpu) &&
+    (!contains(local.grafana_nvidia_alert_files, f) || local.grafana_has_nvidia_gpu) &&
+    (f != "npd-delete-nvidia-alerts.yaml" || (local.grafana_has_amd_gpu && !local.grafana_has_nvidia_gpu)) &&
+    (f != "npd-delete-amd-alerts.yaml" || (local.grafana_has_nvidia_gpu && !local.grafana_has_amd_gpu))
+  ]
   grafana_alerts = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
-    for f in local.grafana_alert_files :
+    for f in local.grafana_alert_files_filtered :
     f => file(join("/", [local.grafana_alert_dir, f]))
   } : {}
 
-  grafana_alert_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_alert_files : join("/", ["${local.grafana_alert_dir}", f])] : []
+  grafana_alert_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_alert_files_filtered : join("/", ["${local.grafana_alert_dir}", f])] : []
 }
 
 resource "random_password" "grafana_admin_password" {
