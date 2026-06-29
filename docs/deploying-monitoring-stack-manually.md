@@ -1162,7 +1162,7 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
    ```yaml
    image:
      repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-     tag: v1.35.2-4
+     tag: v1.35.2-5
    ```
 
 3. Check the vendor-specific release and DaemonSet:

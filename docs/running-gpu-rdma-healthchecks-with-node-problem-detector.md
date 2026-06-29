@@ -56,6 +56,8 @@ Run all commands from the repository root.
 
 Some checks return a passing result when they do not apply to the current shape. The vendor-specific monitor configuration prevents AMD-only and NVIDIA-only checks from running on the wrong vendor.
 
+The B300 and GB300 RDMA route, counter, and IMEX checks use `rdmaFabricData.planes` from OCI host metadata to determine whether the host is multi-plane. Missing, malformed, or unavailable metadata returns `Unknown` instead of treating the host as single-plane. An explicit value of `1` is a valid single-plane result and skips multi-plane checks. Other AMD and NVIDIA shapes do not depend on this host metadata value.
+
 ## Check Intervals and Concurrency
 
 Checks are grouped instead of running as separate synchronized monitors.
