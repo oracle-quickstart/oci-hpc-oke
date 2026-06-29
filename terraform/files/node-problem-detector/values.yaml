@@ -9,8 +9,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -31,7 +31,7 @@ settings:
             "reason": "GpuEccHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "ecc-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -39,8 +39,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -61,7 +61,7 @@ settings:
             "reason": "GpuRowRemapHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rowremap-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -70,8 +70,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -92,7 +92,7 @@ settings:
             "reason": "GpuBusHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "bus-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -101,8 +101,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -123,7 +123,7 @@ settings:
             "reason": "GpuCountHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "gpu-count" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -132,8 +132,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -154,7 +154,7 @@ settings:
             "reason": "GpuPcieHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "gpu-pcie" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -163,8 +163,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -185,7 +185,7 @@ settings:
             "reason": "GpuFabricMgrHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "fabric-mgr" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -194,8 +194,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -216,7 +216,7 @@ settings:
             "reason": "GpuBadPagesHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "bad-page" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -225,8 +225,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -247,7 +247,7 @@ settings:
             "reason": "RdmaLinkHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rdmalink-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -256,8 +256,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -278,7 +278,7 @@ settings:
             "reason": "RdmaLinkFlappingHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rdmalink-flap" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -287,8 +287,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -309,7 +309,7 @@ settings:
             "reason": "RdmaWpaAuthHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "wpa-auth" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -318,8 +318,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -340,7 +340,7 @@ settings:
             "reason": "RdmaRttccHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rttcc-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -349,8 +349,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -371,7 +371,7 @@ settings:
             "reason": "OcaVersionHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "oca-ver" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -380,8 +380,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -402,7 +402,7 @@ settings:
             "reason": "CpuProfileHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "cpu-profile" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -411,8 +411,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -433,7 +433,7 @@ settings:
             "reason": "GpuXidHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "xid-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -442,8 +442,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -464,7 +464,7 @@ settings:
             "reason": "IpAddressHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "ip-address" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -473,8 +473,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -495,7 +495,7 @@ settings:
             "reason": "NvlinkSpeedHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "nvlink-speed" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -504,8 +504,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -526,7 +526,7 @@ settings:
             "reason": "DcgmiHealthHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "dcgmi-health" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -535,8 +535,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -557,7 +557,7 @@ settings:
             "reason": "RocminfoHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rocminfo-check" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -610,7 +610,7 @@ settings:
         healthcheck_type=$1
         healthcheck_log_file=/host/tmp/oke-latest-${healthcheck_type}-healthcheck.log
 
-        cp ./config/*.py /host/tmp
+        cp ./config/*.py ./config/*.json /host/tmp
 
         if [ ! -e "/host/tmp/uv" ]; then
             cp /root/.local/bin/uv /host/tmp/uv
@@ -685,7 +685,7 @@ logDir:
 
 image:
   repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-  tag: v1.35.1-2
+  tag: v1.35.2-2
   # image.digest -- the image digest. If given it takes precedence over a given tag.
   digest: ""
   pullPolicy: IfNotPresent

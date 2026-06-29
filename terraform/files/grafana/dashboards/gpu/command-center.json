@@ -73,8 +73,10 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "count(count by (nodename) (node_uname_info))",
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_info))",
+          "refId": "A",
+          "instant": true,
+          "range": false
         }
       ],
       "title": "Total Nodes",
@@ -132,9 +134,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{instance_shape!~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_info))\n-\ncount(count by(node) (kube_node_status_condition{condition=\"GpuPcie\"}))",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "CPU Nodes",
@@ -192,9 +195,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_status_condition{condition=\"GpuPcie\"}))",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "GPU Nodes",
@@ -252,9 +256,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_health_status == 1 and on(hostname) node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(\n  node_health_status == 1\n  and on(hostname)\n  label_replace(\n    max by(node) (\n      kube_node_status_condition{condition=\"GpuPcie\"}\n    ),\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n)\nor vector(0)",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Healthy GPU Nodes",
@@ -311,8 +316,10 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "(count(amd_gpu_health) or vector(0)) + (sum(max by (instance) (DCGM_FI_DEV_COUNT)) or vector(0))",
-          "refId": "A"
+          "expr": "sum(kube_node_status_capacity{resource=\"amd_com_gpu\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false
         }
       ],
       "title": "Total GPUs",
@@ -370,9 +377,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "(count(amd_gpu_health == 1) or vector(0)) + (sum(max by (hostname) (DCGM_FI_DEV_COUNT) * on(hostname) group_left() (node_health_status == 1)) or vector(0))",
-          "range": true,
-          "refId": "A"
+          "expr": "sum(\n  label_replace(\n    kube_node_status_capacity{resource=\"amd_com_gpu\"},\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n  * on(hostname) group_left()\n  (node_health_status == 1)\n)\nor vector(0)",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Healthy GPUs",
@@ -478,10 +486,11 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"GpuPcie\"}\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{ hostname }}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Compute Node Health",
@@ -572,7 +581,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"GpuPcie\"}\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -615,6 +624,100 @@
       "pluginVersion": "12.1.1",
       "title": "Cluster Alerts",
       "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 10,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "perPage": 20,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "0 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|NodeHasPcieErrors|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth\", status=\"true\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|NodeHasPcieErrors|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth\", status=\"unknown\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
+          "legendFormat": "{{hostname}} / {{condition}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Historical Cluster Node Issues",
+      "type": "state-timeline"
     }
   ],
   "preload": false,

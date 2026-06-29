@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: problem_gauge{reason="GpuCountHasIssues",type="GpuCount"}
+                expr: label_replace(max by(node) (kube_node_status_condition{condition="GpuCount",status="true"}), "hostname", "$1", "node", "(.*)")
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
