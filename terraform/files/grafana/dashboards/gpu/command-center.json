@@ -144,7 +144,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(count by(node) (kube_node_info))\n-\ncount(count by(node) (kube_node_status_condition{condition=\"GpuPcie\"}))",
+          "expr": "count(count by(node) (kube_node_info))\n-\ncount(count by(node) (kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0))",
           "range": false,
           "refId": "A",
           "instant": true
@@ -209,7 +209,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(count by(node) (kube_node_status_condition{condition=\"GpuPcie\"}))",
+          "expr": "count(count by(node) (kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0))",
           "range": false,
           "refId": "A",
           "instant": true
@@ -274,7 +274,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(\n  node_health_status == 1\n  and on(hostname)\n  label_replace(\n    max by(node) (\n      kube_node_status_condition{condition=\"GpuPcie\"}\n    ),\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n)\nor vector(0)",
+          "expr": "count(\n  node_health_status == 1\n  and on(hostname)\n  label_replace(\n    max by(node) (\n      kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n    ),\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n)\nor vector(0)",
           "range": false,
           "refId": "A",
           "instant": true
@@ -514,7 +514,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"GpuPcie\"}\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{ hostname }}",
           "range": false,
           "refId": "A",
@@ -611,7 +611,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"GpuPcie\"}\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"

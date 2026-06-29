@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: max by(hostname, check) ((time() - oke_npd_check_last_run_timestamp_seconds) > bool (2 * oke_npd_check_expected_interval_seconds + 60)) or ((label_replace(max by(node) (kube_node_status_condition{condition="GpuCount"}), "hostname", "$1", "node", "(.*)") * 0 + 1) unless on(hostname) max by(hostname) (oke_npd_check_last_run_timestamp_seconds))
+                expr: max by(hostname, check) ((time() - oke_npd_check_last_run_timestamp_seconds) > bool (2 * oke_npd_check_expected_interval_seconds + 60)) or ((label_replace(max by(node) (kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"} > 0), "hostname", "$1", "node", "(.*)") * 0 + 1) unless on(hostname) max by(hostname) (oke_npd_check_last_run_timestamp_seconds))
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
