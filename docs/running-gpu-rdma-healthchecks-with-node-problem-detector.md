@@ -282,13 +282,15 @@ Checker failures use the `NPD Check Unknown` alert, which selects `status="unkno
 The `NPD Check Stale` alert fires when a check has not updated within:
 
 ```text
-2 * expected interval + 60 seconds
+max(2 * expected interval + 60 seconds, 300 seconds)
 ```
 
 This means:
 
-- A 60-second check becomes stale after 180 seconds.
+- A 60-second check becomes stale after 300 seconds.
 - A 300-second check becomes stale after 660 seconds.
+
+The 300-second minimum accounts for timeout-heavy fast batches. At concurrency two, the configured rule timeouts have batch bounds of 195 seconds for AMD and 210 seconds for NVIDIA. The minimum leaves at least 90 seconds for process cleanup and scheduling overhead without increasing the maximum of three concurrent fast and slow checks.
 
 GPU dashboards and the stale alert use `kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}` as their GPU node inventory. This metric is independent of NPD, so a GPU node remains visible when NPD publishes no conditions or freshness metrics.
 

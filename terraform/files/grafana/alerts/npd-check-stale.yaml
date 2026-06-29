@@ -20,7 +20,7 @@ groups:
                   (
                     max by(hostname, check) (
                       (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile"})
-                      > bool (2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile"} + 60)
+                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile"} + 60, 300)
                     )
                     and on(hostname)
                     label_replace(
@@ -34,7 +34,7 @@ groups:
                   (
                     max by(hostname, check) (
                       (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex"})
-                      > bool (2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex"} + 60)
+                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex"} + 60, 300)
                     )
                     and on(hostname)
                     label_replace(
