@@ -288,6 +288,8 @@ This means:
 - A 60-second check becomes stale after 180 seconds.
 - A 300-second check becomes stale after 660 seconds.
 
+GPU dashboards and the missing-NPD fallback use `kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}` as their GPU node inventory. This metric is independent of NPD, so a GPU node remains visible and the stale alert can detect it when NPD publishes no conditions or freshness metrics.
+
 If NPD kills a command at the outer plugin timeout, NPD can retain the previous node condition. The initial heartbeat stops updating, allowing the stale alert to detect the hung check.
 
 ## Migrating from the Generic Release
