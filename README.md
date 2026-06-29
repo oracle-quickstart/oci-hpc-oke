@@ -118,7 +118,7 @@ Install the GPU Operator with RDMA support enabled:
 helm install --wait \
   -n gpu-operator --create-namespace \
   gpu-operator nvidia/gpu-operator \
-  --version v26.3.0 \
+  --version v26.4.0 \
   --set driver.enabled=false
 ```
 
