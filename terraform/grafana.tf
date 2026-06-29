@@ -7,6 +7,15 @@ locals {
   grafana_gpu_dashboard_dir    = "${path.module}/files/grafana/dashboards/gpu"
   grafana_oci_dashboard_dir    = "${path.module}/files/grafana/dashboards/oci"
 
+  grafana_has_amd_gpu = (
+    (var.worker_rdma_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
+    (var.worker_gpu_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape))
+  )
+  grafana_has_nvidia_gpu = (
+    (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
+    (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape))
+  )
+
   grafana_common_dashboard_files = fileset("${local.grafana_common_dashboard_dir}", "*.json")
   grafana_gpu_dashboard_files    = fileset("${local.grafana_gpu_dashboard_dir}", "*.json")
   grafana_oci_dashboard_files    = fileset("${local.grafana_oci_dashboard_dir}", "*.json")
@@ -19,9 +28,29 @@ locals {
     for f in local.grafana_common_dashboard_files :
     f => file(join("/", ["${local.grafana_common_dashboard_dir}", f]))
   } : {}
-  grafana_gpu_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
+  grafana_gpu_dashboard_sources = {
     for f in local.grafana_gpu_dashboard_files :
     f => file(join("/", ["${local.grafana_gpu_dashboard_dir}", f]))
+  }
+  grafana_gpu_health_dashboard = jsondecode(local.grafana_gpu_dashboard_sources["gpu-health-status.json"])
+  grafana_gpu_health_panels = [
+    for panel in local.grafana_gpu_health_dashboard.panels : panel
+    if(panel.id != 7 || local.grafana_has_nvidia_gpu) && (panel.id != 23 || local.grafana_has_amd_gpu)
+  ]
+  grafana_gpu_health_panels_reflowed = [
+    for index, panel in local.grafana_gpu_health_panels :
+    panel.type == "stat" ? merge(panel, {
+      gridPos = merge(panel.gridPos, {
+        x = (index % 8) * 3
+        y = floor(index / 8) * 3
+      })
+    }) : panel
+  ]
+  grafana_gpu_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
+    for f, content in local.grafana_gpu_dashboard_sources :
+    f => f == "gpu-health-status.json" ? jsonencode(merge(local.grafana_gpu_health_dashboard, {
+      panels = local.grafana_gpu_health_panels_reflowed
+    })) : content
   } : {}
   grafana_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? {
     for f in local.grafana_oci_dashboard_files :

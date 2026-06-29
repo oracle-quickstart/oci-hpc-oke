@@ -20,7 +20,9 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": 20,
-  "links": [],
+  "links": [
+
+  ],
   "panels": [
     {
       "datasource": {
@@ -29,7 +31,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -40,7 +44,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -89,7 +95,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -100,7 +108,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -150,7 +160,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -161,7 +173,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -211,7 +225,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -222,7 +238,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -272,7 +290,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -283,7 +303,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -316,7 +338,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "sum(kube_node_status_capacity{resource=\"amd_com_gpu\"})",
+          "expr": "sum(kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"})",
           "refId": "A",
           "instant": true,
           "range": false
@@ -332,7 +354,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -343,7 +367,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -377,7 +403,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum(\n  label_replace(\n    kube_node_status_capacity{resource=\"amd_com_gpu\"},\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n  * on(hostname) group_left()\n  (node_health_status == 1)\n)\nor vector(0)",
+          "expr": "sum(\n  label_replace(\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"},\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n  * on(hostname) group_left()\n  (node_health_status == 1)\n)\nor vector(0)",
           "range": false,
           "refId": "A",
           "instant": true
@@ -440,7 +466,9 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 5,
@@ -547,7 +575,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -592,8 +622,11 @@
     },
     {
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+        },
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 5,
@@ -606,7 +639,9 @@
         "alertInstanceLabelFilter": "",
         "alertName": "",
         "dashboardAlerts": false,
-        "groupBy": [],
+        "groupBy": [
+
+        ],
         "groupMode": "default",
         "maxItems": 20,
         "showInactiveAlerts": false,
@@ -676,7 +711,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -723,7 +760,9 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": [],
+  "tags": [
+
+  ],
   "templating": {
     "list": [
       {
@@ -733,7 +772,9 @@
         },
         "hide": 1,
         "name": "PROMETHEUS_DS",
-        "options": [],
+        "options": [
+
+        ],
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
@@ -750,7 +791,9 @@
         "label": "Instance Shape",
         "multi": true,
         "name": "instance_shape",
-        "options": [],
+        "options": [
+
+        ],
         "query": {
           "qryType": 1,
           "query": "label_values(node_uname_info,instance_shape)",
@@ -766,7 +809,8 @@
     "from": "now-5m",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+  },
   "timezone": "browser",
   "title": "Command Center",
   "uid": "command-center",

@@ -20,7 +20,9 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": 26,
-  "links": [],
+  "links": [
+
+  ],
   "panels": [
     {
       "datasource": {
@@ -62,7 +64,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -147,7 +151,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -232,7 +238,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -317,7 +325,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -402,7 +412,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -487,7 +499,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -572,12 +586,101 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
         "x": 18,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuRowRemap\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuRowRemap\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuRowRemap\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
+          "legendFormat": "{{hostname}}",
+          "range": false,
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "Row Remap",
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 21,
         "y": 0
       },
       "id": 24,
@@ -657,13 +760,15 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 21,
-        "y": 0
+        "x": 0,
+        "y": 3
       },
       "id": 6,
       "options": {
@@ -742,12 +847,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 3,
         "y": 3
       },
       "id": 8,
@@ -776,7 +883,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((min by(hostname) (\n    min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range])\n  )) < bool 1) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_health{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((min by(hostname) (\n    min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range])\n  )) == bool 1) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_health{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (min by(hostname) (min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range]))) < bool 1\n  ) == 1\n  or\n  (\n    (max by(hostname) (max_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_health{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (min by(hostname) (min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range]))) == bool 1\n  ) == 1\n  or\n  (\n    (max by(hostname) (max_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
@@ -827,12 +934,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 3,
+        "x": 6,
         "y": 3
       },
       "id": 9,
@@ -861,14 +970,14 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
           "instant": true
         }
       ],
-      "title": "Power Throttle (PPT)",
+      "title": "Power Throttle / Violation",
       "type": "stat",
       "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
@@ -912,12 +1021,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 6,
+        "x": 9,
         "y": 3
       },
       "id": 10,
@@ -946,14 +1057,14 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
           "instant": true
         }
       ],
-      "title": "Processor Hot",
+      "title": "Processor Hot / Board Limit",
       "type": "stat",
       "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
@@ -997,12 +1108,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 9,
+        "x": 12,
         "y": 3
       },
       "id": 11,
@@ -1031,7 +1144,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
@@ -1082,12 +1195,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 12,
+        "x": 15,
         "y": 3
       },
       "id": 12,
@@ -1116,14 +1231,14 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
           "instant": true
         }
       ],
-      "title": "HBM Thermal",
+      "title": "HBM Thermal / Sync Boost",
       "type": "stat",
       "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
@@ -1167,12 +1282,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 15,
+        "x": 18,
         "y": 3
       },
       "id": 13,
@@ -1201,14 +1318,14 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "0 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_condition{\n                condition=\"GpuPcie\",\n                node=~\"$hostname\"\n              }\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((sum by(hostname) (\n    increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n      )\n    )",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_condition{\n          condition=\"GpuPcie\",\n          node=~\"$hostname\"\n        }\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
           "range": false,
           "refId": "A",
           "instant": true
         }
       ],
-      "title": "VR Thermal",
+      "title": "VR Thermal / Reliability",
       "type": "stat",
       "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
@@ -1252,12 +1369,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 18,
+        "x": 21,
         "y": 3
       },
       "id": 14,
@@ -1337,13 +1456,15 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 21,
-        "y": 3
+        "x": 0,
+        "y": 6
       },
       "id": 15,
       "options": {
@@ -1422,12 +1543,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 3,
         "y": 6
       },
       "id": 16,
@@ -1507,12 +1630,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 3,
+        "x": 6,
         "y": 6
       },
       "id": 18,
@@ -1592,12 +1717,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 6,
+        "x": 9,
         "y": 6
       },
       "id": 19,
@@ -1677,12 +1804,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 9,
+        "x": 12,
         "y": 6
       },
       "id": 20,
@@ -1777,7 +1906,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 12,
@@ -1875,7 +2006,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -1922,7 +2055,9 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": [],
+  "tags": [
+
+  ],
   "templating": {
     "list": [
       {
@@ -1932,7 +2067,9 @@
         },
         "hide": 1,
         "name": "PROMETHEUS_DS",
-        "options": [],
+        "options": [
+
+        ],
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
@@ -1954,7 +2091,9 @@
         "label": "Node",
         "multi": true,
         "name": "hostname",
-        "options": [],
+        "options": [
+
+        ],
         "query": {
           "qryType": 1,
           "query": "label_values(kube_node_status_condition{condition=\"GpuPcie\"},node)",
@@ -1969,7 +2108,8 @@
     "from": "now-5m",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+  },
   "timezone": "browser",
   "title": "GPU Health Status",
   "uid": "gpu-health",
