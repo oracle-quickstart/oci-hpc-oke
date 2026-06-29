@@ -56,23 +56,16 @@ Run all commands from the repository root.
 
 Some checks return a passing result when they do not apply to the current shape. The vendor-specific monitor configuration prevents AMD-only and NVIDIA-only checks from running on the wrong vendor.
 
-The B300 and GB300 RDMA route, counter, and IMEX checks use `rdmaFabricData.planes` from OCI host metadata to determine whether the host is multi-plane. Missing, malformed, or unavailable metadata returns `Unknown` instead of treating the host as single-plane. An explicit value of `1` is a valid single-plane result and skips multi-plane checks. Other AMD and NVIDIA shapes do not depend on this host metadata value.
+The B300 and GB300 RDMA checks use OCI host metadata to identify multi-plane nodes. If the required metadata is unavailable or invalid, the check returns `Unknown`. Other GPU shapes do not depend on this metadata.
 
-## Check Intervals and Concurrency
+## Check Schedule
 
-Checks are grouped instead of running as separate synchronized monitors.
+Checks run in two groups:
 
-Fast checks:
+- Fast checks run every minute and cover GPU, PCIe, and common RDMA health.
+- Slow checks run every five minutes and cover CPU profile, Oracle Cloud Agent, NVLink, DCGMI, and multi-plane configuration where applicable.
 
-- Run every 60 seconds.
-- Allow two concurrent checks.
-- Use rule timeouts of 30 to 45 seconds.
-
-Slow checks:
-
-- Run every 300 seconds.
-- Allow one concurrent check.
-- Include CPU profile, OCA version, NVLink, DCGMI, and multi-plane configuration checks where applicable.
+NPD limits how many checks run at once to avoid overloading the node.
 
 The exact monitor definitions are in:
 
@@ -95,19 +88,15 @@ Missing commands, timeouts inside Python, parsing failures, invalid output, and 
 
 ## Protected Execution and Logs
 
-Every invocation uses a unique root-owned work directory under:
+Each check runs in a private root-owned directory under:
 
 ```text
 /var/lib/oke-npd/run
 ```
 
-The wrapper stores one root-owned Python runner at `/var/lib/oke-npd/bin/uv` and stages it atomically once per NPD pod. It does not copy the runner into every work directory.
+The wrapper reuses the Python runner at `/var/lib/oke-npd/bin/uv`, removes abandoned work directories, and does not execute code from shared `/tmp`.
 
-Each invocation removes abandoned work directories and incomplete runner staging files older than ten minutes. This cleanup handles directories left behind when NPD ends a check with `SIGKILL`, which cannot run the wrapper's exit trap.
-
-Executable code is not copied to or executed from shared `/tmp`.
-
-The wrapper publishes detailed logs atomically under:
+The wrapper publishes the latest log for each check under:
 
 ```text
 /var/log/oke-npd/latest-<check>.log
@@ -129,7 +118,7 @@ sudo sed -n '1,160p' /var/log/oke-npd/latest-gpu-count.log
 
 ## Freshness Metrics
 
-Before a check starts, the wrapper publishes an initial Unknown heartbeat. A completed check atomically replaces it with the final result.
+The wrapper publishes a heartbeat when a check starts and updates it with the final result when the check finishes.
 
 The node-exporter textfile collector exposes:
 
@@ -275,32 +264,20 @@ curl -fsSG http://127.0.0.1:9090/api/v1/query \
 
 ## Alert Behavior
 
-Confirmed hardware or configuration failures use condition-specific alerts that select `status="true"`.
+Alerts distinguish between confirmed problems, checks that return `Unknown`, and checks that stop updating.
 
-Checker failures use the `NPD Check Unknown` alert, which selects `status="unknown"`.
+The `NPD Check Stale` alert fires when a check stops updating:
 
-The `NPD Check Stale` alert fires when a check has not updated within:
+- Checks scheduled every minute become stale after five minutes.
+- Checks scheduled every five minutes become stale after eleven minutes.
 
-```text
-max(2 * expected interval + 60 seconds, 300 seconds)
-```
+These windows allow enough time for checks to finish during normal scheduling delays.
 
-This means:
+Dashboards use Kubernetes GPU capacity to find GPU nodes, so nodes remain visible if NPD stops reporting. Each expected vendor check is tracked separately, allowing the stale alert to detect one missing check while other checks continue to run.
 
-- A 60-second check becomes stale after 300 seconds.
-- A 300-second check becomes stale after 660 seconds.
+Command Center reports nodes as Failed, Healthy, or Unknown and includes applicable GPU and RDMA conditions in its history.
 
-The 300-second minimum accounts for timeout-heavy fast batches. At concurrency two, the configured rule timeouts have batch bounds of 195 seconds for AMD and 210 seconds for NVIDIA. The minimum leaves at least 90 seconds for process cleanup and scheduling overhead without increasing the maximum of three concurrent fast and slow checks.
-
-GPU dashboards and the stale alert use `kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}` as their GPU node inventory. This metric is independent of NPD, so a GPU node remains visible when NPD publishes no conditions or freshness metrics.
-
-The stale alert expands each AMD GPU node into 13 expected `(hostname, check)` pairs and each NVIDIA GPU node into 19 expected pairs. It compares those pairs with the published freshness metrics. A single missing check alerts even when other checks on the node continue to publish. Published metrics are also restricted to the expected vendor set, so old or test-only check metrics do not create false stale alerts.
-
-The `node_health_status` recording rule evaluates all 13 AMD or 19 NVIDIA conditions configured for the node. It records `0` for Failed, `1` for Healthy, and `2` for Unknown. A missing expected condition is Unknown, and confirmed failures take priority over Unknown. Command Center healthy node and GPU totals count only value `1`.
-
-The Command Center `Historical Cluster Node Issues` timeline tracks all 22 known GPU and RDMA condition names. This is the union of the AMD and NVIDIA custom conditions plus `NodeHasPcieErrors`. Conditions that do not apply to the cluster vendor do not create timeline series.
-
-If NPD kills a command at the outer plugin timeout, NPD can retain the previous node condition. The initial heartbeat stops updating, allowing the stale alert to detect the hung check.
+If a check hangs, its heartbeat stops and the stale alert detects it.
 
 ## Migrating from the Generic Release
 
