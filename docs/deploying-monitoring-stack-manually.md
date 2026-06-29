@@ -329,17 +329,61 @@ done
 
 ### 5.2 Deploy GPU Dashboards (if applicable)
 
+The source GPU Health dashboard contains both vendor-specific panels. Render it for the `GPU_VENDOR` selected in Step 1.3 before creating its ConfigMap. This uses the same panel filtering and stat-panel layout as Terraform.
+
 ```bash
-# Deploy each AMD/NVIDIA GPU dashboard as a ConfigMap
+# Render the vendor-specific GPU Health dashboard
+RENDERED_DASHBOARD_DIR=$(mktemp -d)
+cleanup_rendered_dashboards() {
+  rm -rf "${RENDERED_DASHBOARD_DIR}"
+}
+trap cleanup_rendered_dashboards EXIT
+
+if ! jq -e --arg vendor "${GPU_VENDOR}" '
+  .panels |= map(
+    select(
+      (.id != 7 or $vendor != "amd") and
+      (.id != 23 or $vendor != "nvidia")
+    )
+  )
+  | .panels = (
+      .panels
+      | to_entries
+      | map(
+          if .value.type == "stat" then
+            .value.gridPos.x = ((.key % 8) * 3)
+            | .value.gridPos.y = (((.key / 8) | floor) * 3)
+          else
+            .
+          end
+          | .value
+        )
+    )
+' "${DASHBOARD_PATH}/gpu/gpu-health-status.json" \
+  > "${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"; then
+  cleanup_rendered_dashboards
+  trap - EXIT
+  exit 1
+fi
+
+# Deploy each GPU dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
+  dashboard_file="${dashboard}"
+  if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
+    dashboard_file="${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"
+  fi
+
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
-    --from-file="$(basename "$dashboard")=${dashboard}" \
-    --namespace ${MONITORING_NAMESPACE} \
+    --from-file="$(basename "$dashboard")=${dashboard_file}" \
+    --namespace "${MONITORING_NAMESPACE}" \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
   kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
   kubectl apply -f -
 done
+
+cleanup_rendered_dashboards
+trap - EXIT
 ```
 
 ### 5.3 Verify Dashboards
@@ -347,7 +391,15 @@ done
 ```bash
 # List all dashboard ConfigMaps
 kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
+
+# Show the vendor-specific GPU Health panels that were deployed
+kubectl get configmap dashboard-gpu-health-status \
+  -n "${MONITORING_NAMESPACE}" -o json | \
+jq '.data["gpu-health-status.json"] | fromjson |
+  [.panels[] | select(.id == 7 or .id == 23) | {id, title}]'
 ```
+
+The result must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster.
 
 ## Step 6: Deploy Grafana Alert Rules
 
