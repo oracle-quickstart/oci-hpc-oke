@@ -94,7 +94,7 @@ resource "helm_release" "prometheus" {
   set_sensitive = var.install_grafana ? [
     {
       name  = "grafana.adminPassword"
-      value = random_password.grafana_admin_password.result
+      value = random_password.grafana_admin_password[0].result
     }
   ] : []
 }

@@ -151,7 +151,7 @@ output "grafana_url" {
 }
 
 output "grafana_admin_password" {
-  value = var.install_grafana ? nonsensitive(random_password.grafana_admin_password.result) : "N/A"
+  value = var.install_grafana ? nonsensitive(random_password.grafana_admin_password[0].result) : "N/A"
 }
 
 output "grafana_admin_username" {

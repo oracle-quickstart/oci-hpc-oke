@@ -89,6 +89,8 @@ locals {
 }
 
 resource "random_password" "grafana_admin_password" {
+  count = var.install_grafana ? 1 : 0
+
   length           = 16
   min_lower        = 1
   min_upper        = 1
