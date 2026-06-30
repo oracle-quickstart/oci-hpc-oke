@@ -51,7 +51,7 @@ path end to end; you do not need to run both.
 - Slinky Slurm is installed in the `slurm` namespace.
 - The Slurm login pod, controller, accounting pod, and GPU worker pods are
   ready.
-- At least two GPU Slurm nodes are idle in the `gpu` partition.
+- At least two GPU Slurm nodes are idle in the selected GPU partition.
 - A regular Slurm user exists and has a SlurmDBD association for the account
   used to submit the job. See
   [Slurm User Onboarding](./slurm-operator-user-onboarding.md).
@@ -100,10 +100,18 @@ the cluster is deployed (`slinky_worker_network_mode`, which is forced to
   `mlx5_*`, so `NCCL_IB_HCA=mlx5` matches them all, and the bootstrap/control
   plane runs over the pod overlay interface `eth0`.
 
-Check which mode your cluster's GPU workers use:
+The standard GPU worker pool defaults to partition `gpu` and NodeSet
+`slurm-worker-gpu`. The GPU with RDMA worker pool defaults to partition `rdma`
+and NodeSet `slurm-worker-rdma`. These names are configurable. List the
+deployed NodeSets, select the one that contains the GPU workers, and check its
+network mode:
 
 ```bash
-kubectl -n slurm get nodeset slurm-worker-gpu \
+kubectl -n slurm get nodesets
+
+export SLURM_NODESET=slurm-worker-rdma
+
+kubectl -n slurm get nodeset "$SLURM_NODESET" \
   -o jsonpath='{.spec.template.spec.hostNetwork}{"\n"}'
 # true        -> hostNetwork
 # false/empty -> SR-IOV VFs
@@ -137,7 +145,10 @@ Run these commands after SSHing to the login pod as the Slurm user, for example
 
 ```bash
 export SLURM_ACCOUNT=users
-export SLURM_PARTITION=gpu
+
+# Select the partition that reports GPU GRES. Common values are gpu and rdma.
+sinfo -h -o '%P|%G|%f'
+export SLURM_PARTITION=rdma
 
 export NCCL_NODES=2
 export GPUS_PER_NODE=8
@@ -274,7 +285,7 @@ case "${shape}" in
       -x NCCL_IB_GID_INDEX=3 \
       -x NCCL_ALGO=Ring \
       -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
-      "${EXEC_CMD}" -b 1G -e 10G -i $((1024*1024*1024*9)) -n 100 ;;
+      "${EXEC_CMD}" -b 1G -e 8G -f 2 -g 1 -n 100 ;;
   BM.GPU.H100.8|BM.GPU.H200.8|BM.GPU.B200.8|BM.GPU.B300.8)
     mpirun --mca pml ucx \
       --bind-to numa \
@@ -402,7 +413,11 @@ export WORKER_CONTAINER=slurmd
 
 export SLURM_USER=alice
 export SLURM_ACCOUNT=users
-export SLURM_PARTITION=gpu
+
+# Standard GPU pool: gpu / slurm-worker-gpu
+# GPU with RDMA pool: rdma / slurm-worker-rdma
+export SLURM_PARTITION=rdma
+export SLURM_NODESET=slurm-worker-rdma
 
 export NCCL_NODES=2
 export GPUS_PER_NODE=8
@@ -415,7 +430,7 @@ export LOGIN_POD="$(
 
 export GPU_WORKER_POD="$(
   kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/instance=slurm-worker-gpu \
+    -l app.kubernetes.io/instance="$SLURM_NODESET" \
     -o jsonpath='{.items[0].metadata.name}'
 )"
 ```
@@ -425,6 +440,11 @@ export GPU_WORKER_POD="$(
 Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
 
 ```bash
+kubectl -n "$SLURM_NAMESPACE" get nodesets
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sinfo -h -o '%P|%G|%f'
+
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   sinfo -Nel
 
@@ -584,7 +604,7 @@ case "${shape}" in
       -x NCCL_IB_GID_INDEX=3 \
       -x NCCL_ALGO=Ring \
       -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
-      "${EXEC_CMD}" -b 1G -e 10G -i $((1024*1024*1024*9)) -n 100 ;;
+      "${EXEC_CMD}" -b 1G -e 8G -f 2 -g 1 -n 100 ;;
   BM.GPU.H100.8|BM.GPU.H200.8|BM.GPU.B200.8|BM.GPU.B300.8)
     mpirun --mca pml ucx \
       --bind-to numa \
@@ -701,8 +721,9 @@ A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 
 ### Example Output
 
-This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks
-(avg bus bandwidth ~186 GB/s). Some `NCCL WARN NET/MLX5` /
+This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks.
+At 8 GiB, the out-of-place and in-place bus bandwidth results are 189.60 GB/s
+and 189.50 GB/s. Some `NCCL WARN NET/MLX5` /
 `Spectrum-X (SPCX)` warnings may appear before the table; the successful result
 is the final bandwidth table with `#wrong` equal to `0` and the collective
 conclusion line.
@@ -715,7 +736,7 @@ SLURM_NTASKS=16
 EXEC_CMD=/opt/nccl-tests/bin/all_reduce_perf
 # nccl-tests version 2.17.9 nccl-headers=22903 nccl-library=22903
 # Collective test starting: all_reduce_perf
-# nThread 1 nGpus 1 minBytes 1073741824 maxBytes 10737418240 step: 9663676416(bytes) warmup iters: 1 iters: 100 agg iters: 1 validation: 1 graph: 0
+# nThread 1 nGpus 1 minBytes 1073741824 maxBytes 8589934592 step: 2(factor) warmup iters: 1 iters: 100 agg iters: 1 validation: 1 graph: 0
 #
 # Using devices
 #  Rank  0 Group  0 Pid   2574 on oke-chfmqtu3dcq-nfgm3eqopla-sc7rl5e2tga-0 device  0 [0000:0f:00] NVIDIA A100-SXM4-40GB
@@ -727,10 +748,11 @@ NCCL version 2.29.3+cuda13.1
 #                                                              out-of-place                       in-place
 #       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
 #        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
-  1073741824     268435456     float     sum      -1  10920.1   98.33  184.36       0  10940.7   98.14  184.02       0
- 10737418240    2684354560     float     sum      -1   106972  100.38  188.21       0   106854  100.49  188.41       0
+  1073741824     268435456     float     sum      -1  10887.4   98.62  184.92       0  10867.5   98.80  185.26       0
+  2147483648     536870912     float     sum      -1  21511.7   99.83  187.18       0  21534.0   99.73  186.99       0
+  4294967296    1073741824     float     sum      -1  42747.7  100.47  188.39       0  42707.6  100.57  188.56       0
+  8589934592    2147483648     float     sum      -1  84948.7  101.12  189.60       0  84992.3  101.07  189.50       0
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 186.25
 #
 # Collective test concluded: all_reduce_perf
 ```
@@ -746,7 +768,8 @@ and the image's `97-oke-nvidia-mounts.sh` Enroot hook injects the GPU driver
 userland.
 
 Validated on two `BM.GPU.B4.8` nodes (16 ranks) with a plain `ubuntu:24.04`
-container at ~187 GB/s avg bus bandwidth, at parity with the native run above.
+container at approximately 187 GB/s bus bandwidth at 8 GiB, at parity with the
+native run above.
 
 Key points:
 
@@ -765,7 +788,7 @@ Key points:
   `rdma0`-`rdma15` interfaces, which do not route TCP between nodes.
 
 From inside the login pod, write the job and submit it with
-`sbatch --partition=gpu --account=<account>`:
+`sbatch --partition="$SLURM_PARTITION" --account="$SLURM_ACCOUNT"`:
 
 ```bash
 cat > "$HOME/nccl-pyxis.sh" <<'EOF'
@@ -816,17 +839,20 @@ srun --mpi=pmix --export=ALL \
   --container-image="$CONTAINER_IMAGE" \
   --container-name=nccl \
   --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS" \
-  /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 4G -c 1
+  /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 8G -c 1
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
 
-sbatch --partition=gpu --account=users "$HOME/nccl-pyxis.sh"
+sbatch \
+  --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/nccl-pyxis.sh"
 ```
 
 The first run imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
-on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0` and reports
-an avg bus bandwidth close to the native run. For another NVIDIA shape, replace
-the `NCCL_IB_HCA` list (see
+on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0`. Compare its
+8 GiB bus bandwidth with the native run. For another NVIDIA shape, replace the
+`NCCL_IB_HCA` list (see
 [Create the Slurm Batch Script](#create-the-slurm-batch-script)).
 
 #### Running Pyxis over SR-IOV VFs
@@ -897,11 +923,15 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
 
-sbatch --partition=gpu --account=users "$HOME/nccl-pyxis.sh"
+sbatch \
+  --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/nccl-pyxis.sh"
 ```
 
 Validated on two `BM.GPU.B4.8` VF nodes (16 ranks) with `ubuntu:24.04` at
-~189 GB/s bus bandwidth (8 GiB), at parity with the hostNetwork Pyxis run.
+approximately 189 GB/s bus bandwidth at 8 GiB, at parity with the hostNetwork
+Pyxis run.
 
 ## RCCL Tests (AMD GPU shapes)
 
@@ -927,7 +957,10 @@ Run these commands after SSHing to the login pod as the Slurm user, for example
 
 ```bash
 export SLURM_ACCOUNT=users
-export SLURM_PARTITION=gpu
+
+# Select the partition that reports GPU GRES. Common values are gpu and rdma.
+sinfo -h -o '%P|%G|%f'
+export SLURM_PARTITION=rdma
 
 export RCCL_NODES=2
 export GPUS_PER_NODE=8
@@ -1122,8 +1155,8 @@ EOF
 chmod 755 "$HOME/rccl-slurm.sh"
 ```
 
-Validated on two `BM.GPU.MI300X.8` VF nodes (16 ranks) at ~356 GB/s bus
-bandwidth (8 GiB), at parity with the hostNetwork run.
+Validated on two `BM.GPU.MI300X.8` VF nodes (16 ranks) at approximately
+356 GB/s bus bandwidth at 8 GiB, at parity with the hostNetwork run.
 
 #### Submit the Job
 
@@ -1163,7 +1196,11 @@ export WORKER_CONTAINER=slurmd
 
 export SLURM_USER=alice
 export SLURM_ACCOUNT=users
-export SLURM_PARTITION=gpu
+
+# Standard GPU pool: gpu / slurm-worker-gpu
+# GPU with RDMA pool: rdma / slurm-worker-rdma
+export SLURM_PARTITION=rdma
+export SLURM_NODESET=slurm-worker-rdma
 
 export RCCL_NODES=2
 export GPUS_PER_NODE=8
@@ -1176,7 +1213,7 @@ export LOGIN_POD="$(
 
 export GPU_WORKER_POD="$(
   kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/instance=slurm-worker-gpu \
+    -l app.kubernetes.io/instance="$SLURM_NODESET" \
     -o jsonpath='{.items[0].metadata.name}'
 )"
 ```
@@ -1186,6 +1223,11 @@ export GPU_WORKER_POD="$(
 Check that Slurm sees the GPU nodes and that they advertise GPU GRES.
 
 ```bash
+kubectl -n "$SLURM_NAMESPACE" get nodesets
+
+kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
+  sinfo -h -o '%P|%G|%f'
+
 kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
   sinfo -Nel
 
@@ -1428,7 +1470,8 @@ A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 ### Example Output
 
 This is representative output from a two-node `BM.GPU.MI300X.8` run with 16
-ranks (avg bus bandwidth ~355 GB/s):
+ranks. At 8 GiB, the out-of-place and in-place bus bandwidth results are
+357.04 GB/s and 356.87 GB/s.
 
 ```text
 SLURM_JOB_NODELIST=inst-aq8lt-oke-rdma,inst-ao2dl-oke-rdma
@@ -1454,7 +1497,6 @@ rccl-tests: Version develop:a52452e
   8589934592    2147483648     float     sum      -1    45110  190.42  357.04      0    45132  190.33  356.87      0
  17179869184    4294967296     float     sum      -1    89885  191.13  358.37      0    89917  191.06  358.24      0
 # Out of bounds values : 0 OK
-# Avg bus bandwidth    : 354.659
 #
 # Collective test concluded: all_reduce_perf
 ```
@@ -1473,7 +1515,8 @@ that image `srun` accepts `--container-image`, `--container-name`, and
 `--container-mounts`.
 
 Validated on two `BM.GPU.MI300X.8` nodes (16 ranks) with the self-contained
-`rccl-tests` image at ~354 GB/s, at parity with the native run above.
+`rccl-tests` image at approximately 357 GB/s bus bandwidth at 8 GiB, at parity
+with the native run above.
 
 Key points:
 
@@ -1493,7 +1536,7 @@ Key points:
   first run per node) and then runs.
 
 From inside the login pod, write the job and submit it with
-`sbatch --partition=gpu --account=<account>`:
+`sbatch --partition="$SLURM_PARTITION" --account="$SLURM_ACCOUNT"`:
 
 ```bash
 cat > "$HOME/rccl-pyxis.sh" <<'EOF'
@@ -1539,7 +1582,10 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/rccl-pyxis.sh"
 
-sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
+sbatch \
+  --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/rccl-pyxis.sh"
 ```
 
 #### Running Pyxis over SR-IOV VFs
@@ -1606,12 +1652,15 @@ srun --mpi=pmix --export=ALL \
 EOF
 chmod 755 "$HOME/rccl-pyxis.sh"
 
-sbatch --partition=gpu --account=users "$HOME/rccl-pyxis.sh"
+sbatch \
+  --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/rccl-pyxis.sh"
 ```
 
 Validated on two `BM.GPU.MI300X.8` VF nodes (16 ranks) with the self-contained
-`rccl-tests` image at ~356 GB/s bus bandwidth (8 GiB), at parity with the
-hostNetwork Pyxis run.
+`rccl-tests` image at approximately 356 GB/s bus bandwidth at 8 GiB, at parity
+with the hostNetwork Pyxis run.
 
 ## Troubleshooting
 
