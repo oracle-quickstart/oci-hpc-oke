@@ -684,7 +684,7 @@ resource "null_resource" "slinky_mariadb_via_operator" {
       "export OCI_CLI_AUTH=instance_principal",
       "kubectl create namespace ${var.slinky_slurm_namespace} --dry-run=client -o yaml | kubectl apply -f -",
       "kubectl apply -f ${local.slinky_workdir}/mariadb.yaml",
-      "kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready pod/mariadb-0 --timeout=600s",
+      "kubectl -n ${var.slinky_slurm_namespace} wait --for=condition=Ready mariadb/mariadb --timeout=600s",
     ]
   }
 

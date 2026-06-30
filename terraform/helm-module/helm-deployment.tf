@@ -2,8 +2,8 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  operator_helm_values_path = coalesce(var.operator_helm_values_path, "/home/${var.operator_user}/tf-helm-values")
-  operator_helm_charts_path = coalesce(var.operator_helm_charts_path, "/home/${var.operator_user}/tf-helm-charts")
+  operator_helm_values_path = coalesce(var.operator_helm_values_path, "/home/${var.operator_user}/.oci-hpc-oke/tf-helm-values")
+  operator_helm_charts_path = coalesce(var.operator_helm_charts_path, "/home/${var.operator_user}/.oci-hpc-oke/tf-helm-charts")
   operator_helm_chart_path  = "${local.operator_helm_charts_path}/${var.namespace}-${var.deployment_name}-${basename(var.helm_chart_path)}"
 
   helm_values_override_user_file     = "${var.namespace}-${var.deployment_name}-user-values-override.yaml"
