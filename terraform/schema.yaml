@@ -69,6 +69,8 @@ variableGroups:
       # Workers
       - legacy_imds_endpoints_disabled
       - disable_gpu_device_plugin
+      # Operator
+      - operator_allow_image_drift
 
   - title: "Identity"
     variables:
@@ -183,6 +185,7 @@ variableGroups:
       - install_oci_hpc_oke_utils
       - install_kueue
       - install_mpi_operator
+      - deploy_nccl_rccl_param_configmap
       - install_nvidia_dra_driver
 
   - title: "Worker Pool: System"
@@ -2370,6 +2373,16 @@ variables:
     description: Install MPI Operator for running MPIJob workloads.
     type: boolean
     default: true
+
+  deploy_nccl_rccl_param_configmap:
+    title: Create NCCL/RCCL parameters ConfigMaps
+    description: Create a shape-specific ConfigMap with the recommended NCCL/RCCL parameters for each enabled RDMA or GMC GPU shape. Names use oci-nccl-parameters-<shape> for NVIDIA and oci-rccl-parameters-<shape> for AMD, with the shape converted to lowercase and dots replaced by hyphens. NCCL_IB_HCA is set to 'mlx5' when SR-IOV virtual functions are enabled, otherwise the shape's full device list.
+    type: boolean
+    default: true
+    visible:
+      or:
+        - worker_rdma_enabled
+        - worker_gmc_enabled
 
   # NVIDIA DRA Driver
   install_nvidia_dra_driver:

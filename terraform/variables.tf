@@ -344,6 +344,12 @@ variable "install_mpi_operator" {
   description = "Install MPI Operator for running MPIJob workloads."
 }
 
+variable "deploy_nccl_rccl_param_configmap" {
+  default     = true
+  type        = bool
+  description = "Create a shape-specific ConfigMap in the default namespace with the recommended NCCL/RCCL parameters for each enabled RDMA or GMC GPU shape. Names use oci-nccl-parameters-<shape> for NVIDIA and oci-rccl-parameters-<shape> for AMD, with the shape converted to lowercase and dots replaced by hyphens. NCCL_IB_HCA is set to 'mlx5' when SR-IOV virtual functions are enabled via the network operator for that shape, otherwise the shape's full device list."
+}
+
 variable "install_nvidia_dra_driver" {
   default     = true
   type        = bool

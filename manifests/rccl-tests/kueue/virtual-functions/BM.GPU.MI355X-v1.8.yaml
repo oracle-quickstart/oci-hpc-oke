@@ -90,7 +90,7 @@ spec:
                 -x IB_RX_QUEUE_LEN=8192 \
                 -x coll_hcoll_enable=0 \
                 -x HCOLL_ENABLE_MCAST_ALL=0 \
-                -x NCCL_MIN_CHANNEL=32 \
+                -x NCCL_MIN_NCHANNELS=32 \
                 -x NCCL_IB_QPS_PER_CONNECTION=1 \
                 -x NCCL_SOCKET_IFNAME=eth0 \
                 -x NCCL_IB_SL=0 \
