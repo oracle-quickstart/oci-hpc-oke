@@ -80,12 +80,12 @@ locals {
     (f != "npd-delete-nvidia-alerts.yaml" || (local.grafana_has_amd_gpu && !local.grafana_has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.grafana_has_nvidia_gpu && !local.grafana_has_amd_gpu))
   ]
-  grafana_alerts = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_alerting) ? {
+  grafana_alerts = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? {
     for f in local.grafana_alert_files_filtered :
     f => file(join("/", [local.grafana_alert_dir, f]))
   } : {}
 
-  grafana_alert_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_alerting) ? [for f in local.grafana_alert_files_filtered : join("/", ["${local.grafana_alert_dir}", f])] : []
+  grafana_alert_files_path = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? [for f in local.grafana_alert_files_filtered : join("/", ["${local.grafana_alert_dir}", f])] : []
 }
 
 resource "random_password" "grafana_admin_password" {
