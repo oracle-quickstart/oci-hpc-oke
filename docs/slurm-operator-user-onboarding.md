@@ -27,8 +27,8 @@ node or another shell with `kubectl` access to the cluster.
 curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/slurm-add-user.sh
 chmod +x slurm-add-user.sh
 
-# create user "alice" with the given public key, in the default "users" account
-./slurm-add-user.sh alice --ssh-key-file ~/keys/alice.pub
+# create user "alice" with a sample public key, in the default "users" account
+./slurm-add-user.sh alice --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMfyLyppRwwk+pRIk/ZBKbh03o16dQ8KmCbYi1rNiP5l alice@example.com"
 ```
 
 The only required inputs are the `<username>` and one SSH key source
