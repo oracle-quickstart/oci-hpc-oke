@@ -181,7 +181,7 @@ Check the releases and DaemonSets:
 helm list -n monitoring | grep node-problem-detector
 kubectl get daemonset -n monitoring | grep node-problem-detector
 kubectl get pods -n monitoring \
-  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o wide
 ```
 
@@ -189,7 +189,7 @@ Check the image and pulled digest:
 
 ```bash
 kubectl get pods -n monitoring \
-  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o json | jq -r '.items[] |
     [.metadata.name, .spec.nodeName, .spec.containers[0].image,
      .status.containerStatuses[0].imageID] | @tsv'
@@ -210,7 +210,7 @@ Show GPU and RDMA health conditions in a compact form:
 ```bash
 kubectl get node <node-name> -o json | jq -r '
   .status.conditions[]
-  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
+  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
   | [.type, .status, .reason, .message, .lastTransitionTime]
   | @tsv'
 ```
@@ -235,7 +235,7 @@ Interpret the status as follows:
 kubectl get nodes -o json | jq -r '
   .items[] as $node
   | $node.status.conditions[]
-  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
+  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
   | select(.status == "True" or .status == "Unknown")
   | [$node.metadata.name, $node.spec.providerID,
      $node.metadata.labels["oci.oraclecloud.com/host.serial_number"],

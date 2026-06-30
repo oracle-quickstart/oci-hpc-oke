@@ -83,6 +83,7 @@ kubectl create namespace monitoring
 
 ```bash
 export MONITORING_NAMESPACE="monitoring"
+export PROMETHEUS_STACK_CHART_VERSION="87.2.1"
 
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"
@@ -122,10 +123,13 @@ echo "Grafana admin password: ${GRAFANA_ADMIN_PASSWORD}"
 
 ### 2.2 Install kube-prometheus-stack
 
-The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by removing the Terraform conditional markers:
+The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, then removing the Terraform conditional markers:
 
 ```bash
-sed -e '/^%{ if /d' -e '/^%{ endif }/d' \
+sed -e 's/${install_grafana}/true/' \
+  -e 's/${setup_alerting}/true/' \
+  -e '/^%{ if /d' \
+  -e '/^%{ endif }/d' \
   terraform/files/kube-prometheus/values.yaml.tftpl \
   > /tmp/kube-prometheus-values.yaml
 ```
@@ -135,6 +139,7 @@ Validate the generated YAML:
 ```bash
 helm template kube-prometheus-stack \
   prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
   --namespace ${MONITORING_NAMESPACE} \
   --values /tmp/kube-prometheus-values.yaml \
   --set grafana.adminPassword="${GRAFANA_ADMIN_PASSWORD}" \
@@ -143,6 +148,7 @@ helm template kube-prometheus-stack \
 
 ```bash
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
   --namespace ${MONITORING_NAMESPACE} \
   --values /tmp/kube-prometheus-values.yaml \
   --set grafana.adminPassword="${GRAFANA_ADMIN_PASSWORD}" \
@@ -200,7 +206,7 @@ kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-mo
 
 ```bash
 # Verify ServiceMonitor is created
-kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
+kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter-oke
 
 # Check DCGM exporter pods are running (deployed by NVIDIA GPU Operator)
 kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
@@ -290,14 +296,14 @@ The base values contain the protected wrapper, image, logs, and freshness metric
 ```bash
 # Check if node problem detector pods are running
 kubectl get pods -n ${MONITORING_NAMESPACE} \
-  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)'
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)'
 
 # Check metrics endpoint
 kubectl get servicemonitor -n ${MONITORING_NAMESPACE} | grep node-problem-detector
 
 # Confirm the pulled image and digest
 kubectl get pods -n ${MONITORING_NAMESPACE} \
-  -l 'app.kubernetes.io/name in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
   -o json | jq -r '.items[] |
     [.metadata.name, .spec.nodeName, .spec.containers[0].image,
      .status.containerStatuses[0].imageID] | @tsv'
@@ -402,6 +408,8 @@ jq '.data["gpu-health-status.json"] | fromjson |
 The result must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster.
 
 ## Step 6: Deploy Grafana Alert Rules
+
+This step does not require the custom dashboards from Step 5. You can deploy alert rules when dashboard installation is skipped.
 
 The repository includes alert rules for:
 - GPU ECC errors
@@ -789,7 +797,11 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 3. Create a ClusterIssuer for Let's Encrypt.
 
    ```bash
-   kubectl apply -f terraform/files/cert-manager/cluster-issuer.yaml
+   export ACME_EMAIL="you@example.com"
+
+   sed "s|oke-hpc-stack-\${state}@oracle.com|${ACME_EMAIL}|" \
+     terraform/files/cert-manager/cluster-issuer-prod.yaml | \
+   kubectl apply -f -
    ```
 
 4. Get the public IP address of the LoadBalancer associated with the Contour Ingress Controller.
@@ -802,15 +814,16 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
    ```bash
    helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-   --namespace ${MONITORING_NAMESPACE} \
-   --reuse-values \
-   --set grafana.ingress.enabled=true \
-   --set grafana.ingress.ingressClassName=contour \
-   --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
-   --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
-   --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
-   --set grafana.ingress.tls[0].secretName=grafana-tls \
-   --wait
+     --version "${PROMETHEUS_STACK_CHART_VERSION}" \
+     --namespace ${MONITORING_NAMESPACE} \
+     --reuse-values \
+     --set grafana.ingress.enabled=true \
+     --set grafana.ingress.ingressClassName=contour \
+     --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
+     --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
+     --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
+     --set grafana.ingress.tls[0].secretName=grafana-tls \
+     --wait
    ```
 
 6. Confirm the ingress resource was created.
@@ -932,13 +945,14 @@ Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingr
 helm repo update
 
 helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
   --namespace ${MONITORING_NAMESPACE} \
   --values /tmp/kube-prometheus-values.yaml \
   --reuse-values \
   --wait
 ```
 
-To pin a chart version, list the versions available from the configured repository, set `PROMETHEUS_STACK_CHART_VERSION`, and add `--version "${PROMETHEUS_STACK_CHART_VERSION}"` to the upgrade command:
+To select another chart version, list the versions available from the configured repository and update `PROMETHEUS_STACK_CHART_VERSION`:
 
 ```bash
 helm search repo prometheus-community/kube-prometheus-stack --versions
@@ -1120,7 +1134,7 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 
 2. Check if ServiceMonitor exists:
    ```bash
-   kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
+   kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter-oke
    ```
 
 3. Verify GPU nodes have the label:
@@ -1276,7 +1290,7 @@ helm uninstall gpu-rdma-node-problem-detector-amd -n ${MONITORING_NAMESPACE}
 helm uninstall gpu-rdma-node-problem-detector-nvidia -n ${MONITORING_NAMESPACE}
 
 # Delete DCGM Exporter ServiceMonitor (if deployed)
-kubectl delete servicemonitor nvidia-dcgm-exporter -n gpu-operator --ignore-not-found
+kubectl delete servicemonitor nvidia-dcgm-exporter-oke -n gpu-operator --ignore-not-found
 
 # Uninstall AMD Device Metrics Exporter (if deployed)
 helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}
@@ -1293,8 +1307,8 @@ helm uninstall kube-prometheus-stack -n ${MONITORING_NAMESPACE}
 # Delete contour Ingress Controller (if deployed)
 helm uninstall contour -n projectcontour
 
-# Delete the Cluster Issuer
-kubectl delete -f terraform/files/cert-manager/cluster-issuer.yaml
+# Delete the ClusterIssuer
+kubectl delete clusterissuer le-clusterissuer --ignore-not-found
 
 # Delete cert-manager (OCI CLI is required)
 oci ce cluster disable-addon --addon-name CertManager --cluster-id "<oke-cluster-ocid>" --is-remove-existing-add-on true --force
