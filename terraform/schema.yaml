@@ -2400,7 +2400,7 @@ variables:
     title: Use hostnames instead of IP addresses as OKE worker node names
     description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Enable this for Slurm deployments so Slurm node names are stable hostnames instead of private IP addresses.
     type: boolean
-    default: true
+    default: ${install_slinky}
     visible:
       and:
         - ${install_slinky}
