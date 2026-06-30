@@ -139,11 +139,11 @@ output "worker_rdma_pool_id" { value = lookup(module.oke.worker_pool_ids, "oke-r
 
 # Monitoring
 output "grafana_fetch_endpoint_command" {
-  value = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? format("kubectl get ingress -n %v -l app.kubernetes.io/instance=kube-prometheus-stack -o jsonpath='{.items[0].spec.rules[0].host}'", var.monitoring_namespace) : format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'", var.monitoring_namespace)
+  value = var.install_grafana ? (alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? format("kubectl get ingress -n %v -l app.kubernetes.io/instance=kube-prometheus-stack -o jsonpath='{.items[0].spec.rules[0].host}'", var.monitoring_namespace) : format("kubectl get svc -n %v -l app.kubernetes.io/instance=kube-prometheus-stack,app.kubernetes.io/name=grafana -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}'", var.monitoring_namespace)) : "N/A"
 }
 
 output "grafana_url" {
-  value = var.install_node_problem_detector_kube_prometheus_stack ? (
+  value = var.install_node_problem_detector_kube_prometheus_stack && var.install_grafana ? (
     var.preferred_kubernetes_services == "public" ?
     format("https://grafana.%s.%s", try(data.kubernetes_service_v1.ingress_lb[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], "N/A")), var.wildcard_dns_domain) :
     format("http://%s", try(data.kubernetes_service_v1.grafana_internal_ip[0].status[0].load_balancer[0].ingress[0].ip, try(data.oci_load_balancer_load_balancers.lbs[0].load_balancers[0].ip_addresses[0], try(data.oci_load_balancer_load_balancers.internal_lbs[0].load_balancers[0].ip_addresses[0], "N/A"))))
@@ -151,11 +151,11 @@ output "grafana_url" {
 }
 
 output "grafana_admin_password" {
-  value = nonsensitive(random_password.grafana_admin_password.result)
+  value = var.install_grafana ? nonsensitive(random_password.grafana_admin_password.result) : "N/A"
 }
 
 output "grafana_admin_username" {
-  value = "admin"
+  value = var.install_grafana ? "admin" : "N/A"
 }
 
 output "slinky_login_fetch_ip_command" {
@@ -167,7 +167,7 @@ output "prom_server_port_forward" {
 }
 
 output "grafana_port_forward" {
-  value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-grafana 3000:80", var.monitoring_namespace)
+  value = var.install_grafana ? format("kubectl port-forward -n %v svc/kube-prometheus-stack-grafana 3000:80", var.monitoring_namespace) : "N/A"
 }
 
 output "access_k8s_public_endpoint" {

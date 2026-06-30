@@ -7,19 +7,23 @@ resource "helm_release" "prometheus" {
     helm_release.ingress,
     time_sleep.wait_for_ingress_lb
   ]
-  namespace         = var.monitoring_namespace
-  name              = "kube-prometheus-stack"
-  chart             = "kube-prometheus-stack"
-  repository        = "https://prometheus-community.github.io/helm-charts"
-  version           = var.prometheus_stack_chart_version
-  values            = ["${templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services })}"]
+  namespace  = var.monitoring_namespace
+  name       = "kube-prometheus-stack"
+  chart      = "kube-prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  version    = var.prometheus_stack_chart_version
+  values = [templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
+    install_grafana               = var.install_grafana
+    preferred_kubernetes_services = var.preferred_kubernetes_services
+    setup_alerting                = var.setup_alerting
+  })]
   create_namespace  = true
   recreate_pods     = false
   force_update      = true
   dependency_update = true
   wait              = true
   max_history       = 1
-  set = var.preferred_kubernetes_services == "public" ? [
+  set = var.install_grafana ? (var.preferred_kubernetes_services == "public" ? [
     {
       name  = "grafana.ingress.enabled",
       value = "true"
@@ -86,29 +90,29 @@ resource "helm_release" "prometheus" {
       name  = "grafana.service.annotations.oci\\.oraclecloud\\.com\\/oci-network-security-groups"
       value = "${module.oke.int_lb_nsg_id}"
     }
-  ]
-  set_sensitive = [
+  ]) : []
+  set_sensitive = var.install_grafana ? [
     {
       name  = "grafana.adminPassword"
       value = random_password.grafana_admin_password.result
     }
-  ]
+  ] : []
 }
 
 resource "time_sleep" "wait_for_lb_termination" {
-  count            = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count            = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   destroy_duration = "60s"
 }
 
 resource "time_sleep" "wait_for_lb_provisioning" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services != "public"]) ? 1 : 0
+  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.preferred_kubernetes_services != "public"]) ? 1 : 0
 
   depends_on      = [helm_release.prometheus]
   create_duration = "60s"
 }
 
 data "kubernetes_service_v1" "grafana_internal_ip" {
-  count = alltrue([anytrue([local.deploy_from_orm, local.deploy_from_local]), var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services != "public"]) ? 1 : 0
+  count = alltrue([anytrue([local.deploy_from_orm, local.deploy_from_local]), var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.preferred_kubernetes_services != "public"]) ? 1 : 0
 
   depends_on = [time_sleep.wait_for_lb_provisioning]
 

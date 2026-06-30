@@ -62,7 +62,7 @@ module "certmanager" {
 }
 
 module "ingress" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.preferred_kubernetes_services == "public"]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -123,12 +123,16 @@ module "kube_prometheus_stack" {
   helm_repository_url = "https://prometheus-community.github.io/helm-charts"
   helm_chart_version  = var.prometheus_stack_chart_version
 
-  pre_deployment_commands = [
-    "export PATH=$PATH:/home/${local.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal",
-    "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
-    "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
-  ]
+  pre_deployment_commands = flatten([
+    [
+      "export PATH=$PATH:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+    ],
+    var.install_grafana && var.preferred_kubernetes_services == "public" ? [
+      "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
+      "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
+    ] : []
+  ])
 
   deployment_extra_args = flatten([
     [
@@ -137,7 +141,7 @@ module "kube_prometheus_stack" {
       "--history-max 1",
       "--wait",
     ],
-    var.preferred_kubernetes_services == "public" ? [
+    var.install_grafana ? (var.preferred_kubernetes_services == "public" ? [
       "--set grafana.ingress.enabled=true",
       "--set grafana.ingress.ingressClassName=contour",
       "--set-string grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
@@ -145,24 +149,28 @@ module "kube_prometheus_stack" {
       "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"
-    ] :
-    [
-      "--set grafana.service.type=LoadBalancer",
-      "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape'=flexible",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
-      format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", module.oke.int_lb_nsg_id)
-    ]
+      ] :
+      [
+        "--set grafana.service.type=LoadBalancer",
+        "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape'=flexible",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
+        format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", module.oke.int_lb_nsg_id)
+    ]) : []
   ])
 
   post_deployment_commands = []
 
-  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services })
+  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
+    install_grafana               = var.install_grafana
+    preferred_kubernetes_services = var.preferred_kubernetes_services
+    setup_alerting                = var.setup_alerting
+  })
 
-  helm_user_values_override = yamlencode(
+  helm_user_values_override = var.install_grafana ? yamlencode(
     {
       grafana = merge(
         {
@@ -177,7 +185,7 @@ module "kube_prometheus_stack" {
           }
       } : {})
     }
-  )
+  ) : ""
   depends_on = [module.ingress]
 }
 
@@ -339,7 +347,7 @@ module "amd_device_metrics_exporter" {
 
 
 module "oke-ons-webhook" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_alerting]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.setup_alerting]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
