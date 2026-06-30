@@ -723,10 +723,7 @@ A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 
 This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks.
 At 8 GiB, the out-of-place and in-place bus bandwidth results are 189.60 GB/s
-and 189.50 GB/s. Some `NCCL WARN NET/MLX5` /
-`Spectrum-X (SPCX)` warnings may appear before the table; the successful result
-is the final bandwidth table with `#wrong` equal to `0` and the collective
-conclusion line.
+and 189.50 GB/s.
 
 ```text
 shape=BM.GPU.B4.8
