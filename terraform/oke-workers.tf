@@ -26,7 +26,7 @@ locals {
   worker_gmc_gpu_memory_fabric_ids = compact([
     for id in split("\n", trimspace(var.worker_gmc_gpu_memory_fabric_ids)) : trimspace(id)
   ])
-  hostname_override_effective = coalesce(var.hostname_override, var.install_slinky)
+  hostname_override_effective = coalesce(var.hostname_override, false)
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
