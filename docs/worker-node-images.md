@@ -5,6 +5,9 @@
 
 You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/imageimportexport.htm#Importing) for importing the images below to your tenancy.
 
+> [!TIP]
+> This list is also available in machine-readable form in [worker-node-images.json](./worker-node-images.json) for automating image version checks. The JSON is updated together with this page. Use the `name` field to detect new images: the `url` values are download links that can change over time.
+
 ## VM.GPU.A10.1, VM.GPU.A10.2, BM.GPU.A10.4, BM.GPU4.8, BM.GPU.B4.8, BM.GPU.A100-v2.8, BM.GPU.L40S.4, BM.GPU.H100.8, BM.GPU.H200.8, BM.GPU.B200.8, BM.GPU.B300.8
 
 ### Ubuntu 24.04
