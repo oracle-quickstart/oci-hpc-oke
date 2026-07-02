@@ -2440,7 +2440,7 @@ variables:
       - 25.11.6-ubuntu24.04
       - 26.05-ubuntu24.04
       - 26.05.1-ubuntu26.04
-    default: "25.11.6-ubuntu24.04"
+    default: "26.05.1-ubuntu26.04"
     visible:
       and:
         - ${install_slinky}

@@ -67,18 +67,21 @@ locals {
       amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
-      operator_chart_version      = "1.2.0"
-      slurm_chart_version         = "1.2.0"
-      accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
-      accounting_image_tag        = "26.05-ubuntu24.04"
-      restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
-      restapi_image_tag           = "26.05-ubuntu24.04"
-      sssd_image_repository       = "ghcr.io/slinkyproject/login"
-      sssd_image_tag              = "26.05-ubuntu24.04"
-      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
-      login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
-      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
-      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-16.1"
+      operator_chart_version = "1.2.0"
+      slurm_chart_version    = "1.2.0"
+      # Whole stack rebuilt from the latest SlinkyProject/containers source
+      # into our registry (see slurm-source/README.md for the pinned ref),
+      # same one-registry layout as the 25.11.6 profile.
+      accounting_image_repository = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      accounting_image_tag        = "slurmdbd-26.05.1-ubuntu26.04-2026-07-02.0"
+      restapi_image_repository    = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      restapi_image_tag           = "slurmrestd-26.05.1-ubuntu26.04-2026-07-02.0"
+      sssd_image_repository       = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      sssd_image_tag              = "login-26.05.1-ubuntu26.04-2026-07-02.0"
+      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-07-02.0"
+      login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
+      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-07-02.0"
     }
   }
 

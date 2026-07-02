@@ -31,13 +31,13 @@ set -euo pipefail
 
 registry="${REGISTRY:-iad.ocir.io/idxzjcdglx2s/slurm-operator}"
 operator_registry="${OPERATOR_REGISTRY:-iad.ocir.io/idxzjcdglx2s}"
-build_version="${BUILD_VERSION:-2026-06-19.0}"
+build_version="${BUILD_VERSION:-2026-07-02.0}"
 builder="${BUILDER:-multiarch-builder}"
 platforms="${PLATFORMS:-linux/amd64,linux/arm64}"
 
-slurm_version="${SLURM_VERSION:-25.11.6}"
-flavor="${FLAVOR:-ubuntu24.04}"
-slurm_minor="${slurm_version%.*}" # 25.11.6 -> 25.11
+slurm_version="${SLURM_VERSION:-26.05.1}"
+flavor="${FLAVOR:-ubuntu26.04}"
+slurm_minor="${slurm_version%.*}" # 26.05.1 -> 26.05
 
 operator_repo="${OPERATOR_REPO:-https://github.com/SlinkyProject/slurm-operator.git}"
 operator_ref="${OPERATOR_REF:-v1.2.0}"

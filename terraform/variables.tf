@@ -983,7 +983,7 @@ variable "slinky_slurm_namespace" {
 }
 
 variable "slinky_image_profile" {
-  default     = "25.11.6-ubuntu24.04"
+  default     = "26.05.1-ubuntu26.04"
   type        = string
   description = "Tested Slinky image profile used by auto chart and image tag settings."
 

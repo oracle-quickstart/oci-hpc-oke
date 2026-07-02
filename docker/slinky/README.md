@@ -11,16 +11,16 @@ Target for now:
 | --- | --- |
 | Slurm Operator chart | `1.2.0` |
 | Slurm chart | `1.2.0` |
-| Slurm image family | `25.11.6-ubuntu24.04` |
+| Slurm image family | `26.05.1-ubuntu26.04` |
 | Custom image registry | `iad.ocir.io/idxzjcdglx2s/slurm-operator` |
-| Custom image build suffix | `2026-06-16.0` |
+| Custom image build suffix | `2026-07-02.0` |
 
-The `1.2.0` Slurm chart defaults to upstream `26.05-ubuntu26.04` images. For
-the custom images in this repo, pin the full Slurm patch level to `25.11.6` so
-the rebuilt plugins match the upstream 25.11.6 payloads (chart `1.2.0` supports
-Slurm `25.11` and later).
+The `1.2.0` Slurm chart defaults to upstream `26.05-ubuntu26.04` images, so the
+custom image family now matches the chart default. Pin the full Slurm patch
+level to `26.05.1` so the rebuilt plugins match the upstream 26.05.1 payloads
+(chart `1.2.0` supports Slurm `25.11` and later).
 
-## 25.11 Ubuntu 24.04 Images
+## 26.05.1 Ubuntu 26.04 Images
 
 ### Upstream Images Available
 
@@ -35,43 +35,44 @@ of the upstream equivalents we mirror.
 | --- | --- |
 | Operator manager | `ghcr.io/slinkyproject/slurm-operator:1.2.0` |
 | Operator webhook | `ghcr.io/slinkyproject/slurm-operator-webhook:1.2.0` |
-| Controller base | `ghcr.io/slinkyproject/slurmctld:25.11.6-ubuntu24.04` |
-| REST API | `ghcr.io/slinkyproject/slurmrestd:25.11.6-ubuntu24.04` |
-| Accounting | `ghcr.io/slinkyproject/slurmdbd:25.11.6-ubuntu24.04` |
-| Login base and SSSD sidecar | `ghcr.io/slinkyproject/login:25.11.6-ubuntu24.04` |
-| Login Pyxis payload | `ghcr.io/slinkyproject/login-pyxis:25.11.6-ubuntu24.04` |
-| Worker base | `ghcr.io/slinkyproject/slurmd:25.11.6-ubuntu24.04` |
-| Worker Pyxis payload | `ghcr.io/slinkyproject/slurmd-pyxis:25.11.6-ubuntu24.04` |
+| Controller base | `ghcr.io/slinkyproject/slurmctld:26.05.1-ubuntu26.04` |
+| REST API | `ghcr.io/slinkyproject/slurmrestd:26.05.1-ubuntu26.04` |
+| Accounting | `ghcr.io/slinkyproject/slurmdbd:26.05.1-ubuntu26.04` |
+| Login base and SSSD sidecar | `ghcr.io/slinkyproject/login:26.05.1-ubuntu26.04` |
+| Login Pyxis payload | `ghcr.io/slinkyproject/login-pyxis:26.05.1-ubuntu26.04` |
+| Worker base | `ghcr.io/slinkyproject/slurmd:26.05.1-ubuntu26.04` |
+| Worker Pyxis payload | `ghcr.io/slinkyproject/slurmd-pyxis:26.05.1-ubuntu26.04` |
 
-If we choose a patch tag such as `25.11.6-ubuntu24.04`, switch the whole Slurm
+If we choose a patch tag such as `26.05.1-ubuntu26.04`, switch the whole Slurm
 stack together. Do not mix `25.11`, `25.11.x`, `26.05`, and `26.05.x` images in
 one deployment.
 
 ### Derived Images Built
 
-These 25.11.6 custom images are built and pushed in OCIR by `build-images.sh`.
+These 26.05.1 custom images are built and pushed in OCIR by `build-images.sh`.
 The controller, login, and NVIDIA worker images build FROM the from-source base
 images (see "Base Images Built from Upstream Source") instead of
 `ghcr.io/slinkyproject`, so the whole stack comes from one registry.
 
 | Role | Dockerfile | Target image | Platforms |
 | --- | --- | --- | --- |
-| Controller with PMIx | `slurm-operator/controller/slurmctld-pmix/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Controller with PMIx plus SSSD/NSS | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-sssd-nss-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Login with Pyxis, Enroot, and login tools | `slurm-operator/login/login-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker base with NVML AutoDetect plugins | `slurm-operator/workers/nvidia/slurmd-nvml-core/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Controller with PMIx | `slurm-operator/controller/slurmctld-pmix/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Controller with PMIx plus SSSD/NSS | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Login with Pyxis, Enroot, and login tools | `slurm-operator/login/login-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker base with NVML AutoDetect plugins | `slurm-operator/workers/nvidia/slurmd-nvml-core/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
 
 The current AMD worker Dockerfiles build from the RCCL test image
 `iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1`.
-They can be moved to Slurm `25.11`, but they are not Ubuntu 24.04 images until
-the ROCm/RCCL base image is also moved to Ubuntu 24.04.
+They build Slurm `26.05.1` from source, but they are not Ubuntu 26.04 images
+until the ROCm/RCCL base image is also moved off Ubuntu 22.04, so their tags
+use `rocm7.1.1` instead of an Ubuntu flavor.
 
 | Role | Dockerfile | Target image if keeping current AMD base | Platforms |
 | --- | --- | --- | --- |
-| AMD worker with ROCm/RCCL and SSSD/NSS | `slurm-operator/workers/amd/slurmd-rocm-rccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-2026-06-16.0` | `linux/amd64` |
-| AMD worker with ROCm/RCCL plus Pyxis/Enroot | `slurm-operator/workers/amd/slurmd-rocm-rccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0` | `linux/amd64` |
+| AMD worker with ROCm/RCCL and SSSD/NSS | `slurm-operator/workers/amd/slurmd-rocm-rccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-2026-07-02.0` | `linux/amd64` |
+| AMD worker with ROCm/RCCL plus Pyxis/Enroot | `slurm-operator/workers/amd/slurmd-rocm-rccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-07-02.0` | `linux/amd64` |
 
 ### Control-Plane Images Built from Upstream Source
 
@@ -82,9 +83,9 @@ from upstream source into our registry so the whole stack comes from one place
 (`linux/amd64`, `linux/arm64`):
 
 - `slurmdbd`, `slurmrestd`, and `login` build from the vendored upstream assets
-  in `slurm-operator/slurm-source/` (copied from `SlinkyProject/containers` @
-  `cea8fbea`; see `slurm-source/README.md`) via Docker Bake -- one multi-stage
-  Dockerfile with per-component `--target` stages. The upstream Dockerfile shares
+  in `slurm-operator/slurm-source/` (copied from `SlinkyProject/containers` at
+  the per-directory refs listed in `slurm-source/README.md`) via Docker Bake --
+  one multi-stage Dockerfile with per-component `--target` stages. The upstream Dockerfile shares
   the apt cache mount across arches, so each arch is built separately and combined
   into a multi-arch manifest.
 - `operator` and `webhook` build from a pinned clone of
@@ -95,13 +96,13 @@ from upstream source into our registry so the whole stack comes from one place
 
 | Role | Upstream source / target | Target image | Platforms |
 | --- | --- | --- | --- |
-| SlurmDBD (accounting) | `containers` target `slurmdbd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmdbd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| slurmrestd (REST API) | `containers` target `slurmrestd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Login / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| SlurmDBD (accounting) | `containers` target `slurmdbd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmdbd-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| slurmrestd (REST API) | `containers` target `slurmrestd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmrestd-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Login / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
 | Slinky operator | `slurm-operator` target `manager` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:1.2.0` | `linux/amd64`, `linux/arm64` |
 | Slinky operator webhook | `slurm-operator` target `webhook` | `iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook:1.2.0` | `linux/amd64`, `linux/arm64` |
 
-The terraform `25.11.6-ubuntu24.04` image profile points SlurmDBD, slurmrestd,
+The terraform `26.05.1-ubuntu26.04` image profile points SlurmDBD, slurmrestd,
 and the SSSD sidecar at these tags, and the operator Helm values use the custom
 operator/webhook images.
 
@@ -118,11 +119,11 @@ mount across arches). The `login` base is produced by `build-control-plane-image
 
 | Role | Upstream target | Base image | Platforms |
 | --- | --- | --- | --- |
-| Controller base | `containers` target `slurmctld` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Worker base | `containers` target `slurmd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Worker Pyxis payload | `containers` target `slurmd_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-pyxis-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Login Pyxis payload | `containers` target `login_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-base-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Login base / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
+| Controller base | `containers` target `slurmctld` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Worker base | `containers` target `slurmd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Worker Pyxis payload | `containers` target `slurmd_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-pyxis-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Login Pyxis payload | `containers` target `login_pyxis` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-base-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| Login base / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
 
 The `login_pyxis` target is tagged `login-pyxis-base` so it does not collide with
 the deployed `login-pyxis` image. AMD workers already build entirely from source
@@ -130,13 +131,18 @@ the deployed `login-pyxis` image. AMD workers already build entirely from source
 
 ### Current OCIR Status
 
-OCIR now has the `25.11.6` tags listed above. The non-AMD images were built as
-multi-platform manifests for `linux/amd64` and `linux/arm64`. The AMD ROCm/RCCL
-images were built for `linux/amd64` only.
+OCIR now has the `26.05.1-ubuntu26.04-2026-07-02.0` tags listed above, built
+from the latest vendored `SlinkyProject/containers` source. The non-AMD images
+were built as multi-platform manifests for `linux/amd64` and `linux/arm64`. The
+AMD ROCm/RCCL images were built for `linux/amd64` only.
 
-## Existing 26.05 Custom Images
+## Other Existing Custom Images
 
-These tags exist in OCIR but are not the current target.
+These tags exist in OCIR but are not the current target. The
+`25.11.6-ubuntu24.04-2026-06-19.0` family is the complete previous default set
+(control-plane, bases, and layered images; referenced by the
+`25.11.6-ubuntu24.04` profile), with AMD workers at
+`slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd[-pyxis]-2026-06-16.0`.
 
 | Role | Existing tag |
 | --- | --- |
@@ -206,7 +212,7 @@ image, so their tags intentionally use `rocm7.1.1` instead of `ubuntu26.04`.
 ## Template Versioning
 
 Terraform uses `slinky_image_profile` as the version switch for generated Slinky
-values. The default profile is `25.11.6-ubuntu24.04`; when chart and image tag
+values. The default profile is `26.05.1-ubuntu26.04`; when chart and image tag
 variables are left as `auto`, Terraform resolves them from
 `local.slinky_image_profiles` in `terraform/slinky.tf`.
 
@@ -214,9 +220,9 @@ Supported profiles:
 
 | Profile | Notes |
 | --- | --- |
-| `25.11.6-ubuntu24.04` | Current default target. |
-| `26.05-ubuntu24.04` | Existing OCIR 26.05 custom image family. |
-| `26.05.1-ubuntu26.04` | Existing OCIR 26.05.1 Ubuntu 26.04 custom controller, login, and NVIDIA worker image family. Accounting, REST API, and SSSD sidecar stay on the upstream 26.05 Ubuntu 24.04 tags. |
+| `26.05.1-ubuntu26.04` | Current default target. Whole stack (control-plane, bases, layered images) built from the latest vendored containers source into OCIR. |
+| `25.11.6-ubuntu24.04` | Previous default. Complete OCIR image family, kept for rollback. |
+| `26.05-ubuntu24.04` | Older OCIR 26.05 custom image family. Accounting, REST API, and SSSD sidecar stay on the upstream `ghcr.io` 26.05 Ubuntu 24.04 tags. |
 
 The existing advanced repository and tag variables remain escape hatches. Set a
 specific chart version or image tag only when testing a one-off image. Otherwise
