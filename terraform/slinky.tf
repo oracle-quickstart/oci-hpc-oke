@@ -218,7 +218,7 @@ locals {
       rdma_networks       = ""
       slurmd_parameters   = local.slinky_gpu_numa_topology_enabled ? "numa_node_as_socket" : ""
       numa_topology       = local.slinky_gpu_numa_topology_enabled
-      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_gpu_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_gpu_is_amd ? ["amd", "rocm"] : ["nvidia"])))
+      features            = distinct(compact(concat([var.worker_gpu_shape], local.slinky_gpu_is_amd ? ["amd", "rocm"] : ["nvidia"])))
       imex_claim_template = ""
     }
   } : {}
@@ -240,7 +240,7 @@ locals {
       rdma_networks       = local.slinky_rdma_networks_annotation
       slurmd_parameters   = local.slinky_rdma_numa_topology_enabled ? "numa_node_as_socket" : ""
       numa_topology       = local.slinky_rdma_numa_topology_enabled
-      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_rdma_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
+      features            = distinct(compact(concat([var.worker_rdma_shape], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
       imex_claim_template = ""
     }
   } : {}
@@ -262,7 +262,7 @@ locals {
       rdma_networks       = ""
       slurmd_parameters   = ""
       numa_topology       = false
-      features            = [lower(replace(replace(replace(var.worker_gmc_shape, "BM.GPU.", ""), ".", "-"), "_", "-")), "nvidia", "rdma", "gmc", "imex", "hostnetwork"]
+      features            = [var.worker_gmc_shape, "nvidia", "rdma", "gmc", "imex", "hostnetwork"]
       imex_claim_template = "${nodeset_name}-imex-channel"
     }
   } : {}
@@ -301,10 +301,9 @@ locals {
   slinky_cpu_worker_image_tag        = var.slinky_cpu_worker_image_tag == "auto" ? local.slinky_worker_image_tag : var.slinky_cpu_worker_image_tag
 
   # The operator adds the nodeset name itself as a feature, so "cpu" is
-  # already present and only the shape slug is needed here.
-  slinky_cpu_worker_features = distinct(compact([
-    lower(replace(replace(var.worker_cpu_shape, ".", "-"), "_", "-")),
-  ]))
+  # already present and only the shape name is needed here. Slurm accepts
+  # dotted feature names, so the OCI shape name is used verbatim.
+  slinky_cpu_worker_features = distinct(compact([var.worker_cpu_shape]))
 
   slinky_readonly_replica_dns_names = join("\n", [
     for i in range(var.slinky_openldap_readonly_replicas) :
