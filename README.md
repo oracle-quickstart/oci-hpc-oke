@@ -50,9 +50,9 @@ NAME           STATUS     ROLES    AGE     VERSION
 10.0.96.82     Ready      node     2d23h   v1.35.2
 ```
 
-### Using Host RDMA Network Interfaces in Manifests when using `hostNetwork`
+### Using RDMA Network Interfaces in Manifests
 
-To use the RDMA interfaces on the host in your pods, see [Using Host RDMA Network Interfaces in Manifests when using `hostNetwork`](./docs/using-host-rdma-network-interfaces-in-manifests.md) for the required manifest sections and a complete example pod.
+To use the RDMA interfaces in your pods, see [Using RDMA Network Interfaces in Manifests](./docs/using-rdma-network-interfaces-in-manifests.md) for the required manifest sections and complete examples using `hostNetwork` or SR-IOV virtual functions.
 
 ## Optional: Deploy Kueue & MPI Operator to Run NCCL Tests
 
@@ -69,7 +69,6 @@ See [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-ncc
 - [Adding SSH keys to worker nodes](./docs/adding-ssh-keys-to-worker-nodes.md)
 - [Deploying the Monitoring Stack manually](./docs/deploying-monitoring-stack-manually.md)
 - [Onboarding Users to the Slurm Operator](./docs/slurm-operator-user-onboarding.md)
-- [Running NCCL and RCCL Tests from the Slurm Operator](./docs/running-nccl-rccl-tests-from-slurm-operator.md)
 - [Images to Use for Worker Nodes](./docs/worker-node-images.md)
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
 - [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
@@ -77,13 +76,13 @@ See [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-ncc
 - [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
 - [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
 - [Running ib_write_bw Tests Between Nodes](./docs/running-ib-write-bw-test.md)
-- [Running NCCL and RCCL Tests from Slurm](./docs/running-nccl-rccl-tests-from-slurm-operator.md)
+- [Running NCCL and RCCL Tests from the Slurm Operator](./docs/running-nccl-rccl-tests-from-slurm-operator.md)
 - [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-nccl-rccl-tests-with-kueue.md)
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md)
 - [Upgrading OKE clusters](./docs/oke-hpc-upgrade.md)
 - [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./docs/using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md)
-- [Using Host RDMA Network Interfaces in Manifests when using `hostNetwork`](./docs/using-host-rdma-network-interfaces-in-manifests.md)
+- [Using RDMA Network Interfaces in Manifests](./docs/using-rdma-network-interfaces-in-manifests.md)
 - [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
 - [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./docs/using-nccl-rccl-parameters-configmap.md)
 - [CVE-2026-31431 ("Copy Fail")](./docs/copy-fail.md)

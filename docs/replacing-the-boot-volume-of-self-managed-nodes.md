@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Node Boot Volume Replacement brings significant operational benefits when managing bare metal worker nodes in OKE. It enables updates to key node attributes—like Kubernetes version, host image, and SSH keys—without terminating the underlying instance, preserving the instance OCID and network identity. This is especially valuable for bare metal nodes, where replacement times are longer and shape availability can be constrained. By eliminating the need to re-provision entire instances, the process becomes faster and more resource-efficient, reducing downtime and minimizing disruption to workloads. It also supports use cases like correcting configuration drift and applying critical security updates with minimal operational complexity.
+Node Boot Volume Replacement brings significant operational benefits when managing bare metal worker nodes in OKE. It enables updates to key node attributes (like Kubernetes version, host image, and SSH keys) without terminating the underlying instance, preserving the instance OCID and network identity. This is especially valuable for bare metal nodes, where replacement times are longer and shape availability can be constrained. By eliminating the need to re-provision entire instances, the process becomes faster and more resource-efficient, reducing downtime and minimizing disruption to workloads. It also supports use cases like correcting configuration drift and applying critical security updates with minimal operational complexity.
 
 The script works on both self-managed nodes and OKE managed node pools. See the [Managed node pools](#managed-node-pools) section below for the differences.
 
@@ -15,11 +15,11 @@ The [OKE Native BVR](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/re
 
 ### Prerequisites
 
-1. You can find the Boot Volume Replacement script [here.](https://github.com/oracle-quickstart/oci-hpc-oke/blob/main/docs/files/bvr-script.py)
+1. You can find the Boot Volume Replacement script [here](https://github.com/oracle-quickstart/oci-hpc-oke/blob/main/docs/files/bvr-script.py).
 
 2. Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
-For MacOS/Linux:
+For macOS/Linux:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -35,17 +35,17 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 | --interactive                 | No       | False                  | Enable interactive execution of the script.                                                                                      |
 | --cloud-init-file             | No       | ""                     | File with new node cloud-init (text, non-base64 encoded). If not provided, the existing node cloud-init is used.                 |
 | --image-ocid                  | No       | ""                     | Image OCID to use for the new BootVolume. If not provided, the current node image is used.                                       |
-| -p, --parallelism             | No       | 1                      | How many nodes to upgrade in parallel. Not recommended to enable at the same time with --interactive.                            |
+| -p, --parallelism             | No       | 1                      | How many nodes to upgrade in parallel. Not recommended together with --interactive.                            |
 | --bv-size                     | No       | 0                      | Size of the new boot volume in GB. If not set (or 0), the size of the existing boot volume will be used.                         |
 | --remove-previous-boot-volume | No       | False                  | Remove the existing boot volume after the upgrade. By default, the existing boot volume is preserved.                            |
 | --node-metadata               | No       | "{}"                   | Metadata to add to the new node.                                                                                                 |
-| --desired-k8s-version         | No       | ""                     | Works only with the nodes created using the standard OCI OKE HPC Module. The version should start with v. Eg. v1.33.1            |
+| --desired-k8s-version         | No       | ""                     | Works only with the nodes created using the standard OCI OKE HPC Module. The version should start with v. E.g. v1.33.1            |
 | --timeout-seconds             | No       | 900                    | Timeout in seconds to wait for nodes to join the cluster after Boot Volume Replacement.                                          |
 | --kubeconfig                  | No       | "~/.kube/config"       | Override the path to the kubeconfig file. Default is '~/.kube/config'                                                            |
 | --oci-config-file             | No       | "~/.oci/config"        | Override the path to the oci_config file. Default is '~/.oci/config'                                                             |
 | --oci-config-profile          | No       | "DEFAULT"              | OCI config profile to use. Default is 'DEFAULT'                                                                                  |
 | --region                      | No       |                        | The region to target. Required when using auth='instance_principal'                                                              |
-| --auth                        | No       |                        | Set OCI authentication method. Currently supported values: 'config_file','instance_principal', 'cloud_shell'                     |
+| --auth                        | No       |                        | Set OCI authentication method. Currently supported values: 'config_file', 'instance_principal', 'cloud_shell'                     |
 | --help                        | No       |                        | Show help message and exit                                                                                                       |
 | --debug                       | No       | False                  | Enable debug logging                                                                                                             |
 
@@ -83,6 +83,6 @@ Example:
 ```python
     cloud_init_change_functions.append(lambda cloud_init_data: cloud_init_data.replace(
         "https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-nvme-raid.sh",
-        "https://raw.githubusercontent.com/OguzPastirmaci/misc/refs/heads/master/oke-nvme-provisioner/oke-nvme-bvr.sh")
+        "https://raw.githubusercontent.com/OguzPastirmaci/misc/refs/heads/main/oke-nvme-provisioner/oke-nvme-bvr.sh")
     )
 ```

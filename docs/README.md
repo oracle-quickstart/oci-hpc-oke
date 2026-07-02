@@ -14,7 +14,7 @@ Engine (OKE). For deployment and project overview, see the
 
 ## Running GPU and RDMA workloads
 
-- [Using Host RDMA Network Interfaces in Manifests when using `hostNetwork`](./using-host-rdma-network-interfaces-in-manifests.md): Manifest sections needed to use the host RDMA interfaces in pods.
+- [Using RDMA Network Interfaces in Manifests](./using-rdma-network-interfaces-in-manifests.md): Manifest sections needed to use the RDMA interfaces in pods with `hostNetwork` or SR-IOV virtual functions.
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md): Run PyTorch distributed jobs over the host network with RDMA.
 - [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md): Schedule workloads using RDMA network topology and locality.
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md): Use DRA for multi-node NVLink (IMEX).

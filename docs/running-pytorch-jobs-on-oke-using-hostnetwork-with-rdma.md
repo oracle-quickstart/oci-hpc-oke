@@ -26,7 +26,7 @@ spec:
 ```
 
 ```yaml
-securityContext:
+    securityContext:
       privileged: true
       capabilities:
         add: [ "IPC_LOCK", "SYS_ADMIN" ]
@@ -589,9 +589,9 @@ spec:
                   --data=coco128.yaml \
                   --weights=datasets/weights/yolov5s.pt
               resources:
-               requests:
+                requests:
                   nvidia.com/gpu: 1
-               limits:
+                limits:
                   nvidia.com/gpu: 1
               volumeMounts:
                 - mountPath: /dev/shm
@@ -829,9 +829,9 @@ spec:
                   --data=coco128.yaml \
                   --weights=datasets/weights/yolov5s.pt
               resources:
-               requests:
+                requests:
                   nvidia.com/gpu: 1
-               limits:
+                limits:
                   nvidia.com/gpu: 1
               volumeMounts:
                 - mountPath: /dev/shm
