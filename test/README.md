@@ -1,24 +1,21 @@
 # Terratest
 
-These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. Storage, monitoring, OCI Resource Manager (ORM), and operator-path suites are optional and gated by env flags.
+These tests run Terraform against OCI using API key auth by default, with optional instance principal support. The default suite covers validation failures and a minimal core provisioning apply. The storage (FSS, Lustre) and monitoring suites are optional and gated by env flags. OCI Resource Manager (ORM) and operator-path topologies are covered through the tfvars/JSON config files below and the CI workflows.
 
 ## Prereqs
 - Terraform installed and available on PATH.
 - Go installed (1.26+).
-- OCI CLI installed and configured (required for monitoring, FSS, and operator tests).
+- OCI CLI installed and configured (required for the monitoring and FSS tests).
 - API key auth configured in `~/.oci/config` (unless using instance principal).
 
 ## Required env (default suite)
 - `OCI_AUTH` (optional; defaults to `api_key`, set to `instance_principal` to use instance principal auth)
 - `OCI_TENANCY_OCID`
+- `OCI_COMPARTMENT_OCID`
 - `OCI_REGION`
 - `WORKER_OPS_AD`
 - `WORKER_OPS_IMAGE_ID`
 - `SSH_PUBLIC_KEY` or `SSH_PUBLIC_KEY_PATH`
-
-API key auth (default) also requires:
-- `OCI_USER_OCID`
-- `OCI_FINGERPRINT`
 
 Optional CPU/GPU pool env vars (if unset, `worker_cpu_enabled` and `worker_gpu_enabled` are forced to `false`):
 - `WORKER_CPU_AD`

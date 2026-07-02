@@ -2,10 +2,10 @@
 
 ## Overview
 
-When the cluster is deployed with RDMA or GMC GPU worker pools, Terraform
+When the cluster is deployed with RDMA or GPU Memory Cluster (GMC) worker pools, Terraform
 creates one ConfigMap in the `default` namespace for each distinct supported
 shape. Each ConfigMap holds the recommended NCCL/RCCL tuning parameters from
-[recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md)),
+[recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md),
 one environment variable per key.
 
 The ConfigMap name includes the GPU vendor and normalized shape:

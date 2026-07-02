@@ -4,8 +4,8 @@ Dirty Frag is a Linux kernel vulnerability chain involving flaws in the xfrm-ESP
 
 The vulnerabilities are triggered through two specific kernel modules:
 
-- `esp4` / `esp6` — used in IPSec encapsulation
-- `rxrpc` — used in AFS distributed filesystems
+- `esp4` / `esp6`: used in IPSec encapsulation
+- `rxrpc`: used in AFS distributed filesystems
 
 See [Dirty Frag][wiz-dirty-frag] for additional details.
 

@@ -649,24 +649,24 @@ Prerequisites:
    - Navigate to **Analytics & AI → Messaging** → **Streaming** in OCI Console
    - Create a new stream (e.g., `oci-metrics-stream`)
    - Configure the stream to use the existing stream pool (`DefaultPool`)
-   - Set appropiate retention period (1h) and number of partitions (1)
+   - Set appropriate retention period (1h) and number of partitions (1)
    - Note the `Stream OCID`
 
-2. **Required Permissions**: 
+2. **Required Permissions**:
 
-  The dynamic group containing your OKE nodes needs permissions to read all the resources from the compartment:
-    
-    ```
-    Allow dynamic-group <your-dynamic-group> to use stream-family in compartment <compartment-name>
-    Allow dynamic-group <your-dynamic-group> to read all-resources in compartment <compartment-name>
-    ```
+   The dynamic group containing your OKE nodes needs permissions to read all the resources from the compartment:
 
-  The permissions required for OCI Service Connector Hub connection to push OCI Metrics to OCI Streaming:
+   ```
+   Allow dynamic-group <your-dynamic-group> to use stream-family in compartment <compartment-name>
+   Allow dynamic-group <your-dynamic-group> to read all-resources in compartment <compartment-name>
+   ```
 
-    ```
-    Allow any-user to read metrics in tenancy where all {request.principal.type = 'serviceconnector', request.principal.compartment.id = '<compartment_OCID>'}
-    Allow any-user to use stream-push in compartment id <target_stream_compartment_OCID> where all {request.principal.type='serviceconnector', request.principal.compartment.id='<compartment_OCID>'}
-    ```
+   The permissions required for OCI Service Connector Hub connection to push OCI Metrics to OCI Streaming:
+
+   ```
+   Allow any-user to read metrics in tenancy where all {request.principal.type = 'serviceconnector', request.principal.compartment.id = '<compartment_OCID>'}
+   Allow any-user to use stream-push in compartment id <target_stream_compartment_OCID> where all {request.principal.type='serviceconnector', request.principal.compartment.id='<compartment_OCID>'}
+   ```
 
 3. **Service Connector Hub Connection**: Ensure SCH Connection is configured to pull metrics from OCI metrics and push them to OCI Streaming
    - Navigate to **Analytics & AI → Messaging** → **Connectors** in OCI Console.
@@ -715,7 +715,7 @@ curl localhost:9273/metrics
 ### 8.4 Create the Grafana Dashboards for the OCI Metrics
 
 ```bash
-# Deploy each OCI metrics dashboards as a ConfigMap
+# Deploy each OCI metrics dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/oci/*.json; do
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
     --from-file="$(basename "$dashboard")=${dashboard}" \
@@ -879,7 +879,7 @@ kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometh
 
 # Query Prometheus for AMD GPU metrics (if AMD device metrics exporter is deployed)
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
-  -- promtool query instant http://localhost:9090 'amd_gpu_temperature'
+  -- promtool query instant http://localhost:9090 'amd_gpu_junction_temperature'
 
 # Query for node problem detector metrics
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
@@ -917,6 +917,7 @@ You have two options:
    # Remove dashboard and alert ConfigMaps from state
    terraform state rm 'kubernetes_config_map_v1.grafana_common_dashboards'
    terraform state rm 'kubernetes_config_map_v1.grafana_gpu_dashboards'
+   terraform state rm 'kubernetes_config_map_v1.grafana_oci_dashboards'
    terraform state rm 'kubernetes_config_map_v1.grafana_alerts'
    ```
 
@@ -1298,7 +1299,7 @@ helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}
 # Uninstall OKE ONS Webhook (if deployed)
 helm uninstall oke-ons-webhook -n ${MONITORING_NAMESPACE}
 
-# Uninstall the OKE Metrics Exporter (if deployed)
+# Uninstall the OCI Metrics Exporter (if deployed)
 helm uninstall oci-metrics-exporter -n ${MONITORING_NAMESPACE}
 
 # Uninstall kube-prometheus-stack

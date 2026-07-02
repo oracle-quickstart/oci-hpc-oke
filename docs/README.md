@@ -14,6 +14,7 @@ Engine (OKE). For deployment and project overview, see the
 
 ## Running GPU and RDMA workloads
 
+- [Using RDMA Network Interfaces in Manifests](./using-rdma-network-interfaces-in-manifests.md): Manifest sections needed to use the RDMA interfaces in pods with `hostNetwork` or SR-IOV virtual functions.
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md): Run PyTorch distributed jobs over the host network with RDMA.
 - [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md): Schedule workloads using RDMA network topology and locality.
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md): Use DRA for multi-node NVLink (IMEX).
@@ -23,6 +24,7 @@ Engine (OKE). For deployment and project overview, see the
 - [Recommended NCCL/RCCL Parameters by Shape](./recommended-nccl-rccl-parameters-by-shape.md): Recommended NCCL/RCCL tuning parameters per GPU shape.
 - [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./using-nccl-rccl-parameters-configmap.md): Consume the auto-generated parameters ConfigMap from job manifests.
 - [Running NCCL and RCCL Tests from Slurm Operator](./running-nccl-rccl-tests-from-slurm-operator.md): Run NCCL/RCCL bandwidth tests through the Slurm operator.
+- [Running NCCL and RCCL Tests with Kueue and MPI Operator](./running-nccl-rccl-tests-with-kueue.md): Run NCCL/RCCL bandwidth tests with Kueue and MPI Operator.
 
 ## Slurm
 
@@ -40,6 +42,7 @@ Engine (OKE). For deployment and project overview, see the
 
 ## Images and utilities
 
+- [Images to Use for Worker Nodes](./worker-node-images.md): OS images with GPU drivers and RDMA support to use for all worker pools.
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./importing-images-from-fss-skopeo.md): Import container images from OCI File Storage using Skopeo.
 - [oci-hpc-oke-utils](./oci-hpc-oke-utils.md): Helper utilities for oci-hpc-oke.
 
