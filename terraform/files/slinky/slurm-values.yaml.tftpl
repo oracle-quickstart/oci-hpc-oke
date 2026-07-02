@@ -51,6 +51,14 @@ controller:
     SelectType: select/cons_tres
     SelectTypeParameters: CR_CORE_MEMORY
     PropagateResourceLimitsExcept: MEMLOCK
+    # Operator 1.2 pruned these from its generated slurm.conf; keep the 1.1.1
+    # behavior. Without TaskPlugin/ProctrackType the cgroup.conf constraints
+    # (GPU device isolation) would not be enforced.
+    ReturnToService: 2
+    ProctrackType: proctrack/cgroup
+    PrologFlags: Contain
+    TaskPlugin: task/affinity,task/cgroup
+    SlurmctldParameters: enable_stepmgr
 %{ if gmc_nodeset_enabled ~}
     # This is global Slurm configuration. On non-GMC workers the plugin sees
     # no nvidia-caps-imex-channels device major and disables itself locally.
@@ -59,6 +67,7 @@ controller:
 %{ if accounting_enabled ~}
     AccountingStorageEnforce: associations,limits,qos
     AccountingStorageTRES: gres/gpu
+    JobAcctGatherType: jobacct_gather/cgroup
 %{ endif ~}
   podSpec:
     nodeSelector:
@@ -235,9 +244,6 @@ loginsets:
         type: LoadBalancer
 
 nodesets:
-  slinky:
-    enabled: false
-
 ${worker_nodesets_yaml}
 %{ if cpu_nodeset_enabled ~}
 

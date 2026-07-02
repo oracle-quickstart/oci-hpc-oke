@@ -9,15 +9,16 @@ Target for now:
 
 | Item | Version |
 | --- | --- |
-| Slurm Operator chart | `1.1.1` |
-| Slurm chart | `1.1.1` |
+| Slurm Operator chart | `1.2.0` |
+| Slurm chart | `1.2.0` |
 | Slurm image family | `25.11.6-ubuntu24.04` |
 | Custom image registry | `iad.ocir.io/idxzjcdglx2s/slurm-operator` |
 | Custom image build suffix | `2026-06-16.0` |
 
-The `1.1.1` Slurm chart defaults to upstream `25.11-ubuntu24.04` images. For
+The `1.2.0` Slurm chart defaults to upstream `26.05-ubuntu26.04` images. For
 the custom images in this repo, pin the full Slurm patch level to `25.11.6` so
-the rebuilt plugins match the upstream 25.11.6 payloads.
+the rebuilt plugins match the upstream 25.11.6 payloads (chart `1.2.0` supports
+Slurm `25.11` and later).
 
 ## 25.11 Ubuntu 24.04 Images
 
@@ -32,8 +33,8 @@ of the upstream equivalents we mirror.
 
 | Role | Image |
 | --- | --- |
-| Operator manager | `ghcr.io/slinkyproject/slurm-operator:1.1.1` |
-| Operator webhook | `ghcr.io/slinkyproject/slurm-operator-webhook:1.1.1` |
+| Operator manager | `ghcr.io/slinkyproject/slurm-operator:1.2.0` |
+| Operator webhook | `ghcr.io/slinkyproject/slurm-operator-webhook:1.2.0` |
 | Controller base | `ghcr.io/slinkyproject/slurmctld:25.11.6-ubuntu24.04` |
 | REST API | `ghcr.io/slinkyproject/slurmrestd:25.11.6-ubuntu24.04` |
 | Accounting | `ghcr.io/slinkyproject/slurmdbd:25.11.6-ubuntu24.04` |
@@ -87,7 +88,7 @@ from upstream source into our registry so the whole stack comes from one place
   the apt cache mount across arches, so each arch is built separately and combined
   into a multi-arch manifest.
 - `operator` and `webhook` build from a pinned clone of
-  `SlinkyProject/slurm-operator` @ `v1.1.1` (its Dockerfile needs the Go source
+  `SlinkyProject/slurm-operator` @ `v1.2.0` (its Dockerfile needs the Go source
   tree, so it cannot be vendored standalone; a reference copy is at
   `slurm-operator/operator/slurm-operator/Dockerfile`). Go cross-compile, both
   arches in one pass.
@@ -97,8 +98,8 @@ from upstream source into our registry so the whole stack comes from one place
 | SlurmDBD (accounting) | `containers` target `slurmdbd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmdbd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
 | slurmrestd (REST API) | `containers` target `slurmrestd` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmrestd-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
 | Login / SSSD sidecar | `containers` target `login` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-25.11.6-ubuntu24.04-2026-06-19.0` | `linux/amd64`, `linux/arm64` |
-| Slinky operator | `slurm-operator` target `manager` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:1.1.1` | `linux/amd64`, `linux/arm64` |
-| Slinky operator webhook | `slurm-operator` target `webhook` | `iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook:1.1.1` | `linux/amd64`, `linux/arm64` |
+| Slinky operator | `slurm-operator` target `manager` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:1.2.0` | `linux/amd64`, `linux/arm64` |
+| Slinky operator webhook | `slurm-operator` target `webhook` | `iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook:1.2.0` | `linux/amd64`, `linux/arm64` |
 
 The terraform `25.11.6-ubuntu24.04` image profile points SlurmDBD, slurmrestd,
 and the SSSD sidecar at these tags, and the operator Helm values use the custom

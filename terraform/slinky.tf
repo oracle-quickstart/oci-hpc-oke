@@ -33,8 +33,8 @@ locals {
 
   slinky_image_profiles = {
     "25.11.6-ubuntu24.04" = {
-      operator_chart_version = "1.1.1"
-      slurm_chart_version    = "1.1.1"
+      operator_chart_version = "1.2.0"
+      slurm_chart_version    = "1.2.0"
       # Custom slurmdbd/slurmrestd/login (SSSD) built from upstream source into
       # our registry (build-control-plane-images.sh), so the whole stack comes
       # from one registry.
@@ -53,8 +53,8 @@ locals {
       amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
-      operator_chart_version      = "1.1.1"
-      slurm_chart_version         = "1.1.1"
+      operator_chart_version      = "1.2.0"
+      slurm_chart_version         = "1.2.0"
       accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
       accounting_image_tag        = "26.05-ubuntu24.04"
       restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
@@ -67,8 +67,8 @@ locals {
       amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
-      operator_chart_version      = "1.1.1"
-      slurm_chart_version         = "1.1.1"
+      operator_chart_version      = "1.2.0"
+      slurm_chart_version         = "1.2.0"
       accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
       accounting_image_tag        = "26.05-ubuntu24.04"
       restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
@@ -97,19 +97,20 @@ locals {
   slinky_sssd_image_repository       = var.slinky_sssd_image_repository == "auto" ? local.slinky_image_profile.sssd_image_repository : var.slinky_sssd_image_repository
 
   # Operator + webhook images custom-built from SlinkyProject/slurm-operator
-  # v1.1.1 into our registry (build-control-plane-images.sh). Merged into the
-  # operator Helm values so the operator pods also come from our registry.
+  # into our registry (build-control-plane-images.sh); their tag tracks the
+  # operator chart version. Merged into the operator Helm values so the
+  # operator pods also come from our registry.
   slinky_operator_generated_values = <<-EOT
     certManager:
       enabled: ${var.slinky_operator_cert_manager_enabled}
     operator:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator
-        tag: "1.1.1"
+        tag: "${local.slinky_operator_chart_version}"
     webhook:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook
-        tag: "1.1.1"
+        tag: "${local.slinky_operator_chart_version}"
   EOT
 
   slinky_worker_image_tag = var.slinky_worker_image_tag == "auto" ? (

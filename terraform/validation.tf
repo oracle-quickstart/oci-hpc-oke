@@ -433,7 +433,7 @@ resource "null_resource" "validate_slinky_login_identity" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_login_without_identity
-      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise Slinky chart 1.1.1 configures the LoginSet with its placeholder ldap://ldap.example.com SSSD domain. Enable managed identity or disable the Slurm login service."
+      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise the Slinky slurm chart configures the LoginSet with its placeholder SSSD configuration. Enable managed identity or disable the Slurm login service."
     }
   }
 }
@@ -444,7 +444,7 @@ resource "null_resource" "validate_slinky_worker_identity" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_worker_identity_without_ssh
-      error_message = "slinky_worker_ssh_enabled=false is incompatible with slinky_identity_enabled=true in Slinky chart 1.1.1 because disabling worker SSH also removes the worker SSSD configuration. Keep worker SSH enabled or disable managed identity."
+      error_message = "slinky_worker_ssh_enabled=false is incompatible with slinky_identity_enabled=true because the Slinky slurm chart couples worker SSSD configuration to SSH. Keep worker SSH enabled or disable managed identity."
     }
   }
 }
