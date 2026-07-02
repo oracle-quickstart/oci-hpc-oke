@@ -33,7 +33,9 @@ labeler:
       memory: 64Mi
     limits:
       cpu: 100m
-      memory: 128Mi
+      # The first run OOMs below 256Mi while uv fetches the kubernetes client;
+      # later runs reuse the uv cache and stay small.
+      memory: 256Mi
   controller:
     interval: 900
     nodeSelectorLabel: ""
