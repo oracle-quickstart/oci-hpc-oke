@@ -2366,7 +2366,7 @@ variables:
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
-    default: "0.18.0"
+    default: "0.18.2"
     required: true
     visible: false
   kueue_local_queue_default_namespace:

@@ -49,7 +49,7 @@ one deployment.
 
 ### Derived Images Built
 
-These 26.05.1 custom images are built and pushed in OCIR by `build-images.sh`.
+These 26.05.1 custom images are built and pushed to OCIR by `build-images.sh`.
 The controller, login, and NVIDIA worker images build FROM the from-source base
 images (see "Base Images Built from Upstream Source") instead of
 `ghcr.io/slinkyproject`, so the whole stack comes from one registry.
@@ -178,7 +178,7 @@ image, so their tags intentionally use `rocm7.1.1` instead of `ubuntu26.04`.
 
 | Path | Image role | Copied from |
 | --- | --- | --- |
-| `slurm-operator/operator/slurm-operator/Dockerfile` | Slinky Slurm operator manager and webhook images | `../slurm-operator-oke/Dockerfile` |
+| `slurm-operator/operator/slurm-operator/Dockerfile` | Slinky Slurm operator manager and webhook images | Upstream `SlinkyProject/slurm-operator` repo `Dockerfile` |
 | `slurm-operator/controller/slurmctld-pmix/Dockerfile` | Base controller with PMIx support | `image-builder:/home/ubuntu/slurmctld-pmix/Dockerfile` |
 | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | Default controller with PMIx plus SSSD/NSS client support | `image-builder:/home/ubuntu/slurmctld-pmix-sssd-nss/Dockerfile` |
 | `slurm-operator/login/login-pyxis/Dockerfile` | Default login image with Pyxis, Enroot, and login tools | `image-builder:/home/ubuntu/login-pyxis/Dockerfile` |

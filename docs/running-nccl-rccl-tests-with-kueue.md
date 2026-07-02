@@ -10,7 +10,7 @@ Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
 ```sh
 kubectl apply --server-side -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/mpi-operator/mpi-operator.yaml
 
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.17.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.18.2" --create-namespace --namespace=kueue-system
 ```
 
 ## Run the NCCL/RCCL Tests
@@ -27,7 +27,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.17.2" -
 | iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-12.9.1-ubuntu-24.04-nccl-2.29.3-020926.1 | 12.9.1 |
 
 ### RCCL Tests
-| Image Tag                                                                 | ROCM   |
+| Image Tag                                                                 | ROCm   |
 |---------------------------------------------------------------------------|--------|
 | iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1 | 7.1.1 |
 | iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-6.4.4-ubuntu22.04-rccl-2.22.3-011826.1 | 6.4.4 |

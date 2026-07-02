@@ -7,7 +7,7 @@
 | [Labeler](#labeler) | Enabled | Applies RDMA topology, compute host, firmware, maintenance, and custom labels to nodes |
 | [Topology](#topology) | Enabled with Slinky | Annotates nodes with their Slurm topology unit and generates `topology.yaml` for Slurm scheduling |
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
-| [Hostexec](#hostexec) | Disabled | Runs shell scripts on the host via `nsenter` |
+| [Hostexec](#hostexec) | Enabled in the chart, disabled by default in the Terraform stack | Runs shell scripts on the host via `nsenter` |
 
 The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes.
 
@@ -85,7 +85,7 @@ Applied to all GPU nodes. Sourced from IMDS every 5 minutes (default).
 
 | Label | Description | Example |
 |-------|-------------|---------|
-| `oci.oraclecloud.com/rdma.hpc_island_id` | HPC island placement (last 11 chars of OCID) | `md2gqsaja` |
+| `oci.oraclecloud.com/rdma.hpc_island_id` | HPC island placement (last 11 chars of OCID) | `aqmd2gqsaja` |
 | `oci.oraclecloud.com/rdma.host_id` | Host identifier within the island | `clnbliq` |
 | `oci.oraclecloud.com/rdma.local_block_id` | Local block placement | `xvl2gga` |
 | `oci.oraclecloud.com/rdma.network_block_id` | Network block placement | `sn4ibrza` |
@@ -98,8 +98,8 @@ Applied only to GPU memory fabric shapes. Sourced from IMDS.
 
 | Label | Description | Example |
 |-------|-------------|---------|
-| `oci.oraclecloud.com/host.gpu_memory_fabric_id` | GPU memory fabric placement (last 11 chars) | `tkj3zctga` |
-| `oci.oraclecloud.com/host.gpu_memory_cluster_id` | GPU memory cluster association (last 11 chars) | `5edoma` |
+| `oci.oraclecloud.com/host.gpu_memory_fabric_id` | GPU memory fabric placement (last 11 chars) | `pvtkj3zctga` |
+| `oci.oraclecloud.com/host.gpu_memory_cluster_id` | GPU memory cluster association (last 11 chars) | `gk6pq5edoma` |
 
 #### Compute Host Labels
 
@@ -273,7 +273,7 @@ The labeler uses a centralized controller Deployment paired with a lightweight D
 2. Queries `/instance/shape` to detect GPU memory fabric shapes
 3. For GB200/GB300, queries `/instance/` for GPU memory cluster tags
 
-**OCI API path (Controller or DaemonSet, every 15 minutes):**
+**OCI API path (Controller only, every 15 minutes):**
 1. Lists compute hosts in the tenancy (paginated)
 2. Gets full host details including firmware bundle ID
 3. Gets firmware bundle for per-component firmware versions (cached per unique bundle)
@@ -490,7 +490,7 @@ Hostexec is a DaemonSet that runs a user-defined shell script directly on the ho
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `hostexec.enabled` | `false` | Enable/disable the hostexec DaemonSet |
+| `hostexec.enabled` | `true` | Enable/disable the hostexec DaemonSet (the Terraform stack overrides this to `false` unless `install_hostexec = true`) |
 | `hostexec.interval` | `30` | Seconds between script executions |
 | `hostexec.hostRootPath` | `/` | Host root filesystem mount path |
 | `hostexec.script` | LNet setup script | The shell script to execute on the host |

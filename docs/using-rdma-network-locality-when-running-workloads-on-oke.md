@@ -8,7 +8,7 @@ This guide explains how to leverage RDMA network topology information to optimiz
 ## Overview of Network Locality
 Generative AI workloads drive a different set of engineering tradeoffs than traditional cloud workloads. So, we designed a purpose-built GenAI network tailored to the needs of the best-of-breed Generative AI workloads.
 
-When possible, running a job using the nodes in the same Local Block will provide the best performance. Because the number of nodes in a Local Block is limited; depending on the number of nodes you have, the number of your concurrent jobs running, and the size of your jobs, you might need to use the nodes from another Local Block in the same Network Block or from another Network Block.
+When possible, running a job using the nodes in the same Local Block will provide the best performance. However, the number of nodes in a Local Block is limited. Depending on the number of nodes you have, the number of concurrent jobs, and the size of your jobs, you might need to use nodes from another Local Block in the same Network Block or from another Network Block.
 
 Local Block is the first latency band (Tier-0), Network Block is the second latency band (Tier-1), and HPC Island is the third latency band (Tier-2) in OCI's RDMA networks. You can read [this blog post](https://blogs.oracle.com/cloud-infrastructure/post/first-principles-zettascale-oci-superclusters) and watch the [YouTube video](https://www.youtube.com/watch?v=cZy22n5Ih78) for learning more about OCI's RDMA network design.
 
@@ -62,17 +62,17 @@ oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 > [!NOTE]
 > Starting with stack v26.3.0, Kueue is deployed by default along with the Topology, ResourceFlavor, ClusterQueue, and LocalQueue resources. If you deployed using v26.3.0 or later, skip to [Step 6](#step-6-submit-a-job).
 
-Kueue's **Topology Aware Scheduling (TAS)** automatically places pods as close together as possible in the RDMA network hierarchy. You define a preferred topology level (e.g., Local Block), and Kueue will pack pods there if capacity allows. If not, it progressively falls back to Network Block, then HPC Island — no manual label lookups or affinity rules required.
+Kueue's **Topology Aware Scheduling (TAS)** automatically places pods as close together as possible in the RDMA network hierarchy. You define a preferred topology level (e.g., Local Block), and Kueue will pack pods there if capacity allows. If not, it progressively falls back to Network Block, then HPC Island. No manual label lookups or affinity rules are required.
 
 This is the recommended approach because:
-- **No label values to manage** — Kueue reads the topology from node labels automatically
-- **Automatic fallback** — jobs are never stuck waiting; Kueue finds the best available placement
-- **Integrates with quotas** — ClusterQueue resource quotas prevent overcommitment
+- **No label values to manage**: Kueue reads the topology from node labels automatically
+- **Automatic fallback**: jobs are never stuck waiting; Kueue finds the best available placement
+- **Integrates with quotas**: ClusterQueue resource quotas prevent overcommitment
 
 ### Step 1: Install Kueue
 
 ```sh
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.17.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.18.2" --create-namespace --namespace=kueue-system
 ```
 
 ### Step 2: Create a Topology
@@ -239,14 +239,14 @@ spec:
                   - key: oci.oraclecloud.com/rdma.local_block_id
                     operator: In
                     values:
-                      - 5tjxbt5s6ua
+                      - 4tjxbt4s6ua
             - weight: 50
               preference:
                 matchExpressions:
                   - key: oci.oraclecloud.com/rdma.network_block_id
                     operator: In
                     values:
-                      - 7xmzl5p5wba
+                      - 7xmzl4p4wba
             - weight: 25
               preference:
                 matchExpressions:
@@ -382,7 +382,7 @@ spec:
             - name: node-ordering
               emptyDir: {}
             containers:
-            - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+            - image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
               name: rccl-tests
               volumeMounts:
               - name: node-ordering
@@ -424,12 +424,11 @@ spec:
     Worker:
       replicas: 2
       template:
-        metadata:
         spec:
           dnsPolicy: ClusterFirstWithHostNet
           hostNetwork: true
           containers:
-          - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+          - image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
             securityContext:
               privileged: true
               capabilities:
