@@ -92,7 +92,7 @@ locals {
     var.setup_credential_provider_for_ocir ? [
       "Allow dynamic-group %v to read repos in compartment id %v"
     ] : [],
-    var.setup_oci_metrics_exporter ? [
+    alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter]) ? [
       "Allow dynamic-group %v to read all-resources in compartment id %v",
       "Allow dynamic-group %v to use stream-family in compartment id %v"
     ] : [],
@@ -212,8 +212,14 @@ resource "oci_identity_policy" "gmc_tenancy" {
 }
 
 resource "oci_identity_policy" "lustre_service_network" {
-  provider       = oci.home
-  count          = alltrue([var.create_policies, anytrue([var.create_lustre, var.setup_oci_metrics_exporter])]) ? 1 : 0
+  provider = oci.home
+  count = alltrue([
+    var.create_policies,
+    anytrue([
+      var.create_lustre,
+      alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter])
+    ])
+  ]) ? 1 : 0
   compartment_id = var.tenancy_ocid
   name           = format("oci-services-policies-%v", local.state_id)
   description    = format("OCI services policies for OKE Terraform state %v", local.state_id)
@@ -221,7 +227,7 @@ resource "oci_identity_policy" "lustre_service_network" {
     var.create_lustre ? [
       "Allow service lustrefs to use virtual-network-family in tenancy",
     ] : [],
-    var.setup_oci_metrics_exporter ? [
+    alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter]) ? [
       "Allow any-user to read metrics in tenancy where all {request.principal.type = 'serviceconnector', request.principal.compartment.id = '${var.compartment_ocid}'}",
       "Allow any-user to use stream-push in compartment id ${var.compartment_ocid} where all {request.principal.type='serviceconnector', request.principal.compartment.id='${var.compartment_ocid}'}"
     ] : []

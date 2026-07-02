@@ -20,10 +20,8 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
 
 resource "kubernetes_config_map_v1" "grafana_gpu_dashboards" {
   for_each = (
-    (
-      (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
-      (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))))
-    ) && alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_gpu_dashboards : {}
+    (local.has_amd_gpu || local.has_nvidia_gpu) &&
+    alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_gpu_dashboards : {}
   )
 
   depends_on = [helm_release.prometheus]

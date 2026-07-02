@@ -22,8 +22,7 @@ locals {
           }
         }
       ],
-      (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))) ||
-      (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, "")))) ?
+      local.has_amd_gpu || local.has_nvidia_gpu ?
       [for cdk, cdv in local.grafana_gpu_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",
@@ -78,14 +77,15 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
-    manifest_md5     = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_gpu_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
-    dashboard_layout = "gpu"
-    namespace        = var.monitoring_namespace
-    bastion_host     = module.oke.bastion_public_ip
-    bastion_user     = local.bastion_user
-    ssh_private_key  = tls_private_key.stack_key.private_key_openssh
-    operator_host    = module.oke.operator_private_ip
-    operator_user    = local.operator_user
+    manifest_md5      = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_gpu_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
+    gpu_dashboard_md5 = sha256(join(".", [for name in sort(keys(local.grafana_gpu_dashboards)) : md5(local.grafana_gpu_dashboards[name])]))
+    dashboard_layout  = "gpu"
+    namespace         = var.monitoring_namespace
+    bastion_host      = module.oke.bastion_public_ip
+    bastion_user      = local.bastion_user
+    ssh_private_key   = tls_private_key.stack_key.private_key_openssh
+    operator_host     = module.oke.operator_private_ip
+    operator_user     = local.operator_user
   }
 
 
@@ -117,6 +117,11 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   provisioner "file" {
     source      = "${local.grafana_gpu_dashboard_dir}/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu"
+  }
+
+  provisioner "file" {
+    content     = lookup(local.grafana_gpu_dashboards, "gpu-health-status.json", "{}")
+    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu/gpu-health-status.json"
   }
 
   provisioner "file" {

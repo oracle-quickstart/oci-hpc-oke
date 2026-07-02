@@ -62,7 +62,7 @@ module "certmanager" {
 }
 
 module "ingress" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.preferred_kubernetes_services == "public"]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.preferred_kubernetes_services == "public"]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -123,12 +123,16 @@ module "kube_prometheus_stack" {
   helm_repository_url = "https://prometheus-community.github.io/helm-charts"
   helm_chart_version  = var.prometheus_stack_chart_version
 
-  pre_deployment_commands = [
-    "export PATH=$PATH:/home/${local.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal",
-    "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
-    "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
-  ]
+  pre_deployment_commands = flatten([
+    [
+      "export PATH=$PATH:/home/${local.operator_user}/bin",
+      "export OCI_CLI_AUTH=instance_principal",
+    ],
+    var.install_grafana && var.preferred_kubernetes_services == "public" ? [
+      "command -v jq >/dev/null 2>&1 || sudo bash -c 'apt-get update && apt-get install -y jq || yum install -y jq || dnf install -y jq'",
+      "export INGRESS_IP=$(kubectl get svc -A -l app.kubernetes.io/name=contour  -o json | jq -r '.items[] | select(.spec.type == \"LoadBalancer\") | .status.loadBalancer.ingress[].ip')"
+    ] : []
+  ])
 
   deployment_extra_args = flatten([
     [
@@ -137,7 +141,7 @@ module "kube_prometheus_stack" {
       "--history-max 1",
       "--wait",
     ],
-    var.preferred_kubernetes_services == "public" ? [
+    var.install_grafana ? (var.preferred_kubernetes_services == "public" ? [
       "--set grafana.ingress.enabled=true",
       "--set grafana.ingress.ingressClassName=contour",
       "--set-string grafana.ingress.annotations.'cert-manager\\.io\\/cluster-issuer'=le-clusterissuer",
@@ -145,28 +149,32 @@ module "kube_prometheus_stack" {
       "--set grafana.ingress.hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"
-    ] :
-    [
-      "--set grafana.service.type=LoadBalancer",
-      "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape'=flexible",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
-      "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
-      format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", module.oke.int_lb_nsg_id)
-    ]
+      ] :
+      [
+        "--set grafana.service.type=LoadBalancer",
+        "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape'=flexible",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
+        "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
+        format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", module.oke.int_lb_nsg_id)
+    ]) : []
   ])
 
   post_deployment_commands = []
 
-  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", { preferred_kubernetes_services = var.preferred_kubernetes_services })
+  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
+    install_grafana               = var.install_grafana
+    preferred_kubernetes_services = var.preferred_kubernetes_services
+    setup_alerting                = var.setup_alerting
+  })
 
-  helm_user_values_override = yamlencode(
+  helm_user_values_override = var.install_grafana ? yamlencode(
     {
       grafana = merge(
         {
-          adminPassword = random_password.grafana_admin_password.result
+          adminPassword = random_password.grafana_admin_password[0].result
         },
         var.preferred_kubernetes_services == "internal" ?
         {
@@ -177,13 +185,13 @@ module "kube_prometheus_stack" {
           }
       } : {})
     }
-  )
+  ) : ""
   depends_on = [module.ingress]
 }
 
 
-module "node_problem_detector" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack]) ? 1 : 0
+module "node_problem_detector_amd" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_amd_gpu]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -192,7 +200,7 @@ module "node_problem_detector" {
   operator_user   = local.operator_user
   ssh_private_key = tls_private_key.stack_key.private_key_openssh
 
-  deployment_name     = "gpu-rdma-node-problem-detector"
+  deployment_name     = "gpu-rdma-node-problem-detector-amd"
   helm_chart_name     = "node-problem-detector"
   namespace           = var.monitoring_namespace
   helm_repository_url = "oci://ghcr.io/deliveryhero/helm-charts"
@@ -206,14 +214,43 @@ module "node_problem_detector" {
   post_deployment_commands = []
 
   helm_template_values_override = file("${path.module}/files/node-problem-detector/values.yaml")
-  helm_user_values_override     = ""
+  helm_user_values_override     = file("${path.module}/files/node-problem-detector/values-amd.yaml")
+
+  depends_on = [module.kube_prometheus_stack]
+}
+
+module "node_problem_detector_nvidia" {
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu]) ? 1 : 0
+  source = "./helm-module"
+
+  bastion_host    = module.oke.bastion_public_ip
+  bastion_user    = local.bastion_user
+  operator_host   = module.oke.operator_private_ip
+  operator_user   = local.operator_user
+  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+
+  deployment_name     = "gpu-rdma-node-problem-detector-nvidia"
+  helm_chart_name     = "node-problem-detector"
+  namespace           = var.monitoring_namespace
+  helm_repository_url = "oci://ghcr.io/deliveryhero/helm-charts"
+  helm_chart_version  = var.node_problem_detector_chart_version
+
+  pre_deployment_commands = [
+    "export PATH=$PATH:/home/${local.operator_user}/bin",
+    "export OCI_CLI_AUTH=instance_principal"
+  ]
+  deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
+  post_deployment_commands = []
+
+  helm_template_values_override = file("${path.module}/files/node-problem-detector/values.yaml")
+  helm_user_values_override     = file("${path.module}/files/node-problem-detector/values-nvidia.yaml")
 
   depends_on = [module.kube_prometheus_stack]
 }
 
 
 resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
-  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true", (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) || (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape))]) ? 1 : 0
+  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true", local.has_nvidia_gpu]) ? 1 : 0
 
   triggers = {
     manifest_md5    = md5(local.nvidia_dcgm_exporter_service_monitor_manifest)
@@ -310,7 +347,7 @@ module "amd_device_metrics_exporter" {
 
 
 module "oke-ons-webhook" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.setup_alerting]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_grafana, var.setup_alerting]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -336,7 +373,7 @@ module "oke-ons-webhook" {
     deploy = {
       env = {
         ONS_TOPIC_OCID           = try(oci_ons_notification_topic.grafana_alerts[0].id, "")
-        GRAFANA_INITIAL_PASSWORD = base64encode(random_password.grafana_admin_password.result)
+        GRAFANA_INITIAL_PASSWORD = base64encode(random_password.grafana_admin_password[0].result)
         GRAFANA_SERVICE_URL      = "http://kube-prometheus-stack-grafana"
       }
     }

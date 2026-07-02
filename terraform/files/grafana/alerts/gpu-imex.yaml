@@ -5,8 +5,8 @@ groups:
       folder: Alerts
       interval: 1m
       rules:
-        - uid: oke_npd_node_pcie
-          title: Node PCIe
+        - uid: oke_npd_gpu_imex
+          title: GPU IMEX
           condition: C
           data:
             - refId: A
@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: label_replace(max by(node) (kube_node_status_condition{condition="NodeHasPcieErrors",status="true"}), "hostname", "$1", "node", "(.*)")
+                expr: label_replace(max by(node) (kube_node_status_condition{condition="GpuImex",status="true"}), "hostname", "$1", "node", "(.*)")
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto

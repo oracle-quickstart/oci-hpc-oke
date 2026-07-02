@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"}
+                expr: label_replace(max by(node) (kube_node_status_condition{condition="RdmaRttcc",status="true"}), "hostname", "$1", "node", "(.*)")
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto

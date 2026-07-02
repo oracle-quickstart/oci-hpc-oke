@@ -11,7 +11,7 @@ This guide provides step-by-step instructions to deploy the same Prometheus and 
 - [Step 1: Prepare Your Environment](#step-1-prepare-your-environment)
 - [Step 2: Deploy kube-prometheus-stack](#step-2-deploy-kube-prometheus-stack)
 - [Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor](#step-3-deploy-nvidia-dcgm-exporter-servicemonitor)
-- [Step 3b: Deploy AMD Device Metrics Exporter (Alternative for AMD GPUs)](#step-3b-deploy-amd-device-metrics-exporter-alternative-for-amd-gpus)
+- [Step 3b: Deploy AMD Device Metrics Exporter](#step-3b-deploy-amd-device-metrics-exporter)
 - [Step 4: Deploy Node Problem Detector](#step-4-deploy-node-problem-detector)
 - [Step 5: Deploy Custom Grafana Dashboards](#step-5-deploy-custom-grafana-dashboards)
 - [Step 6: Deploy Grafana Alert Rules](#step-6-deploy-grafana-alert-rules)
@@ -29,7 +29,7 @@ This deployment includes:
 
 - **kube-prometheus-stack**: Complete monitoring solution with Prometheus, Grafana, and exporters
 - **NVIDIA DCGM Exporter**: GPU metrics collection for NVIDIA GPUs
-- **AMD Device Metrics Exporter**: GPU metrics collection for AMD GPUs (MI300X)
+- **AMD Device Metrics Exporter**: GPU metrics collection for AMD GPUs (MI300X and MI355X)
 - **Node Problem Detector**: Custom health checks for GPU, RDMA, and PCIe issues
 - **Custom Dashboards**: Pre-configured dashboards for Kubernetes, GPU nodes (NVIDIA/AMD), and cluster metrics
 - **Alert Rules**: Grafana alert rules for GPU health, RDMA issues, and node problems
@@ -68,7 +68,7 @@ First, clone the [oci-hpc-oke](https://github.com/oracle-quickstart/oci-hpc-oke.
 git clone https://github.com/oracle-quickstart/oci-hpc-oke.git
 
 # Change to the repository directory
-cd oci-hpc-oke
+cd oci-hpc-oke || exit
 ```
 
 **Note**: All subsequent commands in this guide assume you're running them from the repository root directory unless otherwise specified.
@@ -83,6 +83,15 @@ kubectl create namespace monitoring
 
 ```bash
 export MONITORING_NAMESPACE="monitoring"
+export PROMETHEUS_STACK_CHART_VERSION="87.2.1"
+
+# Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
+export GPU_VENDOR="amd"
+
+case "${GPU_VENDOR}" in
+  amd|nvidia|mixed) ;;
+  *) echo "GPU_VENDOR must be amd, nvidia, or mixed" >&2; exit 1 ;;
+esac
 ```
 
 ### 1.4 Add Helm Repositories
@@ -103,7 +112,8 @@ Before installing, generate a strong random password for Grafana instead of usin
 
 ```bash
 # Generate a strong random password (16 characters)
-export GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)
+GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)
+export GRAFANA_ADMIN_PASSWORD
 
 # Display the password (save this in a secure location!)
 echo "Grafana admin password: ${GRAFANA_ADMIN_PASSWORD}"
@@ -113,16 +123,40 @@ echo "Grafana admin password: ${GRAFANA_ADMIN_PASSWORD}"
 
 ### 2.2 Install kube-prometheus-stack
 
+The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, then removing the Terraform conditional markers:
+
+```bash
+sed -e 's/${install_grafana}/true/' \
+  -e 's/${setup_alerting}/true/' \
+  -e '/^%{ if /d' \
+  -e '/^%{ endif }/d' \
+  terraform/files/kube-prometheus/values.yaml.tftpl \
+  > /tmp/kube-prometheus-values.yaml
+```
+
+Validate the generated YAML:
+
+```bash
+helm template kube-prometheus-stack \
+  prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values /tmp/kube-prometheus-values.yaml \
+  --set grafana.adminPassword="${GRAFANA_ADMIN_PASSWORD}" \
+  >/dev/null
+```
+
 ```bash
 helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
   --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/kube-prometheus/values.yaml \
+  --values /tmp/kube-prometheus-values.yaml \
   --set grafana.adminPassword="${GRAFANA_ADMIN_PASSWORD}" \
   --create-namespace \
   --wait
 ```
 
-**Note**: The repository contains both `values.yaml` (for manual deployments) and `values.yaml.tftpl` (Terraform template for automated deployments). Use the `values.yaml` file for manual installations as shown above.
+The generated values enable the node-exporter textfile collector used by NPD freshness metrics.
 
 **Note**: The password is also stored in a Kubernetes secret and can be retrieved later with:
 ```bash
@@ -138,15 +172,20 @@ kubectl get pods -n ${MONITORING_NAMESPACE}
 
 # Example output
 NAME                                                        READY   STATUS    RESTARTS   AGE
-gpu-rdma-node-problem-detector-8hxcv                        1/1     Running   0          121m
-kube-prometheus-stack-grafana-0                             4/4     Running   0          128m
-kube-prometheus-stack-kube-state-metrics-557fd457c6-nqskx   1/1     Running   0          128m
-kube-prometheus-stack-operator-57df9db49c-2h4nv             1/1     Running   0          128m
-kube-prometheus-stack-prometheus-node-exporter-7lzms        1/1     Running   0          128m
-kube-prometheus-stack-prometheus-node-exporter-gbkcm        1/1     Running   0          128m
-kube-prometheus-stack-prometheus-node-exporter-rlndc        1/1     Running   0          128m
-oke-ons-webhook-789cb49d9f-jjr8q                            1/1     Running   0          51m
-prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          128m
+kube-prometheus-stack-grafana-0                             4/4     Running   0          2m
+kube-prometheus-stack-kube-state-metrics-557fd457c6-nqskx   1/1     Running   0          2m
+kube-prometheus-stack-operator-57df9db49c-2h4nv             1/1     Running   0          2m
+kube-prometheus-stack-prometheus-node-exporter-7lzms        1/1     Running   0          2m
+prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          2m
+```
+
+Confirm node exporter has the NPD textfile collector argument:
+
+```bash
+kubectl get daemonset -n ${MONITORING_NAMESPACE} \
+  kube-prometheus-stack-prometheus-node-exporter \
+  -o json | jq -r '.spec.template.spec.containers[0].args[]' | \
+  grep -- '--collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector'
 ```
 
 ## Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor
@@ -167,21 +206,21 @@ kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-mo
 
 ```bash
 # Verify ServiceMonitor is created
-kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
+kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter-oke
 
 # Check DCGM exporter pods are running (deployed by NVIDIA GPU Operator)
 kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ```
 
-## Step 3b: Deploy AMD Device Metrics Exporter (Alternative for AMD GPUs)
+## Step 3b: Deploy AMD Device Metrics Exporter
 
-**Note**: This step is only required if you have AMD GPU nodes (e.g., MI300X) in your cluster. Skip this if you deployed NVIDIA DCGM Exporter in Step 3.
+**Note**: This step is required for AMD MI300X and MI355X nodes. Skip it on NVIDIA-only clusters.
 
 ### 3b.1 Add AMD Device Metrics Exporter Helm Repository
 
 ```bash
-# Add AMD GPU Operator Helm repository
-helm repo add amd-gpu-operator https://amdgpu-helm-charts.github.io/amd-gpu-operator/
+# Add AMD Device Metrics Exporter Helm repository
+helm repo add amd-device-metrics-exporter https://rocm.github.io/device-metrics-exporter
 
 # Update repositories
 helm repo update
@@ -192,15 +231,17 @@ helm repo update
 The values file is located at `terraform/files/amd-device-metrics-exporter/values.yaml`. Key configurations:
 
 - **ServiceMonitor**: Enabled with relabelings for OCI-specific labels
-- **NodeSelector**: Targets nodes with `node.kubernetes.io/instance-type: BM.GPU.MI300X.8`
+- **Node affinity**: Targets `BM.GPU.MI300X.8`, `BM.GPU.MI355X-v1.8`, and `BM.GPU.MI355X.8`
 - **Tolerations**: Configured to run on GPU nodes with taints
 - **Service**: Exposes metrics on port 5000
-- **Image**: Uses `docker.io/rocm/device-metrics-exporter:v1.2.1`
+- **Image**: Uses `docker.io/rocm/device-metrics-exporter:v1.5.0`
 
 ### 3b.3 Install AMD Device Metrics Exporter
 
 ```bash
-helm upgrade --install amd-device-metrics-exporter amd-gpu-operator/device-metrics-exporter \
+helm upgrade --install amd-device-metrics-exporter \
+  amd-device-metrics-exporter/device-metrics-exporter-charts \
+  --version v1.5.0 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/amd-device-metrics-exporter/values.yaml \
   --wait
@@ -222,27 +263,50 @@ kubectl get servicemonitor -n ${MONITORING_NAMESPACE} device-metrics-exporter
 
 ### 4.1 Install Node Problem Detector
 
+NPD uses separate AMD and NVIDIA releases. Run the AMD command when `GPU_VENDOR` is `amd` or `mixed`. Run the NVIDIA command when `GPU_VENDOR` is `nvidia` or `mixed`.
+
+AMD:
+
 ```bash
-helm upgrade --install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
+helm upgrade --install gpu-rdma-node-problem-detector-amd \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-amd.yaml \
   --wait
 ```
 
-**Note**: The values file at `terraform/files/node-problem-detector/values.yaml` contains:
-- Custom health check scripts for GPU ECC errors, RDMA link issues, PCIe problems
-- Node affinity to run only on GPU node types
-- ServiceMonitor configuration for Prometheus integration
-- `fullnameOverride: "gpu-rdma-node-problem-detector"` to ensure correct naming
+NVIDIA:
+
+```bash
+helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-nvidia.yaml \
+  --wait
+```
+
+The base values contain the protected wrapper, image, logs, and freshness metrics. The vendor values select the applicable checks, node shapes, intervals, concurrency, and timeouts.
 
 ### 4.2 Verify Node Problem Detector
 
 ```bash
 # Check if node problem detector pods are running
-kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=node-problem-detector
+kubectl get pods -n ${MONITORING_NAMESPACE} \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)'
 
 # Check metrics endpoint
 kubectl get servicemonitor -n ${MONITORING_NAMESPACE} | grep node-problem-detector
+
+# Confirm the pulled image and digest
+kubectl get pods -n ${MONITORING_NAMESPACE} \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -o json | jq -r '.items[] |
+    [.metadata.name, .spec.nodeName, .spec.containers[0].image,
+     .status.containerStatuses[0].imageID] | @tsv'
 ```
 
 ## Step 5: Deploy Custom Grafana Dashboards
@@ -258,9 +322,9 @@ The repository includes pre-configured dashboards for:
 DASHBOARD_PATH="terraform/files/grafana/dashboards"
 
 # Deploy each common dashboard as a ConfigMap
-for dashboard in ${DASHBOARD_PATH}/common/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
+for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
+  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
+    --from-file="$(basename "$dashboard")=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
@@ -271,17 +335,61 @@ done
 
 ### 5.2 Deploy GPU Dashboards (if applicable)
 
+The source GPU Health dashboard contains both vendor-specific panels. Render it for the `GPU_VENDOR` selected in Step 1.3 before creating its ConfigMap. This uses the same panel filtering and stat-panel layout as Terraform.
+
 ```bash
-# Deploy each AMD/NVIDIA GPU dashboard as a ConfigMap
-for dashboard in ${DASHBOARD_PATH}/gpu/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
-    --namespace ${MONITORING_NAMESPACE} \
+# Render the vendor-specific GPU Health dashboard
+RENDERED_DASHBOARD_DIR=$(mktemp -d)
+cleanup_rendered_dashboards() {
+  rm -rf "${RENDERED_DASHBOARD_DIR}"
+}
+trap cleanup_rendered_dashboards EXIT
+
+if ! jq -e --arg vendor "${GPU_VENDOR}" '
+  .panels |= map(
+    select(
+      (.id != 7 or $vendor != "amd") and
+      (.id != 23 or $vendor != "nvidia")
+    )
+  )
+  | .panels = (
+      .panels
+      | to_entries
+      | map(
+          if .value.type == "stat" then
+            .value.gridPos.x = ((.key % 8) * 3)
+            | .value.gridPos.y = (((.key / 8) | floor) * 3)
+          else
+            .
+          end
+          | .value
+        )
+    )
+' "${DASHBOARD_PATH}/gpu/gpu-health-status.json" \
+  > "${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"; then
+  cleanup_rendered_dashboards
+  trap - EXIT
+  exit 1
+fi
+
+# Deploy each GPU dashboard as a ConfigMap
+for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
+  dashboard_file="${dashboard}"
+  if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
+    dashboard_file="${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"
+  fi
+
+  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
+    --from-file="$(basename "$dashboard")=${dashboard_file}" \
+    --namespace "${MONITORING_NAMESPACE}" \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
   kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
   kubectl apply -f -
 done
+
+cleanup_rendered_dashboards
+trap - EXIT
 ```
 
 ### 5.3 Verify Dashboards
@@ -289,9 +397,19 @@ done
 ```bash
 # List all dashboard ConfigMaps
 kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
+
+# Show the vendor-specific GPU Health panels that were deployed
+kubectl get configmap dashboard-gpu-health-status \
+  -n "${MONITORING_NAMESPACE}" -o json | \
+jq '.data["gpu-health-status.json"] | fromjson |
+  [.panels[] | select(.id == 7 or .id == 23) | {id, title}]'
 ```
 
+The result must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster.
+
 ## Step 6: Deploy Grafana Alert Rules
+
+This step does not require the custom dashboards from Step 5. You can deploy alert rules when dashboard installation is skipped.
 
 The repository includes alert rules for:
 - GPU ECC errors
@@ -304,13 +422,18 @@ The repository includes alert rules for:
 - GPU Xid errors
 - NVLink speed issues
 - DCGM health issues
+- NVIDIA IMEX issues
 - RDMA link issues
 - RDMA link flapping
+- RDMA VF route issues
+- RDMA VF counter issues
 - RDMA RTTCC issues
 - RDMA WPA authentication
 - Node PCIe errors
 - OCA version issues
 - CPU profile issues
+- NPD checks that return Unknown
+- NPD checks that stop updating
 
 ### 6.1 Deploy Alert Rules
 
@@ -318,16 +441,52 @@ The repository includes alert rules for:
 # Set the path to the alerts directory (adjust if needed)
 ALERTS_PATH="terraform/files/grafana/alerts"
 
-# Deploy each alert rule as a ConfigMap
-for alert in ${ALERTS_PATH}/*.yaml; do
-  kubectl create configmap "alert-$(basename $alert .yaml)" \
-    --from-file="$(basename $alert)=${alert}" \
+# Deploy only the common and vendor-applicable alert files
+case "${GPU_VENDOR}" in
+  amd)
+    kubectl delete configmap -n ${MONITORING_NAMESPACE} \
+      alert-dcgm-health alert-gpu-fabric-manager alert-gpu-imex \
+      alert-gpu-row-remap alert-gpu-xid alert-nvlink-speed \
+      alert-rdma-vf-counters alert-rdma-vf-routes \
+      alert-npd-delete-amd-alerts --ignore-not-found
+    ;;
+  nvidia)
+    kubectl delete configmap -n ${MONITORING_NAMESPACE} \
+      alert-gpu-bad-pages alert-npd-delete-nvidia-alerts \
+      --ignore-not-found
+    ;;
+  mixed)
+    kubectl delete configmap -n ${MONITORING_NAMESPACE} \
+      alert-npd-delete-amd-alerts alert-npd-delete-nvidia-alerts \
+      --ignore-not-found
+    ;;
+esac
+
+for alert in "${ALERTS_PATH}"/*.yaml; do
+  alert_name=$(basename "${alert}")
+
+  case "${GPU_VENDOR}:${alert_name}" in
+    amd:dcgm-health.yaml|amd:gpu-fabric-manager.yaml|amd:gpu-imex.yaml|amd:gpu-row-remap.yaml|amd:gpu-xid.yaml|amd:nvlink-speed.yaml|amd:rdma-vf-counters.yaml|amd:rdma-vf-routes.yaml|amd:npd-delete-amd-alerts.yaml)
+      continue
+      ;;
+    nvidia:gpu-bad-pages.yaml|nvidia:npd-delete-nvidia-alerts.yaml)
+      continue
+      ;;
+    mixed:npd-delete-amd-alerts.yaml|mixed:npd-delete-nvidia-alerts.yaml)
+      continue
+      ;;
+  esac
+
+  kubectl create configmap "alert-${alert_name%.yaml}" \
+    --from-file="${alert_name}=${alert}" \
     --namespace ${MONITORING_NAMESPACE} \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_alert=1 | \
   kubectl apply -f -
 done
 ```
+
+The single-vendor cleanup files remove stale file-provisioned rules left by an older generic deployment. Mixed-vendor clusters skip both cleanup files and retain both vendors' rules.
 
 ### 6.2 Verify Alert Rules
 
@@ -371,7 +530,8 @@ The webhook chart is available at `terraform/files/oke-ons-webhook/`.
 
 ```bash
 # Get the base64-encoded Grafana admin password
-export GRAFANA_PASSWORD_B64=$(kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}")
+GRAFANA_PASSWORD_B64=$(kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}")
+export GRAFANA_PASSWORD_B64
 
 # Set your OCI Notifications Topic OCID
 export ONS_TOPIC_OCID="ocid1.onstopic.oc1.region.xxxxx"  # Replace with your actual ONS Topic OCID
@@ -556,9 +716,9 @@ curl localhost:9273/metrics
 
 ```bash
 # Deploy each OCI metrics dashboards as a ConfigMap
-for dashboard in ${DASHBOARD_PATH}/oci/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
+for dashboard in "${DASHBOARD_PATH}"/oci/*.json; do
+  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
+    --from-file="$(basename "$dashboard")=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
@@ -637,7 +797,11 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 3. Create a ClusterIssuer for Let's Encrypt.
 
    ```bash
-   kubectl apply -f terraform/files/cert-manager/cluster-issuer.yaml
+   export ACME_EMAIL="you@example.com"
+
+   sed "s|oke-hpc-stack-\${state}@oracle.com|${ACME_EMAIL}|" \
+     terraform/files/cert-manager/cluster-issuer-prod.yaml | \
+   kubectl apply -f -
    ```
 
 4. Get the public IP address of the LoadBalancer associated with the Contour Ingress Controller.
@@ -650,15 +814,16 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 
    ```bash
    helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-   --namespace ${MONITORING_NAMESPACE} \
-   --reuse-values \
-   --set grafana.ingress.enabled=true \
-   --set grafana.ingress.ingressClassName=contour \
-   --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
-   --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
-   --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
-   --set grafana.ingress.tls[0].secretName=grafana-tls \
-   --wait
+     --version "${PROMETHEUS_STACK_CHART_VERSION}" \
+     --namespace ${MONITORING_NAMESPACE} \
+     --reuse-values \
+     --set grafana.ingress.enabled=true \
+     --set grafana.ingress.ingressClassName=contour \
+     --set grafana.ingress.annotations.'cert-manager\.io\/cluster-issuer'=le-clusterissuer \
+     --set grafana.ingress.hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
+     --set grafana.ingress.tls[0].hosts[0]=grafana.${INGRESS_IP}.endpoint.oci-hpc.ai \
+     --set grafana.ingress.tls[0].secretName=grafana-tls \
+     --wait
    ```
 
 6. Confirm the ingress resource was created.
@@ -719,6 +884,13 @@ kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometh
 # Query for node problem detector metrics
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'problem_gauge'
+
+# Query NPD wrapper status and freshness metrics
+kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
+  -- promtool query instant http://localhost:9090 'oke_npd_check_status_code'
+
+kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
+  -- promtool query instant http://localhost:9090 'oke_npd_check_last_run_timestamp_seconds'
 ```
 
 ## Updating an Existing Deployment
@@ -738,7 +910,8 @@ You have two options:
    # Remove monitoring resources from Terraform state
    terraform state rm 'helm_release.prometheus[0]'
    terraform state rm 'helm_release.amd_device_metrics_exporter[0]'
-   terraform state rm 'helm_release.node-problem_detector[0]'
+   terraform state rm 'helm_release.node_problem_detector_amd[0]'
+   terraform state rm 'helm_release.node_problem_detector_nvidia[0]'
    terraform state rm 'helm_release.oke-ons-webhook[0]'
 
    # Remove dashboard and alert ConfigMaps from state
@@ -761,7 +934,7 @@ helm list -n monitoring
 helm get values kube-prometheus-stack -n monitoring
 
 # Compare with the values file in the repository
-diff <(helm get values kube-prometheus-stack -n monitoring) terraform/files/kube-prometheus/values.yaml
+diff <(helm get values kube-prometheus-stack -n monitoring) /tmp/kube-prometheus-values.yaml
 ```
 
 ### Update kube-prometheus-stack
@@ -772,21 +945,18 @@ Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingr
 helm repo update
 
 helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --version "${PROMETHEUS_STACK_CHART_VERSION}" \
   --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/kube-prometheus/values.yaml \
+  --values /tmp/kube-prometheus-values.yaml \
   --reuse-values \
   --wait
 ```
 
-To upgrade to a specific chart version, add `--version`:
+To select another chart version, list the versions available from the configured repository and update `PROMETHEUS_STACK_CHART_VERSION`:
 
 ```bash
-helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/kube-prometheus/values.yaml \
-  --reuse-values \
-  --version 85.0.3 \
-  --wait
+helm search repo prometheus-community/kube-prometheus-stack --versions
+export PROMETHEUS_STACK_CHART_VERSION="replace-with-selected-version"
 ```
 
 ### Update NVIDIA DCGM Exporter ServiceMonitor
@@ -802,7 +972,9 @@ kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-mo
 ```bash
 helm repo update
 
-helm upgrade amd-device-metrics-exporter amd-gpu-operator/device-metrics-exporter \
+helm upgrade amd-device-metrics-exporter \
+  amd-device-metrics-exporter/device-metrics-exporter-charts \
+  --version v1.5.0 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/amd-device-metrics-exporter/values.yaml \
   --wait
@@ -810,11 +982,36 @@ helm upgrade amd-device-metrics-exporter amd-gpu-operator/device-metrics-exporte
 
 ### Update Node Problem Detector
 
+Upgrade each release present in the cluster.
+
+AMD:
+
 ```bash
-helm upgrade gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
+helm upgrade --install gpu-rdma-node-problem-detector-amd \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-amd.yaml \
   --wait
+```
+
+NVIDIA:
+
+```bash
+helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
+  --namespace ${MONITORING_NAMESPACE} \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-nvidia.yaml \
+  --wait
+```
+
+If this is an older installation with the generic `gpu-rdma-node-problem-detector` release, install and verify the appropriate vendor release before uninstalling the generic release:
+
+```bash
+helm uninstall gpu-rdma-node-problem-detector -n ${MONITORING_NAMESPACE}
 ```
 
 ### Update OKE ONS Webhook
@@ -834,9 +1031,9 @@ Dashboards and alerts are deployed as ConfigMaps, not Helm releases. Re-running 
 # Update common dashboards
 DASHBOARD_PATH="terraform/files/grafana/dashboards"
 
-for dashboard in ${DASHBOARD_PATH}/common/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
+for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
+  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
+    --from-file="$(basename "$dashboard")=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
@@ -845,28 +1042,18 @@ for dashboard in ${DASHBOARD_PATH}/common/*.json; do
 done
 
 # Update AMD/NVIDIA GPU dashboards (if applicable)
-for dashboard in ${DASHBOARD_PATH}/gpu/*.json; do
-  kubectl create configmap "dashboard-$(basename $dashboard .json)" \
-    --from-file="$(basename $dashboard)=${dashboard}" \
+for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
+  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
+    --from-file="$(basename "$dashboard")=${dashboard}" \
     --namespace ${MONITORING_NAMESPACE} \
     --dry-run=client -o yaml | \
   kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
   kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
   kubectl apply -f -
 done
-
-# Update alert rules
-ALERTS_PATH="terraform/files/grafana/alerts"
-
-for alert in ${ALERTS_PATH}/*.yaml; do
-  kubectl create configmap "alert-$(basename $alert .yaml)" \
-    --from-file="$(basename $alert)=${alert}" \
-    --namespace ${MONITORING_NAMESPACE} \
-    --dry-run=client -o yaml | \
-  kubectl label -f - --dry-run=client -o yaml --local grafana_alert=1 | \
-  kubectl apply -f -
-done
 ```
+
+Update alert rules by rerunning the vendor-aware loop from Step 6.1.
 
 The Grafana sidecar will automatically detect ConfigMap changes and reload the updated dashboards and alerts.
 
@@ -885,7 +1072,7 @@ helm rollback kube-prometheus-stack -n monitoring
 helm rollback kube-prometheus-stack 1 -n monitoring
 ```
 
-The same `helm history` and `helm rollback` commands work for all Helm-managed components (`gpu-rdma-node-problem-detector`, `oke-ons-webhook`, `amd-device-metrics-exporter`).
+The same `helm history` and `helm rollback` commands work for all Helm-managed components, including `gpu-rdma-node-problem-detector-amd`, `gpu-rdma-node-problem-detector-nvidia`, `oke-ons-webhook`, and `amd-device-metrics-exporter`.
 
 ### Verify the Update
 
@@ -947,7 +1134,7 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 
 2. Check if ServiceMonitor exists:
    ```bash
-   kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter
+   kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter-oke
    ```
 
 3. Verify GPU nodes have the label:
@@ -972,7 +1159,8 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 
 3. Verify GPU nodes have the correct instance type label:
    ```bash
-   kubectl get nodes -l node.kubernetes.io/instance-type=BM.GPU.MI300X.8
+   kubectl get nodes -L node.kubernetes.io/instance-type | \
+     grep -E 'BM.GPU.MI300X.8|BM.GPU.MI355X-v1.8|BM.GPU.MI355X.8'
    ```
 
 4. Check pod logs for any errors:
@@ -1039,9 +1227,22 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 2. Verify the custom image is accessible:
    ```yaml
    image:
-     repository: iad.ocir.io/hpc_limited_availability/oke-npd
-     tag: v0.8.21-1
+     repository: iad.ocir.io/idxzjcdglx2s/oke-npd
+     tag: v1.35.2-5
    ```
+
+3. Check the vendor-specific release and DaemonSet:
+   ```bash
+   helm list -n ${MONITORING_NAMESPACE} | grep node-problem-detector
+   kubectl get daemonset -n ${MONITORING_NAMESPACE} | grep node-problem-detector
+   ```
+
+4. Inspect a failed check's protected host log on the affected node:
+   ```bash
+   sudo sed -n '1,160p' /var/log/oke-npd/latest-gpu-count.log
+   ```
+
+5. Treat `Unknown` separately from a confirmed failure. `Unknown` means the check could not produce a reliable result. A stale-check alert means the wrapper heartbeat stopped updating.
 
 ### OKE ONS Webhook Issues
 
@@ -1084,11 +1285,12 @@ kubectl delete configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
 # Delete alerts
 kubectl delete configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 
-# Uninstall Node Problem Detector
-helm uninstall gpu-rdma-node-problem-detector -n ${MONITORING_NAMESPACE}
+# Uninstall Node Problem Detector releases that exist in the cluster
+helm uninstall gpu-rdma-node-problem-detector-amd -n ${MONITORING_NAMESPACE}
+helm uninstall gpu-rdma-node-problem-detector-nvidia -n ${MONITORING_NAMESPACE}
 
 # Delete DCGM Exporter ServiceMonitor (if deployed)
-kubectl delete servicemonitor nvidia-dcgm-exporter -n gpu-operator --ignore-not-found
+kubectl delete servicemonitor nvidia-dcgm-exporter-oke -n gpu-operator --ignore-not-found
 
 # Uninstall AMD Device Metrics Exporter (if deployed)
 helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}
@@ -1105,11 +1307,11 @@ helm uninstall kube-prometheus-stack -n ${MONITORING_NAMESPACE}
 # Delete contour Ingress Controller (if deployed)
 helm uninstall contour -n projectcontour
 
-# Delete the Cluster Issuer
-kubectl delete -f terraform/files/cert-manager/cluster-issuer.yaml
+# Delete the ClusterIssuer
+kubectl delete clusterissuer le-clusterissuer --ignore-not-found
 
 # Delete cert-manager (OCI CLI is required)
-oci ce cluster disable-addon --addon-name CertManager --cluster-id {oke-cluster-ocid} --is-remove-existing-add-on true --force
+oci ce cluster disable-addon --addon-name CertManager --cluster-id "<oke-cluster-ocid>" --is-remove-existing-add-on true --force
 
 # Delete PVCs (optional, this will delete all stored metrics and dashboards)
 kubectl delete pvc -n ${MONITORING_NAMESPACE} --all

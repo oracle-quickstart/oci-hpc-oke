@@ -5,8 +5,8 @@ groups:
       folder: Alerts
       interval: 1m
       rules:
-        - uid: oke_npd_node_pcie
-          title: Node PCIe
+        - uid: oke_npd_check_unknown
+          title: NPD Check Unknown
           condition: C
           data:
             - refId: A
@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: label_replace(max by(node) (kube_node_status_condition{condition="NodeHasPcieErrors",status="true"}), "hostname", "$1", "node", "(.*)")
+                expr: label_replace(max by(node, condition) (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth|Rocminfo",status="unknown"}), "hostname", "$1", "node", "(.*)")
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto

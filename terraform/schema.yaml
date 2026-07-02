@@ -149,6 +149,7 @@ variableGroups:
       - operator_image_custom_uri
       - operator_image_compartment
       - operator_image_id
+      - operator_allow_image_drift
       - operator_user
       - create_oci_bastion_service
       - bastion_service_allowed_cidrs
@@ -1179,6 +1180,11 @@ variables:
         - ${create_operator}
         - ${operator_shape_config}
         - eq: [operator_image_type, Custom]
+  operator_allow_image_drift:
+    title: Allow operator image drift
+    type: boolean
+    default: true
+    visible: false
   operator_image_custom_uri:
     title: Operator image URI
     type: string

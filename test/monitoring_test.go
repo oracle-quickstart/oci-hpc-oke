@@ -17,13 +17,13 @@ func TestMonitoring(t *testing.T) {
 	skipUnlessEnv(t, "RUN_MONITORING_TESTS")
 
 	options := newTerraformOptions(t, map[string]interface{}{
-		"install_monitoring":                                  true,
+		"install_monitoring": true,
 		"install_node_problem_detector_kube_prometheus_stack": true,
-		"install_grafana":                                     true,
-		"install_grafana_dashboards":                          true,
-		"install_amd_device_metrics_exporter":                 false,
-		"preferred_kubernetes_services":                       "internal",
-		"setup_alerting":                                      false,
+		"install_grafana":                     true,
+		"install_grafana_dashboards":          true,
+		"install_amd_device_metrics_exporter": false,
+		"preferred_kubernetes_services":       "internal",
+		"setup_alerting":                      false,
 	})
 
 	defer terraform.Destroy(t, options)
@@ -33,14 +33,14 @@ func TestMonitoring(t *testing.T) {
 
 	// Verify core monitoring components
 	requireStateHasPrefix(t, resources, "helm_release.prometheus")
-	requireStateHasPrefix(t, resources, "helm_release.node-problem_detector")
-	requireStateHasPrefix(t, resources, "helm_release.grafana")
+	requireStateHasPrefix(t, resources, "helm_release.node_problem_detector_nvidia")
+	requireStateHasPrefix(t, resources, "random_password.grafana_admin_password")
 
 	// Verify NVIDIA DCGM Exporter ServiceMonitor
 	requireStateHasPrefix(t, resources, "kubectl_manifest.nvidia_dcgm_exporter_service_monitor")
 
 	// Verify Grafana dashboards ConfigMaps
-	requireStateHasPrefix(t, resources, "kubernetes_config_map_v1.grafana_dashboard")
+	requireStateHasPrefix(t, resources, "kubernetes_config_map_v1.grafana_common_dashboards")
 
 	// Verify Grafana login if URL is available
 	grafanaURL := terraform.Output(t, options, "grafana_url")

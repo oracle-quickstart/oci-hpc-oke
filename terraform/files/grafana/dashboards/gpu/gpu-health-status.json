@@ -20,7 +20,9 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": 26,
-  "links": [],
+  "links": [
+
+  ],
   "panels": [
     {
       "datasource": {
@@ -39,6 +41,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -58,7 +64,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -92,14 +100,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"RdmaRttccHasIssues\", type=\"RdmaRttcc\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"RdmaRttcc\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaRttcc\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaRttcc\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "RTTCC",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -118,6 +128,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -137,7 +151,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -171,14 +187,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"OcaVersionHasIssues\", type=\"OcaVersion\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"OcaVersion\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"OcaVersion\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"OcaVersion\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "OCA Ver",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -197,6 +215,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -216,7 +238,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -250,14 +274,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"RdmaLinkHasIssues\", type=\"RdmaLink\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"RdmaLink\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaLink\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaLink\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "RDMA Dev",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -276,6 +302,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -295,7 +325,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -329,14 +361,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"GpuBusHasIssues\", type=\"GpuBus\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuBus\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuBus\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuBus\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Bus Issue",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -355,6 +389,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -374,7 +412,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -408,14 +448,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"RdmaLinkFlappingHasIssues\", type=\"RdmaLinkFlapping\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"RdmaLinkFlapping\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaLinkFlapping\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"RdmaLinkFlapping\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Link Flap",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -434,6 +476,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -453,7 +499,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -461,7 +509,7 @@
         "x": 15,
         "y": 0
       },
-      "id": 6,
+      "id": 23,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -487,14 +535,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"GpuEccHasIssues\", type=\"GpuEcc\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuBadPages\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuBadPages\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuBadPages\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
-      "title": "ECC",
-      "type": "stat"
+      "title": "GPU Bad Pages",
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -513,6 +563,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -532,7 +586,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
@@ -566,14 +622,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"GpuRowRemapHasIssues\", type=\"GpuRowRemap\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuRowRemap\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuRowRemap\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuRowRemap\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Row Remap",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -592,6 +650,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -611,13 +673,189 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
         "x": 21,
         "y": 0
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuCount\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuCount\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuCount\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
+          "legendFormat": "{{hostname}}",
+          "range": false,
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "GPU Count",
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 0,
+        "y": 3
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuEcc\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuEcc\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuEcc\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
+          "legendFormat": "{{hostname}}",
+          "range": false,
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "ECC",
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+
+        ]
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 3,
+        "y": 3
       },
       "id": 8,
       "options": {
@@ -645,14 +883,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (amd_gpu_health == bool 1)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_EXP_XID_ERRORS_COUNT[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "0 * (\n  (\n    (min by(hostname) (min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range]))) < bool 1\n  ) == 1\n  or\n  (\n    (max by(hostname) (max_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_health{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (min by(hostname) (min_over_time(amd_gpu_health{hostname=~\"$hostname\"}[$__range]))) == bool 1\n  ) == 1\n  or\n  (\n    (max by(hostname) (max_over_time(DCGM_EXP_GPU_HEALTH_STATUS{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "GPU Health",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -671,6 +911,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -690,12 +934,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 6,
         "y": 3
       },
       "id": 9,
@@ -724,14 +970,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_ppt_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_ppt_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Power Throttle / Violation",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -750,6 +998,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -769,12 +1021,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 3,
+        "x": 9,
         "y": 3
       },
       "id": 10,
@@ -803,14 +1057,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_processor_hot_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_processor_hot_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Processor Hot / Board Limit",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -829,6 +1085,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -848,12 +1108,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 6,
+        "x": 12,
         "y": 3
       },
       "id": 11,
@@ -882,14 +1144,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_socket_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_socket_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Thermal Violation",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -908,6 +1172,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -927,12 +1195,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 9,
+        "x": 15,
         "y": 3
       },
       "id": 12,
@@ -961,14 +1231,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_hbm_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_hbm_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "HBM Thermal / Sync Boost",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -987,6 +1259,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1006,12 +1282,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 12,
+        "x": 18,
         "y": 3
       },
       "id": 13,
@@ -1040,14 +1318,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by (hostname) (\n  (increase(amd_gpu_violation_vr_thermal_residency_accumulated[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\nor\nmin by (hostname) (\n  (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)\n  and on(hostname)\n  up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[$__range]))) > bool 0\n  ) == 1\n)\nor\n(\n  (\n  0 * (\n    label_replace(\n      max by(node) (\n        kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n      ),\n      \"hostname\", \"$1\", \"node\", \"(.*)\"\n    )\n  )\n  + 2\n)\n  unless on(hostname)\n  (\n    max by(hostname) (\n  present_over_time(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[10m])\n)\n    or\n    max by(hostname) (\n  present_over_time(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[10m])\n)\n  )\n)\nor\n1 * (\n  (\n    (sum by(hostname) (increase(amd_gpu_violation_vr_thermal_residency_accumulated{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n  or\n  (\n    (sum by(hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION{hostname=~\"$hostname\"}[$__range]))) == bool 0\n  ) == 1\n)",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "VR Thermal / Reliability",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1066,6 +1346,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1085,12 +1369,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 15,
+        "x": 21,
         "y": 3
       },
       "id": 14,
@@ -1119,14 +1405,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieCorrectable\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "PCIE Correctable",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1145,6 +1433,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1164,13 +1456,15 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 18,
-        "y": 3
+        "x": 0,
+        "y": 6
       },
       "id": 15,
       "options": {
@@ -1198,14 +1492,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieNonFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "PCIE Non Fatal",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1224,6 +1520,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1243,13 +1543,15 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 21,
-        "y": 3
+        "x": 3,
+        "y": 6
       },
       "id": 16,
       "options": {
@@ -1277,14 +1579,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)\n",
+          "expr": "0 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) > bool 0) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((max by(hostname) (\n    max_over_time(problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[$__range])\n  )) == bool 0) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(problem_gauge{reason=\"PcieFatal\", type=\"NodeHasPcieErrors\", hostname=~\"$hostname\"}[10m])\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "PCIE Fatal",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1303,6 +1607,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1322,12 +1630,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 0,
+        "x": 6,
         "y": 6
       },
       "id": 18,
@@ -1356,14 +1666,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (\n  problem_gauge{reason=\"GpuPcieHasIssues\", type=\"GpuPcie\"} == bool 0\n  and on(hostname) up{job=\"gpu-rdma-node-problem-detector\"} == 1\n)",
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"GpuPcie\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuPcie\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"GpuPcie\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "PCIE Link Width",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1382,6 +1694,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1401,12 +1717,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 3,
+        "x": 9,
         "y": 6
       },
       "id": 19,
@@ -1435,14 +1753,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "(avg by (hostname)\n  (node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\"})\n  >= bool 50 * 1024 * 1024 * 1024)\nand on(hostname)\nup{job=\"gpu-rdma-node-problem-detector\"} == 1\n",
+          "expr": "0 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\", hostname=~\"$hostname\"}[$__range])\n  )) < bool 50 * 1024 * 1024 * 1024) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\", hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\", hostname=~\"$hostname\"}[$__range])\n  )) >= bool 50 * 1024 * 1024 * 1024) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint=\"/\", device=~\"/dev/sd.*\", hostname=~\"$hostname\"}[10m])\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Disk free",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1461,6 +1781,10 @@
                 "1": {
                   "color": "green",
                   "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1480,12 +1804,14 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 3,
         "w": 3,
-        "x": 6,
+        "x": 12,
         "y": 6
       },
       "id": 20,
@@ -1514,14 +1840,16 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "(\n  avg by (hostname) (\n    node_memory_MemAvailable_bytes{instance_shape=~\"(BM|VM).GPU.*\"}\n  )\n  >= bool 50 * 1024 * 1024 * 1024\n)\nand on(hostname)\nup{job=\"gpu-rdma-node-problem-detector\"} == 1\n",
+          "expr": "0 * (\n  ((min by(hostname) (\n    min_over_time(node_memory_MemAvailable_bytes{instance_shape=~\"(BM|VM).GPU.*\", hostname=~\"$hostname\"}[$__range])\n  )) < bool 50 * 1024 * 1024 * 1024) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\", node=~\"$hostname\"} > 0\n            ),\n            \"hostname\", \"$1\", \"node\", \"(.*)\"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(node_memory_MemAvailable_bytes{instance_shape=~\"(BM|VM).GPU.*\", hostname=~\"$hostname\"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((min by(hostname) (\n    min_over_time(node_memory_MemAvailable_bytes{instance_shape=~\"(BM|VM).GPU.*\", hostname=~\"$hostname\"}[$__range])\n  )) >= bool 50 * 1024 * 1024 * 1024) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(node_memory_MemAvailable_bytes{instance_shape=~\"(BM|VM).GPU.*\", hostname=~\"$hostname\"}[10m])\n      )\n    )",
           "legendFormat": "{{hostname}}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Mem free",
-      "type": "stat"
+      "type": "stat",
+      "description": "Failed if the condition occurred during the selected range. Otherwise shows the current state. Missing recent metrics are Unknown."
     },
     {
       "datasource": {
@@ -1549,16 +1877,16 @@
             {
               "options": {
                 "0": {
-                  "color": "green",
-                  "text": "ok"
-                },
-                "10": {
-                  "color": "yellow",
-                  "text": "warning"
-                },
-                "100": {
                   "color": "red",
-                  "text": "error"
+                  "text": "Failed"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1578,7 +1906,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 12,
@@ -1612,13 +1942,13 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "sum by (hostname, device) (\n    increase(problem_counter{reason=\"PcieCorrectable\", hostname=~\"$hostname\"}[5m]) * 1\n)\n+\nsum by (hostname, device) (\n    increase(problem_counter{reason=\"PcieNonFatal\", hostname=~\"$hostname\"}[5m]) * 10\n)\n+\nsum by (hostname, device) (\n    increase(problem_counter{reason=\"PcieFatal\", hostname=~\"$hostname\"}[5m]) * 100\n)\n",
+          "expr": "0 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=~\"GpuPcie|NodeHasPcieErrors\", status=\"true\", node=~\"$hostname\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=~\"GpuPcie|NodeHasPcieErrors\", status=\"unknown\", node=~\"$hostname\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n1 * label_replace(\n  min by(node) (\n    kube_node_status_condition{condition=~\"GpuPcie|NodeHasPcieErrors\", status=\"false\", node=~\"$hostname\"}\n  ) == 1,\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "PCIE Health Score history",
+      "title": "PCIE Health history",
       "type": "state-timeline"
     },
     {
@@ -1648,11 +1978,15 @@
               "options": {
                 "0": {
                   "color": "red",
-                  "text": "down"
+                  "text": "Failed"
                 },
                 "1": {
                   "color": "green",
-                  "text": "up"
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -1672,7 +2006,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -1706,7 +2042,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "min by(hostname) (problem_gauge{reason=\"RdmaLinkFlappingHasIssues\",type=\"RdmaLinkFlapping\"} == bool 0)",
+          "expr": "0 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"RdmaLinkFlapping\", status=\"true\", node=~\"$hostname\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"RdmaLinkFlapping\", status=\"unknown\", node=~\"$hostname\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n1 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=\"RdmaLinkFlapping\", status=\"false\", node=~\"$hostname\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -1719,7 +2055,9 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": [],
+  "tags": [
+
+  ],
   "templating": {
     "list": [
       {
@@ -1729,7 +2067,9 @@
         },
         "hide": 1,
         "name": "PROMETHEUS_DS",
-        "options": [],
+        "options": [
+
+        ],
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
@@ -1746,15 +2086,17 @@
           "type": "prometheus",
           "uid": "${PROMETHEUS_DS}"
         },
-        "definition": "label_values(up,hostname)",
+        "definition": "label_values(kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"},node)",
         "includeAll": true,
         "label": "Node",
         "multi": true,
         "name": "hostname",
-        "options": [],
+        "options": [
+
+        ],
         "query": {
           "qryType": 1,
-          "query": "label_values(up,hostname)",
+          "query": "label_values(kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"},node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1766,7 +2108,8 @@
     "from": "now-5m",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+  },
   "timezone": "browser",
   "title": "GPU Health Status",
   "uid": "gpu-health",

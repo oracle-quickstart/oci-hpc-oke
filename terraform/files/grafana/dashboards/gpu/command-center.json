@@ -20,7 +20,9 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": 20,
-  "links": [],
+  "links": [
+
+  ],
   "panels": [
     {
       "datasource": {
@@ -29,7 +31,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -40,7 +44,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -73,8 +79,10 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "count(count by (nodename) (node_uname_info))",
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_info))",
+          "refId": "A",
+          "instant": true,
+          "range": false
         }
       ],
       "title": "Total Nodes",
@@ -87,7 +95,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -98,7 +108,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -132,9 +144,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{instance_shape!~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_info))\n-\ncount(count by(node) (kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0))",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "CPU Nodes",
@@ -147,7 +160,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -158,7 +173,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -192,9 +209,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(count by(node) (kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0))",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "GPU Nodes",
@@ -207,7 +225,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -218,7 +238,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -252,9 +274,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "count(node_health_status == 1 and on(hostname) node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"})",
-          "range": true,
-          "refId": "A"
+          "expr": "count(\n  node_health_status == 1\n  and on(hostname)\n  label_replace(\n    max by(node) (\n      kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n    ),\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n)\nor vector(0)",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Healthy GPU Nodes",
@@ -267,7 +290,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -278,7 +303,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -311,8 +338,10 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "(count(amd_gpu_health) or vector(0)) + (sum(max by (instance) (DCGM_FI_DEV_COUNT)) or vector(0))",
-          "refId": "A"
+          "expr": "sum(kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"})",
+          "refId": "A",
+          "instant": true,
+          "range": false
         }
       ],
       "title": "Total GPUs",
@@ -325,7 +354,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [],
+          "mappings": [
+
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -336,7 +367,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -370,9 +403,10 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "(count(amd_gpu_health == 1) or vector(0)) + (sum(max by (hostname) (DCGM_FI_DEV_COUNT) * on(hostname) group_left() (node_health_status == 1)) or vector(0))",
-          "range": true,
-          "refId": "A"
+          "expr": "sum(\n  label_replace(\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"},\n    \"hostname\", \"$1\", \"node\", \"(.*)\"\n  )\n  * on(hostname) group_left()\n  (node_health_status == 1)\n)\nor vector(0)",
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Healthy GPUs",
@@ -407,11 +441,15 @@
               "options": {
                 "0": {
                   "color": "red",
-                  "text": "down"
+                  "text": "Failed"
                 },
                 "1": {
                   "color": "green",
-                  "text": "up"
+                  "text": "Healthy"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -432,7 +470,9 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 5,
@@ -478,10 +518,11 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{ hostname }}",
-          "range": true,
-          "refId": "A"
+          "range": false,
+          "refId": "A",
+          "instant": true
         }
       ],
       "title": "Compute Node Health",
@@ -514,11 +555,15 @@
               "options": {
                 "0": {
                   "color": "red",
-                  "text": "down"
+                  "text": "Failed"
                 },
                 "1": {
                   "color": "green",
-                  "text": "up"
+                  "text": "Healthy"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
                 }
               },
               "type": "value"
@@ -538,7 +583,9 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 10,
@@ -572,7 +619,7 @@
             "uid": "$PROMETHEUS_DS"
           },
           "editorMode": "code",
-          "expr": "node_health_status * on(hostname) group_left() node_uname_info{instance_shape=~\"(BM|VM).GPU.*\"}",
+          "expr": "node_health_status\nand on(hostname)\nlabel_replace(\n  max by(node) (\n    kube_node_status_capacity{resource=~\"(amd|nvidia)_com_gpu\"} > 0\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
           "legendFormat": "{{hostname}}",
           "range": true,
           "refId": "A"
@@ -583,8 +630,11 @@
     },
     {
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+        },
+        "overrides": [
+
+        ]
       },
       "gridPos": {
         "h": 5,
@@ -597,7 +647,9 @@
         "alertInstanceLabelFilter": "",
         "alertName": "",
         "dashboardAlerts": false,
-        "groupBy": [],
+        "groupBy": [
+
+        ],
         "groupMode": "default",
         "maxItems": 20,
         "showInactiveAlerts": false,
@@ -615,12 +667,110 @@
       "pluginVersion": "12.1.1",
       "title": "Cluster Alerts",
       "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 10,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "perPage": 20,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.1.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "editorMode": "code",
+          "expr": "0 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|DcgmiHealth|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth|Rocminfo\", status=\"true\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)\nor\n2 * label_replace(\n  max by(node, condition) (\n    kube_node_status_condition{condition=~\"CpuProfile|DcgmiHealth|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth|Rocminfo\", status=\"unknown\"} == 1\n  ),\n  \"hostname\", \"$1\", \"node\", \"(.*)\"\n)",
+          "legendFormat": "{{hostname}} / {{condition}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Historical Cluster Node Issues",
+      "type": "state-timeline"
     }
   ],
   "preload": false,
   "refresh": "",
   "schemaVersion": 41,
-  "tags": [],
+  "tags": [
+
+  ],
   "templating": {
     "list": [
       {
@@ -630,7 +780,9 @@
         },
         "hide": 1,
         "name": "PROMETHEUS_DS",
-        "options": [],
+        "options": [
+
+        ],
         "query": "prometheus",
         "refresh": 1,
         "type": "datasource"
@@ -647,7 +799,9 @@
         "label": "Instance Shape",
         "multi": true,
         "name": "instance_shape",
-        "options": [],
+        "options": [
+
+        ],
         "query": {
           "qryType": 1,
           "query": "label_values(node_uname_info,instance_shape)",
@@ -663,7 +817,8 @@
     "from": "now-5m",
     "to": "now"
   },
-  "timepicker": {},
+  "timepicker": {
+  },
   "timezone": "browser",
   "title": "Command Center",
   "uid": "command-center",

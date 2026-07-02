@@ -9,8 +9,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -31,7 +31,7 @@ settings:
             "reason": "GpuEccHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "ecc-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -39,8 +39,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -61,7 +61,7 @@ settings:
             "reason": "GpuRowRemapHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rowremap-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -70,8 +70,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -92,7 +92,7 @@ settings:
             "reason": "GpuBusHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "bus-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -101,8 +101,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -123,7 +123,7 @@ settings:
             "reason": "GpuCountHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "gpu-count" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -132,8 +132,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -154,7 +154,7 @@ settings:
             "reason": "GpuPcieHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "gpu-pcie" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -163,8 +163,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -185,7 +185,7 @@ settings:
             "reason": "GpuFabricMgrHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "fabric-mgr" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -194,8 +194,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -216,7 +216,7 @@ settings:
             "reason": "GpuBadPagesHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "bad-page" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -225,8 +225,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -247,7 +247,7 @@ settings:
             "reason": "RdmaLinkHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rdmalink-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -256,8 +256,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -278,7 +278,7 @@ settings:
             "reason": "RdmaLinkFlappingHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rdmalink-flap" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -287,8 +287,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -309,7 +309,7 @@ settings:
             "reason": "RdmaWpaAuthHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "wpa-auth" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -318,8 +318,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -340,7 +340,7 @@ settings:
             "reason": "RdmaRttccHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rttcc-stat" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -349,8 +349,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -371,7 +371,7 @@ settings:
             "reason": "OcaVersionHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "oca-ver" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -380,8 +380,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -402,7 +402,7 @@ settings:
             "reason": "CpuProfileHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "cpu-profile" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -411,8 +411,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -433,7 +433,7 @@ settings:
             "reason": "GpuXidHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "xid-err" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -442,8 +442,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -464,7 +464,7 @@ settings:
             "reason": "IpAddressHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "ip-address" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -473,8 +473,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -495,7 +495,7 @@ settings:
             "reason": "NvlinkSpeedHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "nvlink-speed" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -504,8 +504,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -526,7 +526,7 @@ settings:
             "reason": "DcgmiHealthHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "dcgmi-health" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -535,8 +535,8 @@ settings:
         {
         "plugin": "custom",
         "pluginConfig": {
-            "invoke_interval": "300s",
-            "timeout": "30s",
+            "invoke_interval": "60s",
+            "timeout": "45s",
             "max_output_length": 80,
             "concurrency": 1,
             "enable_message_change_based_condition_update": true
@@ -557,7 +557,7 @@ settings:
             "reason": "RocminfoHasIssues",
             "path": "./custom-config/oke_healthcheck.sh",
             "args": [ "rocminfo-check" ],
-            "timeout": "30s"
+            "timeout": "45s"
             }
         ]
         }
@@ -607,33 +607,180 @@ settings:
         readonly NONOK=1
         readonly UNKNOWN=2
 
-        healthcheck_type=$1
-        healthcheck_log_file=/host/tmp/oke-latest-${healthcheck_type}-healthcheck.log
+        healthcheck_type=${1:-}
+        expected_interval=${2:-60}
+        case "$healthcheck_type" in
+            ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|bad-page)
+                ;;
+            rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|oca-ver|cpu-profile)
+                ;;
+            xid-err|ip-address|nvlink-speed|dcgmi-health|rocminfo-check)
+                ;;
+            rdma-vf-routes|rdma-vf-counters|imex)
+                ;;
+            *)
+                echo "Unsupported NPD check: $healthcheck_type"
+                exit "$UNKNOWN"
+                ;;
+        esac
+        case "$expected_interval" in
+            *[!0-9]*|"")
+                echo "Invalid NPD interval: $expected_interval"
+                exit "$UNKNOWN"
+                ;;
+        esac
 
-        cp ./config/*.py /host/tmp
+        umask 077
+        start_time=$(date +%s)
+        run_dir=/host/var/lib/oke-npd/run
+        bin_dir=/host/var/lib/oke-npd/bin
+        cache_dir=/host/var/cache/oke-npd/uv
+        log_dir=/host/var/log/oke-npd
+        metrics_dir=/host/var/lib/node_exporter/textfile_collector
+        container_state_dir=/run/oke-npd
+        uv_source=/root/.local/bin/uv
+        uv_path=$bin_dir/uv
+        healthcheck_log_file=$log_dir/latest-${healthcheck_type}.log
+        metrics_file=$metrics_dir/oke_npd_${healthcheck_type}.prom
 
-        if [ ! -e "/host/tmp/uv" ]; then
-            cp /root/.local/bin/uv /host/tmp/uv
-            chmod +x /host/tmp/uv
+        publish_metrics() {
+            metric_timestamp=$1
+            metric_duration=$2
+            metric_status=$3
+            metrics_tmp=$metrics_dir/.oke_npd_${healthcheck_type}.$$.prom
+            if ! {
+                printf 'oke_npd_check_last_run_timestamp_seconds{check="%s"} %s\n' "$healthcheck_type" "$metric_timestamp"
+                printf 'oke_npd_check_expected_interval_seconds{check="%s"} %s\n' "$healthcheck_type" "$expected_interval"
+                printf 'oke_npd_check_duration_seconds{check="%s"} %s\n' "$healthcheck_type" "$metric_duration"
+                printf 'oke_npd_check_status_code{check="%s"} %s\n' "$healthcheck_type" "$metric_status"
+            } >"$metrics_tmp"
+            then
+                rm -f "$metrics_tmp"
+                return 1
+            fi
+            chmod 0644 "$metrics_tmp" && mv -f "$metrics_tmp" "$metrics_file"
+        }
+
+        cleanup_abandoned_runs() {
+            if ! find "$run_dir" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type d \
+                -mmin +10 \
+                -exec rm -rf -- {} +
+            then
+                return 1
+            fi
+            find "$bin_dir" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type f \
+                -name '.uv.*' \
+                -mmin +10 \
+                -exec rm -f -- {} +
+        }
+
+        stage_uv() {
+            marker=$container_state_dir/uv-staged
+            if [ -e "$marker" ] && [ -x "$uv_path" ]; then
+                return 0
+            fi
+
+            uv_tmp=$(mktemp "$bin_dir/.uv.XXXXXX") || return 1
+            if ! cp "$uv_source" "$uv_tmp" || ! chmod 0700 "$uv_tmp" || ! mv -f "$uv_tmp" "$uv_path"; then
+                rm -f "$uv_tmp"
+                return 1
+            fi
+            touch "$marker"
+        }
+
+        install -d -m 0700 "$run_dir" "$bin_dir" "$cache_dir" "$log_dir" "$container_state_dir" || exit "$UNKNOWN"
+        install -d -m 0755 "$metrics_dir" || exit "$UNKNOWN"
+        if ! cleanup_abandoned_runs; then
+            echo "Unable to clean abandoned NPD run directories"
+            exit "$UNKNOWN"
+        fi
+        if ! stage_uv; then
+            echo "Unable to stage the NPD Python runner"
+            exit "$UNKNOWN"
         fi
 
-        EXIT_CODE=$(nsenter -n/host/proc/1/ns/net chroot /host bash -c "/tmp/uv run /tmp/check_gpu_setup.py --dry-run --$healthcheck_type > /tmp/oke-latest-${healthcheck_type}-healthcheck.log 2>&1")
+        work_dir=$(mktemp -d "$run_dir/${healthcheck_type}.XXXXXX") || exit "$UNKNOWN"
+        trap 'rm -rf "$work_dir"' EXIT
 
-        ERROR_MSG=$(grep "Healthcheck::" "$healthcheck_log_file")
-        UNKNOWN_MSG=$(grep -o 'Skipping.*' "$healthcheck_log_file")
+        if ! cp \
+            /config/check_gpu_setup.py \
+            /config/gpu_bw_test.py \
+            /config/rdma_link_flapping.py \
+            /config/shared_logging.py \
+            /config/xid_checker.py \
+            /config/xid_catalog_data.json \
+            "$work_dir/"
+        then
+            echo "Unable to stage NPD health-check files"
+            exit "$UNKNOWN"
+        fi
 
-        if [ "$ERROR_MSG" != "" ]
+        if ! publish_metrics "$start_time" 0 "$UNKNOWN"; then
+            echo "Unable to publish NPD start metrics"
+            exit "$UNKNOWN"
+        fi
+
+        host_work_dir=${work_dir#/host}
+        host_uv_path=${uv_path#/host}
+        work_log="$work_dir/output.log"
+        if nsenter -n/host/proc/1/ns/net \
+            chroot /host \
+            env UV_CACHE_DIR=/var/cache/oke-npd/uv \
+            "$host_uv_path" run \
+            "$host_work_dir/check_gpu_setup.py" \
+            --dry-run \
+            "--$healthcheck_type" >"$work_log" 2>&1
         then
-            echo "${ERROR_MSG#* }"
-            exit $NONOK
-        elif [ ! "${EXIT_CODE}" ] && [ "$UNKNOWN_MSG" != "" ]
-        then
-            echo $UNKNOWN_MSG
-            exit $UNKNOWN
+            command_rc=$OK
         else
-            echo "No errors found"
-            exit $OK
+            command_rc=$?
         fi
+
+        log_tmp=$(mktemp "$log_dir/.latest-${healthcheck_type}.XXXXXX") || exit "$UNKNOWN"
+        if ! cp "$work_log" "$log_tmp" || ! chmod 0640 "$log_tmp" || ! mv -f "$log_tmp" "$healthcheck_log_file"; then
+            rm -f "$log_tmp"
+            echo "Unable to publish the NPD health-check log"
+            exit "$UNKNOWN"
+        fi
+
+        if [ "$command_rc" -eq "$NONOK" ] && ! grep -q "Healthcheck::" "$work_log"; then
+            result=$UNKNOWN
+        elif [ "$command_rc" -eq "$OK" ] || [ "$command_rc" -eq "$NONOK" ]; then
+            result=$command_rc
+        else
+            result=$UNKNOWN
+        fi
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))
+        if ! publish_metrics "$end_time" "$duration" "$result"; then
+            result=$UNKNOWN
+            command_rc=$UNKNOWN
+        fi
+
+        case "$result" in
+            "$OK")
+                echo "No errors found"
+                ;;
+            "$NONOK")
+                grep "Healthcheck::" "$work_log" | head -c 512
+                ;;
+            *)
+                unknown_msg=$(grep "HealthcheckUnknown::" "$work_log" | head -c 512)
+                if [ -n "$unknown_msg" ]; then
+                    echo "$unknown_msg"
+                else
+                    echo "$healthcheck_type execution failed with exit code $command_rc"
+                fi
+                ;;
+        esac
+        exit "$result"
 
 
   log_monitors:
@@ -685,7 +832,7 @@ logDir:
 
 image:
   repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-  tag: v1.35.1-2
+  tag: v1.35.2-5
   # image.digest -- the image digest. If given it takes precedence over a given tag.
   digest: ""
   pullPolicy: IfNotPresent

@@ -1,158 +1,315 @@
-# Running GPU & RDMA Health Checks with Node Problem Detector
+# Running GPU and RDMA Health Checks with Node Problem Detector
 
-> **Note:** If you deployed the monitoring stack using the Terraform stack, Node Problem Detector is already installed and configured. You do not need to follow the instructions below.
+> [!NOTE]
+> If you deployed the monitoring stack using Terraform, Node Problem Detector is already installed and configured. Do not install a second copy manually.
 
-Node Problem Detector is a Kubernetes add-on that monitors node health and reports problems as node conditions and events. This guide explains how to deploy Node Problem Detector with custom health checks designed specifically for OKE GPU and RDMA nodes.
+Node Problem Detector (NPD) monitors node health and reports problems as Kubernetes node conditions and events. This guide explains the OKE-specific GPU and RDMA checks, their three-state result contract, and how to deploy the vendor-specific NPD releases manually.
 
 ## Overview
 
-These health checks provide continuous monitoring of GPU and RDMA functionality on your worker nodes. Issues are reported as Kubernetes node conditions, making them visible through standard kubectl commands and enabling integration with monitoring and alerting systems.
+The deployment uses separate AMD and NVIDIA releases:
+
+- `gpu-rdma-node-problem-detector-amd`
+- `gpu-rdma-node-problem-detector-nvidia`
+
+Each release has node affinity for its supported shapes and loads only the checks for that GPU vendor. A mixed-vendor cluster runs both releases.
+
+The deployed image is multi-platform and supports `linux/amd64` and `linux/arm64`.
 
 ## Prerequisites
 
-- OKE cluster with GPU nodes
-- kubectl access with cluster-admin privileges
-- Helm 3.x installed
-- `jq` installed (for filtering node status)
+- An OKE cluster with supported GPU nodes
+- `kubectl` access with permission to create cluster-scoped NPD resources
+- Helm 3.8 or later
+- `jq` for the status commands in this guide
+- The `monitoring` namespace
+- A local clone of this repository
 
-## Available Health Checks
+Run all commands from the repository root.
 
-The following health checks are included. Note that depending on the node shape and configuration, some checks may not run. For example, RDMA checks only run on nodes deployed in a [Cluster Network](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm#top).
+## Health Checks
 
-| Name | Description |
-|------|-------------|
-| GpuCount | Checks if the node has the expected number of GPUs available |
-| GpuEcc | Checks for GPU ECC errors |
-| GpuRowRemap | Checks for GPU row remapping errors |
-| GpuBus | Checks if any GPU has fallen off the bus |
-| GpuPcie | Checks if PCIe has the expected bandwidth |
-| GpuFabricMgr | Checks if Fabric Manager is running (NVIDIA multi-GPU systems) |
-| GpuBadPages | Checks if any AMD GPU has bad pages |
-| GpuXid | Checks for GPU Xid errors in dmesg |
-| NvlinkSpeed | Checks if NVLink speeds match expected values |
-| DcgmiHealth | Runs DCGMI health check (NVIDIA GPUs) |
-| Rocminfo | Runs rocminfo health check (AMD GPUs) |
-| NodeHasPcieErrors | Monitors kernel log for PCIe AER errors (correctable, non-fatal, fatal) |
-| RdmaLink | Checks if RDMA links are up |
-| RdmaLinkFlapping | Checks if any RDMA links are flapping |
-| RdmaWpaAuth | Checks if all RDMA interfaces are authenticated |
-| RdmaRttcc | Checks if RTTCC is disabled on the RDMA interfaces |
-| IpAddress | Checks if all RDMA interfaces have an IP address |
-| OcaVersion | Checks if the node has the correct Oracle Cloud Agent version |
-| CpuProfile | Checks if the CPU profile is set to performance |
+| Condition | Vendor | Description |
+|---|---|---|
+| `GpuCount` | AMD and NVIDIA | Verifies the expected GPU count |
+| `GpuEcc` | AMD and NVIDIA | Checks uncorrectable GPU ECC errors |
+| `GpuRowRemap` | NVIDIA | Checks row-remapping errors |
+| `GpuBus` | AMD and NVIDIA | Checks for devices that have fallen off the PCIe bus |
+| `GpuPcie` | AMD and NVIDIA | Checks GPU PCIe link width |
+| `GpuFabricMgr` | NVIDIA | Checks Fabric Manager where required |
+| `GpuBadPages` | AMD | Checks pending AMD GPU bad pages |
+| `GpuXid` | NVIDIA | Checks kernel logs for NVIDIA XID errors |
+| `NvlinkSpeed` | NVIDIA | Checks NVLink count and speed |
+| `DcgmiHealth` | NVIDIA | Runs the DCGMI health check |
+| `Rocminfo` | AMD | Validates ROCm discovery with `rocminfo` |
+| `RdmaLink` | AMD and NVIDIA | Checks RDMA link state |
+| `RdmaLinkFlapping` | AMD and NVIDIA | Checks RDMA link flapping |
+| `RdmaWpaAuth` | AMD and NVIDIA | Checks RDMA interface authentication |
+| `RdmaRttcc` | AMD and NVIDIA | Checks that RTTCC is disabled |
+| `RdmaVfRoutes` | NVIDIA B300 and GB300 | Checks multi-plane RDMA VF addresses and routes |
+| `RdmaVfCounters` | NVIDIA B300 and GB300 | Checks multi-plane RDMA VF error counters |
+| `GpuImex` | NVIDIA GB300 | Checks IMEX service readiness |
+| `IpAddress` | AMD and NVIDIA | Checks required RDMA interface addresses |
+| `OcaVersion` | AMD and NVIDIA | Checks the Oracle Cloud Agent version |
+| `CpuProfile` | AMD and NVIDIA | Checks that online CPUs use the performance governor |
+| `NodeHasPcieErrors` | AMD and NVIDIA | Monitors kernel logs for PCIe AER errors |
 
-### Health Check Frequency
+Some checks return a passing result when they do not apply to the current shape. The vendor-specific monitor configuration prevents AMD-only and NVIDIA-only checks from running on the wrong vendor.
 
-By default, health checks run every 5 minutes. You can modify the frequency by editing the `values.yaml` file before deployment.
+The B300 and GB300 RDMA checks use OCI host metadata to identify multi-plane nodes. If the required metadata is unavailable or invalid, the check returns `Unknown`. Other GPU shapes do not depend on this metadata.
 
-## Deployment
+## Check Schedule
 
-Deploy Node Problem Detector using the Helm chart with the OKE-specific health check configuration:
+Checks run in two groups:
+
+- Fast checks run every minute and cover GPU, PCIe, and common RDMA health.
+- Slow checks run every five minutes and cover CPU profile, Oracle Cloud Agent, NVLink, DCGMI, and multi-plane configuration where applicable.
+
+NPD limits how many checks run at once to avoid overloading the node.
+
+The exact monitor definitions are in:
+
+- `terraform/files/node-problem-detector/values-amd.yaml`
+- `terraform/files/node-problem-detector/values-nvidia.yaml`
+
+## Result Contract
+
+The wrapper and Python health checker use three results:
+
+| Exit code | Result | Node condition status |
+|---:|---|---|
+| `0` | The check ran and passed | `False` |
+| `1` | The check ran and found a confirmed problem | `True` |
+| `2` | The result is unavailable or unreliable | `Unknown` |
+
+NPD conditions describe problems. Therefore, `False` means healthy.
+
+Missing commands, timeouts inside Python, parsing failures, invalid output, and Python exceptions return Unknown instead of Healthy.
+
+## Protected Execution and Logs
+
+Each check runs in a private root-owned directory under:
+
+```text
+/var/lib/oke-npd/run
+```
+
+The wrapper reuses the Python runner at `/var/lib/oke-npd/bin/uv`, removes abandoned work directories, and does not execute code from shared `/tmp`.
+
+The wrapper publishes the latest log for each check under:
+
+```text
+/var/log/oke-npd/latest-<check>.log
+```
+
+Examples:
+
+```text
+/var/log/oke-npd/latest-gpu-count.log
+/var/log/oke-npd/latest-ecc-err.log
+/var/log/oke-npd/latest-rdmalink-stat.log
+```
+
+Read a log directly on the GPU node:
 
 ```bash
-helm install gpu-rdma-node-problem-detector oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector --version 2.4.1 \
-    -n monitoring \
-    -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/terraform/files/node-problem-detector/values.yaml
+sudo sed -n '1,160p' /var/log/oke-npd/latest-gpu-count.log
 ```
 
-The health check scripts are included in the `values.yaml` file as a ConfigMap and will be automatically deployed to all GPU nodes.
+## Freshness Metrics
 
-### Verify Deployment
+The wrapper publishes a heartbeat when a check starts and updates it with the final result when the check finishes.
 
-Check that the Node Problem Detector pods are running:
+The node-exporter textfile collector exposes:
+
+```prometheus
+oke_npd_check_last_run_timestamp_seconds{check="gpu-count"}
+oke_npd_check_expected_interval_seconds{check="gpu-count"}
+oke_npd_check_duration_seconds{check="gpu-count"}
+oke_npd_check_status_code{check="gpu-count"}
+```
+
+Status codes are `0` for pass, `1` for fail, and `2` for Unknown.
+
+The monitoring stack must configure node exporter with:
+
+```text
+--collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
+```
+
+Terraform configures this automatically. For a manual monitoring deployment, follow `docs/deploying-monitoring-stack-manually.md`.
+
+## Manual Deployment
+
+Create the namespace if it does not already exist:
 
 ```bash
-kubectl get pods -l app.kubernetes.io/name=node-problem-detector
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-**Example output:**
+Install the release that matches the cluster's GPU vendor. Install both releases for a mixed-vendor cluster.
 
+### AMD
+
+```bash
+helm upgrade --install gpu-rdma-node-problem-detector-amd \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
+  --namespace monitoring \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-amd.yaml \
+  --wait
 ```
-NAME                              READY   STATUS    RESTARTS   AGE
-node-problem-detector-abc123      1/1     Running   0          2m
-node-problem-detector-def456      1/1     Running   0          2m
-node-problem-detector-ghi789      1/1     Running   0          2m
+
+### NVIDIA
+
+```bash
+helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
+  --namespace monitoring \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-nvidia.yaml \
+  --wait
 ```
 
-## Monitoring Node Health
+## Verify the Deployment
 
-> [!NOTE]
-> After deployment, wait approximately 10 minutes before checking results. RDMA interfaces require time to configure during node boot, so initial checks like `RdmaLink` may report false positives.
+Check the releases and DaemonSets:
 
-### View Node Conditions
+```bash
+helm list -n monitoring | grep node-problem-detector
+kubectl get daemonset -n monitoring | grep node-problem-detector
+kubectl get pods -n monitoring \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -o wide
+```
 
-Health check results are reported as node conditions. View the conditions for a specific node:
+Check the image and pulled digest:
+
+```bash
+kubectl get pods -n monitoring \
+  -l 'app.kubernetes.io/instance in (gpu-rdma-node-problem-detector-amd,gpu-rdma-node-problem-detector-nvidia)' \
+  -o json | jq -r '.items[] |
+    [.metadata.name, .spec.nodeName, .spec.containers[0].image,
+     .status.containerStatuses[0].imageID] | @tsv'
+```
+
+Wait for at least one complete monitor cycle before interpreting the conditions. Fast checks normally appear within one minute. Slow checks can take up to five minutes plus their execution time.
+
+## View Node Conditions
+
+View all conditions for one node:
 
 ```bash
 kubectl describe node <node-name>
 ```
 
-Look for the new condition types in the output. **Example output** (showing relevant sections):
-
-```
-Conditions:
-
-    Type                    Status    Reason                        Message
-    ----                    ------    ------                        -------
-    GpuEcc                  False     GpuEccHasNoIssues             No ECC issues detected with GPUs
-    GpuRowRemap             False     GpuRowRemapHasNoIssues        No Row Remapping issues detected with GPUs
-    GpuBus                  False     GpuBusHasNoIssues             No GPU Bus issues detected with GPUs
-    GpuCount                True      GpuCountHasIssues             Node has missing GPU(s)
-    GpuPcie                 False     GpuPcieHasNoIssues            Node has the expected PCIE bandwidth
-    GpuFabricMgr            False     GpuFabricMgrHasNoIssues       Fabric Manager is running
-    GpuXid                  False     GpuXidHasNoIssues             No GPU Xid errors detected
-    NvlinkSpeed             False     NvlinkSpeedHasNoIssues        NVLink speeds are as expected
-    DcgmiHealth             False     DcgmiHealthHasNoIssues        DCGMI health check passed
-    NodeHasPcieErrors       False     PcieAerError                  Node has experienced PCIe AER errors
-    RdmaLink                False     RdmaLinkHasNoIssues           All RDMA links are up
-    RdmaLinkFlapping        False     RdmaLinkFlappingHasNoIssues   No flapping RDMA links
-    RdmaWpaAuth             False     RdmaWpaAuthHasNoIssues        All RDMA links are authenticated
-    RdmaRttcc               False     RdmaRttccHasNoIssues          RTCCC is disabled on all RDMA interfaces
-    IpAddress               False     IpAddressHasNoIssues          All interfaces have an IP address
-    OcaVersion              False     OcaVersionHasNoIssues         OCA version is up to date
-    CpuProfile              False     CpuProfileHasNoIssues         CPU profile is set to performance
-```
-
-In this example, the node has one issue: `GpuCount` shows `Status: True` with `Reason: GpuCountHasIssues`, indicating the node is missing one or more GPUs. All other checks show `Status: False`, meaning they passed (no issues detected).
-
-### List Nodes with Issues
-
-To get a summary of all GPU nodes with problems:
+Show GPU and RDMA health conditions in a compact form:
 
 ```bash
-kubectl get nodes -o json | jq -r '.items[]
-| select (.metadata.labels."nvidia.com/gpu" == "true" or .metadata.labels."amd.com/gpu" == "true")
-| { name: .metadata.name, ocid: .spec.providerID, serial: .metadata.labels["oci.oraclecloud.com/host.serial_number"], error: .status.conditions[]
-| select(.reason | test("HasIssues$|^Pcie(Correctable|NonFatal|Fatal)$")) | .message }
-| "\(.name)\t\(.ocid)\t\(.serial)\t\(.error)"'
+kubectl get node <node-name> -o json | jq -r '
+  .status.conditions[]
+  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
+  | [.type, .status, .reason, .message, .lastTransitionTime]
+  | @tsv'
 ```
 
-**Example output:**
+Example:
 
+```text
+GpuCount       False    GpuCountHasNoIssues    Node has the expected number of GPUs
+GpuEcc         Unknown  GpuEccHasNoIssues      ECC check failed: amd-smi returned invalid JSON
+RdmaLink       True     RdmaLinkHasIssues      Healthcheck:: RDMA Link Error
 ```
-10.140.30.89    ocid1.instance.oc1.ap-melbourne-1.anww...   2210xcr0bv  Node has missing GPU(s)
+
+Interpret the status as follows:
+
+- `False`: the check ran and found no problem.
+- `True`: the check confirmed a problem.
+- `Unknown`: the check could not produce a reliable result.
+
+## List Nodes with Failed or Unknown Checks
+
+```bash
+kubectl get nodes -o json | jq -r '
+  .items[] as $node
+  | $node.status.conditions[]
+  | select(.type | test("^(CpuProfile|DcgmiHealth|Gpu|IpAddress|NodeHasPcieErrors|NvlinkSpeed|OcaVersion|Rdma|Rocminfo)"))
+  | select(.status == "True" or .status == "Unknown")
+  | [$node.metadata.name, $node.spec.providerID,
+     $node.metadata.labels["oci.oraclecloud.com/host.serial_number"],
+     .type, .status, .message]
+  | @tsv'
 ```
 
-This command filters GPU nodes and displays only those with issues, showing the node name, OCID, serial number, and the specific error message.
+## Verify Freshness Metrics
 
-### Understanding Node Conditions
+Port-forward Prometheus:
 
-Node conditions use the following format:
+```bash
+kubectl port-forward -n monitoring \
+  service/kube-prometheus-stack-prometheus 9090:9090
+```
 
-- **Type**: The name of the health check (e.g., `GpuCount`, `RdmaLink`)
-- **Status**: 
-  - `False` = No issues detected (healthy)
-  - `True` = Issues detected (unhealthy)
-- **Reason**: A coded reason (e.g., `GpuCountHasNoIssues`, `GpuCountHasIssues`)
-- **Message**: A human-readable description of the issue
+In another terminal, query the check status and last-run timestamp:
+
+```bash
+curl -fsSG http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=oke_npd_check_status_code' | jq
+
+curl -fsSG http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=oke_npd_check_last_run_timestamp_seconds' | jq
+```
+
+## Alert Behavior
+
+Alerts distinguish between confirmed problems, checks that return `Unknown`, and checks that stop updating.
+
+The `NPD Check Stale` alert fires when a check stops updating:
+
+- Checks scheduled every minute become stale after five minutes.
+- Checks scheduled every five minutes become stale after eleven minutes.
+
+These windows allow enough time for checks to finish during normal scheduling delays.
+
+Dashboards use Kubernetes GPU capacity to find GPU nodes, so nodes remain visible if NPD stops reporting. Each expected vendor check is tracked separately, allowing the stale alert to detect one missing check while other checks continue to run.
+
+Command Center reports nodes as Failed, Healthy, or Unknown and includes applicable GPU and RDMA conditions in its history.
+
+If a check hangs, its heartbeat stops and the stale alert detects it.
+
+## Migrating from the Generic Release
+
+Older deployments used one release named `gpu-rdma-node-problem-detector`.
+
+Install and verify the vendor-specific release before removing the old release. For example, on AMD:
+
+```bash
+helm upgrade --install gpu-rdma-node-problem-detector-amd \
+  oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
+  --version 2.4.1 \
+  --namespace monitoring \
+  --values terraform/files/node-problem-detector/values.yaml \
+  --values terraform/files/node-problem-detector/values-amd.yaml \
+  --wait
+
+kubectl rollout status \
+  daemonset/gpu-rdma-node-problem-detector-amd \
+  -n monitoring --timeout=5m
+
+helm uninstall gpu-rdma-node-problem-detector -n monitoring
+```
+
+Use the NVIDIA release and values file on NVIDIA clusters.
 
 ## Uninstalling
 
-To remove Node Problem Detector:
+Uninstall the releases present in the cluster:
 
 ```bash
-helm uninstall gpu-rdma-node-problem-detector
+helm uninstall gpu-rdma-node-problem-detector-amd -n monitoring
+helm uninstall gpu-rdma-node-problem-detector-nvidia -n monitoring
 ```
 
-> [!NOTE]
-> Node conditions created by health checks will remain on nodes after uninstalling. They will eventually be removed by Kubernetes garbage collection or can be manually removed.
+Node conditions written by NPD can remain after uninstalling the release. They are removed when another writer updates the node status or when the node is replaced. Do not assume that Kubernetes automatically removes custom conditions when NPD is deleted.
