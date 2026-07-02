@@ -48,6 +48,44 @@ labeler:
         cpu: 500m
         memory: 512Mi
 
+# Annotates Slurm worker nodes with the slurm-operator (chart 1.2+)
+# nodeset.slinky.slurm.net/hostname-override annotation so Slurm node names
+# stay clean hostnames when the Kubernetes node names are private IPs
+# (stacks deployed with hostname_override=false).
+annotator:
+  enabled: false
+  image:
+    repository: ghcr.io/astral-sh/uv
+    tag: "0.7.12-python3.12-bookworm-slim"
+    pullPolicy: IfNotPresent
+  imagePullSecrets: []
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  # Target only the Slurm worker pools; the ops pool must not be annotated.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: oke.oraclecloud.com/pool.name
+                operator: In
+                values:
+                  - oke-gpu
+                  - oke-rdma
+                  - oke-gmc
+                  - oke-cpu
+  podAnnotations: {}
+  podLabels: {}
+  interval: 300
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
 prepuller:
   enabled: false
   image:

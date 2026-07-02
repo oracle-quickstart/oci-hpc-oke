@@ -265,13 +265,13 @@ ${worker_nodesets_yaml}
       image:
         repository: ${cpu_worker_image_repository}
         tag: ${cpu_worker_image_tag}
+%{ if node_name_from_kube_node ~}
       args:
+        # Slurm nodes are named after the Kubernetes node name (a hostname
+        # because the stack bootstraps kubelet with hostname-override).
         - -N
         - $(KUBE_NODE_NAME)
       env:
-        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
-        # hostname_override=true on the stack so nodes register by hostname
-        # instead of private IP and Slurm node names stay clean.
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
@@ -283,6 +283,18 @@ ${worker_nodesets_yaml}
               - /usr/bin/sh
               - -c
               - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+%{ else ~}
+      # Kubernetes node names are IP addresses here; slurmd registers under the
+      # pod hostname, which the operator sets from the hostname-override node
+      # annotation written by the oci-hpc-oke-utils annotator.
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$(hostname)" state=down reason='Pod is terminating'; scontrol delete nodename="$(hostname)" || true
+%{ endif ~}
       volumeMounts:
         - name: shm
           mountPath: /dev/shm

@@ -470,7 +470,7 @@ variable "setup_credential_provider_for_ocir" {
 variable "hostname_override" {
   default     = null
   type        = bool
-  description = "Bootstrap worker nodes with kubelet --hostname-override. When unset, defaults to true for Slurm Operator deployments and false otherwise."
+  description = "Bootstrap worker nodes with kubelet --hostname-override. When unset, defaults to true for Slurm Operator deployments and false otherwise. When explicitly disabled with install_slinky=true, worker nodes keep their IP node names and the oci-hpc-oke-utils annotator sets the nodeset.slinky.slurm.net/hostname-override node annotation so Slurm node names stay hostnames (requires the Slurm operator chart 1.2 or later)."
 }
 variable "disable_gpu_device_plugin" { default = false }
 

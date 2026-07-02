@@ -1,14 +1,15 @@
 apiVersion: v2
 name: oci-hpc-oke-utils
-description: OKE node utility DaemonSets — node labeler (RDMA topology, compute host health, firmware, maintenance events), image prepuller, and hostexec
-version: 0.1.0
-appVersion: "0.1.0"
+description: "OKE node utility DaemonSets: node labeler (RDMA topology, compute host health, firmware, maintenance events), Slurm hostname annotator, image prepuller, and hostexec"
+version: 0.2.0
+appVersion: "0.2.0"
 type: application
 keywords:
   - oke
   - gpu
   - rdma
   - labeler
+  - annotator
   - prepuller
 home: https://github.com/oracle/oci-hpc-oke
 sources:

@@ -93,34 +93,36 @@ locals {
 
   slinky_worker_nodesets_yaml = join("\n", [
     for nodeset_name in sort(keys(local.slinky_worker_nodesets)) : templatefile("${path.module}/files/slinky/worker-nodeset-values.yaml.tftpl", {
-      nodeset_name        = nodeset_name
-      replicas            = local.slinky_worker_nodesets[nodeset_name].replicas
-      image_repository    = var.slinky_worker_image_repository
-      image_tag           = local.slinky_worker_nodesets[nodeset_name].image_tag
-      gpu_resource        = local.slinky_worker_nodesets[nodeset_name].gpu_resource
-      gpus_per_node       = local.slinky_worker_nodesets[nodeset_name].gpus_per_node
-      mount_infiniband    = local.slinky_worker_nodesets[nodeset_name].mount_infiniband
-      worker_ssh_enabled  = var.slinky_worker_ssh_enabled
-      host_network        = local.slinky_worker_nodesets[nodeset_name].host_network
-      sriov_enabled       = local.slinky_worker_nodesets[nodeset_name].sriov_enabled
-      rdma_resource       = local.slinky_worker_nodesets[nodeset_name].rdma_resource
-      rdma_vfs_per_node   = local.slinky_worker_nodesets[nodeset_name].rdma_vfs_per_node
-      rdma_networks       = local.slinky_worker_nodesets[nodeset_name].rdma_networks
-      slurmd_parameters   = local.slinky_worker_nodesets[nodeset_name].slurmd_parameters
-      numa_topology       = local.slinky_worker_nodesets[nodeset_name].numa_topology
-      features_yaml       = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}"])
-      pool_name           = local.slinky_worker_nodesets[nodeset_name].pool_name
-      fabric_label        = local.slinky_worker_nodesets[nodeset_name].fabric_label
-      imex_claim_template = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
-      partition_default   = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
-      identity_enabled    = var.slinky_identity_enabled
-      home_enabled        = var.slinky_home_enabled
-      sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
+      nodeset_name             = nodeset_name
+      node_name_from_kube_node = !local.slinky_hostname_annotator_enabled
+      replicas                 = local.slinky_worker_nodesets[nodeset_name].replicas
+      image_repository         = var.slinky_worker_image_repository
+      image_tag                = local.slinky_worker_nodesets[nodeset_name].image_tag
+      gpu_resource             = local.slinky_worker_nodesets[nodeset_name].gpu_resource
+      gpus_per_node            = local.slinky_worker_nodesets[nodeset_name].gpus_per_node
+      mount_infiniband         = local.slinky_worker_nodesets[nodeset_name].mount_infiniband
+      worker_ssh_enabled       = var.slinky_worker_ssh_enabled
+      host_network             = local.slinky_worker_nodesets[nodeset_name].host_network
+      sriov_enabled            = local.slinky_worker_nodesets[nodeset_name].sriov_enabled
+      rdma_resource            = local.slinky_worker_nodesets[nodeset_name].rdma_resource
+      rdma_vfs_per_node        = local.slinky_worker_nodesets[nodeset_name].rdma_vfs_per_node
+      rdma_networks            = local.slinky_worker_nodesets[nodeset_name].rdma_networks
+      slurmd_parameters        = local.slinky_worker_nodesets[nodeset_name].slurmd_parameters
+      numa_topology            = local.slinky_worker_nodesets[nodeset_name].numa_topology
+      features_yaml            = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}"])
+      pool_name                = local.slinky_worker_nodesets[nodeset_name].pool_name
+      fabric_label             = local.slinky_worker_nodesets[nodeset_name].fabric_label
+      imex_claim_template      = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
+      partition_default        = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
+      identity_enabled         = var.slinky_identity_enabled
+      home_enabled             = var.slinky_home_enabled
+      sssd_config_hash         = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
     })
   ])
 
   slinky_slurm_values_yaml = templatefile("${path.module}/files/slinky/slurm-values.yaml.tftpl", {
     cluster_name                 = local.cluster_name
+    node_name_from_kube_node     = !local.slinky_hostname_annotator_enabled
     identity_enabled             = var.slinky_identity_enabled
     home_enabled                 = var.slinky_home_enabled
     accounting_enabled           = var.slinky_accounting_enabled
@@ -931,6 +933,9 @@ module "slinky_slurm" {
   depends_on = [
     module.slinky_operator,
     module.oci_hpc_oke_utils,
+    # Public control plane: the utils chart (and its annotator) deploys via the
+    # provider path, so order the Slurm install after that release too.
+    helm_release.oci_hpc_oke_utils,
     null_resource.slinky_auth_secrets_via_operator,
     null_resource.slinky_gmc_compute_domains_via_operator,
     null_resource.slinky_openldap_config_via_operator,

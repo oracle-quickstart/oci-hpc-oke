@@ -1,4 +1,4 @@
-{{- if .Values.labeler.enabled }}
+{{- if or .Values.labeler.enabled .Values.annotator.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -9,7 +9,10 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "patch"]
+  {{- if .Values.labeler.enabled }}
+  # Only the labeler patches node status; the annotator needs metadata only.
   - apiGroups: [""]
     resources: ["nodes/status"]
     verbs: ["get", "patch"]
+  {{- end }}
 {{- end }}

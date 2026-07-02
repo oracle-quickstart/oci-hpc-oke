@@ -1,0 +1,94 @@
+{{- if .Values.annotator.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-annotator-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+data:
+  annotator.py: |
+    # /// script
+    # requires-python = ">=3.12"
+    # dependencies = [
+    #     "kubernetes>=31.0.0",
+    # ]
+    # ///
+
+    import logging
+    import os
+    import re
+    import socket
+    import time
+    from pathlib import Path
+
+    from kubernetes import client, config
+
+    HEALTH_FILE = Path("/tmp/health/alive")
+
+    # slurm-operator 1.2+ uses this Node annotation verbatim as the NodeSet
+    # pod hostname, which is also the Slurm node name in DaemonSet mode.
+    ANNOTATION = "nodeset.slinky.slurm.net/hostname-override"
+
+    # RFC 1123 label, what Kubernetes accepts for pod spec.hostname.
+    HOSTNAME_RE = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    log = logging.getLogger("annotator")
+
+
+    def host_short_hostname() -> str | None:
+        # hostNetwork pod: gethostname() returns the node's real hostname,
+        # which is also what slurmd registers as on hostNetwork NodeSets, so
+        # the annotation must carry exactly this value.
+        name = socket.gethostname().split(".")[0]
+        if not name or len(name) > 63 or not HOSTNAME_RE.match(name):
+            log.warning("Host hostname %r is not a valid RFC 1123 label, skipping", name)
+            return None
+        return name
+
+
+    def sync(v1: client.CoreV1Api, node_name: str) -> None:
+        hostname = host_short_hostname()
+        if hostname is None:
+            return
+
+        try:
+            node = v1.read_node(node_name)
+        except Exception:
+            log.exception("Failed to read node %s", node_name)
+            return
+
+        current = (node.metadata.annotations or {}).get(ANNOTATION)
+        if current == hostname:
+            return
+
+        try:
+            v1.patch_node(node_name, {"metadata": {"annotations": {ANNOTATION: hostname}}})
+            log.info("Annotated %s with %s=%s (was %s)", node_name, ANNOTATION, hostname, current)
+        except Exception:
+            log.exception("Failed to patch node %s", node_name)
+
+
+    def main():
+        config.load_incluster_config()
+        v1 = client.CoreV1Api()
+
+        node_name = os.environ["NODE_NAME"]
+        interval = int(os.environ.get("INTERVAL", "300"))
+
+        log.info("Node: %s | Annotation: %s | Interval: %ds", node_name, ANNOTATION, interval)
+
+        while True:
+            sync(v1, node_name)
+            HEALTH_FILE.touch()
+            time.sleep(interval)
+
+
+    if __name__ == "__main__":
+        main()
+{{- end }}
