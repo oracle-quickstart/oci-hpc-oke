@@ -7,16 +7,6 @@ locals {
   grafana_gpu_dashboard_dir    = "${path.module}/files/grafana/dashboards/gpu"
   grafana_oci_dashboard_dir    = "${path.module}/files/grafana/dashboards/oci"
 
-  grafana_has_amd_gpu = (
-    (var.worker_rdma_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
-    (var.worker_gpu_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape))
-  )
-  grafana_has_nvidia_gpu = (
-    (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
-    (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
-    (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
-  )
-
   grafana_common_dashboard_files = fileset("${local.grafana_common_dashboard_dir}", "*.json")
   grafana_gpu_dashboard_files    = fileset("${local.grafana_gpu_dashboard_dir}", "*.json")
   grafana_oci_dashboard_files    = fileset("${local.grafana_oci_dashboard_dir}", "*.json")
@@ -36,7 +26,7 @@ locals {
   grafana_gpu_health_dashboard = jsondecode(local.grafana_gpu_dashboard_sources["gpu-health-status.json"])
   grafana_gpu_health_panels = [
     for panel in local.grafana_gpu_health_dashboard.panels : panel
-    if(panel.id != 7 || local.grafana_has_nvidia_gpu) && (panel.id != 23 || local.grafana_has_amd_gpu)
+    if(panel.id != 7 || local.has_nvidia_gpu) && (panel.id != 23 || local.has_amd_gpu)
   ]
   grafana_gpu_health_panels_reflowed = [
     for index, panel in local.grafana_gpu_health_panels :
@@ -75,10 +65,10 @@ locals {
   ]
   grafana_alert_files_filtered = [
     for f in local.grafana_alert_files : f
-    if(!contains(local.grafana_amd_alert_files, f) || local.grafana_has_amd_gpu) &&
-    (!contains(local.grafana_nvidia_alert_files, f) || local.grafana_has_nvidia_gpu) &&
-    (f != "npd-delete-nvidia-alerts.yaml" || (local.grafana_has_amd_gpu && !local.grafana_has_nvidia_gpu)) &&
-    (f != "npd-delete-amd-alerts.yaml" || (local.grafana_has_nvidia_gpu && !local.grafana_has_amd_gpu))
+    if(!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
+    (!contains(local.grafana_nvidia_alert_files, f) || local.has_nvidia_gpu) &&
+    (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
+    (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
   ]
   grafana_alerts = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? {
     for f in local.grafana_alert_files_filtered :

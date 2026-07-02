@@ -9,9 +9,9 @@ locals {
   patched_kube_config = merge(local.kube_config, {
     "clusters" = [
       for c in local.kube_config["clusters"] : {
-        "name"    = c["name"]
+        "name" = c["name"]
         "cluster" = {
-          "server"                   = local.deploy_from_orm ? local.cluster_orm_endpoint : ( local.deploy_from_local ? local.cluster_public_endpoint : "not-defined" )
+          "server"                   = local.deploy_from_orm ? local.cluster_orm_endpoint : (local.deploy_from_local ? local.cluster_public_endpoint : "not-defined")
           "insecure-skip-tls-verify" = true
         }
       }
@@ -28,10 +28,10 @@ resource "null_resource" "kueue_predestroy_drain_via_orm" {
   }
 
   provisioner "local-exec" {
-    when       = destroy
-    on_failure = continue
+    when        = destroy
+    on_failure  = continue
     interpreter = ["/bin/bash", "-c"]
-    command = <<-EOT
+    command     = <<-EOT
       TMPKUBE="$(mktemp --suffix=.yaml)"
       printf '%s' '${self.triggers.kubeconfig}' > "$TMPKUBE"
       export KUBECONFIG="$TMPKUBE"
@@ -48,5 +48,5 @@ resource "null_resource" "kueue_predestroy_drain_via_orm" {
     ]
   }
 
-  depends_on = [ helm_release.kueue ]
+  depends_on = [helm_release.kueue]
 }

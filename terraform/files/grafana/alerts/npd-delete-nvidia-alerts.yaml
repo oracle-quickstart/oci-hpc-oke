@@ -1,7 +1,7 @@
 apiVersion: 1
 deleteRules:
     - orgId: 1
-      uid: oke_npd_dcgmi_health
+      uid: oke_npd_dcgm_health
     - orgId: 1
       uid: oke_npd_gpu_fabric_mgr
     - orgId: 1

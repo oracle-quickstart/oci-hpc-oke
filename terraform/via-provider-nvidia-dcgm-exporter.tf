@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "kubectl_manifest" "nvidia_dcgm_exporter_service_monitor" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true", local.npd_has_nvidia_gpu, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true", local.has_nvidia_gpu, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
 
   yaml_body = local.nvidia_dcgm_exporter_service_monitor_manifest
 

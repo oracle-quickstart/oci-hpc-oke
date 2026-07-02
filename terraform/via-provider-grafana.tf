@@ -20,7 +20,7 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
 
 resource "kubernetes_config_map_v1" "grafana_gpu_dashboards" {
   for_each = (
-    (local.grafana_has_amd_gpu || local.grafana_has_nvidia_gpu) &&
+    (local.has_amd_gpu || local.has_nvidia_gpu) &&
     alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_gpu_dashboards : {}
   )
 

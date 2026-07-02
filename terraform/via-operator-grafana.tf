@@ -22,7 +22,7 @@ locals {
           }
         }
       ],
-      local.grafana_has_amd_gpu || local.grafana_has_nvidia_gpu ?
+      local.has_amd_gpu || local.has_nvidia_gpu ?
       [for cdk, cdv in local.grafana_gpu_dashboards :
         {
           name      = "dashboard-${trimsuffix(cdk, ".json")}",

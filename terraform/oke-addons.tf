@@ -124,6 +124,16 @@ locals {
     contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)
   ])
 
+  has_amd_gpu = (
+    (var.worker_rdma_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
+    (var.worker_gpu_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape))
+  )
+  has_nvidia_gpu = (
+    (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
+    (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
+    (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
+  )
+
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     var.deploy_nvidia_gpu_operator,
