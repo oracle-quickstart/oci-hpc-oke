@@ -7,17 +7,17 @@ registry="${REGISTRY:-iad.ocir.io/idxzjcdglx2s/slurm-operator}"
 platform="${PLATFORM:-linux/amd64,linux/arm64}"
 amd_platform="${AMD_PLATFORM:-linux/amd64}"
 output="${OUTPUT:-push}"
-build_version="${BUILD_VERSION:-2026-06-19.0}"
+build_version="${BUILD_VERSION:-2026-07-02.0}"
 # AMD workers already build from source (custom RCCL base), so they are not part
 # of the upstream-base rebuild; pin their tag date independently of build_version.
-amd_build_version="${AMD_BUILD_VERSION:-2026-06-16.0}"
+amd_build_version="${AMD_BUILD_VERSION:-2026-07-02.0}"
 # Date suffix of the from-source base images (slurmctld, slurmd, slurmd-pyxis,
 # login, login-pyxis-base) that the layered images below build FROM. Produced by
 # build-base-images.sh and build-control-plane-images.sh (the login base).
-base_build_version="${BASE_BUILD_VERSION:-2026-06-19.0}"
+base_build_version="${BASE_BUILD_VERSION:-2026-07-02.0}"
 builder="${BUILDER:-}"
-slurm_version="${SLURM_VERSION:-25.11.6}"
-slurm_os="${SLURM_OS:-ubuntu24.04}"
+slurm_version="${SLURM_VERSION:-26.05.1}"
+slurm_os="${SLURM_OS:-ubuntu26.04}"
 slurm_base_tag="${SLURM_BASE_TAG:-${slurm_version}-${slurm_os}}"
 # Reference to one of our from-source base images, e.g. base_image slurmctld ->
 # iad.ocir.io/.../slurm-operator:slurmctld-25.11.6-ubuntu24.04-2026-06-19.0

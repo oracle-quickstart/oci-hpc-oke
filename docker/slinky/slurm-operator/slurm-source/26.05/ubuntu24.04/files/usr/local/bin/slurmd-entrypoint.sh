@@ -104,25 +104,6 @@ function addConfItem() {
 	export SLURMD_OPTIONS="${slurmdOptions[*]}"
 }
 
-function configure_sssd() {
-	local sssd_mode="${SSSD_MODE:-embedded}"
-	local available_conf="/etc/supervisor/conf.available/sssd.conf"
-	local enabled_conf="/etc/supervisor/conf.d/sssd.conf"
-
-	rm -f "$enabled_conf"
-
-	case "$sssd_mode" in
-	embedded)
-		ln -s "$available_conf" "$enabled_conf"
-		;;
-	sidecar | disabled) ;;
-	*)
-		echo "unsupported SSSD_MODE: ${sssd_mode}" >&2
-		exit 1
-		;;
-	esac
-}
-
 # configure_pam_slurm configures PAM to use pam_slurm_adopt for SSH sessions.
 #
 # This allows SSH access to be restricted to users with active jobs on the node.
@@ -148,7 +129,6 @@ function main() {
 	mkdir -p /run/slurm/
 
 	ssh-keygen -A
-	configure_sssd
 	configure_pam_slurm
 
 	# Ref: https://slurm.schedmd.com/slurm.conf.html#OPT_CoreSpecCount

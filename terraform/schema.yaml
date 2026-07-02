@@ -2417,9 +2417,9 @@ variables:
     visible: ${install_slinky}
   hostname_override:
     title: Use hostnames instead of IP addresses as OKE worker node names
-    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Enable this for Slurm deployments so Slurm node names are stable hostnames instead of private IP addresses.
+    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. When disabled for Slurm deployments, the oci-hpc-oke-utils annotator keeps Slurm node names on hostnames through the Slurm operator hostname-override node annotation.
     type: boolean
-    default: ${install_slinky}
+    default: false
     visible:
       and:
         - ${install_slinky}
@@ -2440,7 +2440,7 @@ variables:
       - 25.11.6-ubuntu24.04
       - 26.05-ubuntu24.04
       - 26.05.1-ubuntu26.04
-    default: "25.11.6-ubuntu24.04"
+    default: "26.05.1-ubuntu26.04"
     visible:
       and:
         - ${install_slinky}
@@ -2565,7 +2565,7 @@ variables:
         - ${worker_rdma_enabled}
   slinky_worker_ssh_enabled:
     title: Enable SSH on Slurm workers
-    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky 1.1.1 couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
+    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
     type: boolean
     default: true
     visible:

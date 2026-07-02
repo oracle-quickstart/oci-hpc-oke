@@ -468,9 +468,9 @@ variable "setup_credential_provider_for_ocir" {
 
 # OKE Cluster Setup - Advanced Options
 variable "hostname_override" {
-  default     = null
+  default     = false
   type        = bool
-  description = "Bootstrap worker nodes with kubelet --hostname-override. When unset, defaults to true for Slurm Operator deployments and false otherwise."
+  description = "Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Defaults to false: Slurm deployments get clean Slurm node names from the nodeset.slinky.slurm.net/hostname-override node annotation set by the oci-hpc-oke-utils annotator instead (requires the Slurm operator chart 1.2 or later)."
 }
 variable "disable_gpu_device_plugin" { default = false }
 
@@ -983,7 +983,7 @@ variable "slinky_slurm_namespace" {
 }
 
 variable "slinky_image_profile" {
-  default     = "25.11.6-ubuntu24.04"
+  default     = "26.05.1-ubuntu26.04"
   type        = string
   description = "Tested Slinky image profile used by auto chart and image tag settings."
 
@@ -1053,7 +1053,7 @@ variable "slinky_worker_mount_infiniband" {
 variable "slinky_worker_ssh_enabled" {
   default     = true
   type        = bool
-  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because Slinky chart 1.1.1 couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
+  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because the Slinky slurm chart couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
 }
 
 variable "slinky_worker_replicas" {
