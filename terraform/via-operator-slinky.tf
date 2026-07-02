@@ -109,14 +109,16 @@ locals {
       rdma_networks            = local.slinky_worker_nodesets[nodeset_name].rdma_networks
       slurmd_parameters        = local.slinky_worker_nodesets[nodeset_name].slurmd_parameters
       numa_topology            = local.slinky_worker_nodesets[nodeset_name].numa_topology
-      features_yaml            = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}"])
-      pool_name                = local.slinky_worker_nodesets[nodeset_name].pool_name
-      fabric_label             = local.slinky_worker_nodesets[nodeset_name].fabric_label
-      imex_claim_template      = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
-      partition_default        = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
-      identity_enabled         = var.slinky_identity_enabled
-      home_enabled             = var.slinky_home_enabled
-      sssd_config_hash         = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
+      # The operator adds the nodeset name itself as a feature, so drop it
+      # from the list when it collides (e.g. the "rdma" nodeset).
+      features_yaml       = join("\n", [for feature in local.slinky_worker_nodesets[nodeset_name].features : "        - ${feature}" if feature != nodeset_name])
+      pool_name           = local.slinky_worker_nodesets[nodeset_name].pool_name
+      fabric_label        = local.slinky_worker_nodesets[nodeset_name].fabric_label
+      imex_claim_template = local.slinky_worker_nodesets[nodeset_name].imex_claim_template
+      partition_default   = local.slinky_default_partition_name == nodeset_name ? "YES" : "NO"
+      identity_enabled    = var.slinky_identity_enabled
+      home_enabled        = var.slinky_home_enabled
+      sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
     })
   ])
 
