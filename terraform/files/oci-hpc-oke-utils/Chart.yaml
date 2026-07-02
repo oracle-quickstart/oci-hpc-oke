@@ -1,8 +1,8 @@
 apiVersion: v2
 name: oci-hpc-oke-utils
 description: "OKE node utility DaemonSets: node labeler (RDMA topology, compute host health, firmware, maintenance events), Slurm hostname annotator, image prepuller, and hostexec"
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.2.1
+appVersion: "0.2.1"
 type: application
 keywords:
   - oke
