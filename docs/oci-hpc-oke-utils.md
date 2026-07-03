@@ -1,10 +1,11 @@
 # oci-hpc-oke-utils
 
-`oci-hpc-oke-utils` is a Helm chart that deploys utility DaemonSets on GPU nodes. It has three components:
+`oci-hpc-oke-utils` is a Helm chart that deploys utility DaemonSets on GPU nodes. It has four components:
 
 | Component | Default | Description |
 |-----------|---------|-------------|
 | [Labeler](#labeler) | Enabled | Applies RDMA topology, compute host, firmware, maintenance, and custom labels to nodes |
+| [Topology](#topology) | Enabled with Slinky | Annotates nodes with their Slurm topology unit and generates `topology.yaml` for Slurm scheduling |
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Disabled | Runs shell scripts on the host via `nsenter` |
 
@@ -342,6 +343,30 @@ kubectl get nodes -o custom-columns=NAME:.metadata.name,MAINTENANCE:.status.cond
 #### Selecting nodes by RDMA locality
 
 See [Using RDMA Network Locality](./using-rdma-network-locality-when-running-workloads-on-oke.md) for Kueue topology-aware scheduling with the `rdma.*` labels.
+
+---
+
+## Topology
+
+Two pieces of this chart work together to feed OCI RDMA network locality into Slurm scheduling for Slinky clusters:
+
+- **Annotator** (DaemonSet, one pod per node): reads `rdmaTopologyData` from IMDS directly and writes the `topology.slinky.slurm.net/spec` node annotation that slurm-operator uses to register each node's place in the Slurm topology.
+- **Controller** (the same Deployment described under [Labeler Architecture](#architecture)): reads the `rdma.*` node labels the labeler applies and generates `topology.yaml`, with `tree`, `block`, and `flat` topologies, into the Slurm chart's extra-config ConfigMap.
+
+### Configuration
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `topology.enabled` | `false` | Enable the topology annotation and `topology.yaml` generation. The Terraform stack sets this from `slinky_topology_enabled` (default `true`), but only when `install_slinky`, `slinky_install_slurm_cluster`, and `install_oci_hpc_oke_utils` are also enabled. |
+| `topology.slurmNamespace` | `slurm` | Namespace of the Slurm chart's extra-config ConfigMap. |
+| `topology.configMapName` | `slurm-config-extra` | Name of the ConfigMap the generated `topology.yaml` is patched into. |
+| `topology.defaultTopology` | `tree` | Topology (`tree` or `block`) marked `cluster_default` in the generated file. |
+| `topology.blockSizes` | `auto` | `block_sizes` for the `block` topology: `auto` derives them from live local block populations, or a comma-separated list of integers. |
+| `topology.workerPools` | `oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu` | Node pools the controller scans when building `topology.yaml`. |
+
+Without RDMA locality labels, nodes fall back to a synthetic `none` unit in both topologies so they remain schedulable.
+
+See [Managing Slurm Topology on OKE](./managing-slurm-topology-on-oke.md) for the full annotation format, an example generated `topology.yaml`, using topology in job submission, and troubleshooting.
 
 ---
 
