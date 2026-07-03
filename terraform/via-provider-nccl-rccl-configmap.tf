@@ -241,7 +241,9 @@ locals {
 }
 
 resource "kubectl_manifest" "nccl_rccl_configmap" {
-  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? local.nccl_rccl_configmap_manifests : {}
+  # Slurm-namespace copies always go through the operator path, which ensures
+  # the namespace exists; Slinky requires the operator anyway.
+  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? { for k, m in local.nccl_rccl_configmap_manifests : k => m if local.nccl_rccl_configmaps[k].namespace == "default" } : {}
 
   yaml_body         = each.value
   server_side_apply = true
