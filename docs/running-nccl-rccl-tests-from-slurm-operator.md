@@ -85,10 +85,11 @@ Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
 
-Login shells carry the shape's NCCL/RCCL parameters by default (from the
-per-shape ConfigMap), so jobs inherit sane defaults even without sourcing
-`env.sh`. The provided scripts still source `env.sh`, which takes precedence
-where both set a value.
+Slurm GPU workers mount the shape's parameters at `/etc/nccl.conf`; NCCL/RCCL
+read that file at initialization, and per-job environment variables override
+it. Pyxis job steps run in the container filesystem and need
+`--container-mounts=/etc/nccl.conf` to see it. The provided scripts still
+source `env.sh`, whose exports take precedence over the file.
 
 ## Worker Network Mode (hostNetwork vs SR-IOV VFs)
 
