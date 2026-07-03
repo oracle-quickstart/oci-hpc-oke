@@ -14,8 +14,19 @@ locals {
   # When worker nodes keep their IP node names (hostname_override=false), the
   # oci-hpc-oke-utils annotator writes the slurm-operator 1.2
   # nodeset.slinky.slurm.net/hostname-override node annotation so Slurm node
-  # names stay clean hostnames.
-  slinky_hostname_annotator_enabled = alltrue([var.install_slinky, var.slinky_install_slurm_cluster, !local.hostname_override_effective])
+  # names stay clean hostnames. Only worker NodeSets consume the annotation,
+  # so controller-only deployments skip the annotator entirely.
+  slinky_hostname_annotator_enabled = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    !local.hostname_override_effective,
+    anytrue([
+      var.worker_gpu_enabled,
+      var.worker_rdma_enabled,
+      var.worker_gmc_enabled,
+      local.slinky_cpu_nodeset_enabled,
+    ]),
+  ])
 
   slinky_amd_shapes = [
     "BM.GPU.MI300X.8",
