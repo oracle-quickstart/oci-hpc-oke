@@ -29,14 +29,21 @@ locals {
   ])
 
   # Slurm topology management from RDMA locality. Needs the utils chart for
-  # the annotator and generator, and the labeler for the rdma.* labels the
-  # generator reads; silently off without them.
+  # the annotator and generator, the labeler for the rdma.* labels the
+  # generator reads, and at least one worker NodeSet to place; silently off
+  # without them.
   slinky_topology_enabled = alltrue([
     var.install_slinky,
     var.slinky_install_slurm_cluster,
     var.slinky_topology_enabled,
     var.install_rdma_labeler,
     var.install_oci_hpc_oke_utils,
+    anytrue([
+      var.worker_gpu_enabled,
+      var.worker_rdma_enabled,
+      var.worker_gmc_enabled,
+      local.slinky_cpu_nodeset_enabled,
+    ]),
   ])
 
   slinky_amd_shapes = [

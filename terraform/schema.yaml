@@ -2903,7 +2903,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_topology_enabled:
     title: Manage Slurm topology from RDMA network locality
-    description: The oci-hpc-oke-utils annotator writes per-node dynamic topology annotations and its controller generates topology.yaml (tree, block, and flat) from the rdma.* node labels. Requires the OKE utilities chart and its RDMA labeler. Nodes without locality labels share a synthetic none unit.
+    description: The oci-hpc-oke-utils annotator writes per-node dynamic topology annotations and its controller generates topology.yaml (tree, block, and flat) from the rdma.* node labels. Requires the OKE utilities chart, its RDMA labeler, and at least one enabled Slurm worker pool. Nodes without locality labels share a synthetic none unit.
     type: boolean
     default: true
     visible:
