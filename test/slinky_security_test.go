@@ -133,7 +133,7 @@ func TestSlinkyLoginRequiresManagedIdentity(t *testing.T) {
 	require.Contains(t, validation, `!var.slinky_identity_enabled,`)
 	require.Contains(t, validation, `resource "null_resource" "validate_slinky_login_identity"`)
 	require.Contains(t, validation, `slinky_login_enabled=true requires slinky_identity_enabled=true`)
-	require.Contains(t, validation, `ldap://ldap.example.com`)
+	require.Contains(t, validation, `configures the LoginSet with its placeholder SSSD configuration`)
 	require.Contains(t, variables, `Requires slinky_identity_enabled=true`)
 	require.Contains(t, schema, `Requires HA OpenLDAP and SSSD to be enabled.`)
 }
@@ -148,9 +148,9 @@ func TestSlinkyWorkerIdentityRequiresSSH(t *testing.T) {
 	require.Contains(t, validation, `var.slinky_identity_enabled,`)
 	require.Contains(t, validation, `!var.slinky_worker_ssh_enabled,`)
 	require.Contains(t, validation, `resource "null_resource" "validate_slinky_worker_identity"`)
-	require.Contains(t, validation, `disabling worker SSH also removes the worker SSSD configuration`)
+	require.Contains(t, validation, `couples worker SSSD configuration to SSH`)
 	require.Contains(t, variables, `Required when slinky_identity_enabled=true`)
-	require.Contains(t, schema, `Slinky 1.1.1 couples worker identity configuration to SSH.`)
+	require.Contains(t, schema, `Slinky couples worker identity configuration to SSH.`)
 }
 
 func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
