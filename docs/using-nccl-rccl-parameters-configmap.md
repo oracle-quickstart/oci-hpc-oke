@@ -80,6 +80,15 @@ all:
             - mkdir -p /var/run/sshd; printenv | grep -E '^(NCCL|RCCL)_' >> /etc/environment; /usr/sbin/sshd -D -p 2222;
 ```
 
+## Slurm (Slinky) clusters
+
+On Slinky deployments with exactly one parameter set, the ConfigMap is also
+created in the Slurm namespace and wired into the login pod with `envFrom`, so
+`sbatch` and `srun` jobs inherit the parameters through the submission
+environment automatically. Per-job exports still override them. Clusters with
+two different parameter sets (for example separate RDMA and GMC shapes) skip
+the automatic wiring and keep the per-job flow described above.
+
 ## Worked example: BM.GPU.H100.8 NCCL test
 
 The sample manifest

@@ -85,6 +85,11 @@ Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
 
+Login shells carry the shape's NCCL/RCCL parameters by default (from the
+per-shape ConfigMap), so jobs inherit sane defaults even without sourcing
+`env.sh`. The provided scripts still source `env.sh`, which takes precedence
+where both set a value.
+
 ## Worker Network Mode (hostNetwork vs SR-IOV VFs)
 
 The Slurm GPU worker pods reach the RDMA fabric in one of two ways, fixed when

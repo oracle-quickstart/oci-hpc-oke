@@ -221,6 +221,13 @@ loginsets:
       image:
         repository: ${login_image_repository}
         tag: ${login_image_tag}
+%{ if login_nccl_configmap != "" ~}
+      # Jobs inherit the submission environment, so the login pod carries the
+      # shape's NCCL/RCCL parameters into every sbatch and srun job.
+      envFrom:
+        - configMapRef:
+            name: ${login_nccl_configmap}
+%{ endif ~}
       # Enroot in the login pod needs a privileged container
       securityContext:
         privileged: true
