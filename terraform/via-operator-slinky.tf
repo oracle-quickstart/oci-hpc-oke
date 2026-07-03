@@ -125,14 +125,6 @@ locals {
     })
   ])
 
-  # Slurm propagates the submission environment into jobs, so wiring the
-  # per-shape NCCL/RCCL ConfigMap into the login pod covers sbatch and srun.
-  # Only safe when the cluster has exactly one parameter set.
-  slinky_login_nccl_configmap = (
-    length(distinct([for cm in values(local.nccl_rccl_configmaps) : cm.name])) == 1 &&
-    local.deploy_nccl_rccl_param_configmap
-  ) ? one(distinct([for cm in values(local.nccl_rccl_configmaps) : cm.name])) : ""
-
   slinky_slurm_values_yaml = templatefile("${path.module}/files/slinky/slurm-values.yaml.tftpl", {
     cluster_name                 = local.cluster_name
     node_name_from_kube_node     = !local.slinky_hostname_annotator_enabled
@@ -172,7 +164,6 @@ locals {
     sssd_config_hash             = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
     topology_enabled             = local.slinky_topology_enabled
     topology_default             = var.slinky_topology_default
-    login_nccl_configmap         = local.slinky_login_nccl_configmap
   })
 }
 

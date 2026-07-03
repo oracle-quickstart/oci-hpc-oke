@@ -207,8 +207,8 @@ locals {
     )
   }
 
-  # Slurm jobs inherit these values through the login pod environment, and
-  # envFrom can only reference ConfigMaps in the pod's own namespace.
+  # Worker NodeSets mount the ConfigMap as a volume, which (like envFrom) can
+  # only reference a ConfigMap in the pod's own namespace.
   nccl_rccl_configmap_namespaces = distinct(concat(
     ["default"],
     alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? [var.slinky_slurm_namespace] : [],
