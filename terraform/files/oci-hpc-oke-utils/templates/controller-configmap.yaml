@@ -477,8 +477,10 @@ data:
                 if compute_client is None:
                     try:
                         signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-                        compute_client = oci.core.ComputeClient(config={}, signer=signer)
+                        # Read tenant_id first: compute_client being set is the
+                        # "ready" signal, so it must be assigned last.
                         tenant_id = signer.tenancy_id
+                        compute_client = oci.core.ComputeClient(config={}, signer=signer)
                         log.info("OCI ComputeClient ready | Tenant: %s", tenant_id[-11:])
                     except Exception:
                         # Transient IMDS/IAM failures must not disable labels
