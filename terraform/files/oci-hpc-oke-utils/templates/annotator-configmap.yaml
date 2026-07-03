@@ -66,15 +66,20 @@ data:
 
 
     def topology_spec() -> str | None:
-        # None means IMDS was unreachable; keep the existing annotation.
+        # None means IMDS did not answer authoritatively; keep the existing annotation.
         try:
             resp = requests.get(f"{IMDS_BASE}/host/rdmaTopologyData", headers=IMDS_HEADERS, timeout=10)
         except requests.RequestException:
             log.warning("IMDS request failed, keeping existing topology annotation")
             return None
 
-        if resp.status_code != 200 or not resp.text.strip():
+        # 404 or an empty 200 is the authoritative "no capacity topology" answer.
+        # Other statuses (429, 5xx) are transient; do not flap a labeled node to none.
+        if resp.status_code == 404 or (resp.status_code == 200 and not resp.text.strip()):
             return TOPOLOGY_NONE_SPEC
+        if resp.status_code != 200:
+            log.warning("IMDS returned %d, keeping existing topology annotation", resp.status_code)
+            return None
 
         try:
             data = resp.json()
