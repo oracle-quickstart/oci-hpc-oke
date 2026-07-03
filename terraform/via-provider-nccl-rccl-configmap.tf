@@ -194,6 +194,19 @@ locals {
     if length(lookup(local.nccl_rccl_parameters, shape, {})) > 0
   }
 
+  # Same per-shape parameters, with the VF NCCL_IB_HCA override applied, ready
+  # to render into the single nccl.conf file below.
+  nccl_rccl_configmap_effective_params = {
+    for shape, params in local.nccl_rccl_configmap_shape_params :
+    shape => merge(
+      params,
+      alltrue([
+        local.deploy_nvidia_network_operator_manifests,
+        contains(local.nvidia_network_operator_sriov_shapes, shape),
+      ]) ? { NCCL_IB_HCA = "mlx5" } : {},
+    )
+  }
+
   # Slurm jobs inherit these values through the login pod environment, and
   # envFrom can only reference ConfigMaps in the pod's own namespace.
   nccl_rccl_configmap_namespaces = distinct(concat(
@@ -213,13 +226,14 @@ locals {
         lower(replace(pair[0], ".", "-")),
       )
       namespace = pair[1]
-      data = merge(
-        local.nccl_rccl_configmap_shape_params[pair[0]],
-        alltrue([
-          local.deploy_nvidia_network_operator_manifests,
-          contains(local.nvidia_network_operator_sriov_shapes, pair[0]),
-        ]) ? { NCCL_IB_HCA = "mlx5" } : {},
-      )
+      data = {
+        # NCCL and RCCL read /etc/nccl.conf at init; environment variables
+        # still override anything set here.
+        "nccl.conf" = join("\n", [
+          for k in sort(keys(local.nccl_rccl_configmap_effective_params[pair[0]])) :
+          "${k}=${local.nccl_rccl_configmap_effective_params[pair[0]][k]}"
+        ])
+      }
     }
   }
 
