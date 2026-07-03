@@ -28,6 +28,15 @@ locals {
     ]),
   ])
 
+  # Slurm topology management from RDMA locality. Needs the utils chart for
+  # the annotator and the topology.yaml generator; silently off without it.
+  slinky_topology_enabled = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_topology_enabled,
+    var.install_oci_hpc_oke_utils,
+  ])
+
   slinky_amd_shapes = [
     "BM.GPU.MI300X.8",
     "BM.GPU.MI355X-v1.8",

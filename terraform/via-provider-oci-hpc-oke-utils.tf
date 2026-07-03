@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "helm_release" "oci_hpc_oke_utils" {
-  count = alltrue([var.install_oci_hpc_oke_utils, anytrue([var.worker_rdma_enabled, var.worker_gmc_enabled, local.slinky_hostname_annotator_enabled]), local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_oci_hpc_oke_utils, anytrue([var.worker_rdma_enabled, var.worker_gmc_enabled, local.slinky_hostname_annotator_enabled, local.slinky_topology_enabled]), local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
@@ -24,6 +24,12 @@ resource "helm_release" "oci_hpc_oke_utils" {
     # so the annotator must be available here too.
     annotator = {
       enabled = local.slinky_hostname_annotator_enabled
+    }
+    topology = {
+      enabled         = local.slinky_topology_enabled
+      slurmNamespace  = var.slinky_slurm_namespace
+      defaultTopology = var.slinky_topology_default
+      blockSizes      = var.slinky_topology_block_sizes
     }
     prepuller = {
       enabled = var.install_image_prepuller

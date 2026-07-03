@@ -159,6 +159,8 @@ locals {
     cpu_worker_features_yaml     = join("\n", [for feature in local.slinky_cpu_worker_features : "        - ${feature}"])
     cpu_partition_default        = local.slinky_default_partition_name == var.slinky_cpu_nodeset_name ? "YES" : "NO"
     sssd_config_hash             = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
+    topology_enabled             = local.slinky_topology_enabled
+    topology_default             = var.slinky_topology_default
   })
 }
 

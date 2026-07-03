@@ -1301,6 +1301,34 @@ variable "slinky_default_partition" {
   description = "Default Slinky partition. Use auto, gpu, rdma, gmc, cpu, all, or an exact generated partition name. With multiple GMC fabrics, gmc selects the aggregate <slinky_gmc_nodeset_name>-all partition. auto prefers GPU, then RDMA, GMC, and CPU."
 }
 
+variable "slinky_topology_enabled" {
+  default     = true
+  type        = bool
+  description = "Manage Slurm topology from OCI RDMA network locality. The oci-hpc-oke-utils annotator writes the topology.slinky.slurm.net/spec node annotation and its controller generates topology.yaml (tree, block, and flat topologies) from the rdma.* node labels. Requires install_oci_hpc_oke_utils; silently off without it. Nodes without locality labels share a synthetic none unit and stay schedulable."
+}
+
+variable "slinky_topology_default" {
+  default     = "tree"
+  type        = string
+  description = "Topology marked cluster_default in the generated topology.yaml. Partitions without an explicit Topology parameter use it. tree or block."
+
+  validation {
+    condition     = contains(["tree", "block"], var.slinky_topology_default)
+    error_message = "slinky_topology_default must be either 'tree' or 'block'."
+  }
+}
+
+variable "slinky_topology_block_sizes" {
+  default     = "auto"
+  type        = string
+  description = "block_sizes for the generated block topology. auto derives them from current local block populations (smallest block, doubling while the next size fits). Or a comma-separated list of integers, e.g. 8,16,32."
+
+  validation {
+    condition     = var.slinky_topology_block_sizes == "auto" || can(regex("^[0-9]+(,[0-9]+)*$", var.slinky_topology_block_sizes))
+    error_message = "slinky_topology_block_sizes must be 'auto' or a comma-separated list of integers."
+  }
+}
+
 variable "slinky_cpu_worker_enabled" {
   default     = false
   type        = bool
