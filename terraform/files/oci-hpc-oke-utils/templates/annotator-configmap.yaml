@@ -84,7 +84,8 @@ data:
         try:
             data = resp.json()
         except requests.exceptions.JSONDecodeError:
-            return TOPOLOGY_NONE_SPEC
+            log.warning("IMDS returned unparseable rdmaTopologyData, keeping existing topology annotation")
+            return None
 
         island = (data.get("customerHPCIslandId") or "")[-11:]
         netblock = (data.get("customerNetworkBlock") or "")[-11:]
