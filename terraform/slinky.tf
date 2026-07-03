@@ -30,10 +30,12 @@ locals {
 
   # Slurm topology management from RDMA locality. Needs the utils chart for
   # the annotator and the topology.yaml generator; silently off without it.
+  # The generator reads the labeler's rdma.* labels.
   slinky_topology_enabled = alltrue([
     var.install_slinky,
     var.slinky_install_slurm_cluster,
     var.slinky_topology_enabled,
+    var.install_rdma_labeler,
     var.install_oci_hpc_oke_utils,
   ])
 

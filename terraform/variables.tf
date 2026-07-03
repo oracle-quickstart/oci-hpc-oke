@@ -1304,7 +1304,7 @@ variable "slinky_default_partition" {
 variable "slinky_topology_enabled" {
   default     = true
   type        = bool
-  description = "Manage Slurm topology from OCI RDMA network locality. The oci-hpc-oke-utils annotator writes the topology.slinky.slurm.net/spec node annotation and its controller generates topology.yaml (tree, block, and flat topologies) from the rdma.* node labels. Requires install_oci_hpc_oke_utils; silently off without it. Nodes without locality labels share a synthetic none unit and stay schedulable."
+  description = "Manage Slurm topology from OCI RDMA network locality. The oci-hpc-oke-utils annotator writes the topology.slinky.slurm.net/spec node annotation and its controller generates topology.yaml (tree, block, and flat topologies) from the rdma.* node labels. Requires install_oci_hpc_oke_utils and install_rdma_labeler; silently off without them. Nodes without locality labels share a synthetic none unit and stay schedulable."
 }
 
 variable "slinky_topology_default" {
