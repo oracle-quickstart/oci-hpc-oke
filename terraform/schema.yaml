@@ -374,6 +374,9 @@ variableGroups:
       - slinky_rdma_nodeset_name
       - slinky_gmc_nodeset_name
       - slinky_default_partition
+      - slinky_topology_enabled
+      - slinky_topology_default
+      - slinky_topology_block_sizes
       - slinky_cpu_worker_enabled
       - slinky_cpu_nodeset_name
       - slinky_cpu_worker_image_repository
@@ -2898,6 +2901,38 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_topology_enabled:
+    title: Manage Slurm topology from RDMA network locality
+    description: The oci-hpc-oke-utils annotator writes per-node dynamic topology annotations and its controller generates topology.yaml (tree, block, and flat) from the rdma.* node labels. Requires the OKE utilities chart. Nodes without locality labels share a synthetic none unit.
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_topology_default:
+    title: Default Slurm topology
+    description: Topology marked cluster_default in the generated topology.yaml. Partitions without an explicit Topology parameter use it.
+    type: enum
+    enum:
+      - tree
+      - block
+    default: "tree"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_topology_enabled}
+  slinky_topology_block_sizes:
+    title: Block topology block sizes
+    description: auto derives block_sizes from current local block populations. Or a comma-separated list of integers, for example 8,16,32.
+    type: string
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_topology_enabled}
   slinky_cpu_worker_enabled:
     title: Run Slurm workers on the CPU worker pool
     description: Requires the CPU worker pool to be enabled.
