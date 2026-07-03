@@ -91,6 +91,13 @@ locals {
     }
   })
 
+  # Default-namespace ConfigMap entries keep the bare shape key (see
+  # nccl_rccl_configmaps); mirror that rule so the lookup below does not miss.
+  slinky_nodeset_nccl_configmap_keys = {
+    for nodeset_name, nodeset in local.slinky_worker_nodesets :
+    nodeset_name => (var.slinky_slurm_namespace == "default" ? nodeset.shape : "${nodeset.shape}|${var.slinky_slurm_namespace}")
+  }
+
   slinky_worker_nodesets_yaml = join("\n", [
     for nodeset_name in sort(keys(local.slinky_worker_nodesets)) : templatefile("${path.module}/files/slinky/worker-nodeset-values.yaml.tftpl", {
       nodeset_name             = nodeset_name
@@ -121,8 +128,8 @@ locals {
       sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
       # Empty when the shape has no parameter entry or the ConfigMap is disabled;
       # the template skips the mount in that case.
-      nccl_configmap_name = local.deploy_nccl_rccl_param_configmap ? try(local.nccl_rccl_configmaps["${local.slinky_worker_nodesets[nodeset_name].shape}|${var.slinky_slurm_namespace}"].name, "") : ""
-      nccl_conf_hash      = local.deploy_nccl_rccl_param_configmap ? try(sha256(local.nccl_rccl_configmaps["${local.slinky_worker_nodesets[nodeset_name].shape}|${var.slinky_slurm_namespace}"].data["nccl.conf"]), "") : ""
+      nccl_configmap_name = local.deploy_nccl_rccl_param_configmap ? try(local.nccl_rccl_configmaps[local.slinky_nodeset_nccl_configmap_keys[nodeset_name]].name, "") : ""
+      nccl_conf_hash      = local.deploy_nccl_rccl_param_configmap ? try(sha256(local.nccl_rccl_configmaps[local.slinky_nodeset_nccl_configmap_keys[nodeset_name]].data["nccl.conf"]), "") : ""
     })
   ])
 
