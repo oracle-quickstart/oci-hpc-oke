@@ -13,10 +13,10 @@ Topology management is a small pipeline of existing oci-hpc-oke-utils and Slinky
 
 1. **The labeler** (oci-hpc-oke-utils) applies the `oci.oraclecloud.com/rdma.hpc_island_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.local_block_id` labels to each node from IMDS, as described in [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md).
 2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) reads `rdmaTopologyData` from IMDS directly and writes the `topology.slinky.slurm.net/spec` node annotation:
-   - Labeled node: `tree:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>`
-   - No locality data (no capacity topology, or a CPU worker): `tree:none,block:none`
+   - Labeled node: `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>`
+   - No locality data (no capacity topology, or a CPU worker): `tree:root:none,block:none`
 
-   The `isl-` (HPC island), `nb-` (network block), and `lb-` (local block) prefixes keep switch names unique across tiers by construction; the value after each prefix is the corresponding node label value.
+   The `isl-` (HPC island), `nb-` (network block), and `lb-` (local block) prefixes keep switch names unique across tiers by construction; the value after each prefix is the corresponding node label value. Every tree path starts at a single `root` switch so the tree stays connected no matter how many islands exist.
 3. **The oke-utils controller** (a single Deployment, separate from the per-node annotator) lists nodes in the `oke-gpu`, `oke-rdma`, `oke-gmc`, and `oke-cpu` pools, reads their `rdma.*` labels, and generates one `topology.yaml` with three named topologies: `tree`, `block`, and `flat`. It patches the `topology.yaml` key of the `slurm-config-extra` ConfigMap in the Slurm namespace whenever the content changes.
 4. **slurm-operator 1.2** reads the `topology.slinky.slurm.net/spec` annotation on each node. A pod binding webhook copies it onto worker pods at schedule time, and slurmd receives it as `POD_TOPOLOGY` and registers with `Topology=<name>:<unit>,...`. A REST sync step also reconciles the annotation against already-registered nodes, so a changed annotation applies without restarting the pod.
 5. **The Slurm controller pod's reconfigure sidecar** (`controller.inplaceReconfigure: true`) watches `/etc/slurm` and runs `scontrol reconfigure` whenever a mounted config file, including `topology.yaml`, changes. This is what makes controller-generated updates take effect without a slurmctld restart.
@@ -33,6 +33,8 @@ The following is a representative `topology.yaml` for a mixed fleet: two labeled
   cluster_default: true
   tree:
     switches:
+      - switch: root
+        children: isl-af7ubvouuyq,none
       - switch: isl-af7ubvouuyq
         children: nb-7xmzl4p4wba
       - switch: nb-7xmzl4p4wba
@@ -59,7 +61,7 @@ The following is a representative `topology.yaml` for a mixed fleet: two labeled
 The matching node annotation for `gpu-worker-1` and `gpu-worker-2` would be:
 
 ```
-topology.slinky.slurm.net/spec: tree:isl-af7ubvouuyq:nb-7xmzl4p4wba:lb-4tjxbt4s6ua,block:lb-4tjxbt4s6ua
+topology.slinky.slurm.net/spec: tree:root:isl-af7ubvouuyq:nb-7xmzl4p4wba:lb-4tjxbt4s6ua,block:lb-4tjxbt4s6ua
 ```
 
 ## Configuration
@@ -104,7 +106,7 @@ Check the annotation on a node:
 kubectl get node <node-name> -o jsonpath='{.metadata.annotations.topology\.slinky\.slurm\.net/spec}'
 ```
 
-A healthy node shows either `tree:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>` (locality available) or `tree:none,block:none` (no capacity topology for this node, for example a CPU worker). If the annotation is missing entirely, the annotator has not completed its first sync yet, or IMDS was unreachable and there was no prior value to keep.
+A healthy node shows either `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>` (locality available) or `tree:root:none,block:none` (no capacity topology for this node, for example a CPU worker). If the annotation is missing entirely, the annotator has not completed its first sync yet, or IMDS was unreachable and there was no prior value to keep.
 
 Check the generated `topology.yaml` in the ConfigMap the Slurm controller reads:
 

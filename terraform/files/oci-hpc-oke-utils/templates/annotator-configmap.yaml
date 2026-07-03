@@ -43,8 +43,9 @@ data:
     IMDS_HEADERS = {"Authorization": "Bearer Oracle"}
 
     # Nodes without RDMA locality share one synthetic unit so they stay
-    # inside every generated topology and remain schedulable.
-    TOPOLOGY_NONE_SPEC = "tree:none,block:none"
+    # inside every generated topology and remain schedulable. Tree paths
+    # anchor under the generator's single root switch.
+    TOPOLOGY_NONE_SPEC = "tree:root:none,block:none"
 
     logging.basicConfig(
         level=logging.INFO,
@@ -93,9 +94,10 @@ data:
         if not (island and netblock and localblock):
             return TOPOLOGY_NONE_SPEC
 
-        # isl-/nb-/lb- prefixes keep switch names unique across tiers and
-        # readable in scontrol output.
-        return f"tree:isl-{island}:nb-{netblock}:lb-{localblock},block:lb-{localblock}"
+        # isl-/nb-/lb- prefixes keep switch names unique across tiers; the
+        # root anchor keeps the tree connected even when a new island first
+        # appears at registration time.
+        return f"tree:root:isl-{island}:nb-{netblock}:lb-{localblock},block:lb-{localblock}"
 
 
     def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> None:

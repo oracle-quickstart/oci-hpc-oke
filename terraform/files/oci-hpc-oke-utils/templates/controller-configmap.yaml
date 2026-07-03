@@ -47,6 +47,7 @@ data:
     RDMA_NETBLOCK_LABEL = "oci.oraclecloud.com/rdma.network_block_id"
     RDMA_LOCALBLOCK_LABEL = "oci.oraclecloud.com/rdma.local_block_id"
     TOPOLOGY_NONE_UNIT = "none"
+    TOPOLOGY_ROOT_SWITCH = "root"
     TOPOLOGY_PLACEHOLDER_NODE = "placeholder-node"
 
 
@@ -365,6 +366,13 @@ data:
         lines.append(f"  cluster_default: {'true' if default_topology == 'tree' else 'false'}")
         lines.append("  tree:")
         lines.append("    switches:")
+        # A single root keeps the tree connected; Slurm otherwise warns that
+        # no switch reaches all nodes through its descendants.
+        root_children = [f"isl-{island}" for island in sorted(tree)]
+        if unlabeled or not labeled:
+            root_children.append(TOPOLOGY_NONE_UNIT)
+        lines.append(f"      - switch: {TOPOLOGY_ROOT_SWITCH}")
+        lines.append(f"        children: {','.join(root_children)}")
         for island in sorted(tree):
             lines.append(f"      - switch: isl-{island}")
             lines.append(f"        children: {','.join('nb-' + n for n in sorted(tree[island]))}")

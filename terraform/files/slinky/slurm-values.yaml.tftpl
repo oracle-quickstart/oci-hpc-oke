@@ -172,6 +172,8 @@ configFiles:
       cluster_default: ${topology_default == "tree" ? "true" : "false"}
       tree:
         switches:
+          - switch: root
+            children: none
           - switch: none
     - topology: block
       cluster_default: ${topology_default == "block" ? "true" : "false"}
