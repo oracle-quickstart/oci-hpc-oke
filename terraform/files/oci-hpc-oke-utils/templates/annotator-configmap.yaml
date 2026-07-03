@@ -92,7 +92,9 @@ data:
         if not (island and netblock and localblock):
             return TOPOLOGY_NONE_SPEC
 
-        return f"tree:{island}:{netblock}:{localblock},block:{localblock}"
+        # isl-/nb-/lb- prefixes keep switch names unique across tiers and
+        # readable in scontrol output.
+        return f"tree:isl-{island}:nb-{netblock}:lb-{localblock},block:lb-{localblock}"
 
 
     def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> None:

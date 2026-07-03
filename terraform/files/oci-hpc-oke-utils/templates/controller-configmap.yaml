@@ -368,16 +368,16 @@ data:
         lines.append("  tree:")
         lines.append("    switches:")
         for island in sorted(tree):
-            lines.append(f"      - switch: {island}")
-            lines.append(f"        children: {','.join(sorted(tree[island]))}")
+            lines.append(f"      - switch: isl-{island}")
+            lines.append(f"        children: {','.join('nb-' + n for n in sorted(tree[island]))}")
         for island in sorted(tree):
             for netblock in sorted(tree[island]):
-                lines.append(f"      - switch: {netblock}")
-                lines.append(f"        children: {','.join(sorted(tree[island][netblock]))}")
+                lines.append(f"      - switch: nb-{netblock}")
+                lines.append(f"        children: {','.join('lb-' + l for l in sorted(tree[island][netblock]))}")
         for island in sorted(tree):
             for netblock in sorted(tree[island]):
                 for localblock in sorted(tree[island][netblock]):
-                    lines.append(f"      - switch: {localblock}")
+                    lines.append(f"      - switch: lb-{localblock}")
                     lines.append(f"        nodes: {_hostlist(tree[island][netblock][localblock])}")
         if unlabeled or not labeled:
             lines.append(f"      - switch: {TOPOLOGY_NONE_UNIT}")
@@ -391,7 +391,7 @@ data:
             lines.append(f"      - {size}")
         lines.append("    blocks:")
         for name in sorted(blocks):
-            lines.append(f"      - block: {name}")
+            lines.append(f"      - block: lb-{name}")
             lines.append(f"        nodes: {_hostlist(blocks[name])}")
         if unlabeled or not blocks:
             lines.append(f"      - block: {TOPOLOGY_NONE_UNIT}")
