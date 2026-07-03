@@ -194,20 +194,28 @@ locals {
     if length(lookup(local.nccl_rccl_parameters, shape, {})) > 0
   }
 
+  # Slurm jobs inherit these values through the login pod environment, and
+  # envFrom can only reference ConfigMaps in the pod's own namespace.
+  nccl_rccl_configmap_namespaces = distinct(concat(
+    ["default"],
+    alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? [var.slinky_slurm_namespace] : [],
+  ))
+
   nccl_rccl_configmaps = {
-    for shape, params in local.nccl_rccl_configmap_shape_params :
-    shape => {
+    for pair in setproduct(keys(local.nccl_rccl_configmap_shape_params), local.nccl_rccl_configmap_namespaces) :
+    "${pair[0]}|${pair[1]}" => {
+      shape = pair[0]
       name = format(
         "oci-%s-parameters-%s",
-        contains(local.amd_gpu_plugin_shapes, shape) ? "rccl" : "nccl",
-        lower(replace(shape, ".", "-")),
+        contains(local.amd_gpu_plugin_shapes, pair[0]) ? "rccl" : "nccl",
+        lower(replace(pair[0], ".", "-")),
       )
-      namespace = "default"
+      namespace = pair[1]
       data = merge(
-        params,
+        local.nccl_rccl_configmap_shape_params[pair[0]],
         alltrue([
           local.deploy_nvidia_network_operator_manifests,
-          contains(local.nvidia_network_operator_sriov_shapes, shape),
+          contains(local.nvidia_network_operator_sriov_shapes, pair[0]),
         ]) ? { NCCL_IB_HCA = "mlx5" } : {},
       )
     }
