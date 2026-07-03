@@ -204,7 +204,6 @@ locals {
   nccl_rccl_configmaps = {
     for pair in setproduct(keys(local.nccl_rccl_configmap_shape_params), local.nccl_rccl_configmap_namespaces) :
     "${pair[0]}|${pair[1]}" => {
-      shape = pair[0]
       name = format(
         "oci-%s-parameters-%s",
         contains(local.amd_gpu_plugin_shapes, pair[0]) ? "rccl" : "nccl",
@@ -227,8 +226,8 @@ locals {
   ])
 
   nccl_rccl_configmap_manifests = {
-    for shape, configmap in local.nccl_rccl_configmaps :
-    shape => yamlencode({
+    for key, configmap in local.nccl_rccl_configmaps :
+    key => yamlencode({
       apiVersion = "v1"
       kind       = "ConfigMap"
       metadata = {
