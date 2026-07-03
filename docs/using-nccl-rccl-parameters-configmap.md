@@ -98,16 +98,23 @@ required:
 
 ## Slurm (Slinky) clusters
 
-Slurm worker NodeSets mount their own shape's ConfigMap at `/etc/nccl.conf`
-automatically, so `sbatch` and `srun` jobs pick up the parameters without any
-manifest or submission-environment changes. Per-job exports still override
-them. Multi-pool clusters (for example separate RDMA and GMC shapes) get the
-correct file for each pool.
+Slurm worker NodeSets mount their own shape's ConfigMap automatically at both
+`/etc/nccl.conf` (NCCL) and `/etc/rccl.conf` (RCCL), so `sbatch` and `srun`
+jobs pick up the parameters without any manifest or submission-environment
+changes, whichever library the job links against. Per-job exports still
+override them. Multi-pool clusters (for example separate RDMA and GMC
+shapes) get the correct file for each pool.
 
 Containerized Pyxis job steps run in the container filesystem, which does not
-include the worker pod's `/etc/nccl.conf`, so add
-`--container-mounts=/etc/nccl.conf` (or include it in an existing
-`--container-mounts` list) to bind it in.
+include the worker pod's mounted files, so add
+`--container-mounts=/etc/nccl.conf` (NCCL) or `--container-mounts=/etc/rccl.conf`
+(RCCL) (or include the path in an existing `--container-mounts` list) to bind
+in whichever file the job's library reads.
+
+Changing a shape's parameters updates the ConfigMap, but Kubernetes does not
+refresh a `subPath` mount on its own. The worker NodeSet carries a hash of
+the ConfigMap contents as a pod annotation, so a parameter change rolls the
+affected worker pods automatically; no manual restart is needed.
 
 ## Worked example: BM.GPU.H100.8 NCCL test
 

@@ -85,11 +85,15 @@ Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
 
-Slurm GPU workers mount the shape's parameters at `/etc/nccl.conf`; NCCL/RCCL
-read that file at initialization, and per-job environment variables override
-it. Pyxis job steps run in the container filesystem and need
-`--container-mounts=/etc/nccl.conf` to see it. The provided scripts still
-source `env.sh`, whose exports take precedence over the file.
+Slurm GPU workers mount the shape's parameters at both `/etc/nccl.conf`
+(NCCL) and `/etc/rccl.conf` (RCCL); each library reads its own path at
+initialization, and per-job environment variables override either file.
+Pyxis job steps run in the container filesystem and need
+`--container-mounts=/etc/nccl.conf` or `--container-mounts=/etc/rccl.conf`
+(whichever the job's library reads) to see it. The provided scripts still
+source `env.sh`, whose exports take precedence over the file. Changing a
+shape's parameters rolls the affected worker pods automatically, since
+Kubernetes does not refresh a `subPath` ConfigMap mount on its own.
 
 ## Worker Network Mode (hostNetwork vs SR-IOV VFs)
 
