@@ -90,6 +90,28 @@ annotator:
       # later runs reuse the uv cache and stay small.
       memory: 256Mi
 
+# Slurm topology management. The annotator DaemonSet writes the
+# topology.slinky.slurm.net/spec node annotation from IMDS rdmaTopologyData,
+# and the controller Deployment regenerates topology.yaml in the slurm
+# chart's extra-config ConfigMap from the rdma.* node labels.
+topology:
+  enabled: false
+  # Namespace and name of the ConfigMap the slurm chart renders from its
+  # configFiles value (helm release fullname + "-config-extra").
+  slurmNamespace: slurm
+  configMapName: slurm-config-extra
+  # Topology marked cluster_default in topology.yaml: tree or block.
+  defaultTopology: tree
+  # auto derives block_sizes from live local block populations, or a
+  # comma-separated list of integers.
+  blockSizes: auto
+  # Node pools included in the generated topology.
+  workerPools:
+    - oke-gpu
+    - oke-rdma
+    - oke-gmc
+    - oke-cpu
+
 prepuller:
   enabled: false
   image:

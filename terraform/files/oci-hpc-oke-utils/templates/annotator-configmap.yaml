@@ -1,4 +1,4 @@
-{{- if .Values.annotator.enabled }}
+{{- if or .Values.annotator.enabled .Values.topology.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,6 +12,7 @@ data:
     # requires-python = ">=3.12"
     # dependencies = [
     #     "kubernetes>=31.0.0",
+    #     "requests>=2.32.0",
     # ]
     # ///
 
@@ -22,16 +23,28 @@ data:
     import time
     from pathlib import Path
 
+    import requests
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
 
     # slurm-operator 1.2+ uses this Node annotation verbatim as the NodeSet
     # pod hostname, which is also the Slurm node name in DaemonSet mode.
-    ANNOTATION = "nodeset.slinky.slurm.net/hostname-override"
+    ANNOTATION_HOSTNAME = "nodeset.slinky.slurm.net/hostname-override"
+
+    # slurm-operator 1.1+ injects this Node annotation into slurmd as the
+    # dynamic topology line (Topology=<name>:<unit>,...).
+    ANNOTATION_TOPOLOGY = "topology.slinky.slurm.net/spec"
 
     # RFC 1123 label, what Kubernetes accepts for pod spec.hostname.
     HOSTNAME_RE = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+
+    IMDS_BASE = "http://169.254.169.254/opc/v2"
+    IMDS_HEADERS = {"Authorization": "Bearer Oracle"}
+
+    # Nodes without RDMA locality share one synthetic unit so they stay
+    # inside every generated topology and remain schedulable.
+    TOPOLOGY_NONE_SPEC = "tree:none,block:none"
 
     logging.basicConfig(
         level=logging.INFO,
@@ -52,9 +65,45 @@ data:
         return name
 
 
-    def sync(v1: client.CoreV1Api, node_name: str) -> None:
-        hostname = host_short_hostname()
-        if hostname is None:
+    def topology_spec() -> str | None:
+        # None means IMDS was unreachable; keep the existing annotation.
+        try:
+            resp = requests.get(f"{IMDS_BASE}/host/rdmaTopologyData", headers=IMDS_HEADERS, timeout=10)
+        except requests.RequestException:
+            log.warning("IMDS request failed, keeping existing topology annotation")
+            return None
+
+        if resp.status_code != 200 or not resp.text.strip():
+            return TOPOLOGY_NONE_SPEC
+
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError:
+            return TOPOLOGY_NONE_SPEC
+
+        island = (data.get("customerHPCIslandId") or "")[-11:]
+        netblock = (data.get("customerNetworkBlock") or "")[-11:]
+        localblock = (data.get("customerLocalBlock") or "")[-11:]
+        if not (island and netblock and localblock):
+            return TOPOLOGY_NONE_SPEC
+
+        return f"tree:{island}:{netblock}:{localblock},block:{localblock}"
+
+
+    def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> None:
+        desired: dict[str, str] = {}
+
+        if hostname_enabled:
+            hostname = host_short_hostname()
+            if hostname is not None:
+                desired[ANNOTATION_HOSTNAME] = hostname
+
+        if topology_enabled:
+            spec = topology_spec()
+            if spec is not None:
+                desired[ANNOTATION_TOPOLOGY] = spec
+
+        if not desired:
             return
 
         try:
@@ -63,13 +112,15 @@ data:
             log.exception("Failed to read node %s", node_name)
             return
 
-        current = (node.metadata.annotations or {}).get(ANNOTATION)
-        if current == hostname:
+        current = node.metadata.annotations or {}
+        updates = {k: v for k, v in desired.items() if current.get(k) != v}
+        if not updates:
             return
 
         try:
-            v1.patch_node(node_name, {"metadata": {"annotations": {ANNOTATION: hostname}}})
-            log.info("Annotated %s with %s=%s (was %s)", node_name, ANNOTATION, hostname, current)
+            v1.patch_node(node_name, {"metadata": {"annotations": updates}})
+            for k, v in updates.items():
+                log.info("Annotated %s with %s=%s (was %s)", node_name, k, v, current.get(k))
         except Exception:
             log.exception("Failed to patch node %s", node_name)
 
@@ -80,11 +131,14 @@ data:
 
         node_name = os.environ["NODE_NAME"]
         interval = int(os.environ.get("INTERVAL", "300"))
+        hostname_enabled = os.environ.get("HOSTNAME_OVERRIDE_ENABLED", "true").lower() == "true"
+        topology_enabled = os.environ.get("TOPOLOGY_ENABLED", "false").lower() == "true"
 
-        log.info("Node: %s | Annotation: %s | Interval: %ds", node_name, ANNOTATION, interval)
+        log.info("Node: %s | Interval: %ds | hostname-override: %s | topology: %s",
+                 node_name, interval, hostname_enabled, topology_enabled)
 
         while True:
-            sync(v1, node_name)
+            sync(v1, node_name, hostname_enabled, topology_enabled)
             HEALTH_FILE.touch()
             time.sleep(interval)
 

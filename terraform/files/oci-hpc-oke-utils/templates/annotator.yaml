@@ -1,4 +1,4 @@
-{{- if .Values.annotator.enabled }}
+{{- if or .Values.annotator.enabled .Values.topology.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -83,6 +83,10 @@ spec:
                   fieldPath: spec.nodeName
             - name: INTERVAL
               value: {{ .Values.annotator.interval | quote }}
+            - name: HOSTNAME_OVERRIDE_ENABLED
+              value: {{ .Values.annotator.enabled | quote }}
+            - name: TOPOLOGY_ENABLED
+              value: {{ .Values.topology.enabled | quote }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
