@@ -1324,8 +1324,8 @@ variable "slinky_topology_block_sizes" {
   description = "block_sizes for the generated block topology. auto derives them from current local block populations (smallest block, doubling while the next size fits). Or a comma-separated list of integers, e.g. 8,16,32."
 
   validation {
-    condition     = var.slinky_topology_block_sizes == "auto" || can(regex("^[0-9]+(,[0-9]+)*$", var.slinky_topology_block_sizes))
-    error_message = "slinky_topology_block_sizes must be 'auto' or a comma-separated list of integers."
+    condition     = var.slinky_topology_block_sizes == "auto" || can(regex("^[1-9][0-9]*(,[1-9][0-9]*)*$", var.slinky_topology_block_sizes))
+    error_message = "slinky_topology_block_sizes must be 'auto' or a comma-separated list of positive integers."
   }
 }
 
