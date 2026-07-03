@@ -15,4 +15,13 @@ rules:
     resources: ["nodes/status"]
     verbs: ["get", "patch"]
   {{- end }}
+  {{- if .Values.topology.enabled }}
+  # The topology generator patches the slurm chart's extra-config ConfigMap.
+  # ClusterRole instead of a namespaced Role: the utils chart installs before
+  # the Slurm namespace exists.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: [{{ .Values.topology.configMapName | quote }}]
+    verbs: ["get", "patch"]
+  {{- end }}
 {{- end }}
