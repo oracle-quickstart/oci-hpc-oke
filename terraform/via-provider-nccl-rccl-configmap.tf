@@ -201,9 +201,12 @@ locals {
     alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? [var.slinky_slurm_namespace] : [],
   ))
 
+  # Default-namespace entries keep the bare shape key: existing state already
+  # uses it, and a key change would destroy and recreate the same ConfigMap
+  # from two unordered resource addresses.
   nccl_rccl_configmaps = {
     for pair in setproduct(keys(local.nccl_rccl_configmap_shape_params), local.nccl_rccl_configmap_namespaces) :
-    "${pair[0]}|${pair[1]}" => {
+    (pair[1] == "default" ? pair[0] : "${pair[0]}|${pair[1]}") => {
       name = format(
         "oci-%s-parameters-%s",
         contains(local.amd_gpu_plugin_shapes, pair[0]) ? "rccl" : "nccl",
