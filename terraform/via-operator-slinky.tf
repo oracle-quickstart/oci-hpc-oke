@@ -122,6 +122,7 @@ locals {
       # Empty when the shape has no parameter entry or the ConfigMap is disabled;
       # the template skips the mount in that case.
       nccl_configmap_name = local.deploy_nccl_rccl_param_configmap ? try(local.nccl_rccl_configmaps["${local.slinky_worker_nodesets[nodeset_name].shape}|${var.slinky_slurm_namespace}"].name, "") : ""
+      nccl_conf_hash      = local.deploy_nccl_rccl_param_configmap ? try(sha256(local.nccl_rccl_configmaps["${local.slinky_worker_nodesets[nodeset_name].shape}|${var.slinky_slurm_namespace}"].data["nccl.conf"]), "") : ""
     })
   ])
 

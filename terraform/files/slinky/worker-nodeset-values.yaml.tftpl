@@ -1,7 +1,7 @@
   ${nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
-%{ if sriov_enabled || (identity_enabled && worker_ssh_enabled) ~}
+%{ if sriov_enabled || (identity_enabled && worker_ssh_enabled) || nccl_configmap_name != "" ~}
     metadata:
       annotations:
 %{ if identity_enabled && worker_ssh_enabled ~}
@@ -9,6 +9,11 @@
 %{ endif ~}
 %{ if sriov_enabled ~}
         k8s.v1.cni.cncf.io/networks: ${rdma_networks}
+%{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        # subPath ConfigMap mounts never refresh; changed parameters roll the
+        # pods through this hash instead.
+        oci-hpc-oke.oracle.com/nccl-conf-hash: "${nccl_conf_hash}"
 %{ endif ~}
 %{ endif ~}
     # Ignored in DaemonSet mode (pod count follows matching nodes); only used
