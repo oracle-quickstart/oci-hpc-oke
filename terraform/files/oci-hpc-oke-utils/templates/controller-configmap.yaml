@@ -456,17 +456,6 @@ data:
         topology_interval = int(os.environ.get("TOPOLOGY_INTERVAL", "120"))
 
         compute_client = None
-        if oci_labels_enabled:
-            try:
-                signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-                compute_client = oci.core.ComputeClient(config={}, signer=signer)
-                tenant_id = signer.tenancy_id
-            except Exception:
-                # Topology sync only needs the Kubernetes API; keep it alive.
-                log.exception("Failed to create OCI ComputeClient")
-                if not topology_enabled:
-                    return
-                oci_labels_enabled = False
 
         log.info("Controller started | Interval: %ds | OCI labels: %s | Topology: %s",
                  interval, oci_labels_enabled, topology_enabled)
@@ -485,113 +474,125 @@ data:
         next_labels_due = time.monotonic()
         while True:
             if oci_labels_enabled and time.monotonic() >= next_labels_due:
-                cycle_count += 1
-                if cycle_count % FW_CACHE_TTL_CYCLES == 0:
-                    fw_cache.clear()
-                    prev_state.clear()
-                    log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
-                try:
-                    # Get all GPU nodes
-                    nodes = v1.list_node(label_selector=node_selector).items
-                    node_map = {}  # node_name -> (instance_id, compartment_id, existing_labels)
-                    for node in nodes:
-                        node_name = node.metadata.name
-                        # Instance ID from OKE provider ID (oci://<ocid> or bare <ocid>)
-                        provider_id = (node.spec.provider_id or "").removeprefix("oci://")
-                        compartment_id = (node.metadata.annotations or {}).get("oci.oraclecloud.com/compartment-id", "")
-                        if provider_id.startswith("ocid1.instance.") and compartment_id:
-                            existing_labels = node.metadata.labels or {}
-                            node_map[node_name] = (provider_id, compartment_id, existing_labels)
+                if compute_client is None:
+                    try:
+                        signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+                        compute_client = oci.core.ComputeClient(config={}, signer=signer)
+                        tenant_id = signer.tenancy_id
+                        log.info("OCI ComputeClient ready | Tenant: %s", tenant_id[-11:])
+                    except Exception:
+                        # Transient IMDS/IAM failures must not disable labels
+                        # forever; retry on the next label cycle.
+                        log.exception("Failed to create OCI ComputeClient, retrying next cycle")
+                        next_labels_due = time.monotonic() + interval
+                if compute_client is not None and time.monotonic() >= next_labels_due:
+                    cycle_count += 1
+                    if cycle_count % FW_CACHE_TTL_CYCLES == 0:
+                        fw_cache.clear()
+                        prev_state.clear()
+                        log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
+                    try:
+                        # Get all GPU nodes
+                        nodes = v1.list_node(label_selector=node_selector).items
+                        node_map = {}  # node_name -> (instance_id, compartment_id, existing_labels)
+                        for node in nodes:
+                            node_name = node.metadata.name
+                            # Instance ID from OKE provider ID (oci://<ocid> or bare <ocid>)
+                            provider_id = (node.spec.provider_id or "").removeprefix("oci://")
+                            compartment_id = (node.metadata.annotations or {}).get("oci.oraclecloud.com/compartment-id", "")
+                            if provider_id.startswith("ocid1.instance.") and compartment_id:
+                                existing_labels = node.metadata.labels or {}
+                                node_map[node_name] = (provider_id, compartment_id, existing_labels)
 
-                    log.info("Found %d GPU nodes (%d with instance IDs)", len(nodes), len(node_map))
+                        log.info("Found %d GPU nodes (%d with instance IDs)", len(nodes), len(node_map))
 
-                    # List all compute hosts once
-                    all_hosts = _list_all_compute_hosts(compute_client, tenant_id)
-                    log.info("Listed %d compute hosts", len(all_hosts))
+                        # List all compute hosts once
+                        all_hosts = _list_all_compute_hosts(compute_client, tenant_id)
+                        log.info("Listed %d compute hosts", len(all_hosts))
 
-                    # Build instance_id -> host summary mapping
-                    host_by_instance: dict[str, object] = {}
-                    for h in all_hosts:
-                        if h.instance_id:
-                            host_by_instance[h.instance_id] = h
+                        # Build instance_id -> host summary mapping
+                        host_by_instance: dict[str, object] = {}
+                        for h in all_hosts:
+                            if h.instance_id:
+                                host_by_instance[h.instance_id] = h
 
-                    skipped = 0
-                    processed = 0
+                        skipped = 0
+                        processed = 0
 
-                    # Process each node
-                    for node_name, (instance_id, compartment_id, existing_labels) in node_map.items():
-                        host_summary = host_by_instance.get(instance_id)
-                        if not host_summary:
-                            continue
+                        # Process each node
+                        for node_name, (instance_id, compartment_id, existing_labels) in node_map.items():
+                            host_summary = host_by_instance.get(instance_id)
+                            if not host_summary:
+                                continue
 
-                        # Check if this node's state changed since last cycle
-                        current_state = (
-                            host_summary.health,
-                            host_summary.lifecycle_state,
-                            host_summary.has_impacted_components,
-                        )
-                        has_host_labels = "oci.oraclecloud.com/host.platform" in existing_labels
-                        has_fw_labels = "oci.oraclecloud.com/host.fw.bundle_version" in existing_labels
-                        has_maint_labels = any(k.startswith("oci.oraclecloud.com/host.maintenance.") for k in existing_labels)
+                            # Check if this node's state changed since last cycle
+                            current_state = (
+                                host_summary.health,
+                                host_summary.lifecycle_state,
+                                host_summary.has_impacted_components,
+                            )
+                            has_host_labels = "oci.oraclecloud.com/host.platform" in existing_labels
+                            has_fw_labels = "oci.oraclecloud.com/host.fw.bundle_version" in existing_labels
+                            has_maint_labels = any(k.startswith("oci.oraclecloud.com/host.maintenance.") for k in existing_labels)
 
-                        # Skip expensive API calls if node is stable:
-                        # - State unchanged from last cycle
-                        # - Already has host and firmware labels
-                        # - No impacted components
-                        # - No active maintenance labels to clear
-                        prev = prev_state.get(node_name)
-                        if (prev == current_state
-                                and has_host_labels
-                                and has_fw_labels
-                                and not host_summary.has_impacted_components
-                                and not has_maint_labels):
-                            skipped += 1
-                            continue
+                            # Skip expensive API calls if node is stable:
+                            # - State unchanged from last cycle
+                            # - Already has host and firmware labels
+                            # - No impacted components
+                            # - No active maintenance labels to clear
+                            prev = prev_state.get(node_name)
+                            if (prev == current_state
+                                    and has_host_labels
+                                    and has_fw_labels
+                                    and not host_summary.has_impacted_components
+                                    and not has_maint_labels):
+                                skipped += 1
+                                continue
 
-                        # Get full host details
-                        try:
-                            host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_summary.id).data
-                        except Exception:
-                            log.exception("Failed to get compute host for node %s", node_name)
-                            continue
+                            # Get full host details
+                            try:
+                                host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_summary.id).data
+                            except Exception:
+                                log.exception("Failed to get compute host for node %s", node_name)
+                                continue
 
-                        # Build labels
-                        labels = _get_host_labels(host, host_summary.has_impacted_components)
+                            # Build labels
+                            labels = _get_host_labels(host, host_summary.has_impacted_components)
 
-                        # Firmware labels (cached per bundle ID)
-                        if host.firmware_bundle_id:
-                            fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
-                            labels.update(fw_labels)
+                            # Firmware labels (cached per bundle ID)
+                            if host.firmware_bundle_id:
+                                fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
+                                labels.update(fw_labels)
 
-                        # Maintenance: only query if node has impacted components or existing maintenance labels
-                        maint_result = None  # None = not queried or API failed
-                        if host_summary.has_impacted_components or has_maint_labels:
-                            maint_result = _get_maintenance_labels_and_conditions(
-                                compute_client, instance_id, compartment_id)
+                            # Maintenance: only query if node has impacted components or existing maintenance labels
+                            maint_result = None  # None = not queried or API failed
+                            if host_summary.has_impacted_components or has_maint_labels:
+                                maint_result = _get_maintenance_labels_and_conditions(
+                                    compute_client, instance_id, compartment_id)
+                                if maint_result is not None:
+                                    maint_labels, maint_conditions = maint_result
+                                    labels.update(maint_labels)
+
+                            # Always clean fault labels (based on host data already fetched)
+                            # Only clean maintenance labels when maintenance API succeeded
+                            patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
+                                                           clean_faults=True, clean_maintenance=maint_result is not None)
+
+                            # Only reconcile maintenance condition when we got a definitive answer
                             if maint_result is not None:
-                                maint_labels, maint_conditions = maint_result
-                                labels.update(maint_labels)
+                                _apply_maintenance_condition(v1, node_name, maint_result[1])
 
-                        # Always clean fault labels (based on host data already fetched)
-                        # Only clean maintenance labels when maintenance API succeeded
-                        patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
-                                                       clean_faults=True, clean_maintenance=maint_result is not None)
+                            # Update cached state only after successful label patch
+                            if patch_ok:
+                                prev_state[node_name] = current_state
+                            processed += 1
 
-                        # Only reconcile maintenance condition when we got a definitive answer
-                        if maint_result is not None:
-                            _apply_maintenance_condition(v1, node_name, maint_result[1])
+                        log.info("Cycle complete: processed %d, skipped %d stable, %d firmware bundles cached",
+                                 processed, skipped, len(fw_cache))
 
-                        # Update cached state only after successful label patch
-                        if patch_ok:
-                            prev_state[node_name] = current_state
-                        processed += 1
-
-                    log.info("Cycle complete: processed %d, skipped %d stable, %d firmware bundles cached",
-                             processed, skipped, len(fw_cache))
-
-                except Exception:
-                    log.exception("Controller cycle failed")
-                next_labels_due = time.monotonic() + interval
+                    except Exception:
+                        log.exception("Controller cycle failed")
+                    next_labels_due = time.monotonic() + interval
 
             if topology_enabled:
                 try:
