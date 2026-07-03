@@ -119,6 +119,9 @@ locals {
       identity_enabled    = var.slinky_identity_enabled
       home_enabled        = var.slinky_home_enabled
       sssd_config_hash    = nonsensitive(sha256(sensitive(local.slinky_openldap_prereqs_yaml)))
+      # Empty when the shape has no parameter entry or the ConfigMap is disabled;
+      # the template skips the mount in that case.
+      nccl_configmap_name = local.deploy_nccl_rccl_param_configmap ? try(local.nccl_rccl_configmaps["${local.slinky_worker_nodesets[nodeset_name].shape}|${var.slinky_slurm_namespace}"].name, "") : ""
     })
   ])
 

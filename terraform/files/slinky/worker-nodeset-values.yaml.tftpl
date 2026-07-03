@@ -90,6 +90,12 @@
           mountPath: /etc/sssd/ca
           readOnly: true
 %{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        # NCCL/RCCL read this at init; job environment variables override it.
+        - name: nccl-conf
+          mountPath: /etc/nccl.conf
+          subPath: nccl.conf
+%{ endif ~}
     logfile:
       image:
         repository: docker.io/library/alpine
@@ -169,4 +175,9 @@ ${features_yaml}
             items:
               - key: ca.crt
                 path: ca.crt
+%{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        - name: nccl-conf
+          configMap:
+            name: ${nccl_configmap_name}
 %{ endif ~}
