@@ -105,6 +105,10 @@ topology:
   # auto derives block_sizes from live local block populations, or a
   # comma-separated list of integers.
   blockSizes: auto
+  # Topology sync cadence in seconds. Short on purpose: fresh installs hit a
+  # 404 before the Slurm chart exists, and helm upgrades briefly revert the
+  # generated file to the bootstrap skeleton.
+  syncInterval: 120
   # Node pools included in the generated topology.
   workerPools:
     - oke-gpu

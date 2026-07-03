@@ -78,6 +78,8 @@ spec:
               value: {{ .Values.topology.blockSizes | quote }}
             - name: TOPOLOGY_WORKER_POOLS
               value: {{ join "," .Values.topology.workerPools | quote }}
+            - name: TOPOLOGY_INTERVAL
+              value: {{ .Values.topology.syncInterval | quote }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]

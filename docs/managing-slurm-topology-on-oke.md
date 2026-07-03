@@ -120,10 +120,10 @@ kubectl -n slurm exec slurm-controller-0 -c slurmctld -- scontrol show topology
 
 If the ConfigMap looks right but `scontrol show topology` does not match, check the Slurm controller pod's reconfigure sidecar logs; it is what applies changed files with `scontrol reconfigure`.
 
-If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment logs (`kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller`). The controller only patches the ConfigMap when the rendered content differs from what is already there, and it runs on a 900 second interval by default.
+If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment logs (`kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller`). The controller only patches the ConfigMap when the rendered content differs from what is already there. The topology sync runs every 120 seconds by default (`topology.syncInterval`); the OCI label refresh keeps its own separate 900 second interval.
 
 > [!NOTE]
-> A `helm upgrade` of the Slurm chart briefly reverts `topology.yaml` to the bootstrap skeleton (a bare `none` tree switch and a placeholder block), because the chart's `configFiles` value always re-applies that skeleton on deploy. The oke-utils controller rewrites it with real data on its next cycle, so this window is normal and self-corrects; it is not a sign of a problem unless `topology.yaml` never leaves the skeleton state.
+> A `helm upgrade` of the Slurm chart briefly reverts `topology.yaml` to the bootstrap skeleton (a bare `none` tree switch and a placeholder block), because the chart's `configFiles` value always re-applies that skeleton on deploy. The oke-utils controller rewrites it with real data on its next cycle, within about two minutes by default, so this window is normal and self-corrects; it is not a sign of a problem unless `topology.yaml` never leaves the skeleton state.
 
 Disabling the feature (`slinky_topology_enabled = false`) removes `topology.yaml` and the reconfigure sidecar on the next apply, but existing `topology.slinky.slurm.net/spec` node annotations are not removed automatically. Remove them manually if workers will keep running, so slurmd does not register with a topology that no longer exists:
 

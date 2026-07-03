@@ -442,6 +442,7 @@ data:
         topology_default = os.environ.get("TOPOLOGY_DEFAULT", "tree")
         topology_block_sizes = os.environ.get("TOPOLOGY_BLOCK_SIZES", "auto")
         topology_pools = [p for p in os.environ.get("TOPOLOGY_WORKER_POOLS", "").split(",") if p]
+        topology_interval = int(os.environ.get("TOPOLOGY_INTERVAL", "120"))
 
         compute_client = None
         if oci_labels_enabled:
@@ -466,13 +467,18 @@ data:
         cycle_count = 0
         FW_CACHE_TTL_CYCLES = 24  # Clear firmware cache every 24 cycles (~6 hours at 900s interval)
 
+        # The loop ticks at the topology cadence; the OCI label refresh keeps
+        # its own longer interval via next_labels_due.
+        loop_interval = min(interval, topology_interval) if topology_enabled else interval
+
+        next_labels_due = time.monotonic()
         while True:
-            cycle_count += 1
-            if cycle_count % FW_CACHE_TTL_CYCLES == 0:
-                fw_cache.clear()
-                prev_state.clear()
-                log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
-            if oci_labels_enabled:
+            if oci_labels_enabled and time.monotonic() >= next_labels_due:
+                cycle_count += 1
+                if cycle_count % FW_CACHE_TTL_CYCLES == 0:
+                    fw_cache.clear()
+                    prev_state.clear()
+                    log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
                 try:
                     # Get all GPU nodes
                     nodes = v1.list_node(label_selector=node_selector).items
@@ -574,6 +580,7 @@ data:
 
                 except Exception:
                     log.exception("Controller cycle failed")
+                next_labels_due = time.monotonic() + interval
 
             if topology_enabled:
                 try:
@@ -583,7 +590,7 @@ data:
                     log.exception("Topology sync failed")
 
             HEALTH_FILE.touch()
-            time.sleep(interval)
+            time.sleep(loop_interval)
 
 
     if __name__ == "__main__":
