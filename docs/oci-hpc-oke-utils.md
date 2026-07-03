@@ -9,7 +9,7 @@
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Disabled | Runs shell scripts on the host via `nsenter` |
 
-All three target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels).
+The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes.
 
 ## Manual Installation
 
