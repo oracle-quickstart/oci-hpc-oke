@@ -66,7 +66,7 @@ topology.slinky.slurm.net/spec: tree:af7ubvouuyq:7xmzl4p4wba:4tjxbt4s6ua,block:4
 |---|---|---|
 | `slinky_topology_enabled` | `true` | Master switch for the annotator's topology annotation and the oke-utils controller's `topology.yaml` generation. |
 | `slinky_topology_default` | `tree` | Which generated topology (`tree` or `block`) is marked `cluster_default`. Partitions without an explicit `Topology` setting use this one. |
-| `slinky_topology_block_sizes` | `auto` | `block_sizes` for the `block` topology. `auto` derives them from the current local block populations (smallest block size, doubling while the next size still fits the fleet). Otherwise a comma-separated list of integers, for example `8,16,32`. |
+| `slinky_topology_block_sizes` | `auto` | `block_sizes` for the `block` topology. `auto` derives them from the current local block populations (smallest block size, doubling while the next size still fits the fleet). Otherwise a comma-separated list of positive integers, for example `8,16,32`. |
 
 The CPU partition is always pinned to `Topology: flat` in its partition configuration, since CPU workers have no RDMA locality. The GPU, RDMA, and GMC partitions (including the GMC aggregate partition) set no explicit `Topology` and inherit whichever topology is marked `cluster_default`.
 
@@ -124,5 +124,5 @@ If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment
 Disabling the feature (`slinky_topology_enabled = false`) removes `topology.yaml` and the reconfigure sidecar on the next apply, but existing `topology.slinky.slurm.net/spec` node annotations are not removed automatically. Remove them manually if workers will keep running, so slurmd does not register with a topology that no longer exists:
 
 ```bash
-kubectl annotate nodes --all topology.slinky.slurm.net/spec-
+kubectl annotate nodes -l 'oke.oraclecloud.com/pool.name in (oke-gpu,oke-rdma,oke-gmc,oke-cpu)' topology.slinky.slurm.net/spec-
 ```

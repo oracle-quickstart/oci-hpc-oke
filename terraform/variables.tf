@@ -1321,7 +1321,7 @@ variable "slinky_topology_default" {
 variable "slinky_topology_block_sizes" {
   default     = "auto"
   type        = string
-  description = "block_sizes for the generated block topology. auto derives them from current local block populations (smallest block, doubling while the next size fits). Or a comma-separated list of integers, e.g. 8,16,32."
+  description = "block_sizes for the generated block topology. auto derives them from current local block populations (smallest block, doubling while the next size fits). Or a comma-separated list of positive integers, e.g. 8,16,32."
 
   validation {
     condition     = var.slinky_topology_block_sizes == "auto" || can(regex("^[1-9][0-9]*(,[1-9][0-9]*)*$", var.slinky_topology_block_sizes))
