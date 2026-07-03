@@ -406,6 +406,10 @@ data:
 
     def _sync_topology(v1: client.CoreV1Api, namespace: str, name: str,
                        default_topology: str, block_sizes_conf: str, worker_pools: list[str]) -> None:
+        # An empty pool list would render an invalid label selector.
+        if not worker_pools:
+            log.warning("No topology worker pools configured, skipping topology sync")
+            return
         entries = _collect_topology_entries(v1, worker_pools)
         content = _render_topology_yaml(entries, default_topology, block_sizes_conf)
         try:
