@@ -40,6 +40,11 @@ controller:
     image:
       repository: ${controller_image_repository}
       tag: ${controller_image_tag}
+%{ if topology_enabled ~}
+  # Reload config in place when the oke-utils controller updates topology.yaml;
+  # the reconfigure sidecar polls /etc/slurm and runs scontrol reconfigure.
+  inplaceReconfigure: true
+%{ endif ~}
   persistence:
     enabled: true
     storageClassName: oci-bv
@@ -158,6 +163,29 @@ configFiles:
     ConstrainRAMSpace=no
     ConstrainDevices=yes
     ConstrainSwapSpace=no
+%{ if topology_enabled ~}
+  # Bootstrap skeleton so the Controller CR references the file from the first
+  # deploy; the oci-hpc-oke-utils controller regenerates this key in the
+  # deployed ConfigMap from RDMA locality labels.
+  topology.yaml: |
+    - topology: tree
+      cluster_default: ${topology_default == "tree" ? "true" : "false"}
+      tree:
+        switches:
+          - switch: none
+            nodes: placeholder-node
+    - topology: block
+      cluster_default: ${topology_default == "block" ? "true" : "false"}
+      block:
+        block_sizes:
+          - 1
+        blocks:
+          - block: none
+            nodes: placeholder-node
+    - topology: flat
+      cluster_default: false
+      flat: {}
+%{ endif ~}
 
 restapi:
   replicas: 1
@@ -323,6 +351,10 @@ ${cpu_worker_features_yaml}
         State: UP
         Default: "${cpu_partition_default}"
         MaxTime: UNLIMITED
+%{ if topology_enabled ~}
+        # CPU workers have no RDMA locality; keep them on the flat topology.
+        Topology: flat
+%{ endif ~}
     podSpec:
       hostNetwork: false
       dnsPolicy: ClusterFirst
