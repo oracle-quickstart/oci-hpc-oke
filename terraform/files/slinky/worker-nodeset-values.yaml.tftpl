@@ -91,9 +91,13 @@
           readOnly: true
 %{ endif ~}
 %{ if nccl_configmap_name != "" ~}
-        # NCCL/RCCL read this at init; job environment variables override it.
+        # NCCL reads /etc/nccl.conf and RCCL reads /etc/rccl.conf at init;
+        # job environment variables override either file.
         - name: nccl-conf
           mountPath: /etc/nccl.conf
+          subPath: nccl.conf
+        - name: nccl-conf
+          mountPath: /etc/rccl.conf
           subPath: nccl.conf
 %{ endif ~}
     logfile:
