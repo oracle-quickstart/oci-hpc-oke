@@ -396,7 +396,10 @@ data:
         lines.append(f"  cluster_default: {'true' if default_topology == 'block' else 'false'}")
         lines.append("  block:")
         lines.append("    block_sizes:")
-        for size in _block_sizes(blocks, block_sizes_conf):
+        # Mixed fleets size from real blocks only; a fleet with no locality at
+        # all sizes from the synthetic none block so multi node jobs still fit.
+        sizing_blocks = blocks if blocks else ({TOPOLOGY_NONE_UNIT: [e["name"] for e in unlabeled]} if unlabeled else {})
+        for size in _block_sizes(sizing_blocks, block_sizes_conf):
             lines.append(f"      - {size}")
         lines.append("    blocks:")
         for name in sorted(blocks):
