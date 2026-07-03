@@ -111,7 +111,7 @@ kubectl -n slurm get configmap slurm-config-extra -o jsonpath='{.data.topology\.
 Check what Slurm itself sees:
 
 ```bash
-scontrol show topology
+kubectl -n slurm exec slurm-controller-0 -c slurmctld -- scontrol show topology
 ```
 
 If the ConfigMap looks right but `scontrol show topology` does not match, check the Slurm controller pod's reconfigure sidecar logs; it is what applies changed files with `scontrol reconfigure`.
@@ -120,3 +120,9 @@ If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment
 
 > [!NOTE]
 > A `helm upgrade` of the Slurm chart briefly reverts `topology.yaml` to the bootstrap skeleton (a placeholder switch and block), because the chart's `configFiles` value always re-applies that skeleton on deploy. The oke-utils controller rewrites it with real data on its next cycle, so this window is normal and self-corrects; it is not a sign of a problem unless `topology.yaml` never leaves the skeleton state.
+
+Disabling the feature (`slinky_topology_enabled = false`) removes `topology.yaml` and the reconfigure sidecar on the next apply, but existing `topology.slinky.slurm.net/spec` node annotations are not removed automatically. Remove them manually if workers will keep running, so slurmd does not register with a topology that no longer exists:
+
+```bash
+kubectl annotate nodes --all topology.slinky.slurm.net/spec-
+```
