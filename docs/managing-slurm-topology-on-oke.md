@@ -53,7 +53,7 @@ The following is a representative `topology.yaml` for a mixed fleet: two labeled
         nodes: cpu-worker-1,cpu-worker-2
 - topology: flat
   cluster_default: false
-  flat: {}
+  flat: true
 ```
 
 The matching node annotation for `gpu-worker-1` and `gpu-worker-2` would be:

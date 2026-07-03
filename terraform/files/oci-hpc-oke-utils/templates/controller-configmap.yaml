@@ -401,7 +401,7 @@ data:
 
         lines.append("- topology: flat")
         lines.append("  cluster_default: false")
-        lines.append("  flat: {}")
+        lines.append("  flat: true")
 
         return "\n".join(lines) + "\n"
 
