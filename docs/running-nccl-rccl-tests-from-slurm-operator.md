@@ -1533,6 +1533,8 @@ Key points:
   RDMA (`/dev/infiniband`) device nodes into the container with
   `--container-mounts`. The Slurm cgroup (`ConstrainDevices=yes`) still restricts
   the container to the GPUs allocated by `--gres`.
+- Bind `/etc/rccl.conf` into the container so RCCL receives the worker's
+  shape-specific parameters.
 - Use `--container-name` so all tasks on a node share one container instance,
   which UCX intra-node shared memory requires.
 - Submit it as a plain `sbatch`. Do **not** "pre-warm" the import with a separate
@@ -1559,9 +1561,9 @@ set -euo pipefail
 # The rccl-tests image is self-contained for the ROCm/RCCL userland.
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
 
-# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The Slurm
-# cgroup still restricts the container to the --gres GPUs.
-DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+# Enroot has no AMD hook; bind the AMD GPU and RDMA device nodes and RCCL config.
+# The Slurm cgroup still restricts the container to the --gres GPUs.
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband,/etc/rccl.conf:/etc/rccl.conf
 
 # BM.GPU.MI300X.8 RCCL / UCX transport (RCCL reuses the NCCL_* names).
 export NCCL_CUMEM_ENABLE=0
@@ -1626,10 +1628,11 @@ set -euo pipefail
 # The rccl-tests image is self-contained for the ROCm/RCCL userland.
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
 
-# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The container
-# shares the pod network namespace, so /sys/class/infiniband exposes the VF HCAs.
+# Enroot has no AMD hook; bind the AMD GPU and RDMA device nodes and RCCL config.
+# The container shares the pod network namespace, so /sys/class/infiniband
+# exposes the VF HCAs.
 # The Slurm cgroup still restricts the container to the --gres GPUs.
-DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband,/etc/rccl.conf:/etc/rccl.conf
 
 # SR-IOV VF RCCL / transport (RCCL reuses the NCCL_* names). Control plane over
 # the pod overlay eth0 (TCP); RCCL over the VF HCAs matched by NCCL_IB_HCA=mlx5.

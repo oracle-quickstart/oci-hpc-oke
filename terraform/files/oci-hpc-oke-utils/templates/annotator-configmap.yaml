@@ -19,7 +19,6 @@ data:
     import logging
     import os
     import re
-    import socket
     import time
     from pathlib import Path
 
@@ -27,6 +26,8 @@ data:
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
+    READY_FILE = Path("/tmp/health/ready")
+    HOST_HOSTNAME_FILE = Path("/host/etc/hostname")
 
     # slurm-operator 1.2+ uses this Node annotation verbatim as the NodeSet
     # pod hostname, which is also the Slurm node name in DaemonSet mode.
@@ -56,10 +57,11 @@ data:
 
 
     def host_short_hostname() -> str | None:
-        # hostNetwork pod: gethostname() returns the node's real hostname,
-        # which is also what slurmd registers as on hostNetwork NodeSets, so
-        # the annotation must carry exactly this value.
-        name = socket.gethostname().split(".")[0]
+        try:
+            name = HOST_HOSTNAME_FILE.read_text().strip().split(".")[0]
+        except (OSError, UnicodeError):
+            log.exception("Failed to read host hostname from %s", HOST_HOSTNAME_FILE)
+            return None
         if not name or len(name) > 63 or not HOSTNAME_RE.match(name):
             log.warning("Host hostname %r is not a valid RFC 1123 label, skipping", name)
             return None
@@ -100,39 +102,46 @@ data:
         return f"tree:root:isl-{island}:nb-{netblock}:lb-{localblock},block:lb-{localblock}"
 
 
-    def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> None:
+    def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> bool:
         desired: dict[str, str] = {}
+        cycle_ok = True
 
         if hostname_enabled:
             hostname = host_short_hostname()
             if hostname is not None:
                 desired[ANNOTATION_HOSTNAME] = hostname
+            else:
+                cycle_ok = False
 
         if topology_enabled:
             spec = topology_spec()
             if spec is not None:
                 desired[ANNOTATION_TOPOLOGY] = spec
+            else:
+                cycle_ok = False
 
         if not desired:
-            return
+            return False
 
         try:
             node = v1.read_node(node_name)
         except Exception:
             log.exception("Failed to read node %s", node_name)
-            return
+            return False
 
         current = node.metadata.annotations or {}
         updates = {k: v for k, v in desired.items() if current.get(k) != v}
         if not updates:
-            return
+            return cycle_ok
 
         try:
             v1.patch_node(node_name, {"metadata": {"annotations": updates}})
             for k, v in updates.items():
                 log.info("Annotated %s with %s=%s (was %s)", node_name, k, v, current.get(k))
+            return cycle_ok
         except Exception:
             log.exception("Failed to patch node %s", node_name)
+            return False
 
 
     def main():
@@ -148,7 +157,10 @@ data:
                  node_name, interval, hostname_enabled, topology_enabled)
 
         while True:
-            sync(v1, node_name, hostname_enabled, topology_enabled)
+            if sync(v1, node_name, hostname_enabled, topology_enabled):
+                READY_FILE.touch()
+            else:
+                READY_FILE.unlink(missing_ok=True)
             HEALTH_FILE.touch()
             time.sleep(interval)
 

@@ -951,6 +951,8 @@ module "slinky_slurm" {
     # Public control plane: the utils chart (and its annotator) deploys via the
     # provider path, so order the Slurm install after that release too.
     helm_release.oci_hpc_oke_utils,
+    # Update ConfigMaps before rolling workers that mount them with subPath.
+    null_resource.nccl_rccl_configmap,
     null_resource.slinky_auth_secrets_via_operator,
     null_resource.slinky_gmc_compute_domains_via_operator,
     null_resource.slinky_openldap_config_via_operator,

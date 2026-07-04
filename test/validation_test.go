@@ -123,6 +123,13 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "Total required pod IPs",
 	},
+	{
+		name: "InvalidSlinkyTopologyBlockSizes",
+		vars: map[string]interface{}{
+			"slinky_topology_block_sizes": "8,12",
+		},
+		expectedError: "larger power-of-two",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests

@@ -7,9 +7,10 @@ creates one ConfigMap in the `default` namespace for each distinct supported
 shape. Each ConfigMap holds a single `nccl.conf` key: the recommended NCCL/RCCL
 tuning parameters from
 [recommended-nccl-rccl-parameters-by-shape.md](./recommended-nccl-rccl-parameters-by-shape.md),
-one `KEY=value` line per parameter. NCCL and RCCL read `/etc/nccl.conf` at
-initialization, and environment variables take precedence over anything set in
-the file, so a per-job `export` or `-x` still wins.
+one `KEY=value` line per parameter. NCCL reads `/etc/nccl.conf`, while RCCL
+reads `/etc/rccl.conf`. Both libraries read their file at initialization, and
+environment variables take precedence over anything set in the file, so a
+per-job `export` or `-x` still wins.
 
 The ConfigMap name includes the GPU vendor and normalized shape:
 
@@ -54,7 +55,7 @@ kubectl get configmap oci-nccl-parameters-bm-gpu-h100-8 -n default -o yaml
 
 ## Quickstart
 
-For any pod, mount the ConfigMap at `/etc/nccl.conf` with `subPath`:
+For an NCCL pod, mount the ConfigMap at `/etc/nccl.conf` with `subPath`:
 
 ```yaml
 containers:
@@ -69,9 +70,25 @@ volumes:
     name: oci-nccl-parameters-bm-gpu-h100-8
 ```
 
-NCCL/RCCL read the file at process startup, so this works regardless of how
-the process was launched (directly, over SSH, or under Pyxis), with no extra
-environment wiring.
+For an RCCL pod, use the same ConfigMap key and volume but mount it at
+`/etc/rccl.conf`:
+
+```yaml
+containers:
+- name: my-container
+  volumeMounts:
+  - name: rccl-conf
+    mountPath: /etc/rccl.conf
+    subPath: nccl.conf
+volumes:
+- name: rccl-conf
+  configMap:
+    name: oci-rccl-parameters-bm-gpu-mi300x-8
+```
+
+Each library reads its own file at process startup, so this works regardless of
+how the process was launched (directly, over SSH, or under Pyxis), with no
+extra environment wiring.
 
 For an MPIJob the ranks run in the **worker** pods (`mpirun` launches them over
 SSH), so mount the ConfigMap into the worker container the same way. Each
@@ -268,10 +285,10 @@ spec:
   for the full VF layout. The ConfigMap handles the parameter values; it does not
   change pod networking or resources.
 
-- Override a single value. NCCL/RCCL read environment variables first and
-  `/etc/nccl.conf` second, so an explicit `env:` entry or an inline `-x
-  VAR=value` for the same variable takes precedence, overriding one parameter
-  while inheriting the rest from the file.
+- Override a single value. NCCL and RCCL read environment variables before
+  `/etc/nccl.conf` and `/etc/rccl.conf`, respectively. An explicit `env:` entry
+  or an inline `-x VAR=value` for the same variable therefore takes precedence,
+  overriding one parameter while inheriting the rest from the file.
 
 - Available keys vary by shape. Each shape's `nccl.conf` carries only the
   parameters listed for it in

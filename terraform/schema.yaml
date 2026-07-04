@@ -2925,7 +2925,7 @@ variables:
         - ${slinky_topology_enabled}
   slinky_topology_block_sizes:
     title: Block topology block sizes
-    description: auto derives block_sizes from current local block populations. Or a comma-separated list of positive integers, for example 8,16,32.
+    description: auto derives block_sizes from current local block populations. Or a comma-separated list of positive integers where each successive value is a larger power-of-two multiple of the previous value, for example 8,16,32.
     type: string
     default: "auto"
     visible:

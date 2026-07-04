@@ -70,7 +70,7 @@ topology.slinky.slurm.net/spec: tree:root:isl-af7ubvouuyq:nb-7xmzl4p4wba:lb-4tjx
 |---|---|---|
 | `slinky_topology_enabled` | `true` | Master switch for the annotator's topology annotation and the oke-utils controller's `topology.yaml` generation. |
 | `slinky_topology_default` | `tree` | Which generated topology (`tree` or `block`) is marked `cluster_default`. Partitions without an explicit `Topology` setting use this one. |
-| `slinky_topology_block_sizes` | `auto` | `block_sizes` for the `block` topology. `auto` derives them from the current local block populations (smallest block size, doubling while the next size still fits the fleet). Otherwise a comma-separated list of positive integers, for example `8,16,32`. |
+| `slinky_topology_block_sizes` | `auto` | `block_sizes` for the `block` topology. `auto` derives them from the current local block populations (smallest block size, doubling while the next size still fits the fleet). Otherwise use positive integers where each successive value is a larger power-of-two multiple of the previous value, for example `8,16,32`, `8,32`, or `30,120`. |
 
 Topology management is validated against Slurm 26.05 image profiles; 25.11 uses the same slurm-operator mechanism but has seen less production use with dynamic topology, so prefer 26.05 profiles when enabling it.
 

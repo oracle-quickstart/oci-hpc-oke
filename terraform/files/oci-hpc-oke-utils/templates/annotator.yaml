@@ -32,8 +32,7 @@ spec:
     spec:
       automountServiceAccountToken: true  # Required for Kubernetes API access
       serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
-      # hostNetwork so gethostname() returns the node's real hostname even
-      # when the Kubernetes node name is a private IP.
+      # hostNetwork gives the annotator access to the node IMDS endpoint.
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       priorityClassName: system-node-critical
@@ -57,6 +56,12 @@ spec:
         - name: script
           configMap:
             name: {{ include "oci-hpc-oke-utils.fullname" . }}-annotator-script
+        {{- if .Values.annotator.enabled }}
+        - name: host-hostname
+          hostPath:
+            path: /etc/hostname
+            type: File
+        {{- end }}
         - name: uv-cache
           emptyDir: {}
         - name: tmp
@@ -70,6 +75,11 @@ spec:
             - name: script
               mountPath: /scripts
               readOnly: true
+            {{- if .Values.annotator.enabled }}
+            - name: host-hostname
+              mountPath: /host/etc/hostname
+              readOnly: true
+            {{- end }}
             - name: uv-cache
               mountPath: /tmp/uv-cache
             - name: tmp
@@ -93,6 +103,11 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 120
             failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/ready"]
+            periodSeconds: 10
+            failureThreshold: 1
           resources:
             {{- toYaml .Values.annotator.resources | nindent 12 }}
           securityContext:

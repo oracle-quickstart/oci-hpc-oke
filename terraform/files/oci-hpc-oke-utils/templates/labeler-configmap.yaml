@@ -26,6 +26,7 @@ data:
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
+    READY_FILE = Path("/tmp/health/ready")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -155,13 +156,13 @@ data:
 
 
     def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str],
-                       managed_keys: set[str] | None = None):
+                       managed_keys: set[str] | None = None) -> bool:
         try:
             node = v1.read_node(node_name)
             existing = node.metadata.labels or {}
         except Exception:
             log.exception("Failed to read node %s", node_name)
-            return
+            return False
 
         updates = {}
         for k, v in desired.items():
@@ -186,10 +187,13 @@ data:
                 for k, v in updates.items():
                     if v is not None:
                         log.info("  %s=%s", k, v)
+                return True
             except Exception:
                 log.exception("Failed to patch node %s", node_name)
+                return False
         else:
             log.info("%s already labeled, skipping", node_name)
+            return True
 
 
     def main():
@@ -212,6 +216,7 @@ data:
             desired.update(static_gpu_labels)
 
             mapping_read_ok = False
+            cycle_ok = True
             try:
                 node = v1.read_node(node_name)
                 all_labels = dict(node.metadata.labels or {})
@@ -223,11 +228,17 @@ data:
                 desired.update(mapping_labels)
                 mapping_read_ok = True
             except Exception:
-                pass
+                log.exception("Failed to reconcile label mappings for node %s", node_name)
+                cycle_ok = False
 
-            _apply_labels(v1, node_name, desired,
-                          managed_keys=all_seen_mapping_keys if mapping_read_ok else None)
+            if not _apply_labels(v1, node_name, desired,
+                                 managed_keys=all_seen_mapping_keys if mapping_read_ok else None):
+                cycle_ok = False
 
+            if cycle_ok:
+                READY_FILE.touch()
+            else:
+                READY_FILE.unlink(missing_ok=True)
             HEALTH_FILE.touch()
             time.sleep(interval)
 

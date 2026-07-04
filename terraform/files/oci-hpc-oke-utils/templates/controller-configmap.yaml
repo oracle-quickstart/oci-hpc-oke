@@ -29,6 +29,7 @@ data:
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
+    READY_FILE = Path("/tmp/health/ready")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -123,7 +124,8 @@ data:
         return labels
 
 
-    def _get_firmware_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str, fw_cache: dict) -> dict[str, str]:
+    def _get_firmware_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str,
+                             fw_cache: dict) -> dict[str, str] | None:
         """Get firmware labels, using a cache to avoid duplicate API calls for the same bundle."""
         if firmware_bundle_id in fw_cache:
             return fw_cache[firmware_bundle_id]
@@ -132,7 +134,7 @@ data:
             bundle = _oci_call_with_backoff(compute_client.get_firmware_bundle, firmware_bundle_id=firmware_bundle_id).data
         except Exception:
             log.exception("Failed to get firmware bundle %s", firmware_bundle_id)
-            return {}  # Don't cache failures -- retry next cycle
+            return None  # Don't cache failures; retry next cycle.
 
         labels = {}
         if bundle.description:
@@ -247,7 +249,7 @@ data:
             return False
 
 
-    def _apply_maintenance_condition(v1: client.CoreV1Api, node_name: str, conditions: list[dict]):
+    def _apply_maintenance_condition(v1: client.CoreV1Api, node_name: str, conditions: list[dict]) -> bool:
         """Set or clear the MaintenanceFault node condition."""
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -256,7 +258,7 @@ data:
             existing_conditions = node.status.conditions or []
         except Exception:
             log.exception("Failed to read node status for %s", node_name)
-            return
+            return False
 
         has_existing = any(c.type == MAINTENANCE_CONDITION_TYPE for c in existing_conditions)
 
@@ -291,6 +293,7 @@ data:
                 v1.patch_node_status(node_name, {"status": {"conditions": [new_condition]}})
             except Exception:
                 log.exception("Failed to set maintenance condition on %s", node_name)
+                return False
 
         elif has_existing:
             currently_true = any(c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True" for c in existing_conditions)
@@ -304,6 +307,9 @@ data:
                     log.info("Cleared MaintenanceFault condition on %s", node_name)
                 except Exception:
                     log.exception("Failed to clear maintenance condition on %s", node_name)
+                    return False
+
+        return True
 
 
     def _topology_valid(value: str) -> bool:
@@ -396,9 +402,11 @@ data:
         lines.append(f"  cluster_default: {'true' if default_topology == 'block' else 'false'}")
         lines.append("  block:")
         lines.append("    block_sizes:")
-        # Mixed fleets size from real blocks only; a fleet with no locality at
-        # all sizes from the synthetic none block so multi node jobs still fit.
-        sizing_blocks = blocks if blocks else ({TOPOLOGY_NONE_UNIT: [e["name"] for e in unlabeled]} if unlabeled else {})
+        # Slurm requires every block to contain at least the base block size,
+        # so include the synthetic none block whenever it is emitted.
+        sizing_blocks = dict(blocks)
+        if unlabeled:
+            sizing_blocks[TOPOLOGY_NONE_UNIT] = [e["name"] for e in unlabeled]
         for size in _block_sizes(sizing_blocks, block_sizes_conf):
             lines.append(f"      - {size}")
         lines.append("    blocks:")
@@ -418,11 +426,11 @@ data:
 
 
     def _sync_topology(v1: client.CoreV1Api, namespace: str, name: str,
-                       default_topology: str, block_sizes_conf: str, worker_pools: list[str]) -> None:
+                       default_topology: str, block_sizes_conf: str, worker_pools: list[str]) -> bool:
         # An empty pool list would render an invalid label selector.
         if not worker_pools:
             log.warning("No topology worker pools configured, skipping topology sync")
-            return
+            return False
         entries = _collect_topology_entries(v1, worker_pools)
         content = _render_topology_yaml(entries, default_topology, block_sizes_conf)
         try:
@@ -431,12 +439,13 @@ data:
             # The slurm chart owns this ConfigMap; without it there is no cluster.
             if exc.status == 404:
                 log.info("Topology ConfigMap %s/%s not found, skipping", namespace, name)
-                return
+                return True
             raise
         if (cm.data or {}).get(TOPOLOGY_CONFIGMAP_KEY) == content:
-            return
+            return True
         v1.patch_namespaced_config_map(name, namespace, {"data": {TOPOLOGY_CONFIGMAP_KEY: content}})
         log.info("Updated %s in %s/%s (%d nodes)", TOPOLOGY_CONFIGMAP_KEY, namespace, name, len(entries))
+        return True
 
 
     def main():
@@ -472,8 +481,11 @@ data:
         loop_interval = min(interval, topology_interval) if topology_enabled else interval
 
         next_labels_due = time.monotonic()
+        labels_ready = not oci_labels_enabled
+        topology_ready = not topology_enabled
         while True:
             if oci_labels_enabled and time.monotonic() >= next_labels_due:
+                labels_ready = False
                 if compute_client is None:
                     try:
                         signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
@@ -488,6 +500,7 @@ data:
                         log.exception("Failed to create OCI ComputeClient, retrying next cycle")
                         next_labels_due = time.monotonic() + interval
                 if compute_client is not None and time.monotonic() >= next_labels_due:
+                    cycle_ok = True
                     cycle_count += 1
                     if cycle_count % FW_CACHE_TTL_CYCLES == 0:
                         fw_cache.clear()
@@ -553,9 +566,10 @@ data:
 
                             # Get full host details
                             try:
-                                host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_summary.id).data
+                                host = _oci_call_with_backoff(compute_client.get_compute_host, compute_host_id=host_summary.id).data
                             except Exception:
                                 log.exception("Failed to get compute host for node %s", node_name)
+                                cycle_ok = False
                                 continue
 
                             # Build labels
@@ -564,7 +578,10 @@ data:
                             # Firmware labels (cached per bundle ID)
                             if host.firmware_bundle_id:
                                 fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
-                                labels.update(fw_labels)
+                                if fw_labels is None:
+                                    cycle_ok = False
+                                else:
+                                    labels.update(fw_labels)
 
                             # Maintenance: only query if node has impacted components or existing maintenance labels
                             maint_result = None  # None = not queried or API failed
@@ -574,15 +591,19 @@ data:
                                 if maint_result is not None:
                                     maint_labels, maint_conditions = maint_result
                                     labels.update(maint_labels)
+                                else:
+                                    cycle_ok = False
 
                             # Always clean fault labels (based on host data already fetched)
                             # Only clean maintenance labels when maintenance API succeeded
                             patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
                                                            clean_faults=True, clean_maintenance=maint_result is not None)
+                            if not patch_ok:
+                                cycle_ok = False
 
                             # Only reconcile maintenance condition when we got a definitive answer
-                            if maint_result is not None:
-                                _apply_maintenance_condition(v1, node_name, maint_result[1])
+                            if maint_result is not None and not _apply_maintenance_condition(v1, node_name, maint_result[1]):
+                                cycle_ok = False
 
                             # Update cached state only after successful label patch
                             if patch_ok:
@@ -594,15 +615,22 @@ data:
 
                     except Exception:
                         log.exception("Controller cycle failed")
+                        cycle_ok = False
+                    labels_ready = cycle_ok
                     next_labels_due = time.monotonic() + interval
 
             if topology_enabled:
                 try:
-                    _sync_topology(v1, topology_namespace, topology_configmap,
-                                   topology_default, topology_block_sizes, topology_pools)
+                    topology_ready = _sync_topology(v1, topology_namespace, topology_configmap,
+                                                    topology_default, topology_block_sizes, topology_pools)
                 except Exception:
                     log.exception("Topology sync failed")
+                    topology_ready = False
 
+            if labels_ready and topology_ready:
+                READY_FILE.touch()
+            else:
+                READY_FILE.unlink(missing_ok=True)
             HEALTH_FILE.touch()
             time.sleep(loop_interval)
 
