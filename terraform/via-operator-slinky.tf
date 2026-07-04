@@ -820,7 +820,7 @@ resource "null_resource" "slinky_gmc_compute_domains_via_operator" {
   ]) ? 1 : 0
 
   triggers = {
-    manifest_md5    = nonsensitive(md5(local.slinky_gmc_compute_domains_yaml))
+    manifest_md5    = md5(local.slinky_gmc_compute_domains_yaml)
     workdir         = local.slinky_workdir
     slurm_namespace = var.slinky_slurm_namespace
     bastion_host    = module.oke.bastion_public_ip
@@ -887,6 +887,7 @@ resource "null_resource" "slinky_gmc_compute_domains_via_operator" {
   depends_on = [
     null_resource.slinky_auth_secrets_via_operator,
     module.nvidia_dra_driver,
+    helm_release.nvidia_dra_driver,
   ]
 }
 
