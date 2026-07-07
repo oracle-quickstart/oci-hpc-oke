@@ -1280,19 +1280,25 @@ variable "slinky_sssd_image_tag" {
 variable "slinky_nodeset_name" {
   default     = "gpu"
   type        = string
-  description = "Slinky NodeSet and partition name used for the standard GPU worker pool."
+  description = "Slinky NodeSet and partition name used for the standard GPU worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_rdma_nodeset_name" {
   default     = "rdma"
   type        = string
-  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool."
+  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_gmc_nodeset_name" {
   default     = "gmc"
   type        = string
-  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured."
+  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
+}
+
+variable "slinky_hostname_prefix_disabled" {
+  default     = false
+  type        = bool
+  description = "Disable prefix-based Slurm node naming. By default (false), the oci-hpc-oke-utils annotator writes the nodeset.slinky.slurm.net/hostname-override annotation as <prefix>-<host-bits>, where <prefix> is the pool's slinky_*_nodeset_name and <host-bits> is the integer host portion of the node's primary InternalIP within its subnet. Set to true to fall back to the node short hostname (the pre-prefix behavior). Toggling this or changing a slinky_*_nodeset_name only affects newly-provisioned nodes (the prefix rides on the OKE pool's initial_node_labels); existing nodes require pool reconciliation or a manual kubectl label update (see the Slurm Hostname Prefix docs in docs/oci-hpc-oke-utils.md)."
 }
 
 variable "slinky_default_partition" {
@@ -1346,7 +1352,7 @@ variable "slinky_cpu_worker_enabled" {
 variable "slinky_cpu_nodeset_name" {
   default     = "cpu"
   type        = string
-  description = "Slinky nodeset name used for the CPU Slurm worker pool."
+  description = "Slinky nodeset name used for the CPU Slurm worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_cpu_worker_image_repository" {

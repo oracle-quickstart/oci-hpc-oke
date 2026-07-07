@@ -3,7 +3,7 @@
 This guide explains how the stack feeds OCI RDMA network locality (Local Block, Network Block, and HPC Island) into Slurm scheduling for Slinky clusters, so jobs can be placed on nodes that are close together on the network.
 
 > [!IMPORTANT]
-> To get real locality data, you must have a dedicated capacity pool and you must create a capacity topology. Without them, the instance metadata service does not expose `rdmaTopologyData` and the related `oci.oraclecloud.com/rdma.*` node labels are never set. Every worker then shares a single synthetic `none` unit in both the tree and block topologies, and job scheduling behaves the same as it did before this feature existed.
+> To get real locality data, your workers need usable RDMA locality metadata from IMDS. The legacy `rdmaTopologyData` fields are available only on nodes configured with a capacity topology. Other supported RDMA shapes can expose equivalent fields in the IMDS `/host` document. When neither form is available, the labeler writes `no-imds-data` placeholders and every worker shares a single synthetic `none` unit in both the tree and block topologies, so job scheduling behaves the same as it did before this feature existed.
 
 Topology management is on by default (`slinky_topology_enabled = true`), but it only does anything when `install_slinky`, `slinky_install_slurm_cluster`, and `install_oci_hpc_oke_utils` are all also enabled. If any of those three is off, the feature is silently inactive: no annotator, no generated `topology.yaml`, no error.
 
@@ -11,8 +11,8 @@ Topology management is on by default (`slinky_topology_enabled = true`), but it 
 
 Topology management is a small pipeline of existing oci-hpc-oke-utils and Slinky components. No changes to slurm-operator itself are required.
 
-1. **The labeler** (oci-hpc-oke-utils) applies the `oci.oraclecloud.com/rdma.hpc_island_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.local_block_id` labels to each node from IMDS, as described in [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md).
-2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) reads `rdmaTopologyData` from IMDS directly and writes the `topology.slinky.slurm.net/spec` node annotation:
+1. **The labeler** (oci-hpc-oke-utils) applies the `oci.oraclecloud.com/rdma.hpc_island_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.local_block_id` labels to each node from IMDS, as described in [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md). It first reads `/host/rdmaTopologyData`, then falls back to `/host`. The former returns legacy `customer*` locality fields; the latter can provide those embedded fields or the equivalent root `networkBlockId` and `rackId` fields.
+2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) uses the same IMDS lookup order and field mapping, then writes the `topology.slinky.slurm.net/spec` node annotation:
    - Labeled node: `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>`
    - No locality data (no capacity topology, or a CPU worker): `tree:root:none,block:none`
 

@@ -12,6 +12,7 @@ data:
     # requires-python = ">=3.12"
     # dependencies = [
     #     "kubernetes>=31.0.0",
+    #     "pyroute2>=0.9.6",
     #     "requests>=2.32.0",
     # ]
     # ///
@@ -19,11 +20,14 @@ data:
     import logging
     import os
     import re
+    import socket
+    import struct
     import time
     from pathlib import Path
 
     import requests
     from kubernetes import client, config
+    from pyroute2 import IPRoute
 
     HEALTH_FILE = Path("/tmp/health/alive")
     READY_FILE = Path("/tmp/health/ready")
@@ -39,6 +43,21 @@ data:
 
     # RFC 1123 label, what Kubernetes accepts for pod spec.hostname.
     HOSTNAME_RE = re.compile(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+
+    # Node label carrying the per-pool hostname prefix set by Terraform. When
+    # present, the annotator writes <prefix>-<host-bits> instead of the short
+    # hostname, where <host-bits> is the integer host portion of the node's
+    # primary InternalIP within its subnet.
+    HOSTNAME_PREFIX_LABEL = "oci.oraclecloud.com/slinky-hostname-prefix"
+
+    # Node labels/IMDS used for the GB200/GB300 (GPU.GB*) hostname convention:
+    # <prefix>-<rack>-<position>. The shape comes from the standard K8s
+    # instance-type label; position is the labeler's host.tray_index (from
+    # nvidia-smi); rack is the 8-character slice rackId[56:64] read from IMDS
+    # /host (matching the oci-hpc-clusternetwork hostname role).
+    INSTANCE_TYPE_LABEL = "node.kubernetes.io/instance-type"
+    TRAY_INDEX_LABEL = "oci.oraclecloud.com/host.tray_index"
+    GB_SHAPE_RE = re.compile(r"GB\d\d\d")
 
     IMDS_BASE = "http://169.254.169.254/opc/v2"
     IMDS_HEADERS = {"Authorization": "Bearer Oracle"}
@@ -67,34 +86,183 @@ data:
             return None
         return name
 
+    def node_addr_mask(node) -> tuple[str, str] | None:
+        # Anchor on the node's primary InternalIP from the Kubernetes API rather
+        # than parsing the default route: OKE's VCN-native pod networking creates
+        # a per-pod virtual interface (eth0v*) for every pod, each carrying a
+        # /32 address and appearing as a default route via netlink. Those /32s
+        # would yield host bits 0 (a collision on every node). The InternalIP
+        # lives on the real primary VNIC (eth0) and carries the subnet mask.
+        internal_ip = None
+        for addr in (node.status.addresses or []):
+            if addr.type == "InternalIP":
+                internal_ip = addr.address
+                break
+        if not internal_ip:
+            log.warning("Node has no InternalIP; cannot derive host bits")
+            return None
+        try:
+            with IPRoute() as ipr:
+                for addr in ipr.get_addr(family=socket.AF_INET):
+                    if addr.get_attr("IFA_LOCAL") == internal_ip:
+                        prefixlen = addr["prefixlen"]
+                        mask = socket.inet_ntoa(
+                            ((0xFFFFFFFF << (32 - prefixlen)) & 0xFFFFFFFF).to_bytes(4, "big")
+                        )
+                        return internal_ip, mask
+        except Exception:
+            log.exception("Failed to read interface addresses via netlink")
+            return None
+        log.warning("No interface holds the node InternalIP %s", internal_ip)
+        return None
+
+    def host_bits_decimal(node) -> str | None:
+        addrs = node_addr_mask(node)
+        if addrs is None:
+            return None
+        ip, mask = addrs
+        ip_int = struct.unpack("!I", socket.inet_aton(ip))[0]
+        mask_int = struct.unpack("!I", socket.inet_aton(mask))[0]
+        return str(ip_int & (~mask_int & 0xFFFFFFFF))
+
+    def imds_json(path: str):
+        # Minimal IMDS GET: returns the parsed JSON body, or None on any error.
+        # Used for GB rack lookup; topology_spec keeps its own richer handling.
+        try:
+            resp = requests.get(f"{IMDS_BASE}{path}", headers=IMDS_HEADERS, timeout=10)
+        except requests.RequestException:
+            log.warning("IMDS request failed for %s", path)
+            return None
+        if resp.status_code != 200:
+            log.warning("IMDS %s returned %d", path, resp.status_code)
+            return None
+        try:
+            return resp.json()
+        except requests.exceptions.JSONDecodeError:
+            log.warning("IMDS %s returned unparseable JSON", path)
+            return None
+
+    def rack_id_prefix() -> str | None:
+        # 8-character rack identifier: rackId[56:64] from IMDS /host, matching
+        # the oci-hpc-clusternetwork hostname role. The full rackId is >= 64
+        # chars; the labeler's host.rack_id label is only the last 11 and can't
+        # reproduce this slice reliably, so query IMDS for the full value.
+        host = imds_json("/host")
+        if not host:
+            return None
+        rack_id = host.get("rackId") or ""
+        if len(rack_id) >= 64:
+            return rack_id[56:64]
+        log.warning("IMDS /host rackId too short (%d chars) for rack prefix", len(rack_id))
+        return None
+
+    def gb_hostname(prefix: str, labels: dict) -> str | None:
+        # GB200/GB300 convention: <prefix>-<rack>-<position>, where rack is the
+        # 8-character slice rackId[56:64] from IMDS /host and position is the
+        # labeler's host.tray_index label. Returns None when either is
+        # unavailable so the caller falls back to the host-bits convention.
+        rack = rack_id_prefix()
+        position = labels.get(TRAY_INDEX_LABEL, "")
+        if not rack or not position:
+            log.warning("GB shape but rack/position unavailable (rack=%r position=%r); falling back to host-bits convention", rack, position)
+            return None
+        candidate = f"{prefix}-{rack}-{position}"
+        if len(candidate) <= 63 and HOSTNAME_RE.match(candidate):
+            return candidate
+        log.warning("Generated GB hostname %r is not a valid RFC 1123 label, falling back", candidate)
+        return None
+
+    def hostname_from_label_or_short(node) -> str | None:
+        # <prefix>-<host-bits> when the prefix label is set; short hostname
+        # otherwise. GB200/GB300 shapes (node.kubernetes.io/instance-type
+        # matching GB\d\d\d) instead use <prefix>-<rack>-<position>, where rack
+        # is rackId[56:64] from IMDS /host and position is the labeler's
+        # host.tray_index label. Any failure (no InternalIP, netlink error,
+        # missing GB data, invalid result) falls back to the short hostname so
+        # the node stays schedulable.
+        labels = node.metadata.labels or {}
+        prefix = labels.get(HOSTNAME_PREFIX_LABEL, "")
+        if prefix:
+            shape = labels.get(INSTANCE_TYPE_LABEL, "")
+            if shape and GB_SHAPE_RE.search(shape):
+                name = gb_hostname(prefix, labels)
+                if name is not None:
+                    return name
+                # GB data unavailable; fall through to the host-bits convention.
+            suffix = host_bits_decimal(node)
+            if suffix is not None:
+                candidate = f"{prefix}-{suffix}"
+                if len(candidate) <= 63 and HOSTNAME_RE.match(candidate):
+                    return candidate
+                log.warning("Generated hostname %r is not a valid RFC 1123 label, falling back to short hostname", candidate)
+            else:
+                log.warning("Could not compute host bits, falling back to short hostname")
+        return host_short_hostname()
+
+    def _extract_rdma_fields(host_data: dict) -> dict[str, str | None]:
+        # Shape-agnostic mapping of a /host/ response to the RDMA locality tiers
+        # used in the topology annotation. When rdmaTopologyData is embedded,
+        # prefer its original customer* OCIDs. Other RDMA shapes only expose
+        # networkBlockId/rackId/id; with no HPC island reported, reuse the
+        # network block as the island so the tiers stay consistent with the
+        # controller-generated tree.
+        embedded = host_data.get("rdmaTopologyData") or {}
+        if embedded:
+            return {
+                "island": embedded.get("customerHPCIslandId"),
+                "netblock": embedded.get("customerNetworkBlock"),
+                "localblock": embedded.get("customerLocalBlock"),
+            }
+        netblock = host_data.get("networkBlockId")
+        return {
+            "island": netblock,
+            "netblock": netblock,
+            "localblock": host_data.get("rackId"),
+        }
+
 
     def topology_spec() -> str | None:
         # None means IMDS did not answer authoritatively; keep the existing annotation.
-        try:
-            resp = requests.get(f"{IMDS_BASE}/host/rdmaTopologyData", headers=IMDS_HEADERS, timeout=10)
-        except requests.RequestException:
-            log.warning("IMDS request failed, keeping existing topology annotation")
-            return None
+        # Query the compact topology projection first, then fall back to the
+        # complete host document, which embeds the same data when available.
+        fields = None
+        for path in ("/host/rdmaTopologyData", "/host"):
+            try:
+                resp = requests.get(f"{IMDS_BASE}{path}", headers=IMDS_HEADERS, timeout=10)
+            except requests.RequestException:
+                log.warning("IMDS request failed for %s, keeping existing topology annotation", path)
+                return None
 
-        # 404 or an empty 200 is the authoritative "no capacity topology" answer.
-        # Other statuses (429, 5xx) are transient; do not flap a labeled node to none.
-        if resp.status_code == 404 or (resp.status_code == 200 and not resp.text.strip()):
+            # A missing or empty projection can fall back to /host. Other
+            # non-200 statuses (429, 5xx) are transient; do not flap a labeled
+            # node to none.
+            if resp.status_code == 404 or (resp.status_code == 200 and not resp.text.strip()):
+                continue
+            if resp.status_code != 200:
+                log.warning("IMDS returned %d for %s, keeping existing topology annotation", resp.status_code, path)
+                return None
+
+            try:
+                data = resp.json()
+            except requests.exceptions.JSONDecodeError:
+                log.warning("IMDS returned unparseable JSON for %s, keeping existing topology annotation", path)
+                return None
+
+            # The projection returns customer* fields at its top level; /host
+            # embeds them under rdmaTopologyData.
+            if path == "/host/rdmaTopologyData":
+                data = {"rdmaTopologyData": data}
+            candidate = _extract_rdma_fields(data)
+            if all(candidate.get(key) for key in ("island", "netblock", "localblock")):
+                fields = candidate
+                break
+
+        if fields is None:
             return TOPOLOGY_NONE_SPEC
-        if resp.status_code != 200:
-            log.warning("IMDS returned %d, keeping existing topology annotation", resp.status_code)
-            return None
 
-        try:
-            data = resp.json()
-        except requests.exceptions.JSONDecodeError:
-            log.warning("IMDS returned unparseable rdmaTopologyData, keeping existing topology annotation")
-            return None
-
-        island = (data.get("customerHPCIslandId") or "")[-11:]
-        netblock = (data.get("customerNetworkBlock") or "")[-11:]
-        localblock = (data.get("customerLocalBlock") or "")[-11:]
-        if not (island and netblock and localblock):
-            return TOPOLOGY_NONE_SPEC
+        island = fields["island"][-11:]
+        netblock = fields["netblock"][-11:]
+        localblock = fields["localblock"][-11:]
 
         # isl-/nb-/lb- prefixes keep switch names unique across tiers; the
         # root anchor keeps the tree connected even when a new island first
@@ -103,11 +271,19 @@ data:
 
 
     def sync(v1: client.CoreV1Api, node_name: str, hostname_enabled: bool, topology_enabled: bool) -> bool:
+        # Read the node first: the hostname prefix lives in a node label, and
+        # the annotations we patch are compared against the node's current set.
+        try:
+            node = v1.read_node(node_name)
+        except Exception:
+            log.exception("Failed to read node %s", node_name)
+            return False
+
         desired: dict[str, str] = {}
         cycle_ok = True
 
         if hostname_enabled:
-            hostname = host_short_hostname()
+            hostname = hostname_from_label_or_short(node)
             if hostname is not None:
                 desired[ANNOTATION_HOSTNAME] = hostname
             else:
@@ -121,12 +297,6 @@ data:
                 cycle_ok = False
 
         if not desired:
-            return False
-
-        try:
-            node = v1.read_node(node_name)
-        except Exception:
-            log.exception("Failed to read node %s", node_name)
             return False
 
         current = node.metadata.annotations or {}

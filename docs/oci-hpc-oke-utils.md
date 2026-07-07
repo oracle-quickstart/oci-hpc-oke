@@ -370,6 +370,58 @@ See [Managing Slurm Topology on OKE](./managing-slurm-topology-on-oke.md) for th
 
 ---
 
+## Slurm Hostname Prefix
+
+When OKE worker nodes keep their IP-based Kubernetes node names (`hostname_override = false`, the default for Slinky deployments), the annotator DaemonSet writes the slurm-operator 1.2 `nodeset.slinky.slurm.net/hostname-override` node annotation so Slurm node names stay clean. **By default the value is `<prefix>-<host-bits>`**, where:
+
+- `<prefix>` is the worker pool's NodeSet name (`slinky_nodeset_name`, `slinky_rdma_nodeset_name`, `slinky_gmc_nodeset_name`, `slinky_cpu_nodeset_name` — `gpu`, `rdma`, `gmc`, `cpu` by default). One prefix applies to all GMC fabric nodesets since they share the `oke-gmc` pool.
+- `<host-bits>` is the integer value of the **host portion** of the node's primary `InternalIP` within its subnet. For a `/24` this equals the last octet (e.g. `10.0.0.5` → `5` → `gpu-5`); for a `/16` it is the last two octets as one integer (`10.0.5.3` → `1283` → `gpu-1283`).
+
+So a default deployment names GPU nodes `gpu-<n>`, RDMA nodes `rdma-<n>`, GMC nodes `gmc-<n>`, and CPU nodes `cpu-<n>`.
+
+### How it works
+
+1. Terraform sets the prefix on each worker pool as the `oci.oraclecloud.com/slinky-hostname-prefix` node label (via the pool's `initial_node_labels`), so every node in the pool inherits it at bootstrap. The label value is the pool's `slinky_*_hostname_prefix` local, which equals the NodeSet name.
+2. The annotator reads that label off the node object it already fetches each cycle.
+3. It takes the node's primary `InternalIP` (from the Kubernetes API) and uses `pyroute2` netlink to find the interface holding that address and read its netmask. Anchoring on the InternalIP (rather than parsing the default route) avoids OKE's VCN-native per-pod virtual interfaces (`eth0v*`), which carry `/32` addresses and would otherwise be mistaken for the default route and yield `0` on every node — no shell commands or subprocesses.
+4. It computes `host_bits = ip_int & ~mask_int` and writes `<prefix>-<host-bits>` to the `nodeset.slinky.slurm.net/hostname-override` annotation.
+
+If the label is absent or empty, no interface holds the InternalIP, the netlink call fails, or the rendered name is not a valid RFC 1123 label, the annotator falls back to the node short hostname and logs a warning — the node stays schedulable.
+
+### GB200/GB300 shapes
+
+For GB200/GB300 and other `GPU.GB*` shapes (the node's `node.kubernetes.io/instance-type` label matches `GB\d\d\d`, e.g. `BM.GPU.GB200.4`), the suffix is **not** derived from the IP. Instead the hostname is:
+
+```
+<prefix>-<rack>-<position>
+```
+
+where `<rack>` and `<position>` come from:
+
+- `<rack>` — the 8-character slice `rackId[56:64]` read from IMDS `/host` (matching the `oci-hpc-clusternetwork` hostname role; the full `rackId` is ≥64 chars, e.g. `ab12cd34`).
+- `<position>` — the `oci.oraclecloud.com/host.tray_index` node label applied by the oci-hpc-oke-utils **labeler** (the compute-tray position read from `nvidia-smi`, 0–17 on NVL72; set only on GB200/GB300 nodes where `nvidia-smi` reports it). Requires `install_rdma_labeler=true`.
+
+Example: a GMC node with prefix `gmc`, rack prefix `ab12cd34`, tray index `13` becomes `gmc-ab12cd34-13`. The shape and position are read from node labels and the rack from IMDS — no `nvidia-smi` subprocess in the annotator. The rack slice is exactly 8 characters so names stay short and line up with the cluster-network DNS convention.
+
+If the instance type is a GB shape but the rack is too short / IMDS is unreachable, or the position label is missing (e.g. the labeler has not yet set `host.tray_index`), the annotator logs a warning and falls back to the standard `<prefix>-<host-bits>` derivation for that node.
+
+### Changing the prefix or disabling the feature
+
+The `oci.oraclecloud.com/slinky-hostname-prefix` label is applied through each OKE worker pool's `initial_node_labels`, which OCI applies to **newly provisioned** nodes only. Changing a pool's prefix (by changing its `slinky_*_nodeset_name` variable) or toggling `slinky_hostname_prefix_disabled` therefore does **not** retroactively relabel nodes that are already running — existing nodes keep their previous label (or no label) until one of:
+
+- **Node reconciliation** — cycle the worker pool so OKE replaces nodes with freshly-provisioned ones that pick up the new `initial_node_labels`. The stack exposes `worker_<pool>_node_cycling_*` controls per pool.
+- **Manual label update** on live nodes:
+  - Change the prefix: `kubectl label node <node> oci.oraclecloud.com/slinky-hostname-prefix=<new-prefix> --overwrite`
+  - Disable (remove the label): `kubectl label node <node> oci.oraclecloud.com/slinky-hostname-prefix-`
+
+After the label on a node changes (by either path), the annotator picks it up on its next sync cycle (default 300 s) and rewrites the `nodeset.slinky.slurm.net/hostname-override` annotation to the new `<prefix>-<host-bits>` (or back to the short hostname when the label is removed). The slurmd pod then needs to restart so Slurm re-registers the node under the new name; the slurm-operator normally rolls the pod when the annotation changes, otherwise delete the slurmd pod to force re-registration. `slinky_hostname_prefix_disabled` is hidden from the ORM stack UI.
+
+### Node-name collisions across pools
+
+Nodes in different pools that share a subnet have unique host bits, so names never collide within that subnet. If pools live in **different subnets** with overlapping host portions (e.g. a gpu node `10.0.1.5/24` and an rdma node `10.0.2.5/24` both derive `5`), distinct NodeSet names per pool (`gpu`, `rdma`, …) keep the rendered names unique anyway, since the prefix differs. Within a single shared worker subnet (the common case in this stack) there is no collision either way.
+
+---
+
 ## Prepuller
 
 The prepuller is a DaemonSet that pre-pulls container images on GPU nodes so they are cached locally before workloads need them. This avoids long image pull times when large GPU container images (often 10+ GB) are first scheduled.

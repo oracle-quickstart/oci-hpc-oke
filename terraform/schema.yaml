@@ -47,6 +47,8 @@ variableGroups:
       - oke_pre_bootstrap_script
       - oke_post_bootstrap_script
       - oke_kubelet_extra_args
+      # Slinky hostname prefix (internal toggle; default behavior uses the prefix)
+      - slinky_hostname_prefix_disabled
       # Node cycling (per pool)
       - worker_ops_node_cycling_enabled
       - worker_ops_node_cycling_max_surge

@@ -64,7 +64,14 @@ locals {
   # one GPU vendor per Slurm cluster. validation.tf rejects mixed vendors.
   slinky_is_amd         = try(one(local.slinky_enabled_worker_vendors), "nvidia") == "amd"
   slinky_gpu_autodetect = var.slinky_gpu_autodetect == "auto" ? (local.slinky_is_amd ? "rsmi" : "nvml") : var.slinky_gpu_autodetect
-  slinky_openldap_dc    = split(".", var.slinky_openldap_domain)[0]
+  # Per-pool Slurm hostname prefixes. Equal to the nodeset name by default;
+  # distinct locals decouple the prefix from the nodeset/partition name so the
+  # annotator's prefix source can evolve without touching every callsite.
+  slinky_gpu_hostname_prefix  = var.slinky_nodeset_name
+  slinky_rdma_hostname_prefix = var.slinky_rdma_nodeset_name
+  slinky_gmc_hostname_prefix  = var.slinky_gmc_nodeset_name
+  slinky_cpu_hostname_prefix  = var.slinky_cpu_nodeset_name
+  slinky_openldap_dc          = split(".", var.slinky_openldap_domain)[0]
 
   slinky_image_profiles = {
     "25.11.6-ubuntu24.04" = {

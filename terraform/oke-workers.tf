@@ -146,23 +146,27 @@ locals {
         { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
         local.node_metadata
       )
-      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      cloud_init  = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_labels = var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_cpu_hostname_prefix } : {}
     }
     "oke-gpu" = {
-      create                       = local.create_workers && var.worker_gpu_enabled
-      description                  = "OKE-managed GPU Node Pool"
-      placement_ads                = [substr(var.worker_gpu_ad, -1, 0)]
-      mode                         = "node-pool"
-      size                         = var.worker_gpu_pool_size
-      shape                        = var.worker_gpu_shape
-      boot_volume_size             = var.worker_gpu_boot_volume_size
-      image_type                   = local.worker_gpu_image_type
-      os                           = var.worker_gpu_image_os
-      os_version                   = var.worker_gpu_image_os_version
-      image_id                     = local.worker_gpu_image_id
-      max_pods_per_node            = var.worker_gpu_max_pods_per_node
-      kubernetes_version           = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
-      node_labels                  = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      create             = local.create_workers && var.worker_gpu_enabled
+      description        = "OKE-managed GPU Node Pool"
+      placement_ads      = [substr(var.worker_gpu_ad, -1, 0)]
+      mode               = "node-pool"
+      size               = var.worker_gpu_pool_size
+      shape              = var.worker_gpu_shape
+      boot_volume_size   = var.worker_gpu_boot_volume_size
+      image_type         = local.worker_gpu_image_type
+      os                 = var.worker_gpu_image_os
+      os_version         = var.worker_gpu_image_os_version
+      image_id           = local.worker_gpu_image_id
+      max_pods_per_node  = var.worker_gpu_max_pods_per_node
+      kubernetes_version = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
+      node_labels = merge(
+        { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
+        var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gpu_hostname_prefix } : {},
+      )
       node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_gpu_node_cycling_max_unavailable
@@ -191,7 +195,10 @@ locals {
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
       cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
       node_metadata                  = local.node_metadata
-      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      node_labels = merge(
+        { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
+        var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_rdma_hostname_prefix } : {},
+      )
       agent_config = {
         are_all_plugins_disabled = false
         is_management_disabled   = false
@@ -232,7 +239,10 @@ locals {
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
       cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
       node_metadata                  = local.node_metadata
-      node_labels                    = { "oci.oraclecloud.com/disable-gpu-device-plugin" : var.disable_gpu_device_plugin ? "true" : "false" },
+      node_labels = merge(
+        { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
+        var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gmc_hostname_prefix } : {},
+      )
       agent_config = {
         are_all_plugins_disabled = false
         is_management_disabled   = false
