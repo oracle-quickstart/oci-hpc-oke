@@ -263,14 +263,19 @@ loginsets:
     service:
       metadata:
         annotations:
-          oci.oraclecloud.com/load-balancer-type: "lb"
-          service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
-%{ if login_load_balancer_internal ~}
-          service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+          oci.oraclecloud.com/load-balancer-type: "nlb"
+          oci-network-load-balancer.oraclecloud.com/security-list-management-mode: "None"
+          oci.oraclecloud.com/ingress-ip-mode: "proxy"
+%{ if !login_load_balancer_internal ~}
+          oci-network-load-balancer.oraclecloud.com/external-ip-only: "true"
 %{ endif ~}
-          oci.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
+%{ if login_load_balancer_internal ~}
+          oci-network-load-balancer.oraclecloud.com/internal: "true"
+%{ endif ~}
+          oci-network-load-balancer.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
       spec:
         type: LoadBalancer
+        externalTrafficPolicy: Local
 
 nodesets:
 ${worker_nodesets_yaml}
