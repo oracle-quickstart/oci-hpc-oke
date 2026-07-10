@@ -233,6 +233,7 @@ data:
 
 
     def main():
+        READY_FILE.unlink(missing_ok=True)
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
@@ -247,12 +248,13 @@ data:
 
         all_seen_mapping_keys: set[str] = set()
 
+        # Reconciliation failures retry asynchronously and must not block Helm.
+        READY_FILE.touch()
         while True:
             desired = rdma_topology_labels()
             desired.update(static_gpu_labels)
 
             mapping_read_ok = False
-            cycle_ok = True
             try:
                 node = v1.read_node(node_name)
                 all_labels = dict(node.metadata.labels or {})
@@ -265,16 +267,9 @@ data:
                 mapping_read_ok = True
             except Exception:
                 log.exception("Failed to reconcile label mappings for node %s", node_name)
-                cycle_ok = False
 
-            if not _apply_labels(v1, node_name, desired,
-                                 managed_keys=all_seen_mapping_keys if mapping_read_ok else None):
-                cycle_ok = False
-
-            if cycle_ok:
-                READY_FILE.touch()
-            else:
-                READY_FILE.unlink(missing_ok=True)
+            _apply_labels(v1, node_name, desired,
+                          managed_keys=all_seen_mapping_keys if mapping_read_ok else None)
             HEALTH_FILE.touch()
             time.sleep(interval)
 

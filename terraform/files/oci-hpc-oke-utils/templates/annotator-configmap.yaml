@@ -315,6 +315,7 @@ data:
 
 
     def main():
+        READY_FILE.unlink(missing_ok=True)
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
@@ -326,11 +327,10 @@ data:
         log.info("Node: %s | Interval: %ds | hostname-override: %s | topology: %s",
                  node_name, interval, hostname_enabled, topology_enabled)
 
+        # Reconciliation failures retry asynchronously and must not block Helm.
+        READY_FILE.touch()
         while True:
-            if sync(v1, node_name, hostname_enabled, topology_enabled):
-                READY_FILE.touch()
-            else:
-                READY_FILE.unlink(missing_ok=True)
+            sync(v1, node_name, hostname_enabled, topology_enabled)
             HEALTH_FILE.touch()
             time.sleep(interval)
 

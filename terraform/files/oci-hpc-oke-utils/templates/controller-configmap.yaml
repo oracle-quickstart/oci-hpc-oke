@@ -449,6 +449,7 @@ data:
 
 
     def main():
+        READY_FILE.unlink(missing_ok=True)
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
@@ -481,11 +482,10 @@ data:
         loop_interval = min(interval, topology_interval) if topology_enabled else interval
 
         next_labels_due = time.monotonic()
-        labels_ready = not oci_labels_enabled
-        topology_ready = not topology_enabled
+        # Reconciliation failures retry asynchronously and must not block Helm.
+        READY_FILE.touch()
         while True:
             if oci_labels_enabled and time.monotonic() >= next_labels_due:
-                labels_ready = False
                 if compute_client is None:
                     try:
                         signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
@@ -616,21 +616,17 @@ data:
                     except Exception:
                         log.exception("Controller cycle failed")
                         cycle_ok = False
-                    labels_ready = cycle_ok
+                    if not cycle_ok:
+                        log.warning("OCI label cycle incomplete; retrying next cycle")
                     next_labels_due = time.monotonic() + interval
 
             if topology_enabled:
                 try:
-                    topology_ready = _sync_topology(v1, topology_namespace, topology_configmap,
-                                                    topology_default, topology_block_sizes, topology_pools)
+                    _sync_topology(v1, topology_namespace, topology_configmap,
+                                   topology_default, topology_block_sizes, topology_pools)
                 except Exception:
                     log.exception("Topology sync failed")
-                    topology_ready = False
 
-            if labels_ready and topology_ready:
-                READY_FILE.touch()
-            else:
-                READY_FILE.unlink(missing_ok=True)
             HEALTH_FILE.touch()
             time.sleep(loop_interval)
 

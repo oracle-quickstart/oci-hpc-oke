@@ -191,3 +191,25 @@ func TestSlinkyControlPlaneUsesSystemPool(t *testing.T) {
 	require.NotContains(t, slurmValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
 	require.NotContains(t, openldapValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
 }
+
+func TestValidationOkeUtilsReadinessDoesNotWaitForReconciliation(t *testing.T) {
+	scripts := []string{
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "labeler-configmap.yaml"),
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "controller-configmap.yaml"),
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "annotator-configmap.yaml"),
+	}
+
+	for _, script := range scripts {
+		main := strings.Index(script, "    def main():")
+		require.NotEqual(t, -1, main)
+		cleanup := strings.Index(script[main:], "READY_FILE.unlink(missing_ok=True)")
+		ready := strings.Index(script[main:], "READY_FILE.touch()")
+		loop := strings.Index(script[main:], "        while True:")
+		require.NotEqual(t, -1, cleanup)
+		require.NotEqual(t, -1, ready)
+		require.NotEqual(t, -1, loop)
+		require.Less(t, cleanup, ready)
+		require.Less(t, ready, loop)
+		require.NotContains(t, script[main+ready:], "READY_FILE.unlink")
+	}
+}
