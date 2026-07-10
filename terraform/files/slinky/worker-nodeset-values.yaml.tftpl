@@ -24,13 +24,20 @@
       image:
         repository: ${image_repository}
         tag: ${image_tag}
-%{ if node_name_from_kube_node || slurmd_parameters != "" ~}
+%{ if node_name_from_kube_node || host_network || slurmd_parameters != "" ~}
       args:
 %{ if node_name_from_kube_node ~}
         # Slurm nodes are named after the Kubernetes node name (a hostname
         # because the stack bootstraps kubelet with hostname-override).
         - -N
         - $(KUBE_NODE_NAME)
+%{ else ~}
+%{ if host_network ~}
+        # hostNetwork keeps the host UTS hostname, so pass the operator's
+        # generated pod hostname to slurmd explicitly.
+        - -N
+        - $(SLURM_NODE_NAME)
+%{ endif ~}
 %{ endif ~}
 %{ if slurmd_parameters != "" ~}
         - --parameters
@@ -51,6 +58,20 @@
               - -c
               - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
 %{ else ~}
+%{ if host_network ~}
+      env:
+        - name: SLURM_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['nodeset.slinky.slurm.net/pod-hostname']
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$${SLURM_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${SLURM_NODE_NAME}" || true
+%{ else ~}
       # Kubernetes node names are IP addresses here; slurmd registers under the
       # pod hostname, which the operator sets from the hostname-override node
       # annotation written by the oci-hpc-oke-utils annotator.
@@ -61,6 +82,7 @@
               - /usr/bin/sh
               - -c
               - scontrol update nodename="$(hostname)" state=down reason='Pod is terminating'; scontrol delete nodename="$(hostname)" || true
+%{ endif ~}
 %{ endif ~}
       resources:
         limits:
