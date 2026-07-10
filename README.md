@@ -71,7 +71,7 @@ See [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-ncc
 - [Onboarding Users to the Slurm Operator](./docs/slurm-operator-user-onboarding.md)
 - [Images to Use for Worker Nodes](./docs/worker-node-images.md)
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
-- [OCI HPC OKE Utils (Node Labeler, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
+- [OCI HPC OKE Utils (Node Labeler, Slurm Topology, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
 - [Replacing the boot volume of self-managed nodes and managed node pools using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
 - [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
 - [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)

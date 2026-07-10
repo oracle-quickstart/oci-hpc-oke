@@ -1,6 +1,6 @@
 # oci-hpc-oke-utils
 
-`oci-hpc-oke-utils` is a Helm chart that deploys utility DaemonSets on GPU nodes. It has four components:
+`oci-hpc-oke-utils` is a Helm chart that deploys node labeling, Slurm topology, image prepulling, and host execution components. It has four components:
 
 | Component | Default | Description |
 |-----------|---------|-------------|

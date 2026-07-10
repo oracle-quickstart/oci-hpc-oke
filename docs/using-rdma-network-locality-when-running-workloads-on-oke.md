@@ -3,7 +3,7 @@
 This guide explains how to leverage RDMA network topology information to optimize workload placement and performance in Oracle Kubernetes Engine (OKE). By using network locality, you can ensure that distributed workloads are scheduled on nodes with optimal network proximity, reducing latency and maximizing throughput for GPU-accelerated applications.
 
 > [!IMPORTANT]
-> To use the instructions in this guide, you must have a dedicated capacity pool and you must create a capacity topology. Otherwise, `rdmaTopologyData` in instance metadata service and related node labels in OKE will not be available.
+> To use real network locality, workers must expose RDMA locality metadata through the instance metadata service (IMDS). A capacity topology provides the legacy `rdmaTopologyData` fields. Other supported RDMA shapes can expose equivalent `networkBlockId` and `rackId` fields in the IMDS `/host` document. If neither source is available, the OCI HPC OKE Utils labeler writes `no-imds-data` placeholders, so scheduling cannot distinguish real network locality.
 
 ## Overview of Network Locality
 Generative AI workloads drive a different set of engineering tradeoffs than traditional cloud workloads. So, we designed a purpose-built GenAI network tailored to the needs of the best-of-breed Generative AI workloads.
@@ -15,7 +15,7 @@ Local Block is the first latency band (Tier-0), Network Block is the second late
 ![OCI RDMA Network Topology](./images/oci-rdma-topology.png)
 
 ## Network Tier Information
-When you have a dedicated capacity pool and a capacity topology created for the availability domain, the following information will be available in the instance metadata service for bare metal GPU shapes:
+With a dedicated capacity pool and capacity topology created for the availability domain, the legacy `rdmaTopologyData` document is available for bare metal GPU shapes:
 
 ```
 curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTopologyData
@@ -28,9 +28,11 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
 }
 ```
 
+Other supported RDMA shapes can expose equivalent `networkBlockId`, `rackId`, and `id` fields in the IMDS `/host` document. The OCI HPC OKE Utils labeler maps those fields to the same RDMA locality labels used below.
+
 ## Node Labels
 
-When the locality information is available in the instance metadata service, OKE will add the following labels to your nodes during bootstrapping:
+When locality information is available in IMDS, the OCI HPC OKE Utils labeler applies the following labels to each node:
 
 ```
 oci.oraclecloud.com/rdma.hpc_island_id
@@ -56,6 +58,8 @@ oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 | Node Affinity | Yes | With soft rules |
 | Pod Affinity | No | With soft rules |
 | Node Ordering Init Container | No | No |
+
+For Slinky clusters, see [Managing Slurm Topology on OKE](./managing-slurm-topology-on-oke.md) to use the same locality metadata for Slurm scheduling.
 
 ## Kueue with Topology Aware Scheduling (Recommended)
 
