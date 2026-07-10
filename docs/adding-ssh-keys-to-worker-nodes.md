@@ -77,7 +77,6 @@ spec:
           latest_hash=$(echo "$latest" | md5sum | awk '{print $1}')
           keys=$(echo "$latest" | wc -l)
           if [[ $current_hash != $latest_hash ]] && [ "$keys" -gt 0 ]; then
-            echo "$latest" > "$homepath"/.ssh/authorized_keys.tmp
             echo "$(date) Updating $keys keys ($current_hash -> $latest_hash)" >&2
             echo "$latest" | tee "$homepath"/.ssh/authorized_keys
           fi
@@ -147,7 +146,7 @@ kubectl edit configmap authorized-ssh-keys -n kube-system
 kubectl rollout restart daemonset/authorized-ssh-keys -n kube-system
 ```
 
-The pods will be restarted with a rolling update strategy, ensuring continuous availability while applying the new keys across all nodes.
+The DaemonSet's update strategy sets `maxUnavailable: 100%`, so all pods restart at once. Each pod re-applies the keys on its node when it starts; node workloads are not affected.
 
 ## Removing Keys
 

@@ -3,19 +3,19 @@
 This guide explains how to leverage RDMA network topology information to optimize workload placement and performance in Oracle Kubernetes Engine (OKE). By using network locality, you can ensure that distributed workloads are scheduled on nodes with optimal network proximity, reducing latency and maximizing throughput for GPU-accelerated applications.
 
 > [!IMPORTANT]
-> To use the instructions in this guide, you must have a dedicated capacity pool and you must create a capacity topology. Otherwise, `rdmaTopologyData` in instance metadata service and related node labels in OKE will not be available.
+> To use real network locality, workers must expose RDMA locality metadata through the instance metadata service (IMDS). A capacity topology provides the legacy `rdmaTopologyData` fields. Other supported RDMA shapes can expose equivalent `networkBlockId` and `rackId` fields in the IMDS `/host` document. If neither source is available, the OCI HPC OKE Utils labeler writes `no-imds-data` placeholders, so scheduling cannot distinguish real network locality.
 
 ## Overview of Network Locality
 Generative AI workloads drive a different set of engineering tradeoffs than traditional cloud workloads. So, we designed a purpose-built GenAI network tailored to the needs of the best-of-breed Generative AI workloads.
 
-When possible, running a job using the nodes in the same Local Block will provide the best performance. Because the number of nodes in a Local Block is limited; depending on the number of nodes you have, the number of your concurrent jobs running, and the size of your jobs, you might need to use the nodes from another Local Block in the same Network Block or from another Network Block.
+When possible, running a job using the nodes in the same Local Block will provide the best performance. However, the number of nodes in a Local Block is limited. Depending on the number of nodes you have, the number of concurrent jobs, and the size of your jobs, you might need to use nodes from another Local Block in the same Network Block or from another Network Block.
 
 Local Block is the first latency band (Tier-0), Network Block is the second latency band (Tier-1), and HPC Island is the third latency band (Tier-2) in OCI's RDMA networks. You can read [this blog post](https://blogs.oracle.com/cloud-infrastructure/post/first-principles-zettascale-oci-superclusters) and watch the [YouTube video](https://www.youtube.com/watch?v=cZy22n5Ih78) for learning more about OCI's RDMA network design.
 
 ![OCI RDMA Network Topology](./images/oci-rdma-topology.png)
 
 ## Network Tier Information
-When you have a dedicated capacity pool and a capacity topology created for the availability domain, the following information will be available in the instance metadata service for bare metal GPU shapes:
+With a dedicated capacity pool and capacity topology created for the availability domain, the legacy `rdmaTopologyData` document is available for bare metal GPU shapes:
 
 ```
 curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTopologyData
@@ -28,9 +28,11 @@ curl -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/host/rdmaTo
 }
 ```
 
+Other supported RDMA shapes can expose equivalent `networkBlockId`, `rackId`, and `id` fields in the IMDS `/host` document. The OCI HPC OKE Utils labeler maps those fields to the same RDMA locality labels used below.
+
 ## Node Labels
 
-When the locality information is available in the instance metadata service, OKE will add the following labels to your nodes during bootstrapping:
+When locality information is available in IMDS, the OCI HPC OKE Utils labeler applies the following labels to each node:
 
 ```
 oci.oraclecloud.com/rdma.hpc_island_id
@@ -57,22 +59,24 @@ oci.oraclecloud.com/rdma.host_id=ab3zs7y7v7q
 | Pod Affinity | No | With soft rules |
 | Node Ordering Init Container | No | No |
 
+For Slinky clusters, see [Managing Slurm Topology on OKE](./managing-slurm-topology-on-oke.md) to use the same locality metadata for Slurm scheduling.
+
 ## Kueue with Topology Aware Scheduling (Recommended)
 
 > [!NOTE]
 > Starting with stack v26.3.0, Kueue is deployed by default along with the Topology, ResourceFlavor, ClusterQueue, and LocalQueue resources. If you deployed using v26.3.0 or later, skip to [Step 6](#step-6-submit-a-job).
 
-Kueue's **Topology Aware Scheduling (TAS)** automatically places pods as close together as possible in the RDMA network hierarchy. You define a preferred topology level (e.g., Local Block), and Kueue will pack pods there if capacity allows. If not, it progressively falls back to Network Block, then HPC Island — no manual label lookups or affinity rules required.
+Kueue's **Topology Aware Scheduling (TAS)** automatically places pods as close together as possible in the RDMA network hierarchy. You define a preferred topology level (e.g., Local Block), and Kueue will pack pods there if capacity allows. If not, it progressively falls back to Network Block, then HPC Island. No manual label lookups or affinity rules are required.
 
 This is the recommended approach because:
-- **No label values to manage** — Kueue reads the topology from node labels automatically
-- **Automatic fallback** — jobs are never stuck waiting; Kueue finds the best available placement
-- **Integrates with quotas** — ClusterQueue resource quotas prevent overcommitment
+- **No label values to manage**: Kueue reads the topology from node labels automatically
+- **Automatic fallback**: jobs are never stuck waiting; Kueue finds the best available placement
+- **Integrates with quotas**: ClusterQueue resource quotas prevent overcommitment
 
 ### Step 1: Install Kueue
 
 ```sh
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.17.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.18.2" --create-namespace --namespace=kueue-system
 ```
 
 ### Step 2: Create a Topology
@@ -239,14 +243,14 @@ spec:
                   - key: oci.oraclecloud.com/rdma.local_block_id
                     operator: In
                     values:
-                      - 5tjxbt5s6ua
+                      - 4tjxbt4s6ua
             - weight: 50
               preference:
                 matchExpressions:
                   - key: oci.oraclecloud.com/rdma.network_block_id
                     operator: In
                     values:
-                      - 7xmzl5p5wba
+                      - 7xmzl4p4wba
             - weight: 25
               preference:
                 matchExpressions:
@@ -382,7 +386,7 @@ spec:
             - name: node-ordering
               emptyDir: {}
             containers:
-            - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+            - image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
               name: rccl-tests
               volumeMounts:
               - name: node-ordering
@@ -424,12 +428,11 @@ spec:
     Worker:
       replicas: 2
       template:
-        metadata:
         spec:
           dnsPolicy: ClusterFirstWithHostNet
           hostNetwork: true
           containers:
-          - image: iad.ocir.io/hpc_limited_availability/oke/rccl-tests:rocm-6.3.2-OFED-24.10-1.1.4.0
+          - image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1
             securityContext:
               privileged: true
               capabilities:

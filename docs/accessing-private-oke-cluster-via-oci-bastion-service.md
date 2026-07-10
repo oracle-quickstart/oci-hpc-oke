@@ -17,7 +17,7 @@ This guide explains how to use the `oke-bastion-service-session.sh` script to ac
 <details>
 <summary><strong>If you deployed the stack using OCI Resource Manager</strong></summary>
 
-### Step 1: Get the Script
+#### Step 1: Get the Script
 
 Download the script directly:
 
@@ -26,7 +26,7 @@ curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/fi
 chmod +x oke-bastion-service-session.sh
 ```
 
-### Step 2: Get the Session Command from OCI Console
+#### Step 2: Get the Session Command from OCI Console
 
 In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service Kubernetes endpoint session command**.
 
@@ -50,7 +50,7 @@ The command will look like this:
 
 Run it directly to create the session, start the tunnel, and generate the kubeconfig.
 
-### Step 3: Connect to the Cluster
+#### Step 3: Connect to the Cluster
 
 Once the script completes, export the kubeconfig path printed in the output and verify access:
 
@@ -64,7 +64,7 @@ kubectl get nodes
 <details>
 <summary><strong>If you deployed the stack using local Terraform</strong></summary>
 
-### Step 1: Get the Script
+#### Step 1: Get the Script
 
 The script is in the `files/` directory of your local clone. Change to that directory before running commands:
 
@@ -72,7 +72,7 @@ The script is in the `files/` directory of your local clone. Change to that dire
 cd files
 ```
 
-### Step 2: Get the Session Command from Terraform Output
+#### Step 2: Get the Session Command from Terraform Output
 
 The full script invocation is available as a Terraform output:
 
@@ -98,7 +98,7 @@ The command will look like this:
 
 Run this command directly to create the session, start the tunnel, and generate the kubeconfig.
 
-### Step 3: Connect to the Cluster
+#### Step 3: Connect to the Cluster
 
 Once the script completes, export the kubeconfig path printed in the output and verify access:
 
@@ -114,7 +114,7 @@ kubectl get nodes
 <details>
 <summary><strong>If you deployed the stack using OCI Resource Manager</strong></summary>
 
-### Step 1: Get the Script
+#### Step 1: Get the Script
 
 Download the script directly:
 
@@ -123,13 +123,13 @@ curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/fi
 chmod +x oke-bastion-service-session.sh
 ```
 
-### Step 2: Get the Worker Node IP
+#### Step 2: Get the Worker Node IP
 
 ```sh
 kubectl get nodes -o wide
 ```
 
-### Step 3: Get the SSH Command from OCI Console
+#### Step 3: Get the SSH Command from OCI Console
 
 In the OCI Console, navigate to your Resource Manager stack job and open the **Application Information** tab. Copy the value of **Bastion service worker SSH command** and replace `<worker-ip>` with the node IP.
 
@@ -149,7 +149,7 @@ The command will look like this:
   --non-interactive
 ```
 
-### Step 4: Connect to the Worker Node
+#### Step 4: Connect to the Worker Node
 
 Run the command. With `--auto-tunnel`, the script establishes the tunnel and drops you directly into an SSH session on the worker node.
 
@@ -158,7 +158,7 @@ Run the command. With `--auto-tunnel`, the script establishes the tunnel and dro
 <details>
 <summary><strong>If you deployed the stack using local Terraform</strong></summary>
 
-### Step 1: Get the Script
+#### Step 1: Get the Script
 
 The script is in the `files/` directory of your local clone. Change to that directory before running commands:
 
@@ -166,13 +166,13 @@ The script is in the `files/` directory of your local clone. Change to that dire
 cd files
 ```
 
-### Step 2: Get the Worker Node IP
+#### Step 2: Get the Worker Node IP
 
 ```sh
 kubectl get nodes -o wide
 ```
 
-### Step 3: Get the SSH Command from Terraform Output
+#### Step 3: Get the SSH Command from Terraform Output
 
 ```sh
 terraform output -raw bastion_service_worker_ssh_command
@@ -192,7 +192,7 @@ Replace `<worker-ip>` with the node IP. The command will look like this:
   --non-interactive
 ```
 
-### Step 4: Connect to the Worker Node
+#### Step 4: Connect to the Worker Node
 
 Run the command. With `--auto-tunnel`, the script establishes the tunnel and drops you directly into an SSH session on the worker node.
 
