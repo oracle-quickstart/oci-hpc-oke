@@ -37,6 +37,7 @@ path end to end; you do not need to run both.
 - [NCCL Tests (NVIDIA GPU shapes)](#nccl-tests-nvidia-gpu-shapes)
   - [From the Login Pod](#from-the-login-pod)
   - [From the Operator Node](#from-the-operator-node)
+  - [GMC on GB200 and GB300](#gmc-on-gb200-and-gb300)
   - [Example Output](#example-output)
   - [Running via Pyxis (containerized)](#running-via-pyxis-containerized)
 - [RCCL Tests (AMD GPU shapes)](#rccl-tests-amd-gpu-shapes)
@@ -85,6 +86,16 @@ Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
 
+Slurm GPU workers mount the shape's parameters at both `/etc/nccl.conf`
+(NCCL) and `/etc/rccl.conf` (RCCL); each library reads its own path at
+initialization, and per-job environment variables override either file.
+Pyxis job steps run in the container filesystem and need
+`--container-mounts=/etc/nccl.conf` or `--container-mounts=/etc/rccl.conf`
+(whichever the job's library reads) to see it. The provided scripts still
+source `env.sh`, whose exports take precedence over the file. Changing a
+shape's parameters rolls the affected worker pods automatically, since
+Kubernetes does not refresh a `subPath` ConfigMap mount on its own.
+
 ## Worker Network Mode (hostNetwork vs SR-IOV VFs)
 
 The Slurm GPU worker pods reach the RDMA fabric in one of two ways, fixed when
@@ -102,9 +113,12 @@ the cluster is deployed (`slinky_worker_network_mode`, which is forced to
 
 The standard GPU worker pool defaults to partition `gpu` and NodeSet
 `slurm-worker-gpu`. The GPU with RDMA worker pool defaults to partition `rdma`
-and NodeSet `slurm-worker-rdma`. These names are configurable. List the
-deployed NodeSets, select the one that contains the GPU workers, and check its
-network mode:
+and NodeSet `slurm-worker-rdma`. With one GPU memory fabric, GPU Memory Cluster
+workers default to partition and NodeSet `gmc`. Multiple fabrics use one
+`gmc-<fabric-suffix>` NodeSet and partition per fabric. These workers use
+`hostNetwork` and DRA claims for their IMEX channels. These names are
+configurable. List the deployed NodeSets, select the one that contains the GPU
+workers, and check its network mode:
 
 ```bash
 kubectl -n slurm get nodesets
@@ -146,7 +160,7 @@ Run these commands after SSHing to the login pod as the Slurm user, for example
 ```bash
 export SLURM_ACCOUNT=users
 
-# Select the partition that reports GPU GRES. Common values are gpu and rdma.
+# Select the partition that reports GPU GRES. Common values are gpu, rdma, and gmc.
 sinfo -h -o '%P|%G|%f'
 export SLURM_PARTITION=rdma
 
@@ -719,6 +733,92 @@ kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
 
 A successful job ends with `COMPLETED` and `ExitCode` `0:0`.
 
+### GMC on GB200 and GB300
+
+The GB200 and GB300 GPU Memory Cluster shapes use four GPUs per node and an
+NVIDIA DRA `ComputeDomain` for their IMEX channels. Terraform creates one
+`ComputeDomain` per GPU memory fabric and wires its generated
+`ResourceClaimTemplate` into the matching NodeSet. With one fabric, the default
+NodeSet and partition names are both `gmc`. With multiple fabrics, select one
+`gmc-<fabric-suffix>` partition so all nodes in the test share a
+`ComputeDomain`; do not use the aggregate `gmc-all` partition for an MNNVL test.
+
+From the operator node, verify that the DRA resources and Slurm workers are
+ready before submitting a job:
+
+```bash
+kubectl -n slurm get computedomain
+kubectl -n slurm get resourceclaimtemplates,resourceclaims
+kubectl -n dra-driver-nvidia-gpu get pods
+kubectl -n slurm get nodesets
+kubectl -n slurm exec deploy/slurm-login-slinky -- sinfo -Nel
+```
+
+The `ComputeDomain` must report `Ready`, each worker `ResourceClaim` must be
+allocated and reserved for its pod, and at least two nodes in the selected
+fabric-specific partition must be idle.
+
+The shape-specific ConfigMap is mounted into each worker at `/etc/nccl.conf`.
+The following batch script deliberately sets no `NCCL_*` environment variables,
+so NCCL reads its tuning from that file. Run it from the login pod as a regular
+Slurm user:
+
+```bash
+cat > "$HOME/nccl-gmc.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=nccl-gmc
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=2
+#SBATCH --gres=gpu:4
+#SBATCH --time=00:20:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euo pipefail
+
+export PATH=/opt/hpcx/ompi/bin:/opt/nccl-tests/bin:${PATH}
+export LD_LIBRARY_PATH=/opt/nccl-tests/lib:/opt/hpcx/ucx/lib:/opt/hpcx/ompi/lib:/opt/hpcx/nccl_spectrum-x_plugin/lib:/opt/hpcx/nccl_rdma_sharp_plugin/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/opt/hpcx/ompi
+export UCX_TLS=tcp
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+export OMPI_MCA_coll=^hcoll
+
+test -r /etc/nccl.conf
+sha256sum /etc/nccl.conf
+cat /etc/nccl.conf
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+
+mpirun --mca pml ucx \
+  --bind-to numa \
+  --mca coll '^hcoll' \
+  -np "${SLURM_NTASKS}" \
+  -npernode 4 \
+  -x PATH \
+  -x LD_LIBRARY_PATH \
+  -x OPAL_PREFIX \
+  -x UCX_TLS \
+  -x UCX_NET_DEVICES \
+  -x HCOLL_ENABLE_MCAST_ALL \
+  -x coll_hcoll_enable \
+  /opt/nccl-tests/bin/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -n 20
+EOF
+chmod 755 "$HOME/nccl-gmc.sh"
+
+export SLURM_ACCOUNT=users
+export SLURM_PARTITION=gmc  # Use gmc-<fabric-suffix> with multiple fabrics.
+sbatch --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/nccl-gmc.sh"
+```
+
+The worker image's `/opt/nccl-tests/env.sh` currently configures paths only,
+but this script sets those paths explicitly so the batch file contains no NCCL
+tuning overrides. Per-job environment variables, if supplied at submission,
+still take precedence over `/etc/nccl.conf`.
+
 ### Example Output
 
 This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks.
@@ -771,10 +871,10 @@ native run above.
 Key points:
 
 - Use a plain image (`ubuntu:24.04`) and mount the worker's NCCL test payload
-  (`/opt/nccl-tests`, `/opt/hpcx`) and RDMA verbs userland into it. NGC images
-  (for example `nvcr.io/nvidia/pytorch`) ship their own `rdma-core` and set
-  `NVIDIA_VISIBLE_DEVICES` themselves, so the RDMA-userland mounts can be dropped
-  for them.
+  (`/opt/nccl-tests`, `/opt/hpcx`), `/etc/nccl.conf`, and RDMA verbs userland
+  into it. NGC images (for example `nvcr.io/nvidia/pytorch`) ship their own
+  `rdma-core` and set `NVIDIA_VISIBLE_DEVICES` themselves, so the RDMA-userland
+  mounts can be dropped for them.
 - Export `NVIDIA_VISIBLE_DEVICES=all` (activates the GPU hook; the Slurm cgroup
   still restricts the container to the `--gres` GPUs) and
   `MELLANOX_VISIBLE_DEVICES=all` (RDMA device hook).
@@ -800,9 +900,14 @@ set -euo pipefail
 
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-ubuntu:24.04}"
 
-M=/usr/lib/x86_64-linux-gnu
+case "$(uname -m)" in
+  x86_64) M=/usr/lib/x86_64-linux-gnu ;;
+  aarch64) M=/usr/lib/aarch64-linux-gnu ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
 RDMA_USERLAND_MOUNTS="$M/libibverbs.so.1:$M/libibverbs.so.1,$M/libmlx5.so.1:$M/libmlx5.so.1,$M/librdmacm.so.1:$M/librdmacm.so.1,$M/libnl-3.so.200:$M/libnl-3.so.200,$M/libnl-route-3.so.200:$M/libnl-route-3.so.200,$M/libibverbs:$M/libibverbs,/etc/libibverbs.d:/etc/libibverbs.d"
 PAYLOAD_MOUNTS="/opt/nccl-tests:/opt/nccl-tests,/opt/hpcx:/opt/hpcx"
+CONFIG_MOUNT="/etc/nccl.conf:/etc/nccl.conf"
 
 # Activate the GPU and RDMA Enroot hooks. The Slurm cgroup still restricts the
 # container to the GPUs allocated by --gres.
@@ -835,7 +940,7 @@ export OPAL_PREFIX=/opt/hpcx/ompi
 srun --mpi=pmix --export=ALL \
   --container-image="$CONTAINER_IMAGE" \
   --container-name=nccl \
-  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS" \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$CONFIG_MOUNT" \
   /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 8G -c 1
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
@@ -851,6 +956,74 @@ on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0`. Compare its
 8 GiB bus bandwidth with the native run. For another NVIDIA shape, replace the
 `NCCL_IB_HCA` list (see
 [Create the Slurm Batch Script](#create-the-slurm-batch-script)).
+
+#### GMC Pyxis variant
+
+GB200 and GB300 workers are ARM64, have four GPUs per node, and use the `gmc`
+partition. This variant mounts the worker's `/etc/nccl.conf` into the container
+and deliberately sets no `NCCL_*` environment variables. NCCL therefore reads
+the shape-specific tuning, including `NCCL_NVLS_ENABLE=1`, from the mounted file.
+
+```bash
+cat > "$HOME/nccl-gmc-pyxis.sh" <<'EOF'
+#!/usr/bin/env bash
+#SBATCH --job-name=nccl-gmc-pyxis
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=2
+#SBATCH --gres=gpu:4
+#SBATCH --time=00:30:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euo pipefail
+
+CONTAINER_IMAGE="${CONTAINER_IMAGE:-ubuntu:24.04}"
+CONTAINER_NAME="nccl-gmc-${SLURM_JOB_ID}"
+
+case "$(uname -m)" in
+  x86_64) M=/usr/lib/x86_64-linux-gnu ;;
+  aarch64) M=/usr/lib/aarch64-linux-gnu ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+RDMA_USERLAND_MOUNTS="$M/libibverbs.so.1:$M/libibverbs.so.1,$M/libmlx5.so.1:$M/libmlx5.so.1,$M/librdmacm.so.1:$M/librdmacm.so.1,$M/libnl-3.so.200:$M/libnl-3.so.200,$M/libnl-route-3.so.200:$M/libnl-route-3.so.200,$M/libibverbs:$M/libibverbs,/etc/libibverbs.d:/etc/libibverbs.d"
+PAYLOAD_MOUNTS="/opt/nccl-tests:/opt/nccl-tests,/opt/hpcx:/opt/hpcx"
+CONFIG_MOUNT="/etc/nccl.conf:/etc/nccl.conf"
+
+export NVIDIA_VISIBLE_DEVICES=all
+export MELLANOX_VISIBLE_DEVICES=all
+export UCX_TLS=tcp
+export UCX_NET_DEVICES=eth0
+export HCOLL_ENABLE_MCAST_ALL=0
+export coll_hcoll_enable=0
+export OMPI_MCA_coll=^hcoll
+export LD_LIBRARY_PATH=/opt/nccl-tests/lib:/opt/hpcx/ucx/lib:/opt/hpcx/ompi/lib:/opt/hpcx/nccl_spectrum-x_plugin/lib:/opt/hpcx/nccl_rdma_sharp_plugin/lib
+export OPAL_PREFIX=/opt/hpcx/ompi
+
+test -r /etc/nccl.conf
+sha256sum /etc/nccl.conf
+scontrol show hostnames "${SLURM_JOB_NODELIST}"
+
+srun --nodes=1 --ntasks=1 --gres=gpu:1 \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name="$CONTAINER_NAME" \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$CONFIG_MOUNT" \
+  cat /etc/nccl.conf
+
+srun --mpi=pmix --export=ALL \
+  --container-image="$CONTAINER_IMAGE" \
+  --container-name="$CONTAINER_NAME" \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$CONFIG_MOUNT" \
+  /opt/nccl-tests/bin/all_reduce_perf -b 1G -e 8G -f 2 -g 1 -n 20
+EOF
+chmod 755 "$HOME/nccl-gmc-pyxis.sh"
+
+export SLURM_ACCOUNT=users
+export SLURM_PARTITION=gmc  # Use gmc-<fabric-suffix> with multiple fabrics.
+sbatch --partition="$SLURM_PARTITION" \
+  --account="$SLURM_ACCOUNT" \
+  "$HOME/nccl-gmc-pyxis.sh"
+```
 
 #### Running Pyxis over SR-IOV VFs
 
@@ -879,9 +1052,14 @@ set -euo pipefail
 
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-ubuntu:24.04}"
 
-M=/usr/lib/x86_64-linux-gnu
+case "$(uname -m)" in
+  x86_64) M=/usr/lib/x86_64-linux-gnu ;;
+  aarch64) M=/usr/lib/aarch64-linux-gnu ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
 RDMA_USERLAND_MOUNTS="$M/libibverbs.so.1:$M/libibverbs.so.1,$M/libmlx5.so.1:$M/libmlx5.so.1,$M/librdmacm.so.1:$M/librdmacm.so.1,$M/libnl-3.so.200:$M/libnl-3.so.200,$M/libnl-route-3.so.200:$M/libnl-route-3.so.200,$M/libibverbs:$M/libibverbs,/etc/libibverbs.d:/etc/libibverbs.d"
 PAYLOAD_MOUNTS="/opt/nccl-tests:/opt/nccl-tests,/opt/hpcx:/opt/hpcx"
+CONFIG_MOUNT="/etc/nccl.conf:/etc/nccl.conf"
 # Bind the RDMA char devices directly; the Mellanox Enroot hook is skipped (see above).
 DEVICE_MOUNTS="/dev/infiniband:/dev/infiniband"
 
@@ -915,7 +1093,7 @@ export OPAL_PREFIX=/opt/hpcx/ompi
 srun --mpi=pmix --export=ALL \
   --container-image="$CONTAINER_IMAGE" \
   --container-name=nccl \
-  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$DEVICE_MOUNTS" \
+  --container-mounts="$PAYLOAD_MOUNTS,$RDMA_USERLAND_MOUNTS,$CONFIG_MOUNT,$DEVICE_MOUNTS" \
   /opt/nccl-tests/bin/all_reduce_perf -b 1G -f 2 -g 1 -e 8G -c 1
 EOF
 chmod 755 "$HOME/nccl-pyxis.sh"
@@ -1523,6 +1701,8 @@ Key points:
   RDMA (`/dev/infiniband`) device nodes into the container with
   `--container-mounts`. The Slurm cgroup (`ConstrainDevices=yes`) still restricts
   the container to the GPUs allocated by `--gres`.
+- Bind `/etc/rccl.conf` into the container so RCCL receives the worker's
+  shape-specific parameters.
 - Use `--container-name` so all tasks on a node share one container instance,
   which UCX intra-node shared memory requires.
 - Submit it as a plain `sbatch`. Do **not** "pre-warm" the import with a separate
@@ -1549,9 +1729,9 @@ set -euo pipefail
 # The rccl-tests image is self-contained for the ROCm/RCCL userland.
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
 
-# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The Slurm
-# cgroup still restricts the container to the --gres GPUs.
-DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+# Enroot has no AMD hook; bind the AMD GPU and RDMA device nodes and RCCL config.
+# The Slurm cgroup still restricts the container to the --gres GPUs.
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband,/etc/rccl.conf:/etc/rccl.conf
 
 # BM.GPU.MI300X.8 RCCL / UCX transport (RCCL reuses the NCCL_* names).
 export NCCL_CUMEM_ENABLE=0
@@ -1616,10 +1796,11 @@ set -euo pipefail
 # The rccl-tests image is self-contained for the ROCm/RCCL userland.
 CONTAINER_IMAGE="${CONTAINER_IMAGE:-iad.ocir.io#idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1}"
 
-# Enroot has no AMD hook; bind the AMD GPU + RDMA device nodes in. The container
-# shares the pod network namespace, so /sys/class/infiniband exposes the VF HCAs.
+# Enroot has no AMD hook; bind the AMD GPU and RDMA device nodes and RCCL config.
+# The container shares the pod network namespace, so /sys/class/infiniband
+# exposes the VF HCAs.
 # The Slurm cgroup still restricts the container to the --gres GPUs.
-DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband
+DEVICE_MOUNTS=/dev/kfd:/dev/kfd,/dev/dri:/dev/dri,/dev/infiniband:/dev/infiniband,/etc/rccl.conf:/etc/rccl.conf
 
 # SR-IOV VF RCCL / transport (RCCL reuses the NCCL_* names). Control plane over
 # the pod overlay eth0 (TCP); RCCL over the VF HCAs matched by NCCL_IB_HCA=mlx5.

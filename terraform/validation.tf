@@ -167,6 +167,24 @@ locals {
     var.slinky_identity_enabled,
     !var.slinky_worker_ssh_enabled,
   ])
+  invalid_slinky_annotator_without_utils = alltrue([
+    local.slinky_hostname_annotator_enabled,
+    !var.install_oci_hpc_oke_utils,
+  ])
+  # The generated Slurm values are chart 1.2-only: workers rely on the
+  # hostname-override annotation instead of -N naming, and the chart 1.1
+  # built-in slinky NodeSet is no longer overridden off.
+  invalid_slinky_chart_below_1_2 = alltrue([
+    var.install_slinky,
+    anytrue([
+      for v in [local.slinky_operator_chart_version, local.slinky_slurm_chart_version] :
+      try(
+        tonumber(split(".", v)[0]) < 1 ||
+        (tonumber(split(".", v)[0]) == 1 && tonumber(split(".", v)[1]) < 2),
+        false
+      )
+    ]),
+  ])
 
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
@@ -433,7 +451,7 @@ resource "null_resource" "validate_slinky_login_identity" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_login_without_identity
-      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise Slinky chart 1.1.1 configures the LoginSet with its placeholder ldap://ldap.example.com SSSD domain. Enable managed identity or disable the Slurm login service."
+      error_message = "slinky_login_enabled=true requires slinky_identity_enabled=true. Otherwise the Slinky slurm chart configures the LoginSet with its placeholder SSSD configuration. Enable managed identity or disable the Slurm login service."
     }
   }
 }
@@ -444,7 +462,29 @@ resource "null_resource" "validate_slinky_worker_identity" {
   lifecycle {
     precondition {
       condition     = !local.invalid_slinky_worker_identity_without_ssh
-      error_message = "slinky_worker_ssh_enabled=false is incompatible with slinky_identity_enabled=true in Slinky chart 1.1.1 because disabling worker SSH also removes the worker SSSD configuration. Keep worker SSH enabled or disable managed identity."
+      error_message = "slinky_worker_ssh_enabled=false is incompatible with slinky_identity_enabled=true because the Slinky slurm chart couples worker SSSD configuration to SSH. Keep worker SSH enabled or disable managed identity."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_hostname_annotator" {
+  count = local.invalid_slinky_annotator_without_utils ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_annotator_without_utils
+      error_message = "install_slinky=true with hostname_override=false requires install_oci_hpc_oke_utils=true: the oci-hpc-oke-utils annotator sets the node hostname-override annotation that keeps Slurm node names clean when Kubernetes node names are IP addresses. Enable oci-hpc-oke-utils or set hostname_override=true."
+    }
+  }
+}
+
+resource "null_resource" "validate_slinky_chart_version" {
+  count = local.invalid_slinky_chart_below_1_2 ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_slinky_chart_below_1_2
+      error_message = "slinky_operator_chart_version and slinky_slurm_chart_version must be 1.2.0 or later: the stack generates 1.2-only Slurm values (worker names come from the slurm-operator 1.2 hostname-override annotation instead of -N, and the chart 1.1 built-in slinky NodeSet is not overridden off). Use auto or pin 1.2 or later."
     }
   }
 }

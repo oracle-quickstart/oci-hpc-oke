@@ -1,7 +1,7 @@
   ${nodeset_name}:
     enabled: true
     scalingMode: DaemonSet
-%{ if sriov_enabled || (identity_enabled && worker_ssh_enabled) ~}
+%{ if sriov_enabled || (identity_enabled && worker_ssh_enabled) || nccl_configmap_name != "" ~}
     metadata:
       annotations:
 %{ if identity_enabled && worker_ssh_enabled ~}
@@ -9,6 +9,11 @@
 %{ endif ~}
 %{ if sriov_enabled ~}
         k8s.v1.cni.cncf.io/networks: ${rdma_networks}
+%{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        # subPath ConfigMap mounts never refresh; changed parameters roll the
+        # pods through this hash instead.
+        oci-hpc-oke.oracle.com/nccl-conf-hash: "${nccl_conf_hash}"
 %{ endif ~}
 %{ endif ~}
     # Ignored in DaemonSet mode (pod count follows matching nodes); only used
@@ -19,13 +24,20 @@
       image:
         repository: ${image_repository}
         tag: ${image_tag}
+%{ if node_name_from_kube_node || slurmd_parameters != "" ~}
       args:
+%{ if node_name_from_kube_node ~}
+        # Slurm nodes are named after the Kubernetes node name (a hostname
+        # because the stack bootstraps kubelet with hostname-override).
         - -N
         - $(KUBE_NODE_NAME)
+%{ endif ~}
 %{ if slurmd_parameters != "" ~}
         - --parameters
         - ${slurmd_parameters}
 %{ endif ~}
+%{ endif ~}
+%{ if node_name_from_kube_node ~}
       env:
         - name: KUBE_NODE_NAME
           valueFrom:
@@ -38,6 +50,18 @@
               - /usr/bin/sh
               - -c
               - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+%{ else ~}
+      # Kubernetes node names are IP addresses here; slurmd registers under the
+      # pod hostname, which the operator sets from the hostname-override node
+      # annotation written by the oci-hpc-oke-utils annotator.
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$(hostname)" state=down reason='Pod is terminating'; scontrol delete nodename="$(hostname)" || true
+%{ endif ~}
       resources:
         limits:
           ${gpu_resource}: ${gpus_per_node}
@@ -70,6 +94,16 @@
         - name: ldap-ca
           mountPath: /etc/sssd/ca
           readOnly: true
+%{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        # NCCL reads /etc/nccl.conf and RCCL reads /etc/rccl.conf at init;
+        # job environment variables override either file.
+        - name: nccl-conf
+          mountPath: /etc/nccl.conf
+          subPath: nccl.conf
+        - name: nccl-conf
+          mountPath: /etc/rccl.conf
+          subPath: nccl.conf
 %{ endif ~}
     logfile:
       image:
@@ -150,4 +184,9 @@ ${features_yaml}
             items:
               - key: ca.crt
                 path: ca.crt
+%{ endif ~}
+%{ if nccl_configmap_name != "" ~}
+        - name: nccl-conf
+          configMap:
+            name: ${nccl_configmap_name}
 %{ endif ~}

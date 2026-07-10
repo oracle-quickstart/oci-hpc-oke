@@ -1,0 +1,121 @@
+{{- if or .Values.annotator.enabled .Values.topology.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-annotator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: annotator
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: "25%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: annotator
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: annotator
+        {{- with .Values.annotator.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/annotator-configmap.yaml") . | sha256sum }}
+        {{- with .Values.annotator.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: true  # Required for Kubernetes API access
+      serviceAccountName: {{ include "oci-hpc-oke-utils.fullname" . }}
+      # hostNetwork gives the annotator access to the node IMDS endpoint.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: system-node-critical
+      {{- with .Values.annotator.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.annotator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.annotator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.annotator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.fullname" . }}-annotator-script
+        {{- if .Values.annotator.enabled }}
+        - name: host-hostname
+          hostPath:
+            path: /etc/hostname
+            type: File
+        {{- end }}
+        - name: uv-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: annotator
+          image: "{{ .Values.annotator.image.repository }}:{{ .Values.annotator.image.tag }}"
+          imagePullPolicy: {{ .Values.annotator.image.pullPolicy }}
+          command: ["uv", "run", "/scripts/annotator.py"]
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            {{- if .Values.annotator.enabled }}
+            - name: host-hostname
+              mountPath: /host/etc/hostname
+              readOnly: true
+            {{- end }}
+            - name: uv-cache
+              mountPath: /tmp/uv-cache
+            - name: tmp
+              mountPath: /tmp/health
+          env:
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: INTERVAL
+              value: {{ .Values.annotator.interval | quote }}
+            - name: HOSTNAME_OVERRIDE_ENABLED
+              value: {{ .Values.annotator.enabled | quote }}
+            - name: TOPOLOGY_ENABLED
+              value: {{ .Values.topology.enabled | quote }}
+          livenessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/alive"]
+            initialDelaySeconds: 60
+            periodSeconds: 120
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/ready"]
+            periodSeconds: 10
+            failureThreshold: 1
+          resources:
+            {{- toYaml .Values.annotator.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

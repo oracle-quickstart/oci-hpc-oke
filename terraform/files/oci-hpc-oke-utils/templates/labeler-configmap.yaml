@@ -26,6 +26,7 @@ data:
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
+    READY_FILE = Path("/tmp/health/ready")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -48,6 +49,53 @@ data:
             return None
 
 
+    def _extract_rdma_fields(host_data: dict) -> dict[str, str | None]:
+        # Shape-agnostic mapping of a /host/ response to the RDMA locality
+        # fields (plus the GB-only GPU memory fabric). When rdmaTopologyData is
+        # embedded, prefer its original customer* OCIDs. Other RDMA shapes only
+        # expose networkBlockId/rackId/id; with no HPC island reported, reuse
+        # the network block as the island so the controller's island-required
+        # validity check still passes (the top tier just collapses onto it).
+        embedded = host_data.get("rdmaTopologyData") or {}
+        if embedded:
+            return {
+                "island": embedded.get("customerHPCIslandId"),
+                "netblock": embedded.get("customerNetworkBlock"),
+                "localblock": embedded.get("customerLocalBlock"),
+                "host_id": embedded.get("customerHostId"),
+                "gpu_memory_fabric_id": embedded.get("customerGpuMemoryFabric"),
+            }
+        netblock = host_data.get("networkBlockId")
+        return {
+            "island": netblock,
+            "netblock": netblock,
+            "localblock": host_data.get("rackId"),
+            "host_id": host_data.get("id"),
+            "gpu_memory_fabric_id": None,
+        }
+
+
+    def _read_rdma_topology() -> dict | None:
+        # Prefer the compact topology projection, then fall back to the
+        # complete /host document, which embeds the same data when available.
+        for path in ("/host/rdmaTopologyData", "/host"):
+            resp = _imds_get(path)
+            if resp is None or resp.status_code != 200 or not resp.text.strip():
+                continue
+            try:
+                data = resp.json()
+            except requests.exceptions.JSONDecodeError:
+                continue
+            # The projection returns customer* fields at its top level; /host
+            # embeds them under rdmaTopologyData.
+            if path == "/host/rdmaTopologyData":
+                data = {"rdmaTopologyData": data}
+            fields = _extract_rdma_fields(data)
+            if any(v for v in fields.values()):
+                return fields
+        return None
+
+
     def rdma_topology_labels() -> dict[str, str]:
         fallback = {
             "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
@@ -56,47 +104,36 @@ data:
             "oci.oraclecloud.com/rdma.network_block_id": NO_IMDS,
         }
 
-        resp = _imds_get("/host/rdmaTopologyData")
-        if resp is None or resp.status_code != 200 or not resp.text.strip():
-            return fallback
-
-        try:
-            data = resp.json()
-        except requests.exceptions.JSONDecodeError:
-            return fallback
-
-        keys = [
-            ("oci.oraclecloud.com/rdma.hpc_island_id", "customerHPCIslandId"),
-            ("oci.oraclecloud.com/rdma.host_id", "customerHostId"),
-            ("oci.oraclecloud.com/rdma.local_block_id", "customerLocalBlock"),
-            ("oci.oraclecloud.com/rdma.network_block_id", "customerNetworkBlock"),
-        ]
-
         shape_resp = _imds_get("/instance/shape")
         shape = shape_resp.text.strip() if shape_resp and shape_resp.ok else ""
         is_gpu_memory_fabric = any(s in shape for s in GPU_MEMORY_FABRIC_SHAPES)
 
-        if is_gpu_memory_fabric:
-            keys.append(("oci.oraclecloud.com/host.gpu_memory_fabric_id", "customerGpuMemoryFabric"))
+        fields = _read_rdma_topology()
+        if fields is None:
+            if is_gpu_memory_fabric:
+                fallback["oci.oraclecloud.com/host.gpu_memory_fabric_id"] = NO_IMDS
+                fallback["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = NO_IMDS
+            return fallback
 
-        labels = {}
-        for label_key, imds_key in keys:
-            value = data.get(imds_key)
-            labels[label_key] = value[-11:] if value else NO_IMDS
+        label_map = {
+            "oci.oraclecloud.com/rdma.hpc_island_id": fields.get("island"),
+            "oci.oraclecloud.com/rdma.network_block_id": fields.get("netblock"),
+            "oci.oraclecloud.com/rdma.local_block_id": fields.get("localblock"),
+            "oci.oraclecloud.com/rdma.host_id": fields.get("host_id"),
+        }
 
         if is_gpu_memory_fabric:
+            label_map["oci.oraclecloud.com/host.gpu_memory_fabric_id"] = fields.get("gpu_memory_fabric_id")
             instance_resp = _imds_get("/instance/")
+            cluster_ocid = ""
             if instance_resp and instance_resp.ok:
                 try:
-                    instance_data = instance_resp.json()
+                    cluster_ocid = instance_resp.json().get("freeformTags", {}).get("oci:compute:gpumemorycluster", "")
                 except requests.exceptions.JSONDecodeError:
-                    instance_data = {}
-                cluster_ocid = instance_data.get("freeformTags", {}).get("oci:compute:gpumemorycluster")
-                labels["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = cluster_ocid[-11:] if cluster_ocid else NO_IMDS
-            else:
-                labels["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = NO_IMDS
+                    pass
+            label_map["oci.oraclecloud.com/host.gpu_memory_cluster_id"] = cluster_ocid or None
 
-        return labels
+        return {k: (v[-11:] if v else NO_IMDS) for k, v in label_map.items()}
 
 
     def gpu_info_labels() -> dict[str, str]:
@@ -155,13 +192,13 @@ data:
 
 
     def _apply_labels(v1: client.CoreV1Api, node_name: str, desired: dict[str, str],
-                       managed_keys: set[str] | None = None):
+                       managed_keys: set[str] | None = None) -> bool:
         try:
             node = v1.read_node(node_name)
             existing = node.metadata.labels or {}
         except Exception:
             log.exception("Failed to read node %s", node_name)
-            return
+            return False
 
         updates = {}
         for k, v in desired.items():
@@ -186,13 +223,17 @@ data:
                 for k, v in updates.items():
                     if v is not None:
                         log.info("  %s=%s", k, v)
+                return True
             except Exception:
                 log.exception("Failed to patch node %s", node_name)
+                return False
         else:
             log.info("%s already labeled, skipping", node_name)
+            return True
 
 
     def main():
+        READY_FILE.unlink(missing_ok=True)
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
@@ -207,6 +248,8 @@ data:
 
         all_seen_mapping_keys: set[str] = set()
 
+        # Reconciliation failures retry asynchronously and must not block Helm.
+        READY_FILE.touch()
         while True:
             desired = rdma_topology_labels()
             desired.update(static_gpu_labels)
@@ -223,11 +266,10 @@ data:
                 desired.update(mapping_labels)
                 mapping_read_ok = True
             except Exception:
-                pass
+                log.exception("Failed to reconcile label mappings for node %s", node_name)
 
             _apply_labels(v1, node_name, desired,
                           managed_keys=all_seen_mapping_keys if mapping_read_ok else None)
-
             HEALTH_FILE.touch()
             time.sleep(interval)
 

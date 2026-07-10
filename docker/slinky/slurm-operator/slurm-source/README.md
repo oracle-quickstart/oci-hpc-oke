@@ -6,14 +6,24 @@ SlurmDBD, slurmrestd, and login (SSSD sidecar) images can be built from source
 into our registry alongside the layered custom images.
 
 - Source: `SlinkyProject/containers`, path `schedmd/slurm/`
-- Pinned ref: `cea8fbea1c07c727eac653a052947724492b4eb8` (2026-06-10)
+- Pinned refs (per directory, see below)
 - License: Apache-2.0 (SPDX headers retained in the copied files)
 
 Vendored version/flavor directories (matching the terraform image profiles):
 
-- `25.11/ubuntu24.04` (the `25.11.6-ubuntu24.04` profile)
-- `26.05/ubuntu24.04` (the `26.05-ubuntu24.04` profile)
-- `26.05/ubuntu26.04` (the `26.05.1-ubuntu26.04` profile)
+- `25.11/ubuntu24.04` (the `25.11.6-ubuntu24.04` profile) at ref
+  `cea8fbea1c07c727eac653a052947724492b4eb8` (2026-06-10)
+- `26.05/ubuntu24.04` (the `26.05-ubuntu24.04` profile) and `26.05/ubuntu26.04`
+  (the `26.05.1-ubuntu26.04` profile) plus `docker-bake.hcl` at ref
+  `05efda0869fc411f59996af1750ba2a6434c3b0f` (2026-06-25)
+
+The 25.11 directory intentionally stays at the older ref: upstream later
+removed the SSSD packages from the 25.11 login stage, so rebuilding 25.11.6
+from a newer ref would silently break SSSD logins. The shipped 25.11.6 images
+were built from `cea8fbea`. The newer ref also replaces the short-lived
+SSSD_MODE/SACKD_MODE entrypoint switches in the 26.05 images with an always-on
+supervisord sssd program and `authselect select sssd with-mkhomedir` (home
+directories are auto-created at first login).
 
 Each `<minor>/<flavor>/Dockerfile` is a single multi-stage Dockerfile that builds
 every Slurm component (`slurmctld`, `slurmd`, `slurmdbd`, `slurmrestd`, `sackd`,

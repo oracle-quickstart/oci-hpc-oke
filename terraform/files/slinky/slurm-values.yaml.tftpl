@@ -40,6 +40,11 @@ controller:
     image:
       repository: ${controller_image_repository}
       tag: ${controller_image_tag}
+%{ if topology_enabled ~}
+  # Reload config in place when the oke-utils controller updates topology.yaml;
+  # the reconfigure sidecar polls /etc/slurm and runs scontrol reconfigure.
+  inplaceReconfigure: true
+%{ endif ~}
   persistence:
     enabled: true
     storageClassName: oci-bv
@@ -51,6 +56,14 @@ controller:
     SelectType: select/cons_tres
     SelectTypeParameters: CR_CORE_MEMORY
     PropagateResourceLimitsExcept: MEMLOCK
+    # Operator 1.2 pruned these from its generated slurm.conf; keep the 1.1.1
+    # behavior. Without TaskPlugin/ProctrackType the cgroup.conf constraints
+    # (GPU device isolation) would not be enforced.
+    ReturnToService: 2
+    ProctrackType: proctrack/cgroup
+    PrologFlags: Contain
+    TaskPlugin: task/affinity,task/cgroup
+    SlurmctldParameters: enable_stepmgr
 %{ if gmc_nodeset_enabled ~}
     # This is global Slurm configuration. On non-GMC workers the plugin sees
     # no nvidia-caps-imex-channels device major and disables itself locally.
@@ -59,6 +72,7 @@ controller:
 %{ if accounting_enabled ~}
     AccountingStorageEnforce: associations,limits,qos
     AccountingStorageTRES: gres/gpu
+    JobAcctGatherType: jobacct_gather/cgroup
 %{ endif ~}
   podSpec:
     nodeSelector:
@@ -149,6 +163,30 @@ configFiles:
     ConstrainRAMSpace=no
     ConstrainDevices=yes
     ConstrainSwapSpace=no
+%{ if topology_enabled ~}
+  # Bootstrap skeleton so the Controller CR references the file from the first
+  # deploy; the oci-hpc-oke-utils controller regenerates this key in the
+  # deployed ConfigMap from RDMA locality labels.
+  topology.yaml: |
+    - topology: tree
+      cluster_default: ${topology_default == "tree" ? "true" : "false"}
+      tree:
+        switches:
+          - switch: root
+            children: none
+          - switch: none
+    - topology: block
+      cluster_default: ${topology_default == "block" ? "true" : "false"}
+      block:
+        block_sizes:
+          - 1
+        blocks:
+          - block: none
+            nodes: placeholder-node
+    - topology: flat
+      cluster_default: false
+      flat: true
+%{ endif ~}
 
 restapi:
   replicas: 1
@@ -225,19 +263,21 @@ loginsets:
     service:
       metadata:
         annotations:
-          oci.oraclecloud.com/load-balancer-type: "lb"
-          service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
-%{ if login_load_balancer_internal ~}
-          service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+          oci.oraclecloud.com/load-balancer-type: "nlb"
+          oci-network-load-balancer.oraclecloud.com/security-list-management-mode: "None"
+          oci.oraclecloud.com/ingress-ip-mode: "proxy"
+%{ if !login_load_balancer_internal ~}
+          oci-network-load-balancer.oraclecloud.com/external-ip-only: "true"
 %{ endif ~}
-          oci.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
+%{ if login_load_balancer_internal ~}
+          oci-network-load-balancer.oraclecloud.com/internal: "true"
+%{ endif ~}
+          oci-network-load-balancer.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
       spec:
         type: LoadBalancer
+        externalTrafficPolicy: Local
 
 nodesets:
-  slinky:
-    enabled: false
-
 ${worker_nodesets_yaml}
 %{ if cpu_nodeset_enabled ~}
 
@@ -259,13 +299,13 @@ ${worker_nodesets_yaml}
       image:
         repository: ${cpu_worker_image_repository}
         tag: ${cpu_worker_image_tag}
+%{ if node_name_from_kube_node ~}
       args:
+        # Slurm nodes are named after the Kubernetes node name (a hostname
+        # because the stack bootstraps kubelet with hostname-override).
         - -N
         - $(KUBE_NODE_NAME)
       env:
-        # Slurm nodes are named after the Kubernetes node (spec.nodeName). Set
-        # hostname_override=true on the stack so nodes register by hostname
-        # instead of private IP and Slurm node names stay clean.
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
@@ -277,6 +317,18 @@ ${worker_nodesets_yaml}
               - /usr/bin/sh
               - -c
               - scontrol update nodename="$${KUBE_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${KUBE_NODE_NAME}" || true
+%{ else ~}
+      # Kubernetes node names are IP addresses here; slurmd registers under the
+      # pod hostname, which the operator sets from the hostname-override node
+      # annotation written by the oci-hpc-oke-utils annotator.
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /usr/bin/sh
+              - -c
+              - scontrol update nodename="$(hostname)" state=down reason='Pod is terminating'; scontrol delete nodename="$(hostname)" || true
+%{ endif ~}
       volumeMounts:
         - name: shm
           mountPath: /dev/shm
@@ -305,6 +357,10 @@ ${cpu_worker_features_yaml}
         State: UP
         Default: "${cpu_partition_default}"
         MaxTime: UNLIMITED
+%{ if topology_enabled ~}
+        # CPU workers have no RDMA locality; keep them on the flat topology.
+        Topology: flat
+%{ endif ~}
     podSpec:
       hostNetwork: false
       dnsPolicy: ClusterFirst

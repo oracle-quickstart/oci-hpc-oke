@@ -468,9 +468,9 @@ variable "setup_credential_provider_for_ocir" {
 
 # OKE Cluster Setup - Advanced Options
 variable "hostname_override" {
-  default     = null
+  default     = false
   type        = bool
-  description = "Bootstrap worker nodes with kubelet --hostname-override. When unset, defaults to true for Slurm Operator deployments and false otherwise."
+  description = "Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Defaults to false: Slurm deployments get clean Slurm node names from the nodeset.slinky.slurm.net/hostname-override node annotation set by the oci-hpc-oke-utils annotator instead (requires the Slurm operator chart 1.2 or later)."
 }
 variable "disable_gpu_device_plugin" { default = false }
 
@@ -983,7 +983,7 @@ variable "slinky_slurm_namespace" {
 }
 
 variable "slinky_image_profile" {
-  default     = "25.11.6-ubuntu24.04"
+  default     = "26.05.1-ubuntu26.04"
   type        = string
   description = "Tested Slinky image profile used by auto chart and image tag settings."
 
@@ -1053,7 +1053,7 @@ variable "slinky_worker_mount_infiniband" {
 variable "slinky_worker_ssh_enabled" {
   default     = true
   type        = bool
-  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because Slinky chart 1.1.1 couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
+  description = "Enable sshd in Slinky slurmd pods. Required when slinky_identity_enabled=true because the Slinky slurm chart couples worker SSSD configuration to SSH. When hostNetwork is enabled, sshd listens on port 2222 to avoid conflict with the node sshd."
 }
 
 variable "slinky_worker_replicas" {
@@ -1280,25 +1280,67 @@ variable "slinky_sssd_image_tag" {
 variable "slinky_nodeset_name" {
   default     = "gpu"
   type        = string
-  description = "Slinky NodeSet and partition name used for the standard GPU worker pool."
+  description = "Slinky NodeSet and partition name used for the standard GPU worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_rdma_nodeset_name" {
   default     = "rdma"
   type        = string
-  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool."
+  description = "Slinky NodeSet and partition name used for the GPU with RDMA worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_gmc_nodeset_name" {
   default     = "gmc"
   type        = string
-  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured."
+  description = "Slinky NodeSet and partition name prefix used for GPU Memory Cluster fabrics. A fabric suffix is added when multiple fabrics are configured. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
+}
+
+variable "slinky_hostname_prefix_disabled" {
+  default     = false
+  type        = bool
+  description = "Disable prefix-based Slurm node naming. By default (false), the oci-hpc-oke-utils annotator writes the nodeset.slinky.slurm.net/hostname-override annotation as <prefix>-<host-bits>, where <prefix> is the pool's slinky_*_nodeset_name and <host-bits> is the integer host portion of the node's primary InternalIP within its subnet. Set to true to fall back to the node short hostname (the pre-prefix behavior). Toggling this or changing a slinky_*_nodeset_name only affects newly-provisioned nodes (the prefix rides on the OKE pool's initial_node_labels); existing nodes require pool reconciliation or a manual kubectl label update (see the Slurm Hostname Prefix docs in docs/oci-hpc-oke-utils.md)."
 }
 
 variable "slinky_default_partition" {
   default     = "auto"
   type        = string
   description = "Default Slinky partition. Use auto, gpu, rdma, gmc, cpu, all, or an exact generated partition name. With multiple GMC fabrics, gmc selects the aggregate <slinky_gmc_nodeset_name>-all partition. auto prefers GPU, then RDMA, GMC, and CPU."
+}
+
+variable "slinky_topology_enabled" {
+  default     = true
+  type        = bool
+  description = "Manage Slurm topology from OCI RDMA network locality. The oci-hpc-oke-utils annotator writes the topology.slinky.slurm.net/spec node annotation and its controller generates topology.yaml (tree, block, and flat topologies) from the rdma.* node labels. Requires install_oci_hpc_oke_utils, install_rdma_labeler, and at least one enabled Slurm worker pool; silently off without them. Nodes without locality labels share a synthetic none unit and stay schedulable."
+}
+
+variable "slinky_topology_default" {
+  default     = "tree"
+  type        = string
+  description = "Topology marked cluster_default in the generated topology.yaml. Partitions without an explicit Topology parameter use it. tree or block."
+
+  validation {
+    condition     = contains(["tree", "block"], var.slinky_topology_default)
+    error_message = "slinky_topology_default must be either 'tree' or 'block'."
+  }
+}
+
+variable "slinky_topology_block_sizes" {
+  default     = "auto"
+  type        = string
+  description = "block_sizes for the generated block topology. auto derives them from current local block populations (smallest block, doubling while the next size fits). Or a comma-separated list of positive integers where each successive value is a larger power-of-two multiple of the previous value, e.g. 8,16,32."
+
+  validation {
+    condition = var.slinky_topology_block_sizes == "auto" || try(
+      can(regex("^[1-9][0-9]*(,[1-9][0-9]*)*$", var.slinky_topology_block_sizes)) &&
+      alltrue([
+        for index in range(1, length(split(",", var.slinky_topology_block_sizes))) :
+        tonumber(split(",", var.slinky_topology_block_sizes)[index]) > tonumber(split(",", var.slinky_topology_block_sizes)[index - 1]) &&
+        log(tonumber(split(",", var.slinky_topology_block_sizes)[index]) / tonumber(split(",", var.slinky_topology_block_sizes)[index - 1]), 2) == floor(log(tonumber(split(",", var.slinky_topology_block_sizes)[index]) / tonumber(split(",", var.slinky_topology_block_sizes)[index - 1]), 2))
+      ]),
+      false,
+    )
+    error_message = "slinky_topology_block_sizes must be 'auto' or a comma-separated list of positive integers where each successive value is a larger power-of-two multiple of the previous value."
+  }
 }
 
 variable "slinky_cpu_worker_enabled" {
@@ -1310,7 +1352,7 @@ variable "slinky_cpu_worker_enabled" {
 variable "slinky_cpu_nodeset_name" {
   default     = "cpu"
   type        = string
-  description = "Slinky nodeset name used for the CPU Slurm worker pool."
+  description = "Slinky nodeset name used for the CPU Slurm worker pool. Also used as the default hostname prefix for this pool's Slurm node names (<prefix>-<host-bits>), unless slinky_hostname_prefix_disabled=true."
 }
 
 variable "slinky_cpu_worker_image_repository" {

@@ -1,8 +1,8 @@
 # Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink
 
-The [`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/) directory contains NCCL test manifests for various OCI GPU shapes. The GB200 and GB300 shapes use Dynamic Resource Allocation (DRA) to orchestrate Multi-Node NVLink (MNNVL). Other shapes (H100, H200, B200, B300, A100) do not, because MNNVL only applies to GB200/GB300 NVL systems.
+The [`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/) directory contains NCCL test manifests for various OCI GPU shapes. The Slurm Operator deployment also uses DRA for long-running GPU Memory Cluster workers.
 
-This guide explains what DRA pieces appear in those manifests, why they are there, and how to adapt them.
+This guide explains the DRA pieces used by both deployment paths, why they are there, and how to adapt them.
 
 ## When DRA is required
 
@@ -89,6 +89,73 @@ With `numNodes: 0`, pods are admitted as soon as their local IMEX daemon is up; 
 
 - **torchrun / PyTorch Elastic**: the built-in rendezvous already waits for all ranks to join before training starts. No extra wait loop needed.
 - **MPI with a built-in startup barrier** (for example, PMIx rendezvous): also covered by the launcher itself.
+
+## Slurm Operator integration
+
+The Slurm deployment keeps worker pods running instead of creating workers for
+each job. Terraform creates one `ComputeDomain` per GPU memory fabric in the
+Slurm namespace and sets `numNodes: 0` with channel allocation mode `All`:
+
+```yaml
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: gmc-imex-compute-domain
+  namespace: slurm
+spec:
+  numNodes: 0
+  channel:
+    allocationMode: All
+    resourceClaimTemplate:
+      name: gmc-imex-channel
+```
+
+The NVIDIA DRA driver creates the named `ResourceClaimTemplate`. The rendered
+Slurm Helm values then connect that template to both the worker pod and the
+`slurmd` container:
+
+```yaml
+nodesets:
+  gmc:
+    slurmd:
+      resources:
+        limits:
+          nvidia.com/gpu: 4
+        requests:
+          nvidia.com/gpu: 4
+        claims:
+          - name: imex-channel
+    podSpec:
+      hostNetwork: true
+      resourceClaims:
+        - name: imex-channel
+          resourceClaimTemplateName: gmc-imex-channel
+```
+
+With one fabric, the default NodeSet and partition names are both `gmc`. With
+multiple fabrics, each NodeSet and partition is named `gmc-<fabric-suffix>`, and
+each has its own `ComputeDomain` and claim template. The aggregate `gmc-all`
+partition can span fabrics over RDMA. An MNNVL test must use one fabric-specific
+partition so every worker is in the same `ComputeDomain`. All names use the
+configurable `slinky_gmc_nodeset_name` prefix.
+
+Verify the generated resources before submitting a Slurm job:
+
+```bash
+kubectl -n slurm get computedomain
+kubectl -n slurm get resourceclaimtemplates,resourceclaims -o wide
+kubectl -n dra-driver-nvidia-gpu get pods
+kubectl -n slurm get nodesets
+kubectl -n slurm get pods -o wide
+kubectl -n slurm exec deploy/slurm-login-slinky -- sinfo -Nel
+```
+
+Each `ComputeDomain` must report `Ready`, the DRA driver pods must be running,
+and the GMC worker pods must be ready before Slurm reports their nodes as idle.
+The shape-specific NCCL configuration is mounted at `/etc/nccl.conf` in each
+worker. Pyxis jobs must mount that file into their container. See
+[GMC on GB200 and GB300](running-nccl-rccl-tests-from-slurm-operator.md#gmc-on-gb200-and-gb300)
+for direct and Pyxis NCCL test scripts.
 
 ## Naming conventions used here
 

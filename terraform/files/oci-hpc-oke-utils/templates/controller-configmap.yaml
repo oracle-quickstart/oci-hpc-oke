@@ -1,4 +1,4 @@
-{{- if .Values.labeler.enabled }}
+{{- if or .Values.labeler.enabled .Values.topology.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -29,6 +29,7 @@ data:
     from kubernetes import client, config
 
     HEALTH_FILE = Path("/tmp/health/alive")
+    READY_FILE = Path("/tmp/health/ready")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -41,6 +42,14 @@ data:
     ACTIVE_MAINTENANCE_STATES = ("SCHEDULED", "IN_PROGRESS")
     FAULT_LABEL_PREFIX = "oci.oraclecloud.com/host.fault."
     MAINTENANCE_LABEL_PREFIX = "oci.oraclecloud.com/host.maintenance."
+    TOPOLOGY_HOSTNAME_ANNOTATION = "nodeset.slinky.slurm.net/hostname-override"
+    TOPOLOGY_CONFIGMAP_KEY = "topology.yaml"
+    RDMA_ISLAND_LABEL = "oci.oraclecloud.com/rdma.hpc_island_id"
+    RDMA_NETBLOCK_LABEL = "oci.oraclecloud.com/rdma.network_block_id"
+    RDMA_LOCALBLOCK_LABEL = "oci.oraclecloud.com/rdma.local_block_id"
+    TOPOLOGY_NONE_UNIT = "none"
+    TOPOLOGY_ROOT_SWITCH = "root"
+    TOPOLOGY_PLACEHOLDER_NODE = "placeholder-node"
 
 
     def _is_throttled(exc: Exception) -> bool:
@@ -115,7 +124,8 @@ data:
         return labels
 
 
-    def _get_firmware_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str, fw_cache: dict) -> dict[str, str]:
+    def _get_firmware_labels(compute_client: oci.core.ComputeClient, firmware_bundle_id: str, host_platform: str,
+                             fw_cache: dict) -> dict[str, str] | None:
         """Get firmware labels, using a cache to avoid duplicate API calls for the same bundle."""
         if firmware_bundle_id in fw_cache:
             return fw_cache[firmware_bundle_id]
@@ -124,7 +134,7 @@ data:
             bundle = _oci_call_with_backoff(compute_client.get_firmware_bundle, firmware_bundle_id=firmware_bundle_id).data
         except Exception:
             log.exception("Failed to get firmware bundle %s", firmware_bundle_id)
-            return {}  # Don't cache failures -- retry next cycle
+            return None  # Don't cache failures; retry next cycle.
 
         labels = {}
         if bundle.description:
@@ -239,7 +249,7 @@ data:
             return False
 
 
-    def _apply_maintenance_condition(v1: client.CoreV1Api, node_name: str, conditions: list[dict]):
+    def _apply_maintenance_condition(v1: client.CoreV1Api, node_name: str, conditions: list[dict]) -> bool:
         """Set or clear the MaintenanceFault node condition."""
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -248,7 +258,7 @@ data:
             existing_conditions = node.status.conditions or []
         except Exception:
             log.exception("Failed to read node status for %s", node_name)
-            return
+            return False
 
         has_existing = any(c.type == MAINTENANCE_CONDITION_TYPE for c in existing_conditions)
 
@@ -283,6 +293,7 @@ data:
                 v1.patch_node_status(node_name, {"status": {"conditions": [new_condition]}})
             except Exception:
                 log.exception("Failed to set maintenance condition on %s", node_name)
+                return False
 
         elif has_existing:
             currently_true = any(c.type == MAINTENANCE_CONDITION_TYPE and c.status == "True" for c in existing_conditions)
@@ -296,24 +307,168 @@ data:
                     log.info("Cleared MaintenanceFault condition on %s", node_name)
                 except Exception:
                     log.exception("Failed to clear maintenance condition on %s", node_name)
+                    return False
+
+        return True
+
+
+    def _topology_valid(value: str) -> bool:
+        return bool(value) and value != "no-imds-data"
+
+
+    def _collect_topology_entries(v1: client.CoreV1Api, worker_pools: list[str]) -> list[dict]:
+        selector = "oke.oraclecloud.com/pool.name in (" + ",".join(worker_pools) + ")"
+        entries = []
+        for node in v1.list_node(label_selector=selector).items:
+            labels = node.metadata.labels or {}
+            annotations = node.metadata.annotations or {}
+            island = labels.get(RDMA_ISLAND_LABEL, "")
+            netblock = labels.get(RDMA_NETBLOCK_LABEL, "")
+            localblock = labels.get(RDMA_LOCALBLOCK_LABEL, "")
+            # Nodes without full locality data share the synthetic none unit.
+            if not (_topology_valid(island) and _topology_valid(netblock) and _topology_valid(localblock)):
+                island = netblock = localblock = TOPOLOGY_NONE_UNIT
+            entries.append({
+                "name": annotations.get(TOPOLOGY_HOSTNAME_ANNOTATION) or node.metadata.name,
+                "island": island,
+                "netblock": netblock,
+                "localblock": localblock,
+            })
+        return entries
+
+
+    def _hostlist(names) -> str:
+        return ",".join(sorted(set(names)))
+
+
+    def _block_sizes(blocks: dict[str, list[str]], conf: str) -> list[int]:
+        if conf and conf != "auto":
+            return [int(part) for part in conf.split(",")]
+        real = [len(nodes) for nodes in blocks.values()]
+        if not real:
+            return [1]
+        sizes = [min(real)]
+        total = sum(real)
+        while sizes[-1] * 2 <= total:
+            sizes.append(sizes[-1] * 2)
+        return sizes
+
+
+    def _render_topology_yaml(entries: list[dict], default_topology: str, block_sizes_conf: str) -> str:
+        labeled = [e for e in entries if e["localblock"] != TOPOLOGY_NONE_UNIT]
+        unlabeled = [e for e in entries if e["localblock"] == TOPOLOGY_NONE_UNIT]
+
+        tree: dict[str, dict[str, dict[str, list[str]]]] = {}
+        for e in labeled:
+            tree.setdefault(e["island"], {}).setdefault(e["netblock"], {}).setdefault(e["localblock"], []).append(e["name"])
+
+        blocks: dict[str, list[str]] = {}
+        for e in labeled:
+            blocks.setdefault(e["localblock"], []).append(e["name"])
+
+        lines = ["# Generated by oci-hpc-oke-utils; manual edits are overwritten."]
+
+        lines.append("- topology: tree")
+        lines.append(f"  cluster_default: {'true' if default_topology == 'tree' else 'false'}")
+        lines.append("  tree:")
+        lines.append("    switches:")
+        # A single root keeps the tree connected; Slurm otherwise warns that
+        # no switch reaches all nodes through its descendants.
+        root_children = [f"isl-{island}" for island in sorted(tree)]
+        if unlabeled or not labeled:
+            root_children.append(TOPOLOGY_NONE_UNIT)
+        lines.append(f"      - switch: {TOPOLOGY_ROOT_SWITCH}")
+        lines.append(f"        children: {','.join(root_children)}")
+        for island in sorted(tree):
+            lines.append(f"      - switch: isl-{island}")
+            lines.append(f"        children: {','.join('nb-' + n for n in sorted(tree[island]))}")
+        for island in sorted(tree):
+            for netblock in sorted(tree[island]):
+                lines.append(f"      - switch: nb-{netblock}")
+                lines.append(f"        children: {','.join('lb-' + l for l in sorted(tree[island][netblock]))}")
+        for island in sorted(tree):
+            for netblock in sorted(tree[island]):
+                for localblock in sorted(tree[island][netblock]):
+                    lines.append(f"      - switch: lb-{localblock}")
+                    lines.append(f"        nodes: {_hostlist(tree[island][netblock][localblock])}")
+        # A bare switch is valid; only declare nodes when unlabeled workers exist.
+        if unlabeled:
+            lines.append(f"      - switch: {TOPOLOGY_NONE_UNIT}")
+            lines.append(f"        nodes: {_hostlist([e['name'] for e in unlabeled])}")
+        elif not labeled:
+            lines.append(f"      - switch: {TOPOLOGY_NONE_UNIT}")
+
+        lines.append("- topology: block")
+        lines.append(f"  cluster_default: {'true' if default_topology == 'block' else 'false'}")
+        lines.append("  block:")
+        lines.append("    block_sizes:")
+        # Slurm requires every block to contain at least the base block size,
+        # so include the synthetic none block whenever it is emitted.
+        sizing_blocks = dict(blocks)
+        if unlabeled:
+            sizing_blocks[TOPOLOGY_NONE_UNIT] = [e["name"] for e in unlabeled]
+        for size in _block_sizes(sizing_blocks, block_sizes_conf):
+            lines.append(f"      - {size}")
+        lines.append("    blocks:")
+        for name in sorted(blocks):
+            lines.append(f"      - block: lb-{name}")
+            lines.append(f"        nodes: {_hostlist(blocks[name])}")
+        none_nodes = _hostlist([e["name"] for e in unlabeled]) or TOPOLOGY_PLACEHOLDER_NODE
+        if unlabeled or not blocks:
+            lines.append(f"      - block: {TOPOLOGY_NONE_UNIT}")
+            lines.append(f"        nodes: {none_nodes}")
+
+        lines.append("- topology: flat")
+        lines.append("  cluster_default: false")
+        lines.append("  flat: true")
+
+        return "\n".join(lines) + "\n"
+
+
+    def _sync_topology(v1: client.CoreV1Api, namespace: str, name: str,
+                       default_topology: str, block_sizes_conf: str, worker_pools: list[str]) -> bool:
+        # An empty pool list would render an invalid label selector.
+        if not worker_pools:
+            log.warning("No topology worker pools configured, skipping topology sync")
+            return False
+        entries = _collect_topology_entries(v1, worker_pools)
+        content = _render_topology_yaml(entries, default_topology, block_sizes_conf)
+        try:
+            cm = v1.read_namespaced_config_map(name, namespace)
+        except client.exceptions.ApiException as exc:
+            # The slurm chart owns this ConfigMap; without it there is no cluster.
+            if exc.status == 404:
+                log.info("Topology ConfigMap %s/%s not found, skipping", namespace, name)
+                return True
+            raise
+        if (cm.data or {}).get(TOPOLOGY_CONFIGMAP_KEY) == content:
+            return True
+        v1.patch_namespaced_config_map(name, namespace, {"data": {TOPOLOGY_CONFIGMAP_KEY: content}})
+        log.info("Updated %s in %s/%s (%d nodes)", TOPOLOGY_CONFIGMAP_KEY, namespace, name, len(entries))
+        return True
 
 
     def main():
+        READY_FILE.unlink(missing_ok=True)
         config.load_incluster_config()
         v1 = client.CoreV1Api()
 
         interval = int(os.environ.get("CONTROLLER_INTERVAL", "900"))
         node_selector = os.environ.get("NODE_SELECTOR", "")
 
-        try:
-            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-            compute_client = oci.core.ComputeClient(config={}, signer=signer)
-            tenant_id = signer.tenancy_id
-        except Exception:
-            log.exception("Failed to create OCI ComputeClient")
-            return
+        oci_labels_enabled = os.environ.get("OCI_LABELS_ENABLED", "true").lower() == "true"
+        topology_enabled = os.environ.get("TOPOLOGY_ENABLED", "false").lower() == "true"
+        topology_namespace = os.environ.get("TOPOLOGY_SLURM_NAMESPACE", "slurm")
+        topology_configmap = os.environ.get("TOPOLOGY_CONFIGMAP_NAME", "slurm-config-extra")
+        topology_default = os.environ.get("TOPOLOGY_DEFAULT", "tree")
+        topology_block_sizes = os.environ.get("TOPOLOGY_BLOCK_SIZES", "auto")
+        topology_pools = [p for p in os.environ.get("TOPOLOGY_WORKER_POOLS", "").split(",") if p]
+        topology_interval = int(os.environ.get("TOPOLOGY_INTERVAL", "120"))
 
-        log.info("Controller started | Interval: %ds | Tenant: %s", interval, tenant_id[-11:])
+        compute_client = None
+
+        log.info("Controller started | Interval: %ds | OCI labels: %s | Topology: %s",
+                 interval, oci_labels_enabled, topology_enabled)
 
         # Track previous state to skip unchanged nodes
         prev_state: dict[str, tuple] = {}
@@ -322,116 +477,158 @@ data:
         cycle_count = 0
         FW_CACHE_TTL_CYCLES = 24  # Clear firmware cache every 24 cycles (~6 hours at 900s interval)
 
+        # The loop ticks at the topology cadence; the OCI label refresh keeps
+        # its own longer interval via next_labels_due.
+        loop_interval = min(interval, topology_interval) if topology_enabled else interval
+
+        next_labels_due = time.monotonic()
+        # Reconciliation failures retry asynchronously and must not block Helm.
+        READY_FILE.touch()
         while True:
-            cycle_count += 1
-            if cycle_count % FW_CACHE_TTL_CYCLES == 0:
-                fw_cache.clear()
-                prev_state.clear()
-                log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
-            try:
-                # Get all GPU nodes
-                nodes = v1.list_node(label_selector=node_selector).items
-                node_map = {}  # node_name -> (instance_id, compartment_id, existing_labels)
-                for node in nodes:
-                    node_name = node.metadata.name
-                    # Instance ID from OKE provider ID (oci://<ocid> or bare <ocid>)
-                    provider_id = (node.spec.provider_id or "").removeprefix("oci://")
-                    compartment_id = (node.metadata.annotations or {}).get("oci.oraclecloud.com/compartment-id", "")
-                    if provider_id.startswith("ocid1.instance.") and compartment_id:
-                        existing_labels = node.metadata.labels or {}
-                        node_map[node_name] = (provider_id, compartment_id, existing_labels)
-
-                log.info("Found %d GPU nodes (%d with instance IDs)", len(nodes), len(node_map))
-
-                # List all compute hosts once
-                all_hosts = _list_all_compute_hosts(compute_client, tenant_id)
-                log.info("Listed %d compute hosts", len(all_hosts))
-
-                # Build instance_id -> host summary mapping
-                host_by_instance: dict[str, object] = {}
-                for h in all_hosts:
-                    if h.instance_id:
-                        host_by_instance[h.instance_id] = h
-
-                skipped = 0
-                processed = 0
-
-                # Process each node
-                for node_name, (instance_id, compartment_id, existing_labels) in node_map.items():
-                    host_summary = host_by_instance.get(instance_id)
-                    if not host_summary:
-                        continue
-
-                    # Check if this node's state changed since last cycle
-                    current_state = (
-                        host_summary.health,
-                        host_summary.lifecycle_state,
-                        host_summary.has_impacted_components,
-                    )
-                    has_host_labels = "oci.oraclecloud.com/host.platform" in existing_labels
-                    has_fw_labels = "oci.oraclecloud.com/host.fw.bundle_version" in existing_labels
-                    has_maint_labels = any(k.startswith("oci.oraclecloud.com/host.maintenance.") for k in existing_labels)
-
-                    # Skip expensive API calls if node is stable:
-                    # - State unchanged from last cycle
-                    # - Already has host and firmware labels
-                    # - No impacted components
-                    # - No active maintenance labels to clear
-                    prev = prev_state.get(node_name)
-                    if (prev == current_state
-                            and has_host_labels
-                            and has_fw_labels
-                            and not host_summary.has_impacted_components
-                            and not has_maint_labels):
-                        skipped += 1
-                        continue
-
-                    # Get full host details
+            if oci_labels_enabled and time.monotonic() >= next_labels_due:
+                if compute_client is None:
                     try:
-                        host = _oci_call_with_backoff(compute_client.get_compute_hosts, compute_host_id=host_summary.id).data
+                        signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+                        # Read tenant_id first: compute_client being set is the
+                        # "ready" signal, so it must be assigned last.
+                        tenant_id = signer.tenancy_id
+                        compute_client = oci.core.ComputeClient(config={}, signer=signer)
+                        log.info("OCI ComputeClient ready | Tenant: %s", tenant_id[-11:])
                     except Exception:
-                        log.exception("Failed to get compute host for node %s", node_name)
-                        continue
+                        # Transient IMDS/IAM failures must not disable labels
+                        # forever; retry on the next label cycle.
+                        log.exception("Failed to create OCI ComputeClient, retrying next cycle")
+                        next_labels_due = time.monotonic() + interval
+                if compute_client is not None and time.monotonic() >= next_labels_due:
+                    cycle_ok = True
+                    cycle_count += 1
+                    if cycle_count % FW_CACHE_TTL_CYCLES == 0:
+                        fw_cache.clear()
+                        prev_state.clear()
+                        log.info("Cleared firmware and state caches (cycle %d)", cycle_count)
+                    try:
+                        # Get all GPU nodes
+                        nodes = v1.list_node(label_selector=node_selector).items
+                        node_map = {}  # node_name -> (instance_id, compartment_id, existing_labels)
+                        for node in nodes:
+                            node_name = node.metadata.name
+                            # Instance ID from OKE provider ID (oci://<ocid> or bare <ocid>)
+                            provider_id = (node.spec.provider_id or "").removeprefix("oci://")
+                            compartment_id = (node.metadata.annotations or {}).get("oci.oraclecloud.com/compartment-id", "")
+                            if provider_id.startswith("ocid1.instance.") and compartment_id:
+                                existing_labels = node.metadata.labels or {}
+                                node_map[node_name] = (provider_id, compartment_id, existing_labels)
 
-                    # Build labels
-                    labels = _get_host_labels(host, host_summary.has_impacted_components)
+                        log.info("Found %d GPU nodes (%d with instance IDs)", len(nodes), len(node_map))
 
-                    # Firmware labels (cached per bundle ID)
-                    if host.firmware_bundle_id:
-                        fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
-                        labels.update(fw_labels)
+                        # List all compute hosts once
+                        all_hosts = _list_all_compute_hosts(compute_client, tenant_id)
+                        log.info("Listed %d compute hosts", len(all_hosts))
 
-                    # Maintenance: only query if node has impacted components or existing maintenance labels
-                    maint_result = None  # None = not queried or API failed
-                    if host_summary.has_impacted_components or has_maint_labels:
-                        maint_result = _get_maintenance_labels_and_conditions(
-                            compute_client, instance_id, compartment_id)
-                        if maint_result is not None:
-                            maint_labels, maint_conditions = maint_result
-                            labels.update(maint_labels)
+                        # Build instance_id -> host summary mapping
+                        host_by_instance: dict[str, object] = {}
+                        for h in all_hosts:
+                            if h.instance_id:
+                                host_by_instance[h.instance_id] = h
 
-                    # Always clean fault labels (based on host data already fetched)
-                    # Only clean maintenance labels when maintenance API succeeded
-                    patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
-                                                   clean_faults=True, clean_maintenance=maint_result is not None)
+                        skipped = 0
+                        processed = 0
 
-                    # Only reconcile maintenance condition when we got a definitive answer
-                    if maint_result is not None:
-                        _apply_maintenance_condition(v1, node_name, maint_result[1])
+                        # Process each node
+                        for node_name, (instance_id, compartment_id, existing_labels) in node_map.items():
+                            host_summary = host_by_instance.get(instance_id)
+                            if not host_summary:
+                                continue
 
-                    # Update cached state only after successful label patch
-                    if patch_ok:
-                        prev_state[node_name] = current_state
-                    processed += 1
+                            # Check if this node's state changed since last cycle
+                            current_state = (
+                                host_summary.health,
+                                host_summary.lifecycle_state,
+                                host_summary.has_impacted_components,
+                            )
+                            has_host_labels = "oci.oraclecloud.com/host.platform" in existing_labels
+                            has_fw_labels = "oci.oraclecloud.com/host.fw.bundle_version" in existing_labels
+                            has_maint_labels = any(k.startswith("oci.oraclecloud.com/host.maintenance.") for k in existing_labels)
 
-                log.info("Cycle complete: processed %d, skipped %d stable, %d firmware bundles cached",
-                         processed, skipped, len(fw_cache))
+                            # Skip expensive API calls if node is stable:
+                            # - State unchanged from last cycle
+                            # - Already has host and firmware labels
+                            # - No impacted components
+                            # - No active maintenance labels to clear
+                            prev = prev_state.get(node_name)
+                            if (prev == current_state
+                                    and has_host_labels
+                                    and has_fw_labels
+                                    and not host_summary.has_impacted_components
+                                    and not has_maint_labels):
+                                skipped += 1
+                                continue
 
-            except Exception:
-                log.exception("Controller cycle failed")
+                            # Get full host details
+                            try:
+                                host = _oci_call_with_backoff(compute_client.get_compute_host, compute_host_id=host_summary.id).data
+                            except Exception:
+                                log.exception("Failed to get compute host for node %s", node_name)
+                                cycle_ok = False
+                                continue
+
+                            # Build labels
+                            labels = _get_host_labels(host, host_summary.has_impacted_components)
+
+                            # Firmware labels (cached per bundle ID)
+                            if host.firmware_bundle_id:
+                                fw_labels = _get_firmware_labels(compute_client, host.firmware_bundle_id, host.platform or "", fw_cache)
+                                if fw_labels is None:
+                                    cycle_ok = False
+                                else:
+                                    labels.update(fw_labels)
+
+                            # Maintenance: only query if node has impacted components or existing maintenance labels
+                            maint_result = None  # None = not queried or API failed
+                            if host_summary.has_impacted_components or has_maint_labels:
+                                maint_result = _get_maintenance_labels_and_conditions(
+                                    compute_client, instance_id, compartment_id)
+                                if maint_result is not None:
+                                    maint_labels, maint_conditions = maint_result
+                                    labels.update(maint_labels)
+                                else:
+                                    cycle_ok = False
+
+                            # Always clean fault labels (based on host data already fetched)
+                            # Only clean maintenance labels when maintenance API succeeded
+                            patch_ok = _apply_node_labels(v1, node_name, labels, existing_labels,
+                                                           clean_faults=True, clean_maintenance=maint_result is not None)
+                            if not patch_ok:
+                                cycle_ok = False
+
+                            # Only reconcile maintenance condition when we got a definitive answer
+                            if maint_result is not None and not _apply_maintenance_condition(v1, node_name, maint_result[1]):
+                                cycle_ok = False
+
+                            # Update cached state only after successful label patch
+                            if patch_ok:
+                                prev_state[node_name] = current_state
+                            processed += 1
+
+                        log.info("Cycle complete: processed %d, skipped %d stable, %d firmware bundles cached",
+                                 processed, skipped, len(fw_cache))
+
+                    except Exception:
+                        log.exception("Controller cycle failed")
+                        cycle_ok = False
+                    if not cycle_ok:
+                        log.warning("OCI label cycle incomplete; retrying next cycle")
+                    next_labels_due = time.monotonic() + interval
+
+            if topology_enabled:
+                try:
+                    _sync_topology(v1, topology_namespace, topology_configmap,
+                                   topology_default, topology_block_sizes, topology_pools)
+                except Exception:
+                    log.exception("Topology sync failed")
 
             HEALTH_FILE.touch()
-            time.sleep(interval)
+            time.sleep(loop_interval)
 
 
     if __name__ == "__main__":

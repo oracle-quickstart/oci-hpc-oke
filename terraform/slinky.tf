@@ -11,6 +11,41 @@ locals {
     ]),
   ])
 
+  # When worker nodes keep their IP node names (hostname_override=false), the
+  # oci-hpc-oke-utils annotator writes the slurm-operator 1.2
+  # nodeset.slinky.slurm.net/hostname-override node annotation so Slurm node
+  # names stay clean hostnames. Only worker NodeSets consume the annotation,
+  # so controller-only deployments skip the annotator entirely.
+  slinky_hostname_annotator_enabled = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    !local.hostname_override_effective,
+    anytrue([
+      var.worker_gpu_enabled,
+      var.worker_rdma_enabled,
+      var.worker_gmc_enabled,
+      local.slinky_cpu_nodeset_enabled,
+    ]),
+  ])
+
+  # Slurm topology management from RDMA locality. Needs the utils chart for
+  # the annotator and generator, the labeler for the rdma.* labels the
+  # generator reads, and at least one worker NodeSet to place; silently off
+  # without them.
+  slinky_topology_enabled = alltrue([
+    var.install_slinky,
+    var.slinky_install_slurm_cluster,
+    var.slinky_topology_enabled,
+    var.install_rdma_labeler,
+    var.install_oci_hpc_oke_utils,
+    anytrue([
+      var.worker_gpu_enabled,
+      var.worker_rdma_enabled,
+      var.worker_gmc_enabled,
+      local.slinky_cpu_nodeset_enabled,
+    ]),
+  ])
+
   slinky_amd_shapes = [
     "BM.GPU.MI300X.8",
     "BM.GPU.MI355X-v1.8",
@@ -29,12 +64,19 @@ locals {
   # one GPU vendor per Slurm cluster. validation.tf rejects mixed vendors.
   slinky_is_amd         = try(one(local.slinky_enabled_worker_vendors), "nvidia") == "amd"
   slinky_gpu_autodetect = var.slinky_gpu_autodetect == "auto" ? (local.slinky_is_amd ? "rsmi" : "nvml") : var.slinky_gpu_autodetect
-  slinky_openldap_dc    = split(".", var.slinky_openldap_domain)[0]
+  # Per-pool Slurm hostname prefixes. Equal to the nodeset name by default;
+  # distinct locals decouple the prefix from the nodeset/partition name so the
+  # annotator's prefix source can evolve without touching every callsite.
+  slinky_gpu_hostname_prefix  = var.slinky_nodeset_name
+  slinky_rdma_hostname_prefix = var.slinky_rdma_nodeset_name
+  slinky_gmc_hostname_prefix  = var.slinky_gmc_nodeset_name
+  slinky_cpu_hostname_prefix  = var.slinky_cpu_nodeset_name
+  slinky_openldap_dc          = split(".", var.slinky_openldap_domain)[0]
 
   slinky_image_profiles = {
     "25.11.6-ubuntu24.04" = {
-      operator_chart_version = "1.1.1"
-      slurm_chart_version    = "1.1.1"
+      operator_chart_version = "1.2.0"
+      slurm_chart_version    = "1.2.0"
       # Custom slurmdbd/slurmrestd/login (SSSD) built from upstream source into
       # our registry (build-control-plane-images.sh), so the whole stack comes
       # from one registry.
@@ -53,8 +95,8 @@ locals {
       amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
-      operator_chart_version      = "1.1.1"
-      slurm_chart_version         = "1.1.1"
+      operator_chart_version      = "1.2.0"
+      slurm_chart_version         = "1.2.0"
       accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
       accounting_image_tag        = "26.05-ubuntu24.04"
       restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
@@ -67,18 +109,21 @@ locals {
       amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
-      operator_chart_version      = "1.1.1"
-      slurm_chart_version         = "1.1.1"
-      accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
-      accounting_image_tag        = "26.05-ubuntu24.04"
-      restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
-      restapi_image_tag           = "26.05-ubuntu24.04"
-      sssd_image_repository       = "ghcr.io/slinkyproject/login"
-      sssd_image_tag              = "26.05-ubuntu24.04"
-      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-06-16.1"
-      login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-06-16.1"
-      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-06-16.2"
-      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-06-16.1"
+      operator_chart_version = "1.2.0"
+      slurm_chart_version    = "1.2.0"
+      # Whole stack rebuilt from the latest SlinkyProject/containers source
+      # into our registry (see slurm-source/README.md for the pinned ref),
+      # same one-registry layout as the 25.11.6 profile.
+      accounting_image_repository = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      accounting_image_tag        = "slurmdbd-26.05.1-ubuntu26.04-2026-07-02.0"
+      restapi_image_repository    = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      restapi_image_tag           = "slurmrestd-26.05.1-ubuntu26.04-2026-07-02.0"
+      sssd_image_repository       = "iad.ocir.io/idxzjcdglx2s/slurm-operator"
+      sssd_image_tag              = "login-26.05.1-ubuntu26.04-2026-07-02.0"
+      controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-07-02.0"
+      login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
+      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
+      amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-07-02.0"
     }
   }
 
@@ -97,19 +142,20 @@ locals {
   slinky_sssd_image_repository       = var.slinky_sssd_image_repository == "auto" ? local.slinky_image_profile.sssd_image_repository : var.slinky_sssd_image_repository
 
   # Operator + webhook images custom-built from SlinkyProject/slurm-operator
-  # v1.1.1 into our registry (build-control-plane-images.sh). Merged into the
-  # operator Helm values so the operator pods also come from our registry.
+  # into our registry (build-control-plane-images.sh); their tag tracks the
+  # operator chart version. Merged into the operator Helm values so the
+  # operator pods also come from our registry.
   slinky_operator_generated_values = <<-EOT
     certManager:
       enabled: ${var.slinky_operator_cert_manager_enabled}
     operator:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator
-        tag: "1.1.1"
+        tag: "${local.slinky_operator_chart_version}"
     webhook:
       image:
         repository: iad.ocir.io/idxzjcdglx2s/slurm-operator-webhook
-        tag: "1.1.1"
+        tag: "${local.slinky_operator_chart_version}"
   EOT
 
   slinky_worker_image_tag = var.slinky_worker_image_tag == "auto" ? (
@@ -208,7 +254,7 @@ locals {
       rdma_networks       = ""
       slurmd_parameters   = local.slinky_gpu_numa_topology_enabled ? "numa_node_as_socket" : ""
       numa_topology       = local.slinky_gpu_numa_topology_enabled
-      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_gpu_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_gpu_is_amd ? ["amd", "rocm"] : ["nvidia"])))
+      features            = distinct(compact(concat([var.worker_gpu_shape], local.slinky_gpu_is_amd ? ["amd", "rocm"] : ["nvidia"])))
       imex_claim_template = ""
     }
   } : {}
@@ -230,7 +276,7 @@ locals {
       rdma_networks       = local.slinky_rdma_networks_annotation
       slurmd_parameters   = local.slinky_rdma_numa_topology_enabled ? "numa_node_as_socket" : ""
       numa_topology       = local.slinky_rdma_numa_topology_enabled
-      features            = distinct(compact(concat([lower(replace(replace(replace(var.worker_rdma_shape, "BM.GPU.", ""), ".", "-"), "_", "-"))], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
+      features            = distinct(compact(concat([var.worker_rdma_shape], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
       imex_claim_template = ""
     }
   } : {}
@@ -252,7 +298,7 @@ locals {
       rdma_networks       = ""
       slurmd_parameters   = ""
       numa_topology       = false
-      features            = [lower(replace(replace(replace(var.worker_gmc_shape, "BM.GPU.", ""), ".", "-"), "_", "-")), "nvidia", "rdma", "gmc", "imex", "hostnetwork"]
+      features            = [var.worker_gmc_shape, "nvidia", "rdma", "gmc", "imex", "hostnetwork"]
       imex_claim_template = "${nodeset_name}-imex-channel"
     }
   } : {}
@@ -291,10 +337,9 @@ locals {
   slinky_cpu_worker_image_tag        = var.slinky_cpu_worker_image_tag == "auto" ? local.slinky_worker_image_tag : var.slinky_cpu_worker_image_tag
 
   # The operator adds the nodeset name itself as a feature, so "cpu" is
-  # already present and only the shape slug is needed here.
-  slinky_cpu_worker_features = distinct(compact([
-    lower(replace(replace(var.worker_cpu_shape, ".", "-"), "_", "-")),
-  ]))
+  # already present and only the shape name is needed here. Slurm accepts
+  # dotted feature names, so the OCI shape name is used verbatim.
+  slinky_cpu_worker_features = distinct(compact([var.worker_cpu_shape]))
 
   slinky_readonly_replica_dns_names = join("\n", [
     for i in range(var.slinky_openldap_readonly_replicas) :

@@ -8,7 +8,8 @@ metadata:
     {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
     app.kubernetes.io/component: labeler
 spec:
-  maxUnavailable: "25%"
+  # DaemonSets have no scale subresource, so use an integer minAvailable.
+  minAvailable: 1
   selector:
     matchLabels:
       {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}

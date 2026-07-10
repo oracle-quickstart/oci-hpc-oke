@@ -194,22 +194,46 @@ locals {
     if length(lookup(local.nccl_rccl_parameters, shape, {})) > 0
   }
 
-  nccl_rccl_configmaps = {
+  # Same per-shape parameters, with the VF NCCL_IB_HCA override applied, ready
+  # to render into the single nccl.conf file below.
+  nccl_rccl_configmap_effective_params = {
     for shape, params in local.nccl_rccl_configmap_shape_params :
-    shape => {
+    shape => merge(
+      params,
+      alltrue([
+        local.deploy_nvidia_network_operator_manifests,
+        contains(local.nvidia_network_operator_sriov_shapes, shape),
+      ]) ? { NCCL_IB_HCA = "mlx5" } : {},
+    )
+  }
+
+  # Worker NodeSets mount the ConfigMap as a volume, which (like envFrom) can
+  # only reference a ConfigMap in the pod's own namespace.
+  nccl_rccl_configmap_namespaces = distinct(concat(
+    ["default"],
+    alltrue([local.slinky_deploy_from_operator, var.slinky_install_slurm_cluster]) ? [var.slinky_slurm_namespace] : [],
+  ))
+
+  # Default-namespace entries keep the bare shape key: existing state already
+  # uses it, and a key change would destroy and recreate the same ConfigMap
+  # from two unordered resource addresses.
+  nccl_rccl_configmaps = {
+    for pair in setproduct(keys(local.nccl_rccl_configmap_shape_params), local.nccl_rccl_configmap_namespaces) :
+    (pair[1] == "default" ? pair[0] : "${pair[0]}|${pair[1]}") => {
       name = format(
         "oci-%s-parameters-%s",
-        contains(local.amd_gpu_plugin_shapes, shape) ? "rccl" : "nccl",
-        lower(replace(shape, ".", "-")),
+        contains(local.amd_gpu_plugin_shapes, pair[0]) ? "rccl" : "nccl",
+        lower(replace(pair[0], ".", "-")),
       )
-      namespace = "default"
-      data = merge(
-        params,
-        alltrue([
-          local.deploy_nvidia_network_operator_manifests,
-          contains(local.nvidia_network_operator_sriov_shapes, shape),
-        ]) ? { NCCL_IB_HCA = "mlx5" } : {},
-      )
+      namespace = pair[1]
+      data = {
+        # NCCL and RCCL read /etc/nccl.conf at init; environment variables
+        # still override anything set here.
+        "nccl.conf" = join("\n", [
+          for k in sort(keys(local.nccl_rccl_configmap_effective_params[pair[0]])) :
+          "${k}=${local.nccl_rccl_configmap_effective_params[pair[0]][k]}"
+        ])
+      }
     }
   }
 
@@ -219,8 +243,8 @@ locals {
   ])
 
   nccl_rccl_configmap_manifests = {
-    for shape, configmap in local.nccl_rccl_configmaps :
-    shape => yamlencode({
+    for key, configmap in local.nccl_rccl_configmaps :
+    key => yamlencode({
       apiVersion = "v1"
       kind       = "ConfigMap"
       metadata = {
@@ -233,7 +257,9 @@ locals {
 }
 
 resource "kubectl_manifest" "nccl_rccl_configmap" {
-  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? local.nccl_rccl_configmap_manifests : {}
+  # Slurm-namespace copies always go through the operator path, which ensures
+  # the namespace exists; Slinky requires the operator anyway.
+  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_local || local.deploy_from_orm]) ? { for k, m in local.nccl_rccl_configmap_manifests : k => m if local.nccl_rccl_configmaps[k].namespace == "default" } : {}
 
   yaml_body         = each.value
   server_side_apply = true

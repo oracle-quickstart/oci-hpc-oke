@@ -47,6 +47,8 @@ variableGroups:
       - oke_pre_bootstrap_script
       - oke_post_bootstrap_script
       - oke_kubelet_extra_args
+      # Slinky hostname prefix (internal toggle; default behavior uses the prefix)
+      - slinky_hostname_prefix_disabled
       # Node cycling (per pool)
       - worker_ops_node_cycling_enabled
       - worker_ops_node_cycling_max_surge
@@ -374,6 +376,9 @@ variableGroups:
       - slinky_rdma_nodeset_name
       - slinky_gmc_nodeset_name
       - slinky_default_partition
+      - slinky_topology_enabled
+      - slinky_topology_default
+      - slinky_topology_block_sizes
       - slinky_cpu_worker_enabled
       - slinky_cpu_nodeset_name
       - slinky_cpu_worker_image_repository
@@ -2417,9 +2422,9 @@ variables:
     visible: ${install_slinky}
   hostname_override:
     title: Use hostnames instead of IP addresses as OKE worker node names
-    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. Enable this for Slurm deployments so Slurm node names are stable hostnames instead of private IP addresses.
+    description: Bootstrap worker nodes with kubelet --hostname-override so they register in Kubernetes by hostname instead of private IP address. When disabled for Slurm deployments, the oci-hpc-oke-utils annotator keeps Slurm node names on hostnames through the Slurm operator hostname-override node annotation.
     type: boolean
-    default: ${install_slinky}
+    default: false
     visible:
       and:
         - ${install_slinky}
@@ -2440,7 +2445,7 @@ variables:
       - 25.11.6-ubuntu24.04
       - 26.05-ubuntu24.04
       - 26.05.1-ubuntu26.04
-    default: "25.11.6-ubuntu24.04"
+    default: "26.05.1-ubuntu26.04"
     visible:
       and:
         - ${install_slinky}
@@ -2565,7 +2570,7 @@ variables:
         - ${worker_rdma_enabled}
   slinky_worker_ssh_enabled:
     title: Enable SSH on Slurm workers
-    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky 1.1.1 couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
+    description: "Required when HA OpenLDAP and SSSD are enabled because Slinky couples worker identity configuration to SSH. Host-networked workers listen on port 2222."
     type: boolean
     default: true
     visible:
@@ -2898,6 +2903,38 @@ variables:
       and:
         - ${install_slinky}
         - ${slinky_advanced_options}
+  slinky_topology_enabled:
+    title: Manage Slurm topology from RDMA network locality
+    description: The oci-hpc-oke-utils annotator writes per-node dynamic topology annotations and its controller generates topology.yaml (tree, block, and flat) from the rdma.* node labels. Requires the OKE utilities chart, its RDMA labeler, and at least one enabled Slurm worker pool. Nodes without locality labels share a synthetic none unit.
+    type: boolean
+    default: true
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+  slinky_topology_default:
+    title: Default Slurm topology
+    description: Topology marked cluster_default in the generated topology.yaml. Partitions without an explicit Topology parameter use it.
+    type: enum
+    enum:
+      - tree
+      - block
+    default: "tree"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_topology_enabled}
+  slinky_topology_block_sizes:
+    title: Block topology block sizes
+    description: auto derives block_sizes from current local block populations. Or a comma-separated list of positive integers where each successive value is a larger power-of-two multiple of the previous value, for example 8,16,32.
+    type: string
+    default: "auto"
+    visible:
+      and:
+        - ${install_slinky}
+        - ${slinky_advanced_options}
+        - ${slinky_topology_enabled}
   slinky_cpu_worker_enabled:
     title: Run Slurm workers on the CPU worker pool
     description: Requires the CPU worker pool to be enabled.

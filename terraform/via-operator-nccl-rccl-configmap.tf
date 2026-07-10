@@ -2,11 +2,14 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "null_resource" "nccl_rccl_configmap" {
-  for_each = alltrue([local.deploy_nccl_rccl_param_configmap, local.deploy_from_operator]) ? local.nccl_rccl_configmaps : {}
+  # Slurm-namespace copies follow the Slinky deploy gate: with a public control
+  # plane the cluster deploys via the provider while Slinky still deploys via
+  # the operator, and only this path ensures the Slurm namespace exists.
+  for_each = local.deploy_nccl_rccl_param_configmap ? { for k, cm in local.nccl_rccl_configmaps : k => cm if(cm.namespace == "default" ? local.deploy_from_operator : local.slinky_deploy_from_operator) } : {}
 
   triggers = {
     manifest_md5    = md5(local.nccl_rccl_configmap_manifests[each.key])
-    manifest_path   = "/tmp/${each.value.name}.yaml"
+    manifest_path   = "/tmp/${each.value.name}-${each.value.namespace}.yaml"
     configmap_name  = each.value.name
     namespace       = each.value.namespace
     bastion_host    = module.oke.bastion_public_ip
@@ -39,6 +42,7 @@ resource "null_resource" "nccl_rccl_configmap" {
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "for i in $(seq 1 30); do if [ -f ~/.kube/config ] && timeout 10 kubectl cluster-info >/dev/null 2>&1; then echo 'Kubeconfig is ready!'; break; else echo \"Waiting for kubeconfig... ($i/30)\"; sleep 10; fi; done",
       "if ! timeout 30 kubectl cluster-info >/dev/null 2>&1; then echo 'ERROR: Kubeconfig not available after 5 minutes!'; exit 1; fi",
+      "kubectl create namespace ${each.value.namespace} --dry-run=client -o yaml | kubectl apply -f -",
       "kubectl apply --server-side -f ${self.triggers.manifest_path}",
       "rm -f ${self.triggers.manifest_path}"
     ]

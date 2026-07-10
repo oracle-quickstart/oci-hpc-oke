@@ -1,4 +1,4 @@
-{{- if .Values.labeler.enabled }}
+{{- if or .Values.labeler.enabled .Values.topology.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -64,12 +64,33 @@ spec:
               value: {{ .Values.labeler.controller.interval | quote }}
             - name: NODE_SELECTOR
               value: {{ .Values.labeler.controller.nodeSelectorLabel | quote }}
+            - name: OCI_LABELS_ENABLED
+              value: {{ .Values.labeler.enabled | quote }}
+            - name: TOPOLOGY_ENABLED
+              value: {{ .Values.topology.enabled | quote }}
+            - name: TOPOLOGY_SLURM_NAMESPACE
+              value: {{ .Values.topology.slurmNamespace | quote }}
+            - name: TOPOLOGY_CONFIGMAP_NAME
+              value: {{ .Values.topology.configMapName | quote }}
+            - name: TOPOLOGY_DEFAULT
+              value: {{ .Values.topology.defaultTopology | quote }}
+            - name: TOPOLOGY_BLOCK_SIZES
+              value: {{ .Values.topology.blockSizes | quote }}
+            - name: TOPOLOGY_WORKER_POOLS
+              value: {{ join "," .Values.topology.workerPools | quote }}
+            - name: TOPOLOGY_INTERVAL
+              value: {{ .Values.topology.syncInterval | quote }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]
             initialDelaySeconds: 60
             periodSeconds: 120
             failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["test", "-f", "/tmp/health/ready"]
+            periodSeconds: 10
+            failureThreshold: 1
           resources:
             {{- toYaml .Values.labeler.controller.resources | nindent 12 }}
           securityContext:

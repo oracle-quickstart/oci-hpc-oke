@@ -133,7 +133,7 @@ func TestSlinkyLoginRequiresManagedIdentity(t *testing.T) {
 	require.Contains(t, validation, `!var.slinky_identity_enabled,`)
 	require.Contains(t, validation, `resource "null_resource" "validate_slinky_login_identity"`)
 	require.Contains(t, validation, `slinky_login_enabled=true requires slinky_identity_enabled=true`)
-	require.Contains(t, validation, `ldap://ldap.example.com`)
+	require.Contains(t, validation, `configures the LoginSet with its placeholder SSSD configuration`)
 	require.Contains(t, variables, `Requires slinky_identity_enabled=true`)
 	require.Contains(t, schema, `Requires HA OpenLDAP and SSSD to be enabled.`)
 }
@@ -148,9 +148,9 @@ func TestSlinkyWorkerIdentityRequiresSSH(t *testing.T) {
 	require.Contains(t, validation, `var.slinky_identity_enabled,`)
 	require.Contains(t, validation, `!var.slinky_worker_ssh_enabled,`)
 	require.Contains(t, validation, `resource "null_resource" "validate_slinky_worker_identity"`)
-	require.Contains(t, validation, `disabling worker SSH also removes the worker SSSD configuration`)
+	require.Contains(t, validation, `couples worker SSSD configuration to SSH`)
 	require.Contains(t, variables, `Required when slinky_identity_enabled=true`)
-	require.Contains(t, schema, `Slinky 1.1.1 couples worker identity configuration to SSH.`)
+	require.Contains(t, schema, `Slinky couples worker identity configuration to SSH.`)
 }
 
 func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
@@ -190,4 +190,26 @@ func TestSlinkyControlPlaneUsesSystemPool(t *testing.T) {
 	require.Contains(t, openldapValues, `oke.oraclecloud.com/pool.name: ${system_node_pool_name}`)
 	require.NotContains(t, slurmValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
 	require.NotContains(t, openldapValues, `node.kubernetes.io/instance-type: ${system_node_shape}`)
+}
+
+func TestValidationOkeUtilsReadinessDoesNotWaitForReconciliation(t *testing.T) {
+	scripts := []string{
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "labeler-configmap.yaml"),
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "controller-configmap.yaml"),
+		readRepositoryFile(t, "terraform", "files", "oci-hpc-oke-utils", "templates", "annotator-configmap.yaml"),
+	}
+
+	for _, script := range scripts {
+		main := strings.Index(script, "    def main():")
+		require.NotEqual(t, -1, main)
+		cleanup := strings.Index(script[main:], "READY_FILE.unlink(missing_ok=True)")
+		ready := strings.Index(script[main:], "READY_FILE.touch()")
+		loop := strings.Index(script[main:], "        while True:")
+		require.NotEqual(t, -1, cleanup)
+		require.NotEqual(t, -1, ready)
+		require.NotEqual(t, -1, loop)
+		require.Less(t, cleanup, ready)
+		require.Less(t, ready, loop)
+		require.NotContains(t, script[main+ready:], "READY_FILE.unlink")
+	}
 }
