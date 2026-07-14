@@ -56,37 +56,11 @@ To use the RDMA interfaces in your pods, see [Using RDMA Network Interfaces in M
 
 ## Optional: Deploy Kueue & MPI Operator to Run NCCL Tests
 
-Kueue and MPI Operator are required for running the optional NCCL/RCCL tests.
-
-> [!NOTE]
-> Starting with stack v26.3.0, Kueue and MPI Operator are deployed by default.
-
 See [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-nccl-rccl-tests-with-kueue.md) for deployment steps, per-shape test manifests, and example output.
 
-## Guides
+## Documentation
 
-- [Accessing a Private OKE Cluster via OCI Bastion Service](./docs/accessing-private-oke-cluster-via-oci-bastion-service.md)
-- [Adding SSH keys to worker nodes](./docs/adding-ssh-keys-to-worker-nodes.md)
-- [Deploying the Monitoring Stack manually](./docs/deploying-monitoring-stack-manually.md)
-- [Images to Use for Worker Nodes](./docs/worker-node-images.md)
-- [Importing Container Images from OCI File Storage Service Using Skopeo](./docs/importing-images-from-fss-skopeo.md)
-- [OCI HPC OKE Utils (Node Labeler, Slurm Topology, Image Prepuller, Hostexec)](./docs/oci-hpc-oke-utils.md)
-- [Onboarding Users to the Slurm Operator](./docs/slurm-operator-user-onboarding.md)
-- [Replacing the boot volume of self-managed nodes and managed node pools using the Boot Volume Replacement (BVR) script](./docs/replacing-the-boot-volume-of-self-managed-nodes.md)
-- [Running GPU & RDMA active health checks](./docs/running-active-health-checks.md)
-- [Running GPU & RDMA passive health checks](./docs/running-gpu-rdma-healthchecks-with-node-problem-detector.md)
-- [Running ib_write_bw Tests Between Nodes](./docs/running-ib-write-bw-test.md)
-- [Running NCCL and RCCL Tests from the Slurm Operator](./docs/running-nccl-rccl-tests-from-slurm-operator.md)
-- [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-nccl-rccl-tests-with-kueue.md)
-- [Running PyTorch Jobs on OKE Using Host Network with RDMA](./docs/running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md)
-- [Upgrading OKE clusters](./docs/oke-hpc-upgrade.md)
-- [Using Cluster Autoscaler with Cluster Networks](./docs/using-cluster-autoscaler-with-cluster-networks.md)
-- [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./docs/using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md)
-- [Using RDMA Network Interfaces in Manifests](./docs/using-rdma-network-interfaces-in-manifests.md)
-- [Using RDMA Network Locality When Running Workloads on OKE](./docs/using-rdma-network-locality-when-running-workloads-on-oke.md)
-- [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./docs/using-nccl-rccl-parameters-configmap.md)
-- [CVE-2026-31431 ("Copy Fail")](./docs/copy-fail.md)
-- [Dirty Frag: CVE-2026-43284, CVE-2026-43500](./docs/dirty-frag.md)
+See the [documentation index](./docs/README.md) for guides on health checks, running NCCL/RCCL tests, RDMA networking, the Slurm Operator, and more.
 
 ## Contributing
 
