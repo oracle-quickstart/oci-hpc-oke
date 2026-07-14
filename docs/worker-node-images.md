@@ -66,8 +66,6 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 ### Ubuntu 24.04
 
-- [ROCm 7.2.1](https://objectstorage.ap-kulai-1.oraclecloud.com/p/tbQvgvf3OBUWCUHudgkXKWKQcKXDc1FUvLlcAqn0gIJGucJ7oVuojGo24vPoiymV/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-MOFED-2410_1140-AMD-ROCM-721-oca-plugin-157-10-2967-ipv4-2026.04.08-0)
+#### 6.8 Kernel
 
-### Ubuntu 22.04
-
-- [ROCm 7.0.2](https://objectstorage.us-saltlake-2.oraclecloud.com/p/02QYYf_pFsZlBzMQi5-kp3jTYTJiX4RnkOfgpqTxlvwpO7pCie2bfYrRCr5KD_ll/n/hpctraininglab/b/Sudhir-test-bucket/o/Canonical-Ubuntu-22.04-Kernel-5.15-OFED-5.9-AMD-ROCM-702_POLLARA-OPENMPI-4.1.6)
+- [ROCm 7.2.1](https://objectstorage.ap-kulai-1.oraclecloud.com/p/udreDKcRQs-iAJ-lM7US8-4fRdLigS6GAyQAXzpJj5Px-asvDxTJcR5Pf7z_VLt0/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-kernel-6.8.0-106-ainic-a-77-host-sw-MOFED-2410_1140-AMD-ROCM-721-oca-plugin-157-10-2967-ipv4-2026.07.01-0)
