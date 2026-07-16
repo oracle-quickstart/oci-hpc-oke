@@ -57,7 +57,7 @@ spec:
         spec:
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
             command: ["bash", "-c"]
             args:
               - |
@@ -69,7 +69,7 @@ spec:
                   sleep 5
                 done
                 echo "All workers are ready!"
-                mpirun --allow-run-as-root \
+                mpirun --allow-run-as-root --hostfile /etc/mpi/hostfile \
                 -mca coll ^hcoll \
                 -mca coll_hcoll_enable 0 \
                 -np $NP -npernode $NUM_GPUS --bind-to numa \
@@ -112,7 +112,7 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
             command:
               - /bin/bash
               - -c

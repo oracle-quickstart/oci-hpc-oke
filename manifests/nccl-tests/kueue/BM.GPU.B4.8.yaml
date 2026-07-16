@@ -57,10 +57,15 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: mpi-launcher
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
             ports:
             - { name: mpijob-port, containerPort: 2222, protocol: TCP }
             command: ["bash", "-c"]
+            # Open MPI 5 reads the worker ssh port only from this env var (PRRTE ignores -mca plm_rsh_args).
+            # Open MPI 4 does not read PRTE_MCA_* and uses -mca plm_rsh_args from the mpirun command line.
+            env:
+            - name: PRTE_MCA_plm_ssh_args
+              value: "-p 2222"
             args:
               - |
                 set -e -o pipefail; trap 'exit 1' SIGINT
@@ -73,7 +78,7 @@ spec:
                 done
                 echo "All workers are ready!"
                 mpirun --allow-run-as-root \
-                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" \
+                  -mca coll ^hcoll  -mca plm_rsh_args "-p 2222" --hostfile /etc/mpi/hostfile \
                   -mca coll_hcoll_enable 0 \
                   -np $NP -npernode $NUM_GPUS --bind-to numa \
                   -x NCCL_DEBUG=WARN \
@@ -113,7 +118,7 @@ spec:
               privileged: true
               capabilities:
                 add: ["IPC_LOCK"]
-            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
             command:
               - /bin/bash
               - -c
