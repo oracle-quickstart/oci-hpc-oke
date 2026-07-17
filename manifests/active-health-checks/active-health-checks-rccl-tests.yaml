@@ -207,8 +207,6 @@ data:
               dnsPolicy: ClusterFirstWithHostNet
               restartPolicy: OnFailure
               terminationGracePeriodSeconds: 2
-              tolerations:
-              - { key: amd.com/gpu, operator: Exists }
               containers:
               - name: mpi-worker
                 image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.0.2-rccl-2.26.6-ubuntu22.04-102025.1
@@ -430,4 +428,3 @@ spec:
                   items:
                   - key: job.yaml
                     path: bm-gpu-mi300x-8.yaml
-
