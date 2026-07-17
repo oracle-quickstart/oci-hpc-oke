@@ -89,6 +89,8 @@ Applied to all GPU nodes. Sourced from IMDS every 5 minutes (default).
 | `oci.oraclecloud.com/rdma.host_id` | Host identifier within the island | `clnbliq` |
 | `oci.oraclecloud.com/rdma.local_block_id` | Local block placement | `xvl2gga` |
 | `oci.oraclecloud.com/rdma.network_block_id` | Network block placement | `sn4ibrza` |
+| `oci.oraclecloud.com/rdma.ipv6` | Whether the RDMA fabric supports IPv6 | `true` |
+| `oci.oraclecloud.com/rdma.planes` | Number of RDMA fabric planes | `4` |
 
 These labels are used by [Kueue Topology-Aware Scheduling](./using-rdma-network-locality-when-running-workloads-on-oke.md) to place workloads on nodes with optimal RDMA locality.
 
