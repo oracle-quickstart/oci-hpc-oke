@@ -96,6 +96,28 @@ data:
         return None
 
 
+    def rdma_fabric_labels() -> dict[str, str]:
+        fallback = {
+            "oci.oraclecloud.com/rdma.ipv6": NO_IMDS,
+            "oci.oraclecloud.com/rdma.planes": NO_IMDS,
+        }
+
+        resp = _imds_get("/host")
+        if resp is None or resp.status_code != 200 or not resp.text.strip():
+            return fallback
+        try:
+            fabric = resp.json().get("rdmaFabricData") or {}
+        except requests.exceptions.JSONDecodeError:
+            return fallback
+
+        ipv6 = fabric.get("ipv6")
+        planes = fabric.get("planes")
+        return {
+            "oci.oraclecloud.com/rdma.ipv6": str(ipv6).lower() if ipv6 is not None else NO_IMDS,
+            "oci.oraclecloud.com/rdma.planes": str(planes) if planes is not None else NO_IMDS,
+        }
+
+
     def rdma_topology_labels() -> dict[str, str]:
         fallback = {
             "oci.oraclecloud.com/rdma.hpc_island_id": NO_IMDS,
@@ -252,6 +274,7 @@ data:
         READY_FILE.touch()
         while True:
             desired = rdma_topology_labels()
+            desired.update(rdma_fabric_labels())
             desired.update(static_gpu_labels)
 
             mapping_read_ok = False
