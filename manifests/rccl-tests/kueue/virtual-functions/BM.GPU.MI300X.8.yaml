@@ -160,8 +160,5 @@ spec:
             volumeMounts:
             - { mountPath: /dev/shm, name: shm }
             workingDir: /workspace
-          tolerations:
-          - { key: amd.com/gpu, operator: Exists }
           volumes:
           - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
-
