@@ -4,6 +4,16 @@
 > Starting with stack v26.5.0, you can create GPU Memory Clusters directly from the Terraform templates. The instructions below are kept for reference only and will no longer be updated.
 
 ---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
 
 ### Prerequisites
 - Your k8s version of the cluster must be at least v1.32.
@@ -32,10 +42,6 @@ Currently, we don't support deploying GB200 & GB300 shapes to be deployed direct
 
 - Deploy an OKE cluster with the stack
 - Add the GB200 & GB300 following the instructions in this readme.
-
-Deploy the cluster using the button below. Do not use the templates in this branch as they are not being updated.
-
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/oracle-quickstart/oci-hpc-oke/releases/latest/download/oke-gpu-rdma-quickstart.zip)
 
 ### Create a Compute Cluster
 
