@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "oci-hpc-oke-utils values",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "supplicantRunner": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval": {
+          "description": "Seconds between reconciliation passes. A non-positive or non-integer value would reach sleep and CrashLoop every node.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shapes": {
+          "description": "Shapes the runner is allowed to schedule on, matched on node.kubernetes.io/instance-type. Empty schedules everywhere.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

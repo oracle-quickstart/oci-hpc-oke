@@ -33,6 +33,7 @@ spec:
       automountServiceAccountToken: false
       hostPID: true
       priorityClassName: {{ .Values.supplicantRunner.priorityClassName }}
+      terminationGracePeriodSeconds: {{ .Values.supplicantRunner.terminationGracePeriodSeconds }}
       {{- with .Values.supplicantRunner.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -45,15 +46,30 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.supplicantRunner.affinity }}
+      {{- if .Values.supplicantRunner.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.supplicantRunner.affinity | nindent 8 }}
+      {{- else if .Values.supplicantRunner.shapes }}
+      # instance-type is set at node registration, so this is usable before
+      # the device plugin has labelled anything.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                      {{- toYaml .Values.supplicantRunner.shapes | nindent 22 }}
       {{- end }}
       volumes:
         - name: script
           configMap:
             name: {{ include "oci-hpc-oke-utils.supplicantRunnerScriptName" . }}
             defaultMode: 0755
+        # Health markers live here, off the container writable layer.
+        - name: run
+          emptyDir: {}
       containers:
         - name: supplicant-runner
           image: "{{ .Values.supplicantRunner.image.repository }}:{{ .Values.supplicantRunner.image.tag }}"
@@ -64,28 +80,45 @@ spec:
               value: {{ .Values.supplicantRunner.interval | quote }}
           securityContext:
             privileged: true
-          # Liveness only checks the loop, not pass success: a restart
-          # would kill the supplicants this pod started.
+          # Staleness budget must cover a slow pass plus the sleep between
+          # passes, and must not shrink below a usable floor when someone
+          # lowers the interval to make reconciliation more responsive.
+          {{- $stale := max (add (mul .Values.supplicantRunner.interval 6) 60) 180 | int }}
+          # Gates liveness until the first pass has completed, so a slow first
+          # pass cannot be mistaken for a wedged loop.
+          startupProbe:
+            exec:
+              command: ["/bin/bash", "-c", "test -s /run/health/alive"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             exec:
               command:
                 - /bin/bash
                 - -c
-                - test "$(( $(date +%s) - $(cat /tmp/healthy 2>/dev/null || echo 0) ))" -lt {{ add (mul .Values.supplicantRunner.interval 6) 60 }}
-            initialDelaySeconds: 10
+                - test "$(( $(date +%s) - $(cat /run/health/healthy 2>/dev/null || echo 0) ))" -lt {{ $stale }}
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Liveness only checks the loop, not pass success: a restart would
+          # kill the supplicants this pod started. timeoutSeconds is raised
+          # because exec probes share this container's throttled CPU quota.
           livenessProbe:
             exec:
               command:
                 - /bin/bash
                 - -c
-                - test "$(( $(date +%s) - $(cat /tmp/alive 2>/dev/null || echo 0) ))" -lt {{ add (mul .Values.supplicantRunner.interval 6) 60 }}
-            initialDelaySeconds: 60
+                - test "$(( $(date +%s) - $(cat /run/health/alive 2>/dev/null || echo 0) ))" -lt {{ $stale }}
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: script
               mountPath: /scripts
               readOnly: true
+            - name: run
+              mountPath: /run/health
           resources:
             {{- toYaml .Values.supplicantRunner.image.resources | nindent 12 }}
 {{- end }}

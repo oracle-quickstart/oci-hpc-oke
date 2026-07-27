@@ -26,7 +26,19 @@ Hostexec:
   Interval:  {{ .Values.hostexec.interval }}s
 {{- end }}
 
-{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled }}
+{{- if .Values.supplicantRunner.enabled }}
+
+Supplicant Runner:
+  DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
+  Interval:  {{ .Values.supplicantRunner.interval }}s
+  Shapes:    {{ if .Values.supplicantRunner.affinity }}custom affinity{{ else if .Values.supplicantRunner.shapes }}{{ len .Values.supplicantRunner.shapes }} RDMA shapes{{ else }}all nodes{{ end }}
+
+  Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
+  Nodes stay Ready when the fabric rejects a port; alert on the log line:
+    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
+{{- end }}
+
+{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled .Values.supplicantRunner.enabled }}
 
 Verify with:
   kubectl get ds -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}

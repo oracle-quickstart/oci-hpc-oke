@@ -607,10 +607,14 @@ During a prolonged RADIUS outage the runner keeps retrying every 90 seconds and 
 | Value | Default | Description |
 |-------|---------|-------------|
 | `supplicantRunner.enabled` | `false` | Enable/disable the supplicant runner DaemonSet |
-| `supplicantRunner.interval` | `10` | Seconds between reconciliation passes |
-| `supplicantRunner.affinity` | `{}` | Unrestricted by default, see below |
+| `supplicantRunner.interval` | `10` | Seconds between reconciliation passes. Must be a positive integer; enforced by `values.schema.json` |
+| `supplicantRunner.shapes` | RDMA shape list | Shapes the runner may schedule on, matched on `node.kubernetes.io/instance-type`. `[]` schedules everywhere |
+| `supplicantRunner.affinity` | `{}` | Replaces the generated shape affinity entirely when set |
+| `supplicantRunner.terminationGracePeriodSeconds` | `30` | Grace period on pod deletion |
 
-Unlike the other components this one does not target GPU labels. RDMA is available on non-GPU OCI shapes, and GPU labels are applied by the device plugin only after a node boots, so either would miss nodes that need the runner. Instead the runner self-selects: it enumerates the Oracle Cloud Agent's per-interface unit files and exits immediately when a node has none, so scheduling it on a node without RDMA costs a no-op pass every `interval` seconds. Set `nodeSelector` or `affinity` if you want to narrow it anyway.
+Scheduling is restricted to RDMA-capable shapes rather than to GPU labels. RDMA exists on non-GPU shapes such as `BM.HPC2.36` and `BM.Optimized3.36`, so a GPU label would miss nodes that need the runner, and GPU labels are applied by the device plugin only after a node boots, so it would also be unschedulable during early boot on nodes that do need it. `node.kubernetes.io/instance-type` is set by the cloud provider at node registration and does not have that problem.
+
+The shape list is belt and braces rather than the primary guard: the runner also self-selects at runtime by enumerating the Oracle Cloud Agent's per-interface unit files and exiting immediately when a node has none. Scheduling it somewhere without RDMA costs one no-op pass per interval and nothing else.
 
 In Terraform-managed installs, set the stack variable `install_supplicant_runner = true` instead of editing Helm values directly, otherwise the next apply reverts the change.
 

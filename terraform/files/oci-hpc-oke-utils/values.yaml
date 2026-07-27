@@ -213,16 +213,41 @@ hostexec:
 # Only needed on clusters using Dranet PF passthrough.
 supplicantRunner:
   enabled: false
+  # Seconds between reconciliation passes. Must be a positive integer.
   interval: 10
   priorityClassName: system-node-critical
+  terminationGracePeriodSeconds: 30
   imagePullSecrets: []
   tolerations:
     - operator: Exists
   nodeSelector: {}
-  # Deliberately unrestricted: RDMA is not exclusive to GPU shapes, and GPU
-  # labels are applied by the device plugin only after boot. The runner
-  # self-selects instead, exiting immediately on a node with no RDMA
-  # interfaces to manage.
+  # RDMA-capable shapes. Matched on node.kubernetes.io/instance-type, which the
+  # cloud provider sets at node registration, unlike GPU labels which appear
+  # only after the device plugin starts. The runner also self-selects at
+  # runtime, exiting immediately on a node with no RDMA interfaces, so this is
+  # belt and braces. Set to [] to schedule everywhere.
+  shapes:
+    - "BM.HPC2.36"
+    - "BM.GPU4.8"
+    - "BM.GPU.B4.8"
+    - "BM.GPU.A100-v2.8"
+    - "BM.GPU.H100.8"
+    - "BM.GPU.H200.8"
+    - "BM.GPU.B200.8"
+    - "BM.GPU.B300.8"
+    - "BM.GPU.B300.HS.8"
+    - "BM.GPU.GB200.4"
+    - "BM.GPU.GB200-v2.4"
+    - "BM.GPU.GB200-v3.4"
+    - "BM.GPU.GB300.4"
+    - "BM.GPU.MI300X.8"
+    - "BM.GPU.MI355X-v0.8"
+    - "BM.GPU.MI355X.8"
+    - "BM.GPU.MI355X-v1.8"
+    - "BM.GPU.L40S.4"
+    - "BM.Optimized3.36"
+    - "BM.HPC.E5.144"
+  # Replaces the generated shape affinity entirely when set.
   affinity: {}
   podAnnotations: {}
   podLabels: {}

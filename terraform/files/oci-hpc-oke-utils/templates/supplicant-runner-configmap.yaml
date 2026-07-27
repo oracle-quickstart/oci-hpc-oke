@@ -1,4 +1,9 @@
 {{- if .Values.supplicantRunner.enabled }}
+{{- $runner := .Files.Get "files/supplicant-runner/runner.sh" }}
+{{- $reconcile := .Files.Get "files/supplicant-runner/supplicant-runner.sh" }}
+{{- if or (empty $runner) (empty $reconcile) }}
+{{- fail "supplicantRunner: files/supplicant-runner/{runner,supplicant-runner}.sh are missing or empty; the DaemonSet would run an empty script" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,10 +12,23 @@ metadata:
   labels:
     {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
     app.kubernetes.io/component: supplicant-runner
+  annotations:
+    # The name is content-addressed, so an upgrade creates a new ConfigMap and
+    # Helm would prune this one immediately, while pods from the previous
+    # revision are still mounting it for the length of the rollout. Keeping it
+    # trades a little litter for not pulling the scripts out from under them.
+    # Prune old revisions after a rollout with:
+    #   kubectl delete cm -n <ns> -l app.kubernetes.io/component=supplicant-runner
+    "helm.sh/resource-policy": keep
+# Immutable so the executable content of a privileged, host-namespace
+# DaemonSet cannot be edited in place. Changing the scripts changes the name
+# above, which rolls the DaemonSet. Note the hash covers the two script files
+# only: editing this template without touching them keeps the same name and
+# the API server will reject the update, which is loud rather than silent.
 immutable: true
 data:
   runner.sh: |
-{{ .Files.Get "files/supplicant-runner/runner.sh" | indent 4 }}
+{{ $runner | indent 4 }}
   supplicant-runner.sh: |
-{{ .Files.Get "files/supplicant-runner/supplicant-runner.sh" | indent 4 }}
+{{ $reconcile | indent 4 }}
 {{- end }}
