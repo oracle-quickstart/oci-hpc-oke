@@ -224,11 +224,9 @@ missing_too_long() {
   [ $(( now - since )) -ge "$AUTH_GRACE" ]
 }
 
-# A live pod always keeps its sandbox process here, so "only ours" means the
-# pod is gone. A netns releases its interfaces only when its last process
-# exits, so staying would strand the PF off the host. Only the pids in this
-# one namespace are examined, and the comm check also catches an orphan of
-# ours whose pidfile was lost.
+# A live pod keeps its sandbox process here, so "only ours" means it is gone.
+# A netns releases its interfaces only when its last process exits, so staying
+# would strand the PF off the host. The comm check also catches our orphans.
 netns_has_other_procs() {
   local ns=$1 pid
   build_proc_map

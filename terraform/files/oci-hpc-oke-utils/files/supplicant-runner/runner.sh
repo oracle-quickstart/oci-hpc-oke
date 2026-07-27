@@ -18,13 +18,8 @@ mark() {
 }
 
 while true; do
-  # Streamed over stdin: the fd survives the namespace switch, so nothing
-  # is staged on the host filesystem. Readiness (healthy) tracks whether the
-  # runner is working, not whether the fabric authorizes us: a RADIUS outage
-  # would otherwise take every node NotReady at once and fail helm --wait.
-  # Liveness (alive) tracks only the loop, since a restart kills the
-  # supplicants this pod started.
-  # || rc=$? keeps a nonzero pass from tripping set -e and exiting the loop.
+  # Streamed over stdin so nothing is staged on the host filesystem; the fd
+  # survives the namespace switch. || rc=$? stops set -e exiting the loop.
   rc=0
   nsenter --target 1 --net --mount --uts --ipc --pid -- /bin/bash < /scripts/supplicant-runner.sh || rc=$?
   case $rc in
@@ -32,6 +27,7 @@ while true; do
       mark healthy
       rm -f "$health/unauthorized"
       ;;
+    # Fabric rejected a port. Stay Ready: an outage hits every node at once.
     2)
       mark healthy
       mark unauthorized
@@ -40,6 +36,7 @@ while true; do
       echo "supplicant-runner: reconciliation pass failed"
       ;;
   esac
+  # Liveness only, not readiness: a restart kills this pod's supplicants.
   mark alive
   sleep "${interval}"
 done
