@@ -560,47 +560,34 @@ The ConfigMap checksum is included as a pod annotation, so updating the script t
 
 The supplicant runner keeps 802.1X (WPA) authentication alive for RDMA interfaces that [Dranet](https://github.com/google/dranet) moves into pod network namespaces. Only enable it on clusters that use Dranet with PF passthrough.
 
-### Background
+### The Problem
 
-On OCI GPU nodes, the Oracle Cloud Agent plugin `oci-rdma-authentication` runs one `wpa_supplicant` per RDMA interface through a systemd unit bound to the host network device. The RDMA switches re-run 802.1X authentication periodically (60 and 80 minutes after the last authentication).
+The Oracle Cloud Agent runs one `wpa_supplicant` per RDMA interface on the host, and the switches re-run 802.1X authentication roughly every hour. When Dranet moves an interface into a pod, that supplicant stays on the host and can no longer see the device, so the next reauthentication goes unanswered and the switch drops the port. Jobs longer than the reauthentication interval lose the interface.
 
-When Dranet moves an RDMA PF into a pod network namespace:
-
-1. The agent's `wpa_supplicant` for that interface keeps running on the host but can no longer see the device, logging `ioctl[SIOCGIFADDR]: No such device` repeatedly.
-2. The switch's reauthentication frames follow the interface into the pod, where nothing answers them, because the host supplicant is in a different network namespace.
-3. The switch de-authorizes the port and drops traffic on it, so jobs running longer than the reauthentication interval lose the interface.
-
-Because the agent's supplicant stays alive, it also keeps holding its control socket at `/var/run/wpa_supplicant/<interface>`, which is why the runner gives each of its own supplicants a private control socket directory.
+You can spot this on a node without the runner installed: the agent's supplicant logs `ioctl[SIOCGIFADDR]: No such device` for as long as the interface is claimed.
 
 ### How It Works
 
-The supplicant runner DaemonSet runs a reconciliation pass on the host every `interval` seconds:
+Every `interval` seconds the DaemonSet runs a pass on the host that:
 
-1. Enumerates the RDMA interfaces managed by the Oracle Cloud Agent (from its generated `wpa_supplicant-wired@<interface>.service` unit files) and records each interface's PCI address while it is in the host network namespace.
-2. For each interface missing from the host network namespace, finds the pod network namespace holding it and starts a `wpa_supplicant` there using `nsenter --net`. Dranet claims can rename the interface inside the pod (`parameters.interface.name`), so the device is matched by its recorded PCI address (via `ethtool -i` bus-info), and the supplicant runs on the current in-pod name. Because only the network namespace is entered, the supplicant reads the certificates from the host filesystem and uses a per-interface copy of the Oracle Cloud Agent's configuration with a private control socket directory, so pods with identical interface names cannot collide. Certificates never enter workload pods, and pods need no extra privileges or spec changes.
-3. Stops its supplicant when the claiming pod goes away, and again once the interface is back on the host, handing authentication back to the Oracle Cloud Agent. Releasing promptly matters: a network namespace only gives its interfaces back to the host after the last process in it exits, so a supplicant left behind in a dead pod's namespace would keep the PF out of the host's reach indefinitely. The runner detects this by checking whether any process other than its own supplicants is still using the namespace.
-4. Watches the EAP-TLS keystore (`/run/wpa_supplicant/client.p12`) for certificate rotations and reconfigures its supplicants, since the Oracle Cloud Agent cannot reach them while the systemd unit is dead.
+1. Finds RDMA interfaces missing from the host network namespace.
+2. Locates the pod namespace holding each one and starts a `wpa_supplicant` there with `nsenter --net`. Only the network namespace is entered, so certificates stay on the host and workload pods need no privileges or spec changes.
+3. Stops that supplicant when the claiming pod exits, handing the interface back to the agent.
+4. Forwards certificate rotations to the supplicants it started, which the agent cannot reach.
 
-State (pidfiles, PCI address map, in-pod interface names, per-interface supplicant configs and control sockets, last seen certificate timestamp) is kept in `/run/oke-supplicant-runner` on the host, which clears on reboot.
+State lives in `/run/oke-supplicant-runner` and clears on reboot.
 
-### Security and Rollout
+### Monitoring
 
-The reconcile script is streamed to the host over stdin through `nsenter`, so nothing is staged on the host filesystem, and it refuses to run if it does not land in the host mount namespace. The script ConfigMap is immutable and content-hash named: changing the scripts requires a Helm upgrade, which creates a new ConfigMap and rolls the DaemonSet, instead of executable content being mutated in place.
+Readiness reflects whether the *runner* is working, not whether the fabric authorizes the ports. A node goes NotReady only for faults it can fix (config unwritable, supplicant will not start, an interface it cannot find). When supplicants are running but the fabric rejects them, as during a RADIUS outage, nodes stay Ready and the condition is reported instead. Taking the whole fleet NotReady for a fabric outage would break any concurrent apply without adding information.
 
-A running supplicant is not assumed to be authorized: each pass checks `suppPortStatus` through the supplicant's private control socket, and a port that stays unauthorized beyond a 90 second grace period gets its supplicant restarted, repeatedly, until it authenticates.
+Alert on this line, emitted once per pass and naming the affected interfaces:
 
-Readiness distinguishes two kinds of trouble:
+```bash
+kubectl logs -n kube-system -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
+```
 
-| Situation | Readiness | Why |
-|-----------|-----------|-----|
-| The runner cannot do its job (config unwritable, supplicant will not start, a claimed interface cannot be found) | NotReady | The node needs attention and `helm --wait` should catch it |
-| Supplicants are running but the fabric rejects them (RADIUS outage, revoked certificate) | **Ready**, with `UNAUTHORIZED` logged every pass | A fabric outage hits every node at once; taking the whole fleet NotReady would fail any concurrent apply without telling anyone anything new |
-
-The reconcile script signals this by exit code: 0 clean, 1 runner fault, 2 unauthorized. On exit 2 the container also touches `/tmp/unauthorized`, so the condition is visible without parsing logs. Alert on the `UNAUTHORIZED:` log line, which names the affected interfaces and is emitted once per pass.
-
-Liveness only checks that the reconcile loop itself is still running, because restarting the pod would also restart the healthy supplicants it started. Rolling updates replace at most 10% of nodes at a time.
-
-During a prolonged RADIUS outage the runner keeps retrying every 90 seconds and picks up a rotated certificate two ways: it watches the keystore mtime and reconfigures within one pass, and each restart re-reads the keystore anyway. Authentication resumes within about 90 seconds of the fabric recovering, with no manual intervention.
+An unauthorized port is retried every 90 seconds indefinitely, so authentication resumes on its own once the fabric recovers.
 
 ### Configuration
 
@@ -612,17 +599,13 @@ During a prolonged RADIUS outage the runner keeps retrying every 90 seconds and 
 | `supplicantRunner.affinity` | `{}` | Replaces the generated shape affinity entirely when set |
 | `supplicantRunner.terminationGracePeriodSeconds` | `30` | Grace period on pod deletion |
 
-Scheduling is restricted to RDMA-capable shapes rather than to GPU labels. RDMA exists on non-GPU shapes such as `BM.HPC2.36` and `BM.Optimized3.36`, so a GPU label would miss nodes that need the runner, and GPU labels are applied by the device plugin only after a node boots, so it would also be unschedulable during early boot on nodes that do need it. `node.kubernetes.io/instance-type` is set by the cloud provider at node registration and does not have that problem.
+Shapes are matched on `node.kubernetes.io/instance-type` rather than GPU labels, because RDMA also exists on non-GPU shapes and GPU labels only appear after the device plugin starts. The list is a safety net, not the real guard: the runner exits immediately on any node with no RDMA interfaces, so scheduling it elsewhere costs one no-op pass per interval.
 
-The shape list is belt and braces rather than the primary guard: the runner also self-selects at runtime by enumerating the Oracle Cloud Agent's per-interface unit files and exiting immediately when a node has none. Scheduling it somewhere without RDMA costs one no-op pass per interval and nothing else.
-
-In Terraform-managed installs, set the stack variable `install_supplicant_runner = true` instead of editing Helm values directly, otherwise the next apply reverts the change.
+In Terraform-managed installs set `install_supplicant_runner = true` rather than editing Helm values, otherwise the next apply reverts it.
 
 ### Caveats
 
-- There is a gap of up to `interval` seconds without a supplicant right after Dranet moves an interface. The switch port stays authorized from the previous session, so this only matters if a reauthentication lands inside that gap.
-- After a claiming pod exits, the interface takes a few reconciliation passes to reach the host again: the runner stops its supplicant, the namespace then goes away, and the kernel returns the interface. The Oracle Cloud Agent picks it up and re-authenticates on its own within seconds.
-- Restarting a runner pod (including upgrades) also stops the supplicants it started, since they live in the pod's cgroup. The replacement pod restarts them within one interval, and the switch port stays authorized in the meantime.
-- The "no such device" log lines from the Oracle Cloud Agent continue while an interface is inside a pod. They are harmless once the runner is answering reauthentication.
-- The PCI address used to match renamed interfaces is recorded while the interface is on the host. If the DaemonSet is first installed while a renaming claim is already active, that interface is picked up after it returns to the host once. Claims that keep the original name are unaffected.
+- Brief gaps without a supplicant are normal: up to `interval` seconds after Dranet claims an interface, and a few passes after a pod exits before the interface reaches the host again. The port stays authorized from its existing session throughout.
+- Restarting a runner pod, including on upgrade, stops the supplicants it started, since they share its cgroup. The replacement restarts them within one interval.
+- Renamed interfaces are matched by PCI address, recorded while the interface is on the host. If the DaemonSet is installed while a renaming claim is already active, that interface is picked up after it returns to the host once.
 - Requires `wpa_supplicant`, `wpa_cli`, and `ethtool` on the host. All ship on OCI GPU images.
