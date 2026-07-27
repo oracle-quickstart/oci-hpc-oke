@@ -208,3 +208,32 @@ hostexec:
       lnetctl net add --net tcp --if "$DEFAULT_IFACE" --peer-timeout 180 --peer-credits 120 --credits 1024
       echo "LNet configured successfully"
     fi
+
+# Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
+# Only needed on clusters using Dranet PF passthrough.
+supplicantRunner:
+  enabled: false
+  interval: 10
+  priorityClassName: system-node-critical
+  imagePullSecrets: []
+  tolerations:
+    - operator: Exists
+  nodeSelector: {}
+  # Deliberately unrestricted: RDMA is not exclusive to GPU shapes, and GPU
+  # labels are applied by the device plugin only after boot. The runner
+  # self-selects instead, exiting immediately on a node with no RDMA
+  # interfaces to manage.
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
+  image:
+    repository: ghcr.io/astral-sh/uv
+    tag: "0.7.12-python3.12-bookworm-slim"
+    pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi

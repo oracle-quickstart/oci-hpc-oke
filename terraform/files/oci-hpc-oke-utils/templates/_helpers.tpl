@@ -18,3 +18,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{/*
+Content-addressed name for the supplicant runner script ConfigMap. The
+ConfigMap is immutable, so script changes produce a new name and roll the
+DaemonSet instead of mutating executable content in place.
+*/}}
+{{- define "oci-hpc-oke-utils.supplicantRunnerScriptName" -}}
+{{- $hash := printf "%s%s" (.Files.Get "files/supplicant-runner/runner.sh") (.Files.Get "files/supplicant-runner/supplicant-runner.sh") | sha256sum | trunc 8 -}}
+{{- printf "%s-supplicant-runner-%s" (include "oci-hpc-oke-utils.fullname" .) $hash -}}
+{{- end -}}

@@ -40,6 +40,7 @@ variableGroups:
       # OCI HPC OKE Utils
       - install_image_prepuller
       - install_hostexec
+      - install_supplicant_runner
       # Monitoring
       - wildcard_dns_domain
       # Cluster setup

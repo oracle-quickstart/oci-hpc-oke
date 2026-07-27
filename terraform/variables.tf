@@ -1395,6 +1395,13 @@ variable "install_hostexec" {
   description = "Deploy the hostexec DaemonSet to execute commands on the host."
 }
 
+# supplicant runner
+variable "install_supplicant_runner" {
+  default     = false
+  type        = bool
+  description = "Deploy the supplicant runner DaemonSet to keep 802.1X authentication alive for RDMA interfaces moved into pod network namespaces by Dranet."
+}
+
 
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {

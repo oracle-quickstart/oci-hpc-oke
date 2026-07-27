@@ -1,0 +1,91 @@
+{{- if .Values.supplicantRunner.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: supplicant-runner
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # A restart briefly stops this pod's supplicants, so roll slowly.
+      maxUnavailable: "10%"
+  selector:
+    matchLabels:
+      {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: supplicant-runner
+  template:
+    metadata:
+      labels:
+        {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: supplicant-runner
+        {{- with .Values.supplicantRunner.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.supplicantRunner.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      hostPID: true
+      priorityClassName: {{ .Values.supplicantRunner.priorityClassName }}
+      {{- with .Values.supplicantRunner.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.supplicantRunner.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.supplicantRunner.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.supplicantRunner.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "oci-hpc-oke-utils.supplicantRunnerScriptName" . }}
+            defaultMode: 0755
+      containers:
+        - name: supplicant-runner
+          image: "{{ .Values.supplicantRunner.image.repository }}:{{ .Values.supplicantRunner.image.tag }}"
+          imagePullPolicy: {{ .Values.supplicantRunner.image.pullPolicy }}
+          command: ["/bin/bash", "/scripts/runner.sh"]
+          env:
+            - name: SUPPLICANT_RUNNER_INTERVAL
+              value: {{ .Values.supplicantRunner.interval | quote }}
+          securityContext:
+            privileged: true
+          # Liveness only checks the loop, not pass success: a restart
+          # would kill the supplicants this pod started.
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - test "$(( $(date +%s) - $(cat /tmp/healthy 2>/dev/null || echo 0) ))" -lt {{ add (mul .Values.supplicantRunner.interval 6) 60 }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - test "$(( $(date +%s) - $(cat /tmp/alive 2>/dev/null || echo 0) ))" -lt {{ add (mul .Values.supplicantRunner.interval 6) 60 }}
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            {{- toYaml .Values.supplicantRunner.image.resources | nindent 12 }}
+{{- end }}

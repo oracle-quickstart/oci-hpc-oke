@@ -1,0 +1,16 @@
+{{- if .Values.supplicantRunner.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.supplicantRunnerScriptName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: supplicant-runner
+immutable: true
+data:
+  runner.sh: |
+{{ .Files.Get "files/supplicant-runner/runner.sh" | indent 4 }}
+  supplicant-runner.sh: |
+{{ .Files.Get "files/supplicant-runner/supplicant-runner.sh" | indent 4 }}
+{{- end }}

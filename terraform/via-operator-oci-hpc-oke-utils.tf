@@ -42,6 +42,9 @@ module "oci_hpc_oke_utils" {
     hostexec = {
       enabled = var.install_hostexec
     }
+    supplicantRunner = {
+      enabled = var.install_supplicant_runner
+    }
   })
   helm_user_values_override = ""
 
