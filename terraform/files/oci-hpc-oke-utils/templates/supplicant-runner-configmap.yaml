@@ -13,17 +13,15 @@ metadata:
     {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
     app.kubernetes.io/component: supplicant-runner
   annotations:
-    # The name is content-addressed, so an upgrade creates a new ConfigMap
-    # and Helm would prune this one while previous-revision pods still mount
-    # it. Keeping it trades a little litter for not pulling the scripts out
-    # from under them. Prune old revisions after a rollout with
-    # kubectl delete cm -l app.kubernetes.io/component=supplicant-runner
+    # The name is content-addressed, so an upgrade creates a new ConfigMap.
+    # Helm would prune this one while older pods still mount it.
+    # Keeping it costs a little litter. Prune after a rollout with
+    #   kubectl delete cm -l app.kubernetes.io/component=supplicant-runner
     "helm.sh/resource-policy": keep
-# Immutable so the executable content of a privileged, host-namespace
-# DaemonSet cannot be edited in place. Changing the scripts changes the name
-# above, which rolls the DaemonSet. The hash covers the two script files
-# only, so editing this template without touching them keeps the same name
-# and the API server rejects the update. Loud, rather than silent.
+# Immutable, so nobody can edit what a privileged DaemonSet executes.
+# Changing a script changes the name above and rolls the DaemonSet.
+# The hash covers the scripts only.
+# Editing this template alone keeps the name, so the update is rejected.
 immutable: true
 data:
   runner.sh: |

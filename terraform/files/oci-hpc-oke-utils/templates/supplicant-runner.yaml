@@ -79,11 +79,11 @@ spec:
               value: {{ .Values.supplicantRunner.interval | quote }}
           securityContext:
             privileged: true
-          # Covers a slow pass plus the sleep between passes, with a floor
-          # so lowering the interval does not tighten the window.
+          # Covers a slow pass plus the sleep between passes.
+          # The floor stops a lower interval from tightening the window.
           {{- $stale := max (add (mul .Values.supplicantRunner.interval 6) 60) 180 | int }}
-          # Gates liveness until the first pass completes, so a slow one
-          # is not mistaken for a wedged loop.
+          # Gates liveness until the first pass completes.
+          # A slow first pass is not a wedged loop.
           startupProbe:
             exec:
               command: ["/bin/bash", "-c", "test -s /run/health/alive"]
@@ -99,9 +99,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-          # Liveness only checks the loop, not pass success. A restart
-          # would kill the supplicants this pod started. timeoutSeconds is
-          # raised because exec probes share the throttled CPU quota.
+          # Checks the loop only, not pass success.
+          # A restart would kill the supplicants this pod started.
+          # The timeout is raised because probes share the CPU quota.
           livenessProbe:
             exec:
               command:
