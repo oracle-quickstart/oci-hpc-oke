@@ -50,8 +50,7 @@ spec:
       affinity:
         {{- toYaml .Values.supplicantRunner.affinity | nindent 8 }}
       {{- else if .Values.supplicantRunner.shapes }}
-      # instance-type is set at node registration, so this is usable before
-      # the device plugin has labelled anything.
+      # instance-type is set at node registration, unlike GPU labels.
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -80,12 +79,11 @@ spec:
               value: {{ .Values.supplicantRunner.interval | quote }}
           securityContext:
             privileged: true
-          # Staleness budget must cover a slow pass plus the sleep between
-          # passes, and must not shrink below a usable floor when someone
-          # lowers the interval to make reconciliation more responsive.
+          # Covers a slow pass plus the sleep between passes, with a floor
+          # so lowering the interval does not tighten the window.
           {{- $stale := max (add (mul .Values.supplicantRunner.interval 6) 60) 180 | int }}
-          # Gates liveness until the first pass has completed, so a slow first
-          # pass cannot be mistaken for a wedged loop.
+          # Gates liveness until the first pass completes, so a slow one
+          # is not mistaken for a wedged loop.
           startupProbe:
             exec:
               command: ["/bin/bash", "-c", "test -s /run/health/alive"]
@@ -101,9 +99,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
-          # Liveness only checks the loop, not pass success: a restart would
-          # kill the supplicants this pod started. timeoutSeconds is raised
-          # because exec probes share this container's throttled CPU quota.
+          # Liveness only checks the loop, not pass success. A restart
+          # would kill the supplicants this pod started. timeoutSeconds is
+          # raised because exec probes share the throttled CPU quota.
           livenessProbe:
             exec:
               command:

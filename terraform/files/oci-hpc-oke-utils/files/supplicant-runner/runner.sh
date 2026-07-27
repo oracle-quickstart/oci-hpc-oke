@@ -18,8 +18,8 @@ mark() {
 }
 
 while true; do
-  # Streamed over stdin so nothing is staged on the host filesystem; the fd
-  # survives the namespace switch. || rc=$? stops set -e exiting the loop.
+  # Streamed over stdin so nothing is staged on the host filesystem.
+  # || rc=$? stops set -e exiting the loop on a nonzero pass.
   rc=0
   nsenter --target 1 --net --mount --uts --ipc --pid -- /bin/bash < /scripts/supplicant-runner.sh || rc=$?
   case $rc in
@@ -27,7 +27,7 @@ while true; do
       mark healthy
       rm -f "$health/unauthorized"
       ;;
-    # Fabric rejected a port. Stay Ready: an outage hits every node at once.
+    # Fabric rejected a port. Stay Ready, an outage hits every node at once.
     2)
       mark healthy
       mark unauthorized
@@ -36,7 +36,7 @@ while true; do
       echo "supplicant-runner: reconciliation pass failed"
       ;;
   esac
-  # Liveness only, not readiness: a restart kills this pod's supplicants.
+  # Liveness only, not readiness. A restart kills this pod's supplicants.
   mark alive
   sleep "${interval}"
 done

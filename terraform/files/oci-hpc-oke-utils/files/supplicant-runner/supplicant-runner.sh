@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Runs 802.1X for RDMA PFs that Dranet moved into pod netns: the OCA
+# Runs 802.1X for RDMA PFs that Dranet moved into pod netns. The OCA
 # supplicant stays on the host and cannot answer the switch reauth there.
 # One idempotent pass per invocation, on the host.
 #
 # Exit 0 clean, 1 the runner itself failed, 2 supplicants are running but
-# the fabric will not authorize them. The caller keeps the node Ready on 2:
-# a RADIUS outage hits every node at once and is not a runner fault.
+# the fabric will not authorize them. The caller keeps the node Ready on 2,
+# because a RADIUS outage hits every node at once and is not our fault.
 set -uo pipefail
 
-# Everything below assumes the host filesystem, so fail closed if the
-# namespace entry did not happen.
+# Everything below assumes host paths, so fail closed if we are not there.
 if [ "$(readlink /proc/self/ns/mnt 2>/dev/null)" != "$(readlink /proc/1/ns/mnt 2>/dev/null)" ]; then
   echo "supplicant-runner: not in the host mount namespace, refusing to run"
   exit 1
@@ -28,8 +27,8 @@ unauthorized=()
 
 log() { echo "supplicant-runner: $*"; }
 
-# The OCA units are the authoritative list of managed PFs. The bare
-# template name would expand to an empty interface, so skip it.
+# The OCA units are the authoritative list of managed PFs.
+# The bare template name expands to an empty interface, so skip it.
 ifaces=()
 for unit in /etc/systemd/system/wpa_supplicant-wired@*.service; do
   [ -e "$unit" ] || continue
@@ -38,14 +37,14 @@ for unit in /etc/systemd/system/wpa_supplicant-wired@*.service; do
   [ -n "$unit" ] && ifaces+=("$unit")
 done
 
-# Nothing to manage here. Checked before the tools below, so a node without
-# the RDMA auth stack is a clean no-op rather than permanently NotReady.
+# Checked before the tools below so a node with no RDMA auth stack is a
+# clean no-op rather than permanently NotReady.
 if [ ${#ifaces[@]} -eq 0 ]; then
   exit 0
 fi
 
-# On a node that does have PFs, these are required: without them the runner
-# cannot authenticate or tell whether it did.
+# Required once a node has PFs. Without them we cannot authenticate,
+# or even tell whether we did.
 for tool in wpa_supplicant wpa_cli nsenter ip; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     log "required tool $tool not found, refusing to run"
@@ -69,9 +68,9 @@ bus_info() {
   nsenter --net="$1" ethtool -i "$2" 2>/dev/null | awk '/^bus-info:/ {print $2}'
 }
 
-# Namespace state, built at most once per pass and only when a PF is
-# actually missing. Forking readlink per process costs seconds on a node
-# with thousands of them, and this used to run per interface.
+# Built at most once per pass, and only when a PF is actually missing.
+# Forking readlink per process costs seconds on a busy node, and this
+# used to run once per interface.
 declare -A NS_PIDS=()
 declare -A NS_IFACES=()
 declare -A OUR_PIDS=()
@@ -111,8 +110,9 @@ netns_has_iface() {
   return 1
 }
 
-# Prints "<pid> <current-name>". A claim can rename a PF to another PF's
-# name, so a name match only counts when the PCI address agrees.
+# Prints "<pid> <current-name>".
+# A claim can rename a PF to another PF's name, so a name match only
+# counts when the PCI address agrees.
 find_in_netns() {
   local iface=$1 pci=$2 ns pid name
   build_proc_map
@@ -142,9 +142,9 @@ find_in_netns() {
   return 1
 }
 
-# Pidfiles outlive their supplicants, so check the pid is still ours before
-# trusting or killing it. The config path is unique per interface; the netns
-# test also keeps the host's OCA supplicants safe.
+# Pidfiles outlive their supplicants, so check the pid is still ours
+# before trusting or killing it. The config path is unique per interface,
+# and the netns test keeps the host's OCA supplicants safe.
 runner_pid() {
   local iface=$1 pidfile="$STATE_DIR/$1.pid" pid
   [ -f "$pidfile" ] || return 1
@@ -164,9 +164,9 @@ runner_pid() {
   echo "$pid"
 }
 
-# A supplicant whose pidfile was lost can never be found by runner_pid
-# again, and it would pin the pod netns forever. Its argv still names this
-# interface's config, so recover it from the namespace map.
+# A supplicant whose pidfile was lost is invisible to runner_pid and would
+# pin the pod netns forever. Its argv still names this interface's config,
+# so find it that way.
 adopt_orphan() {
   local iface=$1 ns pid
   build_proc_map
@@ -183,8 +183,8 @@ adopt_orphan() {
   return 1
 }
 
-# Waits for the process to go before deleting its state, so the caller can
-# start a replacement without racing the old one for the control socket.
+# Waits for the process to go before deleting its state, so a replacement
+# does not race the old one for the control socket.
 stop_runner() {
   local iface=$1 pid waited
   if ! pid=$(runner_pid "$iface"); then
@@ -205,14 +205,14 @@ stop_runner() {
   rm -rf "$STATE_DIR/ctrl/$iface"
 }
 
-# Kept out of stop_runner: the window must measure how long the port has
-# been failing, or a rejected port looks healthy by restarting inside it.
+# Kept out of stop_runner so the window measures how long the port has been
+# failing. Otherwise a rejected port looks healthy by restarting inside it.
 clear_auth_state() {
   rm -f "$STATE_DIR/$1.unauth" "$STATE_DIR/$1.restart" "$STATE_DIR/$1.missing"
 }
 
-# Interfaces go briefly missing while a pod is torn down, so only report a
-# failure once one has been undiscoverable for longer than that.
+# Interfaces go briefly missing while a pod is torn down. Only report one
+# that has been undiscoverable for longer than that.
 missing_too_long() {
   local iface=$1 since now
   now=$(date +%s)
@@ -241,14 +241,14 @@ netns_has_other_procs() {
   return 1
 }
 
-# A live daemon proves nothing: EAP can be rejected while it keeps running.
+# A live daemon proves nothing. EAP can be rejected while it keeps running.
 supplicant_authorized() {
   local iface=$1 podname=$2
   wpa_cli -p "$STATE_DIR/ctrl/$iface" -i "$podname" status 2>/dev/null | grep -q '^suppPortStatus=Authorized'
 }
 
-# Private control socket per interface: in-pod names are only unique per
-# netns, so a shared directory can collide.
+# Private control socket per interface, because in-pod names are only unique
+# per netns and a shared directory can collide.
 make_conf() {
   local iface=$1
   local conf="$STATE_DIR/$iface.conf"
@@ -268,7 +268,7 @@ running=()
 for iface in "${ifaces[@]}"; do
   pidfile="$STATE_DIR/$iface.pid"
 
-  # PF is on the host: the OCA plugin owns authentication again.
+  # PF is on the host, so the OCA plugin owns authentication again.
   if [ -e "/sys/class/net/$iface" ]; then
     [ -f "$pidfile" ] && stop_runner "$iface"
     clear_auth_state "$iface"
@@ -309,7 +309,7 @@ for iface in "${ifaces[@]}"; do
         continue
       fi
 
-      # Reported but not a runner fault: the supplicant is running and the
+      # Reported but not a runner fault. The supplicant is running and the
       # fabric is refusing it, which during a RADIUS outage is true on every
       # node at once. Summarised at the end of the pass.
       unauthorized+=("$iface")
@@ -350,7 +350,7 @@ for iface in "${ifaces[@]}"; do
       fail=1
     fi
   elif missing_too_long "$iface"; then
-    # Claimed but undiscoverable well past a teardown: report it rather
+    # Claimed but undiscoverable long after any teardown. Report it rather
     # than looking healthy while the port is unauthenticated.
     log "$iface not found in host netns or any pod netns"
     fail=1
@@ -376,8 +376,8 @@ if [ "$last_mtime" != "none" ] && [ "$p12_mtime" != "$last_mtime" ] && [ "$p12_m
     fi
   done
 fi
-# Recorded only after the rotation was acted on, so a pass that dies partway
-# retries instead of marking the new certificate as handled.
+# Recorded only after acting on the rotation, so a pass that dies partway
+# retries instead of marking the new certificate handled.
 [ "$p12_mtime" != missing ] && echo "$p12_mtime" > "$STATE_DIR/p12.mtime"
 
 if [ ${#unauthorized[@]} -gt 0 ]; then
