@@ -55,9 +55,24 @@ for tool in wpa_supplicant wpa_cli nsenter ip; do
   fi
 done
 
-mkdir -p "$STATE_DIR"
+# The failure windows below live in these files, so a state directory we
+# cannot write would silently reset them every pass and hide a dead port.
+if ! mkdir -p "$STATE_DIR" 2>/dev/null || ! : > "$STATE_DIR/.probe" 2>/dev/null; then
+  log "cannot write $STATE_DIR, refusing to run"
+  exit 1
+fi
+rm -f "$STATE_DIR/.probe"
 # Holds config copies carrying the EAP-TLS key password.
 chmod 700 "$STATE_DIR"
+
+# Same reasoning per file, since a full filesystem fails writes one at a time.
+write_state() {
+  if ! echo "$2" > "$STATE_DIR/$1" 2>/dev/null; then
+    log "cannot write $STATE_DIR/$1"
+    fail=1
+    return 1
+  fi
+}
 
 host_ns=$(readlink /proc/1/ns/net)
 
@@ -217,7 +232,7 @@ missing_too_long() {
   now=$(date +%s)
   since=$(cat "$STATE_DIR/$iface.missing" 2>/dev/null || echo "")
   if [ -z "$since" ]; then
-    echo "$now" > "$STATE_DIR/$iface.missing"
+    write_state "$iface.missing" "$now"
     return 1
   fi
   [ $(( now - since )) -ge "$AUTH_GRACE" ]
@@ -241,9 +256,17 @@ netns_has_other_procs() {
 }
 
 # A live daemon proves nothing. EAP can be rejected while it keeps running.
-supplicant_authorized() {
-  local iface=$1 podname=$2
-  wpa_cli -p "$STATE_DIR/ctrl/$iface" -i "$podname" status 2>/dev/null | grep -q '^suppPortStatus=Authorized'
+# Returns 0 authorized, 1 the fabric rejected it, 2 it did not answer.
+# The caller must keep 1 and 2 apart. A port the fabric refuses is not our
+# problem, but a supplicant we cannot reach on its own control socket is.
+supplicant_status() {
+  local iface=$1 podname=$2 out
+  out=$(wpa_cli -p "$STATE_DIR/ctrl/$iface" -i "$podname" status 2>/dev/null) || return 2
+  case "$out" in
+    *suppPortStatus=Authorized*) return 0 ;;
+    *suppPortStatus=*) return 1 ;;
+  esac
+  return 2
 }
 
 # Private control socket per interface.
@@ -274,7 +297,7 @@ for iface in "${ifaces[@]}"; do
     # Record the PCI address now, while the name still maps to the device.
     pci=$(basename "$(readlink -f "/sys/class/net/$iface/device" 2>/dev/null)")
     if [ -n "$pci" ] && [ "$pci" != "/" ]; then
-      echo "$pci" > "$STATE_DIR/$iface.pci"
+      write_state "$iface.pci" "$pci"
     fi
     continue
   fi
@@ -291,7 +314,8 @@ for iface in "${ifaces[@]}"; do
         continue
       fi
       now=$(date +%s)
-      if supplicant_authorized "$iface" "$podname"; then
+      supplicant_status "$iface" "$podname" && sup=0 || sup=$?
+      if [ "$sup" -eq 0 ]; then
         clear_auth_state "$iface"
         running+=("$iface")
         continue
@@ -300,7 +324,7 @@ for iface in "${ifaces[@]}"; do
       unauth_since=$(cat "$STATE_DIR/$iface.unauth" 2>/dev/null || echo "")
       if [ -z "$unauth_since" ]; then
         unauth_since=$now
-        echo "$unauth_since" > "$STATE_DIR/$iface.unauth"
+        write_state "$iface.unauth" "$unauth_since"
       fi
       if [ $(( now - unauth_since )) -lt "$AUTH_GRACE" ]; then
         # Initial handshake or a brief reauth flap.
@@ -308,22 +332,32 @@ for iface in "${ifaces[@]}"; do
         continue
       fi
 
-      # Reported, but not a runner fault.
-      # The supplicant is up and the fabric is refusing it.
-      unauthorized+=("$iface")
+      if [ "$sup" -eq 2 ]; then
+        # We cannot reach a supplicant we started, which is ours to fix.
+        log "$iface supplicant has not answered its control socket for $(( now - unauth_since ))s"
+        fail=1
+      else
+        # Reported, but not a runner fault.
+        # The supplicant is up and the fabric is refusing it.
+        unauthorized+=("$iface")
+      fi
       last_restart=$(cat "$STATE_DIR/$iface.restart" 2>/dev/null || echo 0)
       if [ $(( now - last_restart )) -lt "$AUTH_GRACE" ]; then
         running+=("$iface")
         continue
       fi
       log "$iface unauthorized for $(( now - unauth_since ))s, restarting its supplicant"
-      echo "$now" > "$STATE_DIR/$iface.restart"
+      write_state "$iface.restart" "$now"
       stop_runner "$iface"
     else
       # Pod is gone or the PF moved to a different claim.
       stop_runner "$iface"
       clear_auth_state "$iface"
     fi
+  elif adopt_orphan "$iface" >/dev/null; then
+    # Pidfile lost, but the process is still out there holding the control
+    # socket and the pod netns. Nothing can replace it until it is gone.
+    stop_runner "$iface"
   fi
 
   pci=$(cat "$STATE_DIR/$iface.pci" 2>/dev/null || true)
@@ -339,7 +373,7 @@ for iface in "${ifaces[@]}"; do
     # Without -s a daemonized supplicant discards its log output.
     if nsenter --net="/proc/$target/ns/net" \
       wpa_supplicant -B -s -Dwired -i "$podname" -c "$STATE_DIR/$iface.conf" -P "$pidfile"; then
-      echo "$podname" > "$STATE_DIR/$iface.podname"
+      write_state "$iface.podname" "$podname"
       rm -f "$STATE_DIR/$iface.missing"
       running+=("$iface")
     else
@@ -376,7 +410,7 @@ if [ "$last_mtime" != "none" ] && [ "$p12_mtime" != "$last_mtime" ] && [ "$p12_m
 fi
 # Recorded only after acting on the rotation.
 # A pass that dies partway then retries instead of marking it handled.
-[ "$p12_mtime" != missing ] && echo "$p12_mtime" > "$STATE_DIR/p12.mtime"
+[ "$p12_mtime" != missing ] && write_state p12.mtime "$p12_mtime"
 
 if [ ${#unauthorized[@]} -gt 0 ]; then
   log "UNAUTHORIZED: ${#unauthorized[@]} of ${#ifaces[@]} interfaces rejected by the fabric: ${unauthorized[*]}"
