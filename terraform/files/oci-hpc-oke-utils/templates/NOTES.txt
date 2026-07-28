@@ -44,7 +44,7 @@ Supplicant Runner:
     kubectl get nodes -L node.kubernetes.io/instance-type
 {{- end }}
 
-  Pods stay Ready when the fabric rejects a port; alert on the log line:
+  Pods stay Ready when a port is not authorized; alert on the log line:
     kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
 {{- end }}
 

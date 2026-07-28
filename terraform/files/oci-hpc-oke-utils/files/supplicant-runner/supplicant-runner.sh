@@ -8,9 +8,11 @@
 # Exit codes:
 #   0  nothing to report. Interfaces inside their grace window count here,
 #      so this does not mean every port is authorized
-#   1  the runner failed at something it owns, so its pod goes NotReady
-#   2  supplicants are up but the fabric is rejecting them. The caller keeps
-#      the pod Ready, since a fabric outage hits every node at once
+#   1  the runner cannot do its job on this node, so its pod goes NotReady
+#   2  supplicants are up but their ports are not authorized. Usually the
+#      fabric, sometimes a bad certificate, and the two look the same from
+#      here. The caller keeps the pod Ready either way, since a fabric
+#      outage hits every node at once
 set -uo pipefail
 
 # Everything below assumes host paths, so bail out if nsenter did not work.
@@ -251,7 +253,7 @@ netns_has_other_procs() {
 }
 
 # A live daemon proves nothing. EAP can be rejected while it keeps running.
-# Returns 0 authorized, 1 the fabric rejected it, 2 it did not answer.
+# Returns 0 authorized, 1 running but not authorized, 2 it did not answer.
 # The caller must keep 1 and 2 apart. A port the fabric refuses is not our
 # problem, but a supplicant we cannot reach on its own control socket is.
 supplicant_status() {
@@ -333,7 +335,7 @@ for iface in "${ifaces[@]}"; do
         fail=1
       else
         # Reported, but not a runner fault.
-        # The supplicant is up and the fabric is refusing it.
+        # The supplicant is up and the port did not authorize.
         unauthorized+=("$iface")
       fi
       last_restart=$(cat "$STATE_DIR/$iface.restart" 2>/dev/null || echo 0)
@@ -359,6 +361,13 @@ for iface in "${ifaces[@]}"; do
   if found=$(find_in_netns "$iface" "$pci"); then
     target=${found%% *}
     podname=${found##* }
+    # wpa_supplicant reads this key from the config it is given, so starting
+    # one without it just parks a daemon that can never authenticate.
+    if [ ! -r "$WPA_P12" ]; then
+      log "client certificate $WPA_P12 is missing or unreadable, not starting a supplicant for $iface"
+      fail=1
+      continue
+    fi
     if ! make_conf "$iface"; then
       log "cannot create supplicant config for $iface ($WPA_CONF missing)"
       fail=1
@@ -385,9 +394,19 @@ for iface in "${ifaces[@]}"; do
 done
 
 # The OCA cannot reach these supplicants, so forward cert rotations here.
-p12_mtime=$(stat -c %Y "$WPA_P12" 2>/dev/null || echo missing)
+# Unreadable counts as missing, since a rotation we cannot read is one we
+# cannot forward.
+p12_mtime=missing
+[ -r "$WPA_P12" ] && p12_mtime=$(stat -c %Y "$WPA_P12" 2>/dev/null || echo missing)
 last_mtime=$(cat "$STATE_DIR/p12.mtime" 2>/dev/null || echo none)
-if [ "$last_mtime" != "none" ] && [ "$p12_mtime" != "$last_mtime" ] && [ "$p12_mtime" != missing ]; then
+if [ "$p12_mtime" = missing ]; then
+  # Only a fault once we are the ones keeping ports authenticated. Before any
+  # claim the OCA owns them and may not have written the certificate yet.
+  if [ ${#running[@]} -gt 0 ]; then
+    log "client certificate $WPA_P12 is missing or unreadable, rotations cannot be forwarded"
+    fail=1
+  fi
+elif [ "$last_mtime" != "none" ] && [ "$p12_mtime" != "$last_mtime" ]; then
   for iface in "${running[@]}"; do
     podname=$(cat "$STATE_DIR/$iface.podname" 2>/dev/null || echo "$iface")
     log "certificate rotated, reconfiguring supplicant for $iface"
@@ -408,7 +427,7 @@ fi
 [ "$p12_mtime" != missing ] && write_state p12.mtime "$p12_mtime"
 
 if [ ${#unauthorized[@]} -gt 0 ]; then
-  log "UNAUTHORIZED: ${#unauthorized[@]} of ${#ifaces[@]} interfaces rejected by the fabric: ${unauthorized[*]}"
+  log "UNAUTHORIZED: supplicant running but port not authorized on ${#unauthorized[@]} of ${#ifaces[@]} interfaces: ${unauthorized[*]}"
 fi
 
 [ "$fail" -ne 0 ] && exit 1

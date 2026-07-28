@@ -10,7 +10,7 @@
 | [Hostexec](#hostexec) | Enabled in the chart, disabled by default in the Terraform stack | Runs shell scripts on the host via `nsenter` |
 | [Supplicant Runner](#supplicant-runner) | Disabled | Keeps 802.1X authentication alive for RDMA interfaces moved into pod network namespaces by Dranet |
 
-The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec and the supplicant runner have no node selector and run on all nodes.
+The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes. The supplicant runner targets RDMA-capable shapes matched on `node.kubernetes.io/instance-type`.
 
 ## Manual Installation
 
@@ -579,7 +579,7 @@ State lives in `/run/oke-supplicant-runner` and clears on reboot.
 
 ### Monitoring
 
-Readiness reflects whether the *runner* is working, not whether the fabric authorizes the ports. Its pod goes NotReady only for faults it can fix, such as a config it cannot write, a supplicant that will not start, or a claimed interface it cannot find. When supplicants are running but the fabric rejects them, as during a RADIUS outage, the pods stay Ready and the condition is reported instead, because taking every runner pod NotReady at once would fail concurrent applies without adding information.
+Readiness reflects whether the *runner* is working, not whether the ports are authorized. Its pod goes NotReady only for faults it can act on, such as a config it cannot write, a supplicant that will not start, a claimed interface it cannot find, or a missing client certificate. When supplicants are running but their ports are not authorized, as during a RADIUS outage, the pods stay Ready and the condition is reported instead, because taking every runner pod NotReady at once would fail concurrent applies without adding information.
 
 This is the readiness of the runner's own pod, not the node. The node's Ready condition is untouched and workloads keep scheduling, so do not expect a failing runner to drain anything. What it does affect is `helm --wait`, rollouts of this DaemonSet, and anything watching pod readiness.
 
@@ -590,6 +590,8 @@ kubectl logs -n kube-system -l app.kubernetes.io/component=supplicant-runner | g
 ```
 
 An unauthorized port is retried every 90 seconds indefinitely, so authentication resumes on its own once the fabric recovers.
+
+The line says the port did not authorize, not why. The usual cause is fabric side, but an expired or mismatched client certificate is rejected by RADIUS and looks identical from the supplicant's side, so the runner does not guess. If the line names every interface on one node while other nodes are quiet, suspect that node's certificate; if it appears across nodes at once, suspect the fabric. A certificate that is missing or unreadable outright is caught separately and does take the pod NotReady.
 
 ### Configuration
 
