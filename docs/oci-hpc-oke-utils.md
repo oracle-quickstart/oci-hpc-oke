@@ -579,9 +579,11 @@ State lives in `/run/oke-supplicant-runner` and clears on reboot.
 
 ### Monitoring
 
-Readiness reflects whether the *runner* is working, not whether the fabric authorizes the ports. A node goes NotReady only for faults it can fix (config unwritable, supplicant will not start, an interface it cannot find). When supplicants are running but the fabric rejects them, as during a RADIUS outage, nodes stay Ready and the condition is reported instead. Taking the whole fleet NotReady for a fabric outage would break any concurrent apply without adding information.
+Readiness reflects whether the *runner* is working, not whether the fabric authorizes the ports. Its pod goes NotReady only for faults it can fix, such as a config it cannot write, a supplicant that will not start, or a claimed interface it cannot find. When supplicants are running but the fabric rejects them, as during a RADIUS outage, the pods stay Ready and the condition is reported instead, because taking every runner pod NotReady at once would fail concurrent applies without adding information.
 
-Alert on this line, emitted once per pass and naming the affected interfaces:
+This is the readiness of the runner's own pod, not the node. The node's Ready condition is untouched and workloads keep scheduling, so do not expect a failing runner to drain anything. What it does affect is `helm --wait`, rollouts of this DaemonSet, and anything watching pod readiness.
+
+The authoritative signal is the log line below, emitted once per pass and naming the affected interfaces. Alert on it:
 
 ```bash
 kubectl logs -n kube-system -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED

@@ -37,8 +37,10 @@ resource "helm_release" "oci_hpc_oke_utils" {
     hostexec = {
       enabled = var.install_hostexec
     }
-    supplicantRunner = {
-      enabled = var.install_supplicant_runner
-    }
+    supplicantRunner = merge(
+      { enabled = var.install_supplicant_runner },
+      # Empty keeps the chart's built-in RDMA shape list.
+      length(var.supplicant_runner_shapes) > 0 ? { shapes = var.supplicant_runner_shapes } : {}
+    )
   })]
 }

@@ -1402,6 +1402,12 @@ variable "install_supplicant_runner" {
   description = "Deploy the supplicant runner DaemonSet to keep 802.1X authentication alive for RDMA interfaces moved into pod network namespaces by Dranet."
 }
 
+variable "supplicant_runner_shapes" {
+  default     = []
+  type        = list(string)
+  description = "Shapes the supplicant runner may schedule on, matched on node.kubernetes.io/instance-type. Empty keeps the chart's built-in RDMA shape list. Set this if your shape is RDMA capable but not in that list, otherwise the DaemonSet schedules nowhere."
+}
+
 
 # K8s resources deployment method
 variable "deploy_to_oke_from_orm" {

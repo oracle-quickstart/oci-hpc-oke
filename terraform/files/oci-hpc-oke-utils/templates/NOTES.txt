@@ -34,7 +34,17 @@ Supplicant Runner:
   Shapes:    {{ if .Values.supplicantRunner.affinity }}custom affinity{{ else if .Values.supplicantRunner.shapes }}{{ len .Values.supplicantRunner.shapes }} RDMA shapes{{ else }}all nodes{{ end }}
 
   Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
-  Nodes stay Ready when the fabric rejects a port; alert on the log line:
+{{- if and (not .Values.supplicantRunner.affinity) .Values.supplicantRunner.shapes }}
+
+  This install succeeds even when no node matches those shapes, so check
+  that it landed somewhere:
+    kubectl get ds -n {{ .Release.Namespace }} {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
+  A desired count of 0 means your RDMA shape is not in supplicantRunner.shapes
+  (Terraform: supplicant_runner_shapes). Compare against:
+    kubectl get nodes -L node.kubernetes.io/instance-type
+{{- end }}
+
+  Pods stay Ready when the fabric rejects a port; alert on the log line:
     kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
 {{- end }}
 

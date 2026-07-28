@@ -2,7 +2,9 @@ labeler:
   enabled: true
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: "0.7.12-python3.12-bookworm-slim"
+    # Pinned by digest so a retagged image cannot reach a privileged,
+    # host-namespace pod. The tag is kept for readability only.
+    tag: "0.7.12-python3.12-bookworm-slim@sha256:a071e4d58c7697cda6f8a8c3e64c2ffdf2b9246c6991dbd92d3c3b5ae61b5d9a"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations:
@@ -58,7 +60,9 @@ annotator:
   enabled: false
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: "0.7.12-python3.12-bookworm-slim"
+    # Pinned by digest so a retagged image cannot reach a privileged,
+    # host-namespace pod. The tag is kept for readability only.
+    tag: "0.7.12-python3.12-bookworm-slim@sha256:a071e4d58c7697cda6f8a8c3e64c2ffdf2b9246c6991dbd92d3c3b5ae61b5d9a"
     pullPolicy: IfNotPresent
   imagePullSecrets: []
   tolerations:
@@ -177,7 +181,9 @@ hostexec:
   podLabels: {}
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: "0.7.12-python3.12-bookworm-slim"
+    # Pinned by digest so a retagged image cannot reach a privileged,
+    # host-namespace pod. The tag is kept for readability only.
+    tag: "0.7.12-python3.12-bookworm-slim@sha256:a071e4d58c7697cda6f8a8c3e64c2ffdf2b9246c6991dbd92d3c3b5ae61b5d9a"
     pullPolicy: IfNotPresent
     resources:
       requests:
@@ -253,7 +259,9 @@ supplicantRunner:
   podLabels: {}
   image:
     repository: ghcr.io/astral-sh/uv
-    tag: "0.7.12-python3.12-bookworm-slim"
+    # Pinned by digest so a retagged image cannot reach a privileged,
+    # host-namespace pod. The tag is kept for readability only.
+    tag: "0.7.12-python3.12-bookworm-slim@sha256:a071e4d58c7697cda6f8a8c3e64c2ffdf2b9246c6991dbd92d3c3b5ae61b5d9a"
     pullPolicy: IfNotPresent
     resources:
       requests:

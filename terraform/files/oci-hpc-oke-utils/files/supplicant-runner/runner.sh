@@ -27,7 +27,7 @@ while true; do
       mark healthy
       rm -f "$health/unauthorized"
       ;;
-    # Fabric rejected a port. Stay Ready, because an outage hits every node.
+    # Fabric rejected a port. Keep this pod Ready, an outage hits every node.
     2)
       mark healthy
       mark unauthorized

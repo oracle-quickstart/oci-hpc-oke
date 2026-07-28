@@ -6,10 +6,11 @@
 # Runs on the host. One pass per invocation, safe to repeat.
 #
 # Exit codes:
-#   0  all managed interfaces are authorized
-#   1  the runner failed at something it owns, so the node goes NotReady
-#   2  supplicants are up but the fabric is rejecting them. The caller
-#      keeps the node Ready, since a fabric outage hits every node at once
+#   0  nothing to report. Interfaces inside their grace window count here,
+#      so this does not mean every port is authorized
+#   1  the runner failed at something it owns, so its pod goes NotReady
+#   2  supplicants are up but the fabric is rejecting them. The caller keeps
+#      the pod Ready, since a fabric outage hits every node at once
 set -uo pipefail
 
 # Everything below assumes host paths, so bail out if nsenter did not work.
@@ -48,7 +49,7 @@ fi
 
 # Required once a node has PFs.
 # Without them the runner cannot authenticate, or tell whether it did.
-for tool in wpa_supplicant wpa_cli nsenter ip; do
+for tool in wpa_supplicant wpa_cli nsenter ip ethtool; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     log "required tool $tool not found, refusing to run"
     exit 1
@@ -75,12 +76,6 @@ write_state() {
 }
 
 host_ns=$(readlink /proc/1/ns/net)
-
-have_ethtool=yes
-if ! command -v ethtool >/dev/null 2>&1; then
-  have_ethtool=no
-  log "ethtool not found, renamed interfaces cannot be matched by PCI address"
-fi
 
 bus_info() {
   nsenter --net="$1" ethtool -i "$2" 2>/dev/null | awk '/^bus-info:/ {print $2}'
@@ -135,14 +130,14 @@ find_in_netns() {
   for ns in "${!NS_PIDS[@]}"; do
     pid=${NS_PIDS[$ns]%% *}
     if netns_has_iface "$ns" "$iface"; then
-      if [ -z "$pci" ] || [ "$have_ethtool" != yes ] || [ "$(bus_info "/proc/$pid/ns/net" "$iface")" = "$pci" ]; then
+      if [ -z "$pci" ] || [ "$(bus_info "/proc/$pid/ns/net" "$iface")" = "$pci" ]; then
         echo "$pid $iface"
         return 0
       fi
     fi
   done
   # Nothing matched by name, so look for the device itself.
-  if [ -z "$pci" ] || [ "$have_ethtool" != yes ]; then
+  if [ -z "$pci" ]; then
     return 1
   fi
   for ns in "${!NS_PIDS[@]}"; do

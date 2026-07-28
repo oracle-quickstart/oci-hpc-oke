@@ -41,6 +41,7 @@ variableGroups:
       - install_image_prepuller
       - install_hostexec
       - install_supplicant_runner
+      - supplicant_runner_shapes
       # Monitoring
       - wildcard_dns_domain
       # Cluster setup
