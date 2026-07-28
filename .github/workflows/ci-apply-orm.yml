@@ -150,7 +150,7 @@ jobs:
             core.setOutput('head_sha', pr.data.head.sha);
             core.setOutput('base_ref', pr.data.base.ref);
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: github.event_name == 'issue_comment'
 
       - name: Parse topology and overrides from comment
@@ -186,7 +186,7 @@ jobs:
       OVERRIDES_JSON: ${{ inputs.overrides || needs.check-orm-trigger.outputs.overrides || '{}' }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: >-
             ${{
