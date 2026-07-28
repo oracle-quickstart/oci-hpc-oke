@@ -223,6 +223,23 @@ supplicantRunner:
   interval: 10
   priorityClassName: system-node-critical
   terminationGracePeriodSeconds: 30
+  # Not privileged. These are what the work actually needs: SYS_ADMIN and
+  # SYS_PTRACE to join another namespace, NET_ADMIN and NET_RAW for the
+  # supplicant's EAPOL socket, KILL to stop supplicants it started, and
+  # DAC_OVERRIDE for host state under /run. Staying unprivileged keeps the
+  # seccomp and AppArmor profiles and the device and /proc restrictions.
+  securityContext:
+    privileged: false
+    capabilities:
+      drop: ["ALL"]
+      add:
+        - SYS_ADMIN
+        - SYS_PTRACE
+        - SYS_CHROOT
+        - NET_ADMIN
+        - NET_RAW
+        - KILL
+        - DAC_OVERRIDE
   imagePullSecrets: []
   tolerations:
     - operator: Exists

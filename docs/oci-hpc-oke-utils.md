@@ -605,6 +605,21 @@ Shapes are matched on `node.kubernetes.io/instance-type` rather than GPU labels,
 
 In Terraform-managed installs set `install_supplicant_runner = true` rather than editing Helm values, otherwise the next apply reverts it.
 
+### Privileges
+
+The DaemonSet runs unprivileged with an explicit capability set rather than `privileged: true`:
+
+| Capability | Needed for |
+|------------|-----------|
+| `SYS_ADMIN`, `SYS_PTRACE`, `SYS_CHROOT` | Joining the host mount namespace and a pod's network namespace |
+| `NET_ADMIN`, `NET_RAW` | The supplicant's EAPOL packet socket |
+| `KILL` | Stopping supplicants it started |
+| `DAC_OVERRIDE` | Host state under `/run` |
+
+`privileged: true` would additionally disable the seccomp and AppArmor profiles, unmask `/proc` and `/sys`, and permit every device. Keeping those confinements is worthwhile even though `SYS_ADMIN` remains powerful on its own.
+
+This was validated on Ubuntu 24.04 with kernel 6.8 and cri-o. A host with a stricter AppArmor profile could refuse `setns` even with `SYS_ADMIN`, so `supplicantRunner.securityContext` is a plain values field and can be set back to `privileged: true` without forking the chart.
+
 ### Caveats
 
 - Brief gaps without a supplicant are normal: up to `interval` seconds after Dranet claims an interface, and a few passes after a pod exits before the interface reaches the host again. The port stays authorized from its existing session throughout.

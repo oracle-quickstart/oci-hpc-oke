@@ -78,7 +78,7 @@ spec:
             - name: SUPPLICANT_RUNNER_INTERVAL
               value: {{ .Values.supplicantRunner.interval | quote }}
           securityContext:
-            privileged: true
+            {{- toYaml .Values.supplicantRunner.securityContext | nindent 12 }}
           # Covers a slow pass plus the sleep between passes.
           # The floor stops a lower interval from tightening the window.
           {{- $stale := max (add (mul .Values.supplicantRunner.interval 6) 60) 180 | int }}
