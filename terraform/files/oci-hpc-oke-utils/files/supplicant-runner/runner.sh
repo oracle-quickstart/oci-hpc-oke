@@ -12,6 +12,12 @@ fi
 
 mkdir -p "$health"
 
+# The emptyDir outlives a container restart, but the supplicants this pod
+# started do not. Stale markers would let the probes pass on the previous
+# container's timestamps while nothing is running, so start from nothing and
+# make this loop earn them back.
+rm -f "$health"/alive "$health"/healthy "$health"/unauthorized
+
 # Written via rename so a probe never reads a half-written marker.
 mark() {
   date +%s > "$health/.$1.tmp" && mv -f "$health/.$1.tmp" "$health/$1"
