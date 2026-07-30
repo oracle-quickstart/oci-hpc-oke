@@ -12,9 +12,14 @@
           "type": "boolean"
         },
         "interval": {
-          "description": "Seconds between reconciliation passes. A non-positive or non-integer value would reach sleep and CrashLoop every node.",
+          "description": "Upper bound in seconds between reconciliation passes. A host link event reconciles sooner. A non-positive or non-integer value would reach read and CrashLoop every node.",
           "type": "integer",
           "minimum": 1
+        },
+        "settleMs": {
+          "description": "Milliseconds of quiet to wait after host link events before reconciling, so a pass does not run while Dranet is still configuring a PF. 0 reconciles immediately.",
+          "type": "integer",
+          "minimum": 0
         },
         "terminationGracePeriodSeconds": {
           "type": "integer",

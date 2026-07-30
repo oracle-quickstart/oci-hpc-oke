@@ -124,6 +124,10 @@ netns_has_iface() {
   return 1
 }
 
+netns_iface_is_up() {
+  nsenter --net="$1" ip -o link show up dev "$2" 2>/dev/null | grep -q .
+}
+
 # Prints "<pid> <current-name>". A claim can rename a PF to another PF's name,
 # so a name match is only trusted when the PCI address agrees.
 find_in_netns() {
@@ -222,8 +226,8 @@ clear_auth_state() {
   rm -f "$STATE_DIR/$1.unauth" "$STATE_DIR/$1.restart" "$STATE_DIR/$1.missing"
 }
 
-# Interfaces go briefly missing while a pod is torn down.
-# Only report one that stays undiscoverable for longer than that.
+# Interfaces can be missing or down briefly while Dranet moves them.
+# Only report one that stays unavailable for longer than that.
 missing_too_long() {
   local iface=$1 since now
   now=$(date +%s)
@@ -361,6 +365,14 @@ for iface in "${ifaces[@]}"; do
   if found=$(find_in_netns "$iface" "$pci"); then
     target=${found%% *}
     podname=${found##* }
+    # Dranet brings the PF up only after its namespace configuration is done.
+    if ! netns_iface_is_up "/proc/$target/ns/net" "$podname"; then
+      if missing_too_long "$iface"; then
+        log "$iface: pod interface $podname did not come up within ${AUTH_GRACE}s"
+        fail=1
+      fi
+      continue
+    fi
     # wpa_supplicant reads this key from the config it is given, so starting
     # one without it just parks a daemon that can never authenticate.
     if [ ! -r "$WPA_P12" ]; then

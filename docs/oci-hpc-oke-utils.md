@@ -558,7 +558,7 @@ The ConfigMap checksum is included as a pod annotation, so updating the script t
 
 ## Supplicant Runner
 
-The supplicant runner keeps 802.1X (WPA) authentication alive for RDMA interfaces that [Dranet](https://github.com/google/dranet) moves into pod network namespaces. Only enable it on clusters that use Dranet with PF passthrough.
+The supplicant runner keeps 802.1X (WPA) authentication alive for RDMA interfaces that [Dranet](https://github.com/kubernetes-sigs/dranet) moves into pod network namespaces. Only enable it on clusters that use Dranet with PF passthrough.
 
 ### The Problem
 
@@ -568,7 +568,9 @@ You can spot this on a node without the runner installed: the agent's supplicant
 
 ### How It Works
 
-Every `interval` seconds the DaemonSet runs a pass on the host that:
+The DaemonSet runs a pass at startup, after a host link event, or when `interval` expires. Link events are held by one persistent `ip monitor link` process, so events that arrive during a pass remain queued. After an event, the runner waits for `settleMs` of quiet before starting the next pass. The settle is bounded at `settleMs` plus 250 milliseconds or 256 events so sustained link churn cannot starve reconciliation.
+
+Each pass:
 
 1. Finds RDMA interfaces missing from the host network namespace.
 2. Locates the pod namespace holding each one and starts a `wpa_supplicant` there with `nsenter --net`. Only the network namespace is entered, so certificates stay on the host and workload pods need no privileges or spec changes.
@@ -576,6 +578,8 @@ Every `interval` seconds the DaemonSet runs a pass on the host that:
 4. Forwards certificate rotations to the supplicants it started, which the agent cannot reach.
 
 State lives in `/run/oke-supplicant-runner` and clears on reboot.
+
+If the link monitor exits, the runner falls back to periodic passes and retries the monitor with exponential backoff from 10 to 300 seconds. The backoff resets after the monitor stays active for at least 60 seconds.
 
 ### Monitoring
 
@@ -589,6 +593,8 @@ The authoritative signal is the log line below, emitted once per pass and naming
 kubectl logs -n kube-system -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
 ```
 
+The latest pass statistics are stored in `/run/health/stats` inside each runner pod. The file reports the wake reason, pass duration, pass result, drained event count, monitor loss count, and whether the monitor is active.
+
 An unauthorized port is retried every 90 seconds indefinitely, so authentication resumes on its own once the fabric recovers.
 
 The line says the port did not authorize, not why. The usual cause is fabric side, but an expired or mismatched client certificate is rejected by RADIUS and looks identical from the supplicant's side, so the runner does not guess. If the line names every interface on one node while other nodes are quiet, suspect that node's certificate; if it appears across nodes at once, suspect the fabric. A certificate that is missing or unreadable outright is caught separately and does take the pod NotReady.
@@ -598,7 +604,8 @@ The line says the port did not authorize, not why. The usual cause is fabric sid
 | Value | Default | Description |
 |-------|---------|-------------|
 | `supplicantRunner.enabled` | `false` | Enable/disable the supplicant runner DaemonSet |
-| `supplicantRunner.interval` | `10` | Seconds between reconciliation passes. Must be a positive integer; enforced by `values.schema.json` |
+| `supplicantRunner.interval` | `10` | Maximum seconds between reconciliation passes. Must be a positive integer |
+| `supplicantRunner.settleMs` | `500` | Milliseconds of quiet after host link events before reconciliation. `0` disables the delay |
 | `supplicantRunner.shapes` | RDMA shape list | Shapes the runner may schedule on, matched on `node.kubernetes.io/instance-type`. `[]` schedules everywhere |
 | `supplicantRunner.affinity` | `{}` | Replaces the generated shape affinity entirely when set |
 | `supplicantRunner.terminationGracePeriodSeconds` | `30` | Grace period on pod deletion |
@@ -609,7 +616,7 @@ In Terraform-managed installs set `install_supplicant_runner = true` rather than
 
 ### Caveats
 
-- Brief gaps without a supplicant are normal: up to `interval` seconds after Dranet claims an interface, and a few passes after a pod exits before the interface reaches the host again. The port stays authorized from its existing session throughout.
-- Restarting a runner pod, including on upgrade, stops the supplicants it started, since they share its cgroup. The replacement restarts them within one interval.
+- Brief gaps without a supplicant are normal. With a working link monitor, attach latency includes `settleMs` plus one pass. During monitor fallback, it can also include up to `interval`. The port stays authorized from its existing session throughout.
+- Restarting a runner pod, including on upgrade, stops the supplicants it started because they share its cgroup. The replacement starts them after its first pass.
 - Renamed interfaces are matched by PCI address, recorded while the interface is on the host. If the DaemonSet is installed while a renaming claim is already active, that interface is picked up after it returns to the host once.
 - Requires `wpa_supplicant`, `wpa_cli`, and `ethtool` on the host. All ship on OCI GPU images.

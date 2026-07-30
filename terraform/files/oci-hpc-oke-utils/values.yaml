@@ -219,8 +219,12 @@ hostexec:
 # Only needed on clusters using Dranet PF passthrough.
 supplicantRunner:
   enabled: false
-  # Seconds between reconciliation passes. Must be a positive integer.
+  # Upper bound in seconds between reconciliation passes. Must be a positive
+  # integer. A host link event reconciles sooner.
   interval: 10
+  # Milliseconds of quiet to wait after host link events before reconciling, so
+  # a pass does not run while Dranet is still configuring a PF.
+  settleMs: 500
   priorityClassName: system-node-critical
   terminationGracePeriodSeconds: 30
   imagePullSecrets: []
@@ -265,8 +269,14 @@ supplicantRunner:
     pullPolicy: IfNotPresent
     resources:
       requests:
-        cpu: 10m
+        # Held well above the idle average so CPU weight is high enough that a
+        # busy GPU node cannot starve the runner of the core the limit allows.
+        cpu: 100m
         memory: 64Mi
       limits:
-        cpu: 100m
+        # A pass is a few hundred sequential forks, so it cannot use more than
+        # one core but it does want a whole one briefly. A tighter limit does
+        # not reduce its CPU cost, it only stretches each pass over more
+        # scheduling periods.
+        cpu: "1"
         memory: 128Mi

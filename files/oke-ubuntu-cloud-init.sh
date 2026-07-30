@@ -103,6 +103,14 @@ default_ulimits = [
 ]
 EOF
 
+    # Dranet moves one RDMA PF at a time inside RunPodSandbox, so a claim for
+    # several PFs runs well past the 2s default. On timeout CRI-O closes the NRI
+    # connection, and Dranet exits after five closures and drops the attach.
+    cat >/etc/crio/crio.conf.d/13-nri-timeout.conf <<'EOF'
+[crio.nri]
+nri_plugin_request_timeout = "30s"
+EOF
+
     # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor by
     # default, which breaks Enroot/Pyxis container startup in Slurm jobs
     # (enroot-nsenter: failed to create user namespace: Permission denied).

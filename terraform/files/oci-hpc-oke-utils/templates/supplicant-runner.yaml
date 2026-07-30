@@ -77,11 +77,14 @@ spec:
           env:
             - name: SUPPLICANT_RUNNER_INTERVAL
               value: {{ .Values.supplicantRunner.interval | quote }}
+            - name: SUPPLICANT_RUNNER_SETTLE_MS
+              value: {{ .Values.supplicantRunner.settleMs | quote }}
           securityContext:
             privileged: true
-          # Covers a slow pass plus the sleep between passes.
+          # Covers the periodic wait, bounded event settle, and a slow pass.
           # The floor stops a lower interval from tightening the window.
-          {{- $stale := max (add (mul .Values.supplicantRunner.interval 6) 60) 180 | int }}
+          {{- $settleWindow := div (add (.Values.supplicantRunner.settleMs | int) 1249) 1000 | int }}
+          {{- $stale := max (add (mul (.Values.supplicantRunner.interval | int) 6) $settleWindow 60) 180 | int }}
           # Gates liveness until the first pass completes.
           # A slow first pass is not a wedged loop.
           startupProbe:

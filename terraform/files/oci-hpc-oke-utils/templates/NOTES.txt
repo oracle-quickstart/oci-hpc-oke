@@ -30,7 +30,8 @@ Hostexec:
 
 Supplicant Runner:
   DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
-  Interval:  {{ .Values.supplicantRunner.interval }}s
+  Fallback:  {{ .Values.supplicantRunner.interval }}s
+  Settle:    {{ .Values.supplicantRunner.settleMs }}ms
   Shapes:    {{ if .Values.supplicantRunner.affinity }}custom affinity{{ else if .Values.supplicantRunner.shapes }}{{ len .Values.supplicantRunner.shapes }} RDMA shapes{{ else }}all nodes{{ end }}
 
   Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
