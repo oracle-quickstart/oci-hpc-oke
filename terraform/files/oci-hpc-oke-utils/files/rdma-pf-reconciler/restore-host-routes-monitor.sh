@@ -175,10 +175,14 @@ record_pending() {
     read -r since previous_reason <<< "$line"
   fi
 
-  if ! [[ "$since" =~ ^[0-9]+$ ]] || [ "$previous_reason" != "$reason" ]; then
+  if ! [[ "$since" =~ ^[0-9]+$ ]]; then
     write_state_file "$file" "$now $reason" || return
     PENDING_STARTED=1
     return 0
+  fi
+  if [ "$previous_reason" != "$reason" ]; then
+    write_state_file "$file" "$since $reason" || return
+    PENDING_STARTED=1
   fi
   if [ $(( now - since )) -ge "$PENDING_GRACE" ]; then
     return "$PENDING_STATE_EXPIRED"

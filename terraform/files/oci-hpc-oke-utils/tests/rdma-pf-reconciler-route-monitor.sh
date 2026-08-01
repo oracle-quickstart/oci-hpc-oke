@@ -145,22 +145,31 @@ test_pending_reasons_are_distinct() {
   tests=$(( tests + 1 ))
 }
 
-test_pending_reason_change_resets_timer() {
+test_pending_reason_change_preserves_timer() {
   new_case
-  local rc=0 state
+  local rc=0 state start expired
 
-  printf '%s\n' "1 policy-rule-missing" > "$STATE_DIR/rdma0.routes-pending"
+  start=$(( $(date +%s) - 10 ))
+  printf '%s\n' "$start policy-rule-missing" > "$STATE_DIR/rdma0.routes-pending"
   record_pending rdma0 connected-main-route-missing || rc=$?
   assert_equal 0 "$rc" "changed pending reason result"
-  assert_equal 1 "$PENDING_STARTED" "changed pending reason starts timer"
+  assert_equal 1 "$PENDING_STARTED" "changed pending reason is reported"
   state=$(cat "$STATE_DIR/rdma0.routes-pending")
-  assert_contains "$state" " connected-main-route-missing" "changed pending state"
+  assert_equal "$start connected-main-route-missing" "$state" "changed pending state"
 
-  printf '%s\n' "$(( $(date +%s) - PENDING_GRACE )) connected-main-route-missing" \
-    > "$STATE_DIR/rdma0.routes-pending"
+  rc=0
+  record_pending rdma0 policy-rule-missing || rc=$?
+  assert_equal 0 "$rc" "second changed pending reason result"
+  state=$(cat "$STATE_DIR/rdma0.routes-pending")
+  assert_equal "$start policy-rule-missing" "$state" "alternating pending state"
+
+  expired=$(( $(date +%s) - PENDING_GRACE ))
+  printf '%s\n' "$expired policy-rule-missing" > "$STATE_DIR/rdma0.routes-pending"
   rc=0
   record_pending rdma0 connected-main-route-missing || rc=$?
-  assert_equal "$PENDING_STATE_EXPIRED" "$rc" "expired pending result"
+  assert_equal "$PENDING_STATE_EXPIRED" "$rc" "changed expired pending result"
+  state=$(cat "$STATE_DIR/rdma0.routes-pending")
+  assert_equal "$expired connected-main-route-missing" "$state" "expired pending state"
   tests=$(( tests + 1 ))
 }
 
@@ -284,7 +293,7 @@ test_deleted_address_and_unrelated_events_are_ignored() {
 }
 
 test_pending_reasons_are_distinct
-test_pending_reason_change_resets_timer
+test_pending_reason_change_preserves_timer
 test_state_write_failure_is_not_a_timeout
 test_transient_retry_refreshes_rules
 test_invalid_policy_state_is_not_retried

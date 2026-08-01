@@ -585,7 +585,7 @@ State lives in `/run/oke-rdma-pf-reconciler` and clears on reboot.
 
 If the link monitor exits, the reconciler falls back to periodic passes and retries the monitor with exponential backoff from 10 to 300 seconds. The backoff resets after the monitor stays active for at least 60 seconds. The route monitor writes a progress heartbeat on each event-loop cycle. If it exits or the heartbeat becomes stale, the main process removes its healthy marker and restarts the monitor.
 
-A missing output-interface policy rule and a missing main-table connected route are tracked as separate pending conditions. Each condition gets up to 90 seconds, and changing conditions resets the timer. If one PF remains incomplete, the route monitor records that PF as failed, keeps monitoring the other PFs, and marks the reconciler pod NotReady. It does not restart the shared route monitor. A route state-file failure is reported separately and remains fatal to the route monitor.
+A missing output-interface policy rule and a missing main-table connected route are tracked as separate pending conditions. Each interface gets one overall 90-second grace period. A condition change updates the current diagnosis without extending the deadline. If one PF remains incomplete, the route monitor records that PF as failed, keeps monitoring the other PFs, and marks the reconciler pod NotReady. It does not restart the shared route monitor. A route state-file failure is reported separately and remains fatal to the route monitor.
 
 ### Monitoring
 
