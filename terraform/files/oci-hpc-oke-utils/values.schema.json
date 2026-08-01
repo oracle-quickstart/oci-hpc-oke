@@ -4,7 +4,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "supplicantRunner": {
+    "rdmaPfReconciler": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -26,7 +26,7 @@
           "minimum": 0
         },
         "shapes": {
-          "description": "Shapes the runner is allowed to schedule on, matched on node.kubernetes.io/instance-type. Empty schedules everywhere.",
+          "description": "Shapes the reconciler is allowed to schedule on, matched on node.kubernetes.io/instance-type. Empty schedules everywhere.",
           "type": "array",
           "items": {
             "type": "string"

@@ -20,11 +20,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
-Content-addressed name for the supplicant runner script ConfigMap. The
+Content-addressed name for the RDMA PF reconciler script ConfigMap. The
 ConfigMap is immutable, so script changes produce a new name and roll the
 DaemonSet instead of mutating executable content in place.
 */}}
-{{- define "oci-hpc-oke-utils.supplicantRunnerScriptName" -}}
-{{- $hash := printf "%s%s" (.Files.Get "files/supplicant-runner/runner.sh") (.Files.Get "files/supplicant-runner/supplicant-runner.sh") | sha256sum | trunc 8 -}}
-{{- printf "%s-supplicant-runner-%s" (include "oci-hpc-oke-utils.fullname" .) $hash -}}
+{{- define "oci-hpc-oke-utils.rdmaPfReconcilerScriptName" -}}
+{{- $hash := printf "%s%s%s%s" (.Files.Get "files/rdma-pf-reconciler/rdma-pf-reconciler.sh") (.Files.Get "files/rdma-pf-reconciler/reconcile-auth.sh") (.Files.Get "files/rdma-pf-reconciler/restore-host-routes.sh") (.Files.Get "files/rdma-pf-reconciler/restore-host-routes-monitor.sh") | sha256sum | trunc 8 -}}
+{{- printf "%s-rdma-pf-reconciler-%s" (include "oci-hpc-oke-utils.fullname" .) $hash -}}
 {{- end -}}

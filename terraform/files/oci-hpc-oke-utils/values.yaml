@@ -215,9 +215,10 @@ hostexec:
       echo "LNet configured successfully"
     fi
 
-# Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
+# Keeps 802.1X alive for claimed RDMA PFs and restores OCA policy routes
+# after the PFs return to the host.
 # Only needed on clusters using Dranet PF passthrough.
-supplicantRunner:
+rdmaPfReconciler:
   enabled: false
   # Upper bound in seconds between reconciliation passes. Must be a positive
   # integer. A host link event reconciles sooner.
@@ -233,7 +234,7 @@ supplicantRunner:
   nodeSelector: {}
   # RDMA-capable shapes. Matched on node.kubernetes.io/instance-type, which the
   # cloud provider sets at node registration, unlike GPU labels which appear
-  # only after the device plugin starts. The runner also self-selects at
+  # only after the device plugin starts. The reconciler also self-selects at
   # runtime, exiting immediately on a node with no RDMA interfaces, so this is
   # belt and braces. Set to [] to schedule everywhere.
   shapes:
@@ -270,7 +271,7 @@ supplicantRunner:
     resources:
       requests:
         # Held well above the idle average so CPU weight is high enough that a
-        # busy GPU node cannot starve the runner of the core the limit allows.
+        # busy GPU node cannot starve the reconciler of the core the limit allows.
         cpu: 100m
         memory: 64Mi
       limits:

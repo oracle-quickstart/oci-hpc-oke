@@ -26,30 +26,31 @@ Hostexec:
   Interval:  {{ .Values.hostexec.interval }}s
 {{- end }}
 
-{{- if .Values.supplicantRunner.enabled }}
+{{- if .Values.rdmaPfReconciler.enabled }}
 
-Supplicant Runner:
-  DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
-  Fallback:  {{ .Values.supplicantRunner.interval }}s
-  Settle:    {{ .Values.supplicantRunner.settleMs }}ms
-  Shapes:    {{ if .Values.supplicantRunner.affinity }}custom affinity{{ else if .Values.supplicantRunner.shapes }}{{ len .Values.supplicantRunner.shapes }} RDMA shapes{{ else }}all nodes{{ end }}
+RDMA PF Reconciler:
+  DaemonSet: {{ include "oci-hpc-oke-utils.fullname" . }}-rdma-pf-reconciler
+  Fallback:  {{ .Values.rdmaPfReconciler.interval }}s
+  Settle:    {{ .Values.rdmaPfReconciler.settleMs }}ms
+  Shapes:    {{ if .Values.rdmaPfReconciler.affinity }}custom affinity{{ else if .Values.rdmaPfReconciler.shapes }}{{ len .Values.rdmaPfReconciler.shapes }} RDMA shapes{{ else }}all nodes{{ end }}
 
-  Keeps 802.1X alive for RDMA interfaces Dranet moves into pod netns.
-{{- if and (not .Values.supplicantRunner.affinity) .Values.supplicantRunner.shapes }}
+  Keeps 802.1X alive for claimed RDMA PFs and restores OCA policy routes
+  after the PFs return to the host.
+{{- if and (not .Values.rdmaPfReconciler.affinity) .Values.rdmaPfReconciler.shapes }}
 
   This install succeeds even when no node matches those shapes, so check
   that it landed somewhere:
-    kubectl get ds -n {{ .Release.Namespace }} {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
-  A desired count of 0 means your RDMA shape is not in supplicantRunner.shapes
-  (Terraform: supplicant_runner_shapes). Compare against:
+    kubectl get ds -n {{ .Release.Namespace }} {{ include "oci-hpc-oke-utils.fullname" . }}-rdma-pf-reconciler
+  A desired count of 0 means your RDMA shape is not in rdmaPfReconciler.shapes
+  (Terraform: rdma_pf_reconciler_shapes). Compare against:
     kubectl get nodes -L node.kubernetes.io/instance-type
 {{- end }}
 
   Pods stay Ready when a port is not authorized; alert on the log line:
-    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
+    kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=rdma-pf-reconciler | grep UNAUTHORIZED
 {{- end }}
 
-{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled .Values.supplicantRunner.enabled }}
+{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled .Values.rdmaPfReconciler.enabled }}
 
 Verify with:
   kubectl get ds -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}

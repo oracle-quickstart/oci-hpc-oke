@@ -1,0 +1,41 @@
+{{- if .Values.rdmaPfReconciler.enabled }}
+{{- $reconciler := .Files.Get "files/rdma-pf-reconciler/rdma-pf-reconciler.sh" }}
+{{- $auth := .Files.Get "files/rdma-pf-reconciler/reconcile-auth.sh" }}
+{{- $routes := .Files.Get "files/rdma-pf-reconciler/restore-host-routes.sh" }}
+{{- $routeMonitor := .Files.Get "files/rdma-pf-reconciler/restore-host-routes-monitor.sh" }}
+{{- if or (empty $reconciler) (empty $auth) (empty $routes) (empty $routeMonitor) }}
+{{- fail "rdmaPfReconciler: a required script in files/rdma-pf-reconciler is missing or empty; the DaemonSet would run an empty script" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oci-hpc-oke-utils.rdmaPfReconcilerScriptName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rdma-pf-reconciler
+  annotations:
+    # The name is content-addressed, so an upgrade creates a new ConfigMap.
+    # Helm would prune this one while older pods still mount it.
+    # Keeping it costs a little litter. Once a rollout has finished, the
+    # superseded revisions can go. The field selector excludes the live one,
+    # and the labels keep it to this release in this namespace.
+    #   kubectl -n {{ .Release.Namespace }} delete configmap \
+    #     -l app.kubernetes.io/component=rdma-pf-reconciler,app.kubernetes.io/instance={{ .Release.Name }} \
+    #     --field-selector metadata.name!={{ include "oci-hpc-oke-utils.rdmaPfReconcilerScriptName" . }}
+    "helm.sh/resource-policy": keep
+# Immutable, so nobody can edit what a privileged DaemonSet executes.
+# Changing a script changes the name above and rolls the DaemonSet.
+# The hash covers the scripts only.
+# Editing this template alone keeps the name, so the update is rejected.
+immutable: true
+data:
+  rdma-pf-reconciler.sh: |
+{{ $reconciler | indent 4 }}
+  reconcile-auth.sh: |
+{{ $auth | indent 4 }}
+  restore-host-routes.sh: |
+{{ $routes | indent 4 }}
+  restore-host-routes-monitor.sh: |
+{{ $routeMonitor | indent 4 }}
+{{- end }}

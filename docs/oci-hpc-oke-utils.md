@@ -8,9 +8,9 @@
 | [Topology](#topology) | Enabled with Slinky | Annotates nodes with their Slurm topology unit and generates `topology.yaml` for Slurm scheduling |
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Enabled in the chart, disabled by default in the Terraform stack | Runs shell scripts on the host via `nsenter` |
-| [Supplicant Runner](#supplicant-runner) | Disabled | Keeps 802.1X authentication alive for RDMA interfaces moved into pod network namespaces by Dranet |
+| [RDMA PF Reconciler](#rdma-pf-reconciler) | Disabled | Keeps 802.1X alive for claimed RDMA PFs and restores OCA policy routes when PFs return to the host |
 
-The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes. The supplicant runner targets RDMA-capable shapes matched on `node.kubernetes.io/instance-type`.
+The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes. The RDMA PF reconciler targets RDMA-capable shapes matched on `node.kubernetes.io/instance-type`.
 
 ## Manual Installation
 
@@ -556,19 +556,21 @@ The ConfigMap checksum is included as a pod annotation, so updating the script t
 
 ---
 
-## Supplicant Runner
+## RDMA PF Reconciler
 
-The supplicant runner keeps 802.1X (WPA) authentication alive for RDMA interfaces that [Dranet](https://github.com/kubernetes-sigs/dranet) moves into pod network namespaces. Only enable it on clusters that use Dranet with PF passthrough.
+The RDMA PF reconciler keeps 802.1X (WPA) authentication alive for RDMA interfaces that [Dranet](https://github.com/kubernetes-sigs/dranet) moves into pod network namespaces. It also restores the Oracle Cloud Agent policy-table routes after a PF returns to the host. Only enable it on clusters that use Dranet with PF passthrough.
 
 ### The Problem
 
 The Oracle Cloud Agent runs one `wpa_supplicant` per RDMA interface on the host, and the switches re-run 802.1X authentication roughly every hour. When Dranet moves an interface into a pod, that supplicant stays on the host and can no longer see the device, so the next reauthentication goes unanswered and the switch drops the port. Jobs longer than the reauthentication interval lose the interface.
 
-You can spot this on a node without the runner installed: the agent's supplicant logs `ioctl[SIOCGIFADDR]: No such device` for as long as the interface is claimed.
+You can spot the authentication issue on a node without the reconciler installed: the agent's supplicant logs `ioctl[SIOCGIFADDR]: No such device` for as long as the interface is claimed.
+
+When a PF returns to the host, the policy rules survive but the connected and local routes in the policy table can be missing. A new claim can move the PF back into a pod before a slow periodic repair runs.
 
 ### How It Works
 
-The DaemonSet runs a pass at startup, after a host link event, or when `interval` expires. Link events are held by one persistent `ip monitor link` process, so events that arrive during a pass remain queued. After an event, the runner waits for `settleMs` of quiet before starting the next pass. The settle is bounded at `settleMs` plus 250 milliseconds or 256 events so sustained link churn cannot starve reconciliation.
+The DaemonSet runs an authentication pass at startup, after a host link event, or when `interval` expires. Link events are held by one persistent `ip monitor link` process, so events that arrive during a pass remain queued. After an event, the reconciler waits for `settleMs` of quiet before starting the next pass. The settle is bounded at `settleMs` plus 250 milliseconds or 256 events so sustained link churn cannot starve reconciliation.
 
 Each pass:
 
@@ -577,46 +579,52 @@ Each pass:
 3. Stops that supplicant when the claiming pod exits, handing the interface back to the agent.
 4. Forwards certificate rotations to the supplicants it started, which the agent cannot reach.
 
-State lives in `/run/oke-supplicant-runner` and clears on reboot.
+An independent `ip -4 monitor address route rule` process handles route restoration. When a PF receives its host IPv4 address or one of its routes or rules changes, it derives the policy table from the surviving `oif <interface> lookup <table>` rule and derives the connected network and source address from the kernel route in the main table. It replaces the connected and local routes, then reads the policy table back and requires both routes before reporting success. A periodic scan provides fallback if an event is missed.
 
-If the link monitor exits, the runner falls back to periodic passes and retries the monitor with exponential backoff from 10 to 300 seconds. The backoff resets after the monitor stays active for at least 60 seconds.
+State lives in `/run/oke-rdma-pf-reconciler` and clears on reboot.
+
+If the link monitor exits, the reconciler falls back to periodic passes and retries the monitor with exponential backoff from 10 to 300 seconds. The backoff resets after the monitor stays active for at least 60 seconds. The route monitor writes a progress heartbeat on each event-loop cycle. If it exits or the heartbeat becomes stale, the main process removes its healthy marker and restarts the monitor.
+
+A missing output-interface policy rule and a missing main-table connected route are tracked as separate pending conditions. Each condition gets up to 90 seconds, and changing conditions resets the timer. If one PF remains incomplete, the route monitor records that PF as failed, keeps monitoring the other PFs, and marks the reconciler pod NotReady. It does not restart the shared route monitor. A route state-file failure is reported separately and remains fatal to the route monitor.
 
 ### Monitoring
 
-Readiness reflects whether the *runner* is working, not whether the ports are authorized. Its pod goes NotReady only for faults it can act on, such as a config it cannot write, a supplicant that will not start, a claimed interface it cannot find, or a missing client certificate. When supplicants are running but their ports are not authorized, as during a RADIUS outage, the pods stay Ready and the condition is reported instead, because taking every runner pod NotReady at once would fail concurrent applies without adding information.
+Readiness reflects whether the reconciler is working, not whether the ports are authorized. Its pod goes NotReady only for faults it can act on, such as a config it cannot write, a supplicant that will not start, a claimed interface it cannot find, a missing client certificate, or a route monitor failure. When supplicants are running but their ports are not authorized, as during a RADIUS outage, the pods stay Ready and the condition is reported instead, because taking every reconciler pod NotReady at once would fail concurrent applies without adding information.
 
-This is the readiness of the runner's own pod, not the node. The node's Ready condition is untouched and workloads keep scheduling, so do not expect a failing runner to drain anything. What it does affect is `helm --wait`, rollouts of this DaemonSet, and anything watching pod readiness.
+This is the readiness of the reconciler's own pod, not the node. The node's Ready condition is untouched and workloads keep scheduling, so do not expect a failing reconciler to drain anything. What it does affect is `helm --wait`, rollouts of this DaemonSet, and anything watching pod readiness.
 
 The authoritative signal is the log line below, emitted once per pass and naming the affected interfaces. Alert on it:
 
 ```bash
-kubectl logs -n kube-system -l app.kubernetes.io/component=supplicant-runner | grep UNAUTHORIZED
+kubectl logs -n kube-system -l app.kubernetes.io/component=rdma-pf-reconciler | grep UNAUTHORIZED
 ```
 
-The latest pass statistics are stored in `/run/health/stats` inside each runner pod. The file reports the wake reason, pass duration, pass result, drained event count, monitor loss count, and whether the monitor is active.
+The latest pass statistics are stored in `/run/health/stats` inside each reconciler pod. The file reports the wake reason, pass duration, pass result, drained event count, authentication monitor loss count, route monitor restart count, route monitor heartbeat age, whether the route monitor is degraded, and whether each monitor is active.
 
 An unauthorized port is retried every 90 seconds indefinitely, so authentication resumes on its own once the fabric recovers.
 
-The line says the port did not authorize, not why. The usual cause is fabric side, but an expired or mismatched client certificate is rejected by RADIUS and looks identical from the supplicant's side, so the runner does not guess. If the line names every interface on one node while other nodes are quiet, suspect that node's certificate; if it appears across nodes at once, suspect the fabric. A certificate that is missing or unreadable outright is caught separately and does take the pod NotReady.
+The line says the port did not authorize, not why. The usual cause is fabric side, but an expired or mismatched client certificate is rejected by RADIUS and looks identical from the supplicant's side, so the reconciler does not guess. If the line names every interface on one node while other nodes are quiet, suspect that node's certificate; if it appears across nodes at once, suspect the fabric. A certificate that is missing or unreadable outright is caught separately and does take the pod NotReady.
 
 ### Configuration
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `supplicantRunner.enabled` | `false` | Enable/disable the supplicant runner DaemonSet |
-| `supplicantRunner.interval` | `10` | Maximum seconds between reconciliation passes. Must be a positive integer |
-| `supplicantRunner.settleMs` | `500` | Milliseconds of quiet after host link events before reconciliation. `0` disables the delay |
-| `supplicantRunner.shapes` | RDMA shape list | Shapes the runner may schedule on, matched on `node.kubernetes.io/instance-type`. `[]` schedules everywhere |
-| `supplicantRunner.affinity` | `{}` | Replaces the generated shape affinity entirely when set |
-| `supplicantRunner.terminationGracePeriodSeconds` | `30` | Grace period on pod deletion |
+| `rdmaPfReconciler.enabled` | `false` | Enable/disable the RDMA PF reconciler DaemonSet |
+| `rdmaPfReconciler.interval` | `10` | Maximum seconds between reconciliation passes. Must be a positive integer |
+| `rdmaPfReconciler.settleMs` | `500` | Milliseconds of quiet after host link events before reconciliation. `0` disables the delay |
+| `rdmaPfReconciler.shapes` | RDMA shape list | Shapes the reconciler may schedule on, matched on `node.kubernetes.io/instance-type`. `[]` schedules everywhere |
+| `rdmaPfReconciler.affinity` | `{}` | Replaces the generated shape affinity entirely when set |
+| `rdmaPfReconciler.terminationGracePeriodSeconds` | `30` | Grace period on pod deletion |
 
-Shapes are matched on `node.kubernetes.io/instance-type` rather than GPU labels, because RDMA also exists on non-GPU shapes and GPU labels only appear after the device plugin starts. The list is a safety net, not the real guard: the runner exits immediately on any node with no RDMA interfaces, so scheduling it elsewhere costs one no-op pass per interval.
+Shapes are matched on `node.kubernetes.io/instance-type` rather than GPU labels, because RDMA also exists on non-GPU shapes and GPU labels only appear after the device plugin starts. The list is a safety net, not the real guard: the reconciler exits immediately on any node with no RDMA interfaces, so scheduling it elsewhere costs one no-op pass per interval.
 
-In Terraform-managed installs set `install_supplicant_runner = true` rather than editing Helm values, otherwise the next apply reverts it.
+In Terraform-managed installs set `install_rdma_pf_reconciler = true` rather than editing Helm values, otherwise the next apply reverts it.
 
 ### Caveats
 
 - Brief gaps without a supplicant are normal. With a working link monitor, attach latency includes `settleMs` plus one pass. During monitor fallback, it can also include up to `interval`. The port stays authorized from its existing session throughout.
-- Restarting a runner pod, including on upgrade, stops the supplicants it started because they share its cgroup. The replacement starts them after its first pass.
+- Restarting a reconciler pod, including on upgrade, stops the supplicants it started because they share its cgroup. The replacement starts them after its first pass.
+- Route restoration has a short race with the next claim. The event path verifies both routes and retries missing prerequisites, failed replacement, or failed read-back for up to one second. Long external rtnetlink lock holds can still consume the available window.
+- The mocked route test checks parsing and route decisions only. `rdma-pf-reconciler-netlink-integration.sh` uses a private Linux network namespace, real `ip` processes, address, route, and rule events, and 16 policy tables. It requires root or `sudo`.
 - Renamed interfaces are matched by PCI address, recorded while the interface is on the host. If the DaemonSet is installed while a renaming claim is already active, that interface is picked up after it returns to the host once.
-- Requires `wpa_supplicant`, `wpa_cli`, and `ethtool` on the host. All ship on OCI GPU images.
+- Requires Bash 5, `wpa_supplicant`, `wpa_cli`, `nsenter`, `setsid`, `ip`, and `ethtool` on the host. All ship on OCI GPU images.

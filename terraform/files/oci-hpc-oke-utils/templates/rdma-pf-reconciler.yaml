@@ -1,12 +1,12 @@
-{{- if .Values.supplicantRunner.enabled }}
+{{- if .Values.rdmaPfReconciler.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "oci-hpc-oke-utils.fullname" . }}-supplicant-runner
+  name: {{ include "oci-hpc-oke-utils.fullname" . }}-rdma-pf-reconciler
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "oci-hpc-oke-utils.labels" . | nindent 4 }}
-    app.kubernetes.io/component: supplicant-runner
+    app.kubernetes.io/component: rdma-pf-reconciler
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -16,40 +16,40 @@ spec:
   selector:
     matchLabels:
       {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: supplicant-runner
+      app.kubernetes.io/component: rdma-pf-reconciler
   template:
     metadata:
       labels:
         {{- include "oci-hpc-oke-utils.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: supplicant-runner
-        {{- with .Values.supplicantRunner.podLabels }}
+        app.kubernetes.io/component: rdma-pf-reconciler
+        {{- with .Values.rdmaPfReconciler.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.supplicantRunner.podAnnotations }}
+      {{- with .Values.rdmaPfReconciler.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
       automountServiceAccountToken: false
       hostPID: true
-      priorityClassName: {{ .Values.supplicantRunner.priorityClassName }}
-      terminationGracePeriodSeconds: {{ .Values.supplicantRunner.terminationGracePeriodSeconds }}
-      {{- with .Values.supplicantRunner.imagePullSecrets }}
+      priorityClassName: {{ .Values.rdmaPfReconciler.priorityClassName }}
+      terminationGracePeriodSeconds: {{ .Values.rdmaPfReconciler.terminationGracePeriodSeconds }}
+      {{- with .Values.rdmaPfReconciler.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.supplicantRunner.tolerations }}
+      {{- with .Values.rdmaPfReconciler.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.supplicantRunner.nodeSelector }}
+      {{- with .Values.rdmaPfReconciler.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.supplicantRunner.affinity }}
+      {{- if .Values.rdmaPfReconciler.affinity }}
       affinity:
-        {{- toYaml .Values.supplicantRunner.affinity | nindent 8 }}
-      {{- else if .Values.supplicantRunner.shapes }}
+        {{- toYaml .Values.rdmaPfReconciler.affinity | nindent 8 }}
+      {{- else if .Values.rdmaPfReconciler.shapes }}
       # instance-type is set at node registration, unlike GPU labels.
       affinity:
         nodeAffinity:
@@ -59,32 +59,32 @@ spec:
                   - key: node.kubernetes.io/instance-type
                     operator: In
                     values:
-                      {{- toYaml .Values.supplicantRunner.shapes | nindent 22 }}
+                      {{- toYaml .Values.rdmaPfReconciler.shapes | nindent 22 }}
       {{- end }}
       volumes:
         - name: script
           configMap:
-            name: {{ include "oci-hpc-oke-utils.supplicantRunnerScriptName" . }}
+            name: {{ include "oci-hpc-oke-utils.rdmaPfReconcilerScriptName" . }}
             defaultMode: 0755
         # Health markers live here, off the container writable layer.
         - name: run
           emptyDir: {}
       containers:
-        - name: supplicant-runner
-          image: "{{ .Values.supplicantRunner.image.repository }}:{{ .Values.supplicantRunner.image.tag }}"
-          imagePullPolicy: {{ .Values.supplicantRunner.image.pullPolicy }}
-          command: ["/bin/bash", "/scripts/runner.sh"]
+        - name: rdma-pf-reconciler
+          image: "{{ .Values.rdmaPfReconciler.image.repository }}:{{ .Values.rdmaPfReconciler.image.tag }}"
+          imagePullPolicy: {{ .Values.rdmaPfReconciler.image.pullPolicy }}
+          command: ["/bin/bash", "/scripts/rdma-pf-reconciler.sh"]
           env:
-            - name: SUPPLICANT_RUNNER_INTERVAL
-              value: {{ .Values.supplicantRunner.interval | quote }}
-            - name: SUPPLICANT_RUNNER_SETTLE_MS
-              value: {{ .Values.supplicantRunner.settleMs | quote }}
+            - name: RDMA_PF_RECONCILER_INTERVAL
+              value: {{ .Values.rdmaPfReconciler.interval | quote }}
+            - name: RDMA_PF_RECONCILER_SETTLE_MS
+              value: {{ .Values.rdmaPfReconciler.settleMs | quote }}
           securityContext:
             privileged: true
           # Covers the periodic wait, bounded event settle, and a slow pass.
           # The floor stops a lower interval from tightening the window.
-          {{- $settleWindow := div (add (.Values.supplicantRunner.settleMs | int) 1249) 1000 | int }}
-          {{- $stale := max (add (mul (.Values.supplicantRunner.interval | int) 6) $settleWindow 60) 180 | int }}
+          {{- $settleWindow := div (add (.Values.rdmaPfReconciler.settleMs | int) 1249) 1000 | int }}
+          {{- $stale := max (add (mul (.Values.rdmaPfReconciler.interval | int) 6) $settleWindow 60) 180 | int }}
           # Gates liveness until the first pass completes.
           # A slow first pass is not a wedged loop.
           startupProbe:
@@ -121,5 +121,5 @@ spec:
             - name: run
               mountPath: /run/health
           resources:
-            {{- toYaml .Values.supplicantRunner.image.resources | nindent 12 }}
+            {{- toYaml .Values.rdmaPfReconciler.image.resources | nindent 12 }}
 {{- end }}

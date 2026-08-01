@@ -1395,17 +1395,17 @@ variable "install_hostexec" {
   description = "Deploy the hostexec DaemonSet to execute commands on the host."
 }
 
-# supplicant runner
-variable "install_supplicant_runner" {
+# RDMA PF reconciler
+variable "install_rdma_pf_reconciler" {
   default     = false
   type        = bool
-  description = "Deploy the supplicant runner DaemonSet to keep 802.1X authentication alive for RDMA interfaces moved into pod network namespaces by Dranet."
+  description = "Deploy the RDMA PF reconciler DaemonSet to keep 802.1X authentication alive for claimed RDMA PFs and restore OCA policy routes after the PFs return to the host."
 }
 
-variable "supplicant_runner_shapes" {
+variable "rdma_pf_reconciler_shapes" {
   default     = []
   type        = list(string)
-  description = "Shapes the supplicant runner may schedule on, matched on node.kubernetes.io/instance-type. Empty keeps the chart's built-in RDMA shape list. Set this if your shape is RDMA capable but not in that list, otherwise the DaemonSet schedules nowhere."
+  description = "Shapes the RDMA PF reconciler may schedule on, matched on node.kubernetes.io/instance-type. Empty keeps the chart's built-in RDMA shape list. Set this if your shape is RDMA capable but not in that list, otherwise the DaemonSet schedules nowhere."
 }
 
 

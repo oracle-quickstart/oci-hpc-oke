@@ -8,7 +8,7 @@
 # Exit codes:
 #   0  nothing to report. Interfaces inside their grace window count here,
 #      so this does not mean every port is authorized
-#   1  the runner cannot do its job on this node, so its pod goes NotReady
+#   1  the reconciler cannot do its job on this node, so its pod goes NotReady
 #   2  supplicants are up but their ports are not authorized. Usually the
 #      fabric, sometimes a bad certificate, and the two look the same from
 #      here. The caller keeps the pod Ready either way, since a fabric
@@ -17,14 +17,14 @@ set -uo pipefail
 
 # Everything below assumes host paths, so bail out if nsenter did not work.
 if [ "$(readlink /proc/self/ns/mnt 2>/dev/null)" != "$(readlink /proc/1/ns/mnt 2>/dev/null)" ]; then
-  echo "supplicant-runner: not in the host mount namespace, refusing to run"
+  echo "rdma-pf-reconciler: not in the host mount namespace, refusing to run"
   exit 1
 fi
 
 # Paths used by the OCA oci-rdma-authentication plugin on OCI GPU images.
 WPA_CONF=/etc/wpa_supplicant/wpa_supplicant-wired-8021x.conf
 WPA_P12=/run/wpa_supplicant/client.p12
-STATE_DIR=/run/oke-supplicant-runner
+STATE_DIR=/run/oke-rdma-pf-reconciler
 
 # Longer than an EAP-TLS handshake and wpa_supplicant's HELD back-off.
 AUTH_GRACE=90
@@ -32,7 +32,7 @@ AUTH_GRACE=90
 fail=0
 unauthorized=()
 
-log() { echo "supplicant-runner: $*"; }
+log() { echo "rdma-pf-reconciler: $*"; }
 
 # The OCA units are the authoritative list of managed PFs.
 # The bare template name expands to an empty interface, so skip it.
@@ -50,8 +50,8 @@ if [ ${#ifaces[@]} -eq 0 ]; then
 fi
 
 # Required once a node has PFs.
-# Without them the runner cannot authenticate, or tell whether it did.
-for tool in wpa_supplicant wpa_cli nsenter ip ethtool; do
+# Without them the reconciler cannot authenticate, or tell whether it did.
+for tool in wpa_supplicant wpa_cli nsenter setsid ip ethtool; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     log "required tool $tool not found, refusing to run"
     exit 1
@@ -134,6 +134,7 @@ find_in_netns() {
   local iface=$1 pci=$2 ns pid name
   build_proc_map
   for ns in "${!NS_PIDS[@]}"; do
+    netns_has_other_procs "$ns" || continue
     pid=${NS_PIDS[$ns]%% *}
     if netns_has_iface "$ns" "$iface"; then
       if [ -z "$pci" ] || [ "$(bus_info "/proc/$pid/ns/net" "$iface")" = "$pci" ]; then
@@ -147,6 +148,7 @@ find_in_netns() {
     return 1
   fi
   for ns in "${!NS_PIDS[@]}"; do
+    netns_has_other_procs "$ns" || continue
     pid=${NS_PIDS[$ns]%% *}
     for name in $(netns_ifaces "$ns"); do
       [ "$name" = "lo" ] && continue
@@ -161,7 +163,7 @@ find_in_netns() {
 
 # Pidfiles outlive their supplicants. The config path is unique per interface,
 # and the netns test spares the agent's own supplicants.
-runner_pid() {
+managed_supplicant_pid() {
   local iface=$1 pidfile="$STATE_DIR/$1.pid" pid
   [ -f "$pidfile" ] || return 1
   pid=$(cat "$pidfile" 2>/dev/null) || return 1
@@ -180,7 +182,7 @@ runner_pid() {
   echo "$pid"
 }
 
-# A supplicant whose pidfile was lost is invisible to runner_pid.
+# A supplicant whose pidfile was lost is invisible to managed_supplicant_pid.
 # It would pin the pod netns forever, but its argv still names our config.
 adopt_orphan() {
   local iface=$1 ns pid
@@ -200,9 +202,9 @@ adopt_orphan() {
 
 # Waits for the process to exit before deleting its state.
 # A replacement would otherwise race it for the control socket.
-stop_runner() {
+stop_managed_supplicant() {
   local iface=$1 pid waited
-  if ! pid=$(runner_pid "$iface"); then
+  if ! pid=$(managed_supplicant_pid "$iface"); then
     pid=$(adopt_orphan "$iface") && log "$iface: adopting orphaned supplicant (pid $pid)"
   fi
   if [ -n "${pid:-}" ]; then
@@ -220,7 +222,7 @@ stop_runner() {
   rm -rf "$STATE_DIR/ctrl/$iface"
 }
 
-# Kept out of stop_runner so the window tracks the port, not the process.
+# Kept out of stop_managed_supplicant so the window tracks the port, not the process.
 # Otherwise a rejected port looks healthy by restarting inside its grace.
 clear_auth_state() {
   rm -f "$STATE_DIR/$1.unauth" "$STATE_DIR/$1.restart" "$STATE_DIR/$1.missing"
@@ -246,6 +248,8 @@ netns_has_other_procs() {
   local ns=$1 pid
   build_proc_map
   for pid in ${NS_PIDS[$ns]:-}; do
+    # A process stopped earlier in this pass remains in the cached map.
+    [ "$(readlink "/proc/$pid/ns/net" 2>/dev/null)" = "$ns" ] || continue
     [ -n "${OUR_PIDS[$pid]:-}" ] && continue
     if [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = "wpa_supplicant" ] &&
       tr '\0' '\n' < "/proc/$pid/cmdline" 2>/dev/null | grep -q "^$STATE_DIR/"; then
@@ -293,7 +297,7 @@ for iface in "${ifaces[@]}"; do
 
   # PF is on the host, so the OCA plugin owns authentication again.
   if [ -e "/sys/class/net/$iface" ]; then
-    [ -f "$pidfile" ] && stop_runner "$iface"
+    [ -f "$pidfile" ] && stop_managed_supplicant "$iface"
     clear_auth_state "$iface"
     # Record the PCI address now, while the name still maps to the device.
     pci=$(basename "$(readlink -f "/sys/class/net/$iface/device" 2>/dev/null)")
@@ -304,13 +308,13 @@ for iface in "${ifaces[@]}"; do
   fi
 
   podname=$(cat "$STATE_DIR/$iface.podname" 2>/dev/null || echo "$iface")
-  if pid=$(runner_pid "$iface"); then
+  if pid=$(managed_supplicant_pid "$iface"); then
     build_proc_map
     sup_ns=$(readlink "/proc/$pid/ns/net" 2>/dev/null)
     if [ -n "$sup_ns" ] && netns_has_iface "$sup_ns" "$podname"; then
       if ! netns_has_other_procs "$sup_ns"; then
         log "$iface: claiming pod is gone, releasing the interface"
-        stop_runner "$iface"
+        stop_managed_supplicant "$iface"
         clear_auth_state "$iface"
         continue
       fi
@@ -338,7 +342,7 @@ for iface in "${ifaces[@]}"; do
         log "$iface supplicant has not answered its control socket for $(( now - unauth_since ))s"
         fail=1
       else
-        # Reported, but not a runner fault.
+        # Reported, but not a reconciler fault.
         # The supplicant is up and the port did not authorize.
         unauthorized+=("$iface")
       fi
@@ -349,16 +353,16 @@ for iface in "${ifaces[@]}"; do
       fi
       log "$iface unauthorized for $(( now - unauth_since ))s, restarting its supplicant"
       write_state "$iface.restart" "$now"
-      stop_runner "$iface"
+      stop_managed_supplicant "$iface"
     else
       # Pod is gone or the PF moved to a different claim.
-      stop_runner "$iface"
+      stop_managed_supplicant "$iface"
       clear_auth_state "$iface"
     fi
   elif adopt_orphan "$iface" >/dev/null; then
     # Pidfile lost, but the process is still out there holding the control
     # socket and the pod netns. Nothing can replace it until it is gone.
-    stop_runner "$iface"
+    stop_managed_supplicant "$iface"
   fi
 
   pci=$(cat "$STATE_DIR/$iface.pci" 2>/dev/null || true)
@@ -430,7 +434,7 @@ elif [ "$last_mtime" != "none" ] && [ "$p12_mtime" != "$last_mtime" ]; then
     if ! wpa_cli -p "$STATE_DIR/ctrl/$iface" -i "$podname" reconfigure 2>/dev/null | grep -q '^OK'; then
       # Next pass restarts it with the new certificate.
       fail=1
-      stop_runner "$iface"
+      stop_managed_supplicant "$iface"
     fi
   done
 fi

@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "helm_release" "oci_hpc_oke_utils" {
-  count = alltrue([var.install_oci_hpc_oke_utils, anytrue([var.worker_rdma_enabled, var.worker_gmc_enabled, local.slinky_hostname_annotator_enabled, local.slinky_topology_enabled, var.install_supplicant_runner]), local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count = alltrue([var.install_oci_hpc_oke_utils, anytrue([var.worker_rdma_enabled, var.worker_gmc_enabled, local.slinky_hostname_annotator_enabled, local.slinky_topology_enabled, var.install_rdma_pf_reconciler]), local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [
     module.oke,
     data.oci_resourcemanager_private_endpoint_reachable_ip.oke
@@ -37,10 +37,10 @@ resource "helm_release" "oci_hpc_oke_utils" {
     hostexec = {
       enabled = var.install_hostexec
     }
-    supplicantRunner = merge(
-      { enabled = var.install_supplicant_runner },
+    rdmaPfReconciler = merge(
+      { enabled = var.install_rdma_pf_reconciler },
       # Empty keeps the chart's built-in RDMA shape list.
-      length(var.supplicant_runner_shapes) > 0 ? { shapes = var.supplicant_runner_shapes } : {}
+      length(var.rdma_pf_reconciler_shapes) > 0 ? { shapes = var.rdma_pf_reconciler_shapes } : {}
     )
   })]
 }

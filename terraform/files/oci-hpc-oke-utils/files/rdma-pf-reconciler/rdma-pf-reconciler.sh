@@ -7,25 +7,25 @@ LC_NUMERIC=C
 
 # exec {fd}<, fractional `read -t`, and EPOCHREALTIME are all used below.
 if [ "${BASH_VERSINFO[0]}" -lt 5 ]; then
-  echo "supplicant-runner: bash 5 or newer required, found $BASH_VERSION"
+  echo "rdma-pf-reconciler: bash 5 or newer required, found $BASH_VERSION"
   exit 1
 fi
 
-interval="${SUPPLICANT_RUNNER_INTERVAL:-10}"
+interval="${RDMA_PF_RECONCILER_INTERVAL:-10}"
 health=/run/health
 
 # Waited out after a link event, because the host sees a PF leave before Dranet
 # has finished configuring it in the Pod. Reconciling sooner can start a
 # supplicant on a down, unconfigured interface.
-settle_ms="${SUPPLICANT_RUNNER_SETTLE_MS:-500}"
+settle_ms="${RDMA_PF_RECONCILER_SETTLE_MS:-500}"
 
 # A bad interval would otherwise reach `read -t` and CrashLoop every node.
 if ! [ "$interval" -gt 0 ] 2>/dev/null; then
-  echo "supplicant-runner: interval must be a positive integer, got '$interval'"
+  echo "rdma-pf-reconciler: interval must be a positive integer, got '$interval'"
   exit 1
 fi
 if ! [ "$settle_ms" -ge 0 ] 2>/dev/null; then
-  echo "supplicant-runner: settle must be a non-negative integer, got '$settle_ms'"
+  echo "rdma-pf-reconciler: settle must be a non-negative integer, got '$settle_ms'"
   exit 1
 fi
 
@@ -80,7 +80,7 @@ lose_monitor() {
     monitor_backoff=$monitor_initial_backoff
   fi
   monitor_retry_at=$(( EPOCHSECONDS + monitor_backoff ))
-  echo "supplicant-runner: host link watch ended (loss #$monitor_restarts)," \
+  echo "rdma-pf-reconciler: host link watch ended (loss #$monitor_restarts)," \
     "retrying in ${monitor_backoff}s, interval-only until then"
   monitor_backoff=$(( monitor_backoff * 2 ))
   if [ "$monitor_backoff" -gt 300 ]; then
@@ -102,7 +102,7 @@ settle_events() {
     now=${EPOCHREALTIME/./}
     remaining=$(( deadline - now ))
     if [ "$remaining" -le 0 ]; then
-      echo "supplicant-runner: link event settle reached its time limit"
+      echo "rdma-pf-reconciler: link event settle reached its time limit"
       break
     fi
 
@@ -116,7 +116,7 @@ settle_events() {
     read -r -t "$wait_seconds" -u "$events" _ || rc=$?
     if [ "$rc" -gt 128 ]; then
       if [ "$wait_us" -lt "$settle_us" ]; then
-        echo "supplicant-runner: link event settle reached its time limit"
+        echo "rdma-pf-reconciler: link event settle reached its time limit"
       fi
       break
     fi
@@ -128,7 +128,7 @@ settle_events() {
   done
 
   if [ "$n" -ge 256 ]; then
-    echo "supplicant-runner: link event settle reached its event limit"
+    echo "rdma-pf-reconciler: link event settle reached its event limit"
   fi
   drained=$n
 }
@@ -153,7 +153,7 @@ wait_for_change() {
   if [ "$watching" -eq 0 ]; then
     if [ "$EPOCHSECONDS" -ge "$monitor_retry_at" ]; then
       start_monitor
-      echo "supplicant-runner: host link watch restarted"
+      echo "rdma-pf-reconciler: host link watch restarted"
     else
       wake=fallback
       fallback_wait
@@ -178,30 +178,121 @@ wait_for_change() {
   settle_events
 }
 
+route_monitor_pid=0
+route_monitor_restarts=0
+route_monitor_started_at=0
+route_monitor_heartbeat_age=-1
+route_monitor_heartbeat=/run/oke-rdma-pf-reconciler/route-monitor-heartbeat
+route_monitor_degraded_file=/run/oke-rdma-pf-reconciler/route-monitor-degraded
+route_monitor_degraded=0
+route_monitor_stale=$(( interval * 2 ))
+if [ "$route_monitor_stale" -lt 20 ]; then
+  route_monitor_stale=20
+fi
+
+start_route_monitor() {
+  nsenter --target 1 --mount -- rm -f "$route_monitor_heartbeat" 2>/dev/null || true
+  {
+    cat /scripts/restore-host-routes.sh
+    cat /scripts/restore-host-routes-monitor.sh
+  } | nsenter --target 1 --net --mount --uts --ipc -- setsid /bin/bash &
+  route_monitor_pid=$!
+  route_monitor_started_at=$EPOCHSECONDS
+}
+
+stop_route_monitor() {
+  if [ "$route_monitor_pid" -gt 0 ]; then
+    kill -TERM -- "-$route_monitor_pid" 2>/dev/null || true
+    for _ in {1..10}; do
+      kill -0 "$route_monitor_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$route_monitor_pid" 2>/dev/null; then
+      kill -KILL -- "-$route_monitor_pid" 2>/dev/null || true
+    fi
+    wait "$route_monitor_pid" 2>/dev/null || true
+    route_monitor_pid=0
+  fi
+}
+
+route_monitor_progressing() {
+  local heartbeat
+  route_monitor_heartbeat_age=-1
+  if heartbeat=$(nsenter --target 1 --mount -- cat "$route_monitor_heartbeat" 2>/dev/null) &&
+    [[ "$heartbeat" =~ ^[0-9]+$ ]]; then
+    route_monitor_heartbeat_age=$(( EPOCHSECONDS - heartbeat ))
+    [ "$route_monitor_heartbeat_age" -ge 0 ] &&
+      [ "$route_monitor_heartbeat_age" -le "$route_monitor_stale" ] && return 0
+  fi
+  [ $(( EPOCHSECONDS - route_monitor_started_at )) -lt 5 ]
+}
+
+check_route_monitor() {
+  local reason
+  if ! kill -0 "$route_monitor_pid" 2>/dev/null; then
+    reason="stopped"
+  elif ! route_monitor_progressing; then
+    if [ "$route_monitor_heartbeat_age" -ge 0 ]; then
+      reason="made no progress for ${route_monitor_heartbeat_age}s"
+    else
+      reason="has no progress heartbeat"
+    fi
+  else
+    return 0
+  fi
+
+  route_monitor_restarts=$(( route_monitor_restarts + 1 ))
+  echo "rdma-pf-reconciler: host route event watch $reason, restarting"
+  rm -f "$health/healthy"
+  stop_route_monitor
+  start_route_monitor
+  return 1
+}
+
+check_route_monitor_degraded() {
+  route_monitor_degraded=0
+  if nsenter --target 1 --mount -- test -s "$route_monitor_degraded_file"; then
+    route_monitor_degraded=1
+    rm -f "$health/healthy"
+  fi
+}
+
+trap stop_route_monitor EXIT
+trap 'exit 0' INT TERM
+
+start_route_monitor
 start_monitor
 
 while true; do
   pass_start=${EPOCHREALTIME/./}
+  route_monitor_ok=1
+  check_route_monitor || route_monitor_ok=0
+
   # Streamed over stdin so nothing is staged on the host filesystem.
   # || rc=$? stops set -e exiting the loop on a nonzero pass.
   rc=0
-  nsenter --target 1 --net --mount --uts --ipc --pid -- /bin/bash < /scripts/supplicant-runner.sh || rc=$?
+  nsenter --target 1 --net --mount --uts --ipc --pid -- /bin/bash < /scripts/reconcile-auth.sh || rc=$?
   pass_ms=$(( ( ${EPOCHREALTIME/./} - pass_start ) / 1000 ))
 
-  case $rc in
-    0)
-      mark healthy
-      rm -f "$health/unauthorized"
-      ;;
-    # Fabric rejected a port. Keep this pod Ready, an outage hits every node.
-    2)
-      mark healthy
-      mark unauthorized
-      ;;
-    *)
-      echo "supplicant-runner: reconciliation pass failed"
-      ;;
-  esac
+  check_route_monitor || route_monitor_ok=0
+  check_route_monitor_degraded
+
+  if [ "$route_monitor_ok" -eq 1 ] && [ "$route_monitor_degraded" -eq 0 ]; then
+    case $rc in
+      0)
+        mark healthy
+        rm -f "$health/unauthorized"
+        ;;
+      # Fabric rejected a port. Keep this pod Ready, an outage hits every node.
+      2)
+        mark healthy
+        mark unauthorized
+        ;;
+    esac
+  fi
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+    echo "rdma-pf-reconciler: authentication reconciliation failed"
+  fi
   # Liveness only, not readiness. A restart kills this pod's supplicants.
   mark alive
 
@@ -211,6 +302,10 @@ while true; do
     echo "wake=$wake"
     echo "pass_ms=$pass_ms"
     echo "pass_rc=$rc"
+    echo "route_monitor_restarts=$route_monitor_restarts"
+    echo "route_monitor_running=$route_monitor_ok"
+    echo "route_monitor_degraded=$route_monitor_degraded"
+    echo "route_monitor_heartbeat_age=$route_monitor_heartbeat_age"
     echo "drained_events=$drained"
     echo "monitor_restarts=$monitor_restarts"
     echo "watching=$watching"
@@ -219,7 +314,7 @@ while true; do
   # Quiet on an idle node: only log a pass that was triggered by a change or did
   # not come back clean.
   if [ "$wake" != timeout ] || [ "$rc" -ne 0 ]; then
-    echo "supplicant-runner: wake=$wake pass_ms=$pass_ms rc=$rc" \
+    echo "rdma-pf-reconciler: wake=$wake pass_ms=$pass_ms rc=$rc" \
       "drained=$drained watching=$watching"
   fi
 
