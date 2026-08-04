@@ -46,6 +46,13 @@
 %{ endif ~}
 %{ if node_name_from_kube_node ~}
       env:
+%{ if topology_enabled ~}
+        # Register without topology; the operator applies it after startup.
+        - name: POD_TOPOLOGY
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['oci-hpc-oke.oracle.com/slurm-topology-at-registration']
+%{ endif ~}
         - name: KUBE_NODE_NAME
           valueFrom:
             fieldRef:
@@ -60,6 +67,13 @@
 %{ else ~}
 %{ if host_network ~}
       env:
+%{ if topology_enabled ~}
+        # Register without topology; the operator applies it after startup.
+        - name: POD_TOPOLOGY
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['oci-hpc-oke.oracle.com/slurm-topology-at-registration']
+%{ endif ~}
         - name: SLURM_NODE_NAME
           valueFrom:
             fieldRef:
@@ -72,6 +86,14 @@
               - -c
               - scontrol update nodename="$${SLURM_NODE_NAME}" state=down reason='Pod is terminating'; scontrol delete nodename="$${SLURM_NODE_NAME}" || true
 %{ else ~}
+%{ if topology_enabled ~}
+      env:
+        # Register without topology; the operator applies it after startup.
+        - name: POD_TOPOLOGY
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['oci-hpc-oke.oracle.com/slurm-topology-at-registration']
+%{ endif ~}
       # Kubernetes node names are IP addresses here; slurmd registers under the
       # pod hostname, which the operator sets from the hostname-override node
       # annotation written by the oci-hpc-oke-utils annotator.

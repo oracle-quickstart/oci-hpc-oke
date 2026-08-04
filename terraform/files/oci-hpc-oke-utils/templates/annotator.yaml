@@ -97,6 +97,12 @@ spec:
               value: {{ .Values.annotator.enabled | quote }}
             - name: TOPOLOGY_ENABLED
               value: {{ .Values.topology.enabled | quote }}
+            - name: TOPOLOGY_SLURM_NAMESPACE
+              value: {{ .Values.topology.slurmNamespace | quote }}
+            - name: TOPOLOGY_CONFIGMAP_NAME
+              value: {{ .Values.topology.configMapName | quote }}
+            - name: RETRY_INTERVAL
+              value: {{ .Values.topology.retryInterval | quote }}
           livenessProbe:
             exec:
               command: ["test", "-f", "/tmp/health/alive"]

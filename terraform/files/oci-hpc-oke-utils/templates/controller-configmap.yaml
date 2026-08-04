@@ -438,8 +438,8 @@ data:
         except client.exceptions.ApiException as exc:
             # The slurm chart owns this ConfigMap; without it there is no cluster.
             if exc.status == 404:
-                log.info("Topology ConfigMap %s/%s not found, skipping", namespace, name)
-                return True
+                log.info("Topology ConfigMap %s/%s not found, retrying", namespace, name)
+                return False
             raise
         if (cm.data or {}).get(TOPOLOGY_CONFIGMAP_KEY) == content:
             return True
@@ -464,6 +464,7 @@ data:
         topology_block_sizes = os.environ.get("TOPOLOGY_BLOCK_SIZES", "auto")
         topology_pools = [p for p in os.environ.get("TOPOLOGY_WORKER_POOLS", "").split(",") if p]
         topology_interval = int(os.environ.get("TOPOLOGY_INTERVAL", "120"))
+        topology_retry_interval = int(os.environ.get("TOPOLOGY_RETRY_INTERVAL", "5"))
 
         compute_client = None
 
@@ -620,15 +621,22 @@ data:
                         log.warning("OCI label cycle incomplete; retrying next cycle")
                     next_labels_due = time.monotonic() + interval
 
+            topology_ok = True
             if topology_enabled:
                 try:
-                    _sync_topology(v1, topology_namespace, topology_configmap,
-                                   topology_default, topology_block_sizes, topology_pools)
+                    topology_ok = _sync_topology(
+                        v1, topology_namespace, topology_configmap,
+                        topology_default, topology_block_sizes, topology_pools,
+                    )
                 except Exception:
                     log.exception("Topology sync failed")
+                    topology_ok = False
 
             HEALTH_FILE.touch()
-            time.sleep(loop_interval)
+            sleep_interval = loop_interval
+            if topology_enabled and not topology_ok:
+                sleep_interval = min(loop_interval, topology_retry_interval)
+            time.sleep(sleep_interval)
 
 
     if __name__ == "__main__":
