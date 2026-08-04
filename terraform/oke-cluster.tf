@@ -179,7 +179,7 @@ locals {
     } : {},
     var.create_lustre ? {
       lustre = merge(
-        { create = "always" },
+        { create = "never" },
         (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 7, netnum = 1 } : {},
         var.create_vcn && var.lustre_sn_cidr != null ?
