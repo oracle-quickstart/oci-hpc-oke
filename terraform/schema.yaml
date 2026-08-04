@@ -62,7 +62,6 @@ variableGroups:
       - worker_gpu_node_cycling_max_surge
       - worker_gpu_node_cycling_max_unavailable
       - worker_gpu_node_cycling_mode
-      - worker_rdma_host_group_id
       # Networking
       - subnet_advanced_attrs
       - allow_rules_lustre
@@ -266,6 +265,8 @@ variableGroups:
       - worker_rdma_image_custom_id
       - worker_rdma_advanced_options
       - worker_rdma_use_cluster_network
+      - worker_rdma_use_host_group
+      - worker_rdma_host_group_id
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -2141,6 +2142,28 @@ variables:
       and:
         - ${worker_rdma_enabled}
         - ${worker_rdma_advanced_options}
+  worker_rdma_use_host_group:
+    title: Use host group
+    description: Place the GPU with RDMA worker pool in an existing host group.
+    type: boolean
+    default: false
+    required: false
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+  worker_rdma_host_group_id:
+    title: Host group OCID
+    description: OCID of the existing host group for the GPU with RDMA worker pool.
+    type: ocid
+    required: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+        - ${worker_rdma_use_host_group}
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
