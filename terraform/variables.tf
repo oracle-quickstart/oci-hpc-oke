@@ -853,7 +853,11 @@ variable "worker_rdma_kubernetes_version" {
   type        = string
 }
 variable "worker_rdma_use_cluster_network" { default = false }
-variable "worker_rdma_host_group_id" { default = "" }
+variable "worker_rdma_host_group_id" {
+  default     = ""
+  description = "OCID of the existing host group for the GPU with RDMA worker pool."
+  type        = string
+}
 
 # Workers - GPU Memory Cluster
 variable "worker_gmc_enabled" {
