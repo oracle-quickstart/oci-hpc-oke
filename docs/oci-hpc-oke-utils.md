@@ -352,7 +352,7 @@ See [Using RDMA Network Locality](./using-rdma-network-locality-when-running-wor
 
 Two pieces of this chart work together to feed OCI RDMA network locality into Slurm scheduling for Slinky clusters:
 
-- **Annotator** (DaemonSet, one pod per node): reads `rdmaTopologyData` from IMDS directly and writes the `topology.slinky.slurm.net/spec` node annotation that slurm-operator uses to register each node's place in the Slurm topology.
+- **Annotator** (DaemonSet, one pod per node): reads `rdmaTopologyData` from IMDS directly and writes the `topology.slinky.slurm.net/spec` node annotation after the generated file contains the requested topology units. Workers register without topology first, then slurm-operator applies the annotation through its REST sync.
 - **Controller** (the same Deployment described under [Labeler Architecture](#architecture)): reads the `rdma.*` node labels the labeler applies and generates `topology.yaml`, with `tree`, `block`, and `flat` topologies, into the Slurm chart's extra-config ConfigMap.
 
 ### Configuration
@@ -364,6 +364,8 @@ Two pieces of this chart work together to feed OCI RDMA network locality into Sl
 | `topology.configMapName` | `slurm-config-extra` | Name of the ConfigMap the generated `topology.yaml` is patched into. |
 | `topology.defaultTopology` | `tree` | Topology (`tree` or `block`) marked `cluster_default` in the generated file. |
 | `topology.blockSizes` | `auto` | `block_sizes` for the `block` topology: `auto` derives them from live local block populations, or a comma-separated list of integers. |
+| `topology.syncInterval` | `120` | Normal topology reconciliation interval in seconds. |
+| `topology.retryInterval` | `5` | Retry interval while the topology ConfigMap or requested units are unavailable. |
 | `topology.workerPools` | `oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu` | Node pools the controller scans when building `topology.yaml`. |
 
 Without RDMA locality labels, nodes fall back to a synthetic `none` unit in both topologies so they remain schedulable.

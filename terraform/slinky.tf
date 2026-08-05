@@ -75,8 +75,8 @@ locals {
 
   slinky_image_profiles = {
     "25.11.6-ubuntu24.04" = {
-      operator_chart_version = "1.2.0"
-      slurm_chart_version    = "1.2.0"
+      operator_chart_version = "1.2.1"
+      slurm_chart_version    = "1.2.1"
       # Custom slurmdbd/slurmrestd/login (SSSD) built from upstream source into
       # our registry (build-control-plane-images.sh), so the whole stack comes
       # from one registry.
@@ -95,8 +95,8 @@ locals {
       amd_worker_tag       = "slurmd-rocm-rccl-25.11.6-rocm7.1.1-sssd-pyxis-2026-06-16.0"
     }
     "26.05-ubuntu24.04" = {
-      operator_chart_version      = "1.2.0"
-      slurm_chart_version         = "1.2.0"
+      operator_chart_version      = "1.2.1"
+      slurm_chart_version         = "1.2.1"
       accounting_image_repository = "ghcr.io/slinkyproject/slurmdbd"
       accounting_image_tag        = "26.05-ubuntu24.04"
       restapi_image_repository    = "ghcr.io/slinkyproject/slurmrestd"
@@ -109,8 +109,8 @@ locals {
       amd_worker_tag              = "slurmd-rocm-rccl-26.05-rocm7.1.1-sssd-pyxis-2026-06-15.0"
     }
     "26.05.1-ubuntu26.04" = {
-      operator_chart_version = "1.2.0"
-      slurm_chart_version    = "1.2.0"
+      operator_chart_version = "1.2.1"
+      slurm_chart_version    = "1.2.1"
       # Whole stack rebuilt from the latest SlinkyProject/containers source
       # into our registry (see slurm-source/README.md for the pinned ref),
       # same one-registry layout as the 25.11.6 profile.

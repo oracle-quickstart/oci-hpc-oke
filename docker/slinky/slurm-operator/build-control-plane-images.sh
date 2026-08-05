@@ -40,8 +40,8 @@ flavor="${FLAVOR:-ubuntu26.04}"
 slurm_minor="${slurm_version%.*}" # 26.05.1 -> 26.05
 
 operator_repo="${OPERATOR_REPO:-https://github.com/SlinkyProject/slurm-operator.git}"
-operator_ref="${OPERATOR_REF:-v1.2.0}"
-operator_version="${OPERATOR_VERSION:-1.2.0}"
+operator_ref="${OPERATOR_REF:-v1.2.1}"
+operator_version="${OPERATOR_VERSION:-1.2.1}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workdir="$(mktemp -d)"
@@ -59,6 +59,11 @@ bake_files=(--file ./docker-bake.hcl --file "./${slurm_minor}/${flavor}/slurm.hc
 components=(slurmdbd slurmrestd login)
 
 IFS=',' read -r -a platform_list <<<"${platforms}"
+operator_platform_args=(--set "*.platform=${platform_list[0]}")
+for platform in "${platform_list[@]:1}"; do
+  operator_platform_args+=(--set "*.platform+=${platform}")
+done
+
 for platform in "${platform_list[@]}"; do
   arch="${platform##*/}"
   echo "== build components ${platform} =="
@@ -85,6 +90,6 @@ git clone --quiet --branch "${operator_ref}" "${operator_repo}" "${workdir}/oper
 cd "${workdir}/operator"
 REGISTRY="${operator_registry}" VERSION="${operator_version}" docker buildx bake \
   --builder "${builder}" --file ./docker-bake.hcl \
-  --set "*.platform=${platforms}" --push operator webhook
+  "${operator_platform_args[@]}" --push operator webhook
 
 echo "Built control-plane images into ${registry} and ${operator_registry}."

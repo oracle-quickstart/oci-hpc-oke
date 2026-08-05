@@ -102,6 +102,7 @@ locals {
     for nodeset_name in sort(keys(local.slinky_worker_nodesets)) : templatefile("${path.module}/files/slinky/worker-nodeset-values.yaml.tftpl", {
       nodeset_name             = nodeset_name
       node_name_from_kube_node = !local.slinky_hostname_annotator_enabled
+      topology_enabled         = local.slinky_topology_enabled
       replicas                 = local.slinky_worker_nodesets[nodeset_name].replicas
       image_repository         = var.slinky_worker_image_repository
       image_tag                = local.slinky_worker_nodesets[nodeset_name].image_tag

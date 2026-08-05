@@ -12,16 +12,18 @@ Topology management is on by default (`slinky_topology_enabled = true`), but it 
 Topology management is a small pipeline of existing oci-hpc-oke-utils and Slinky components. No changes to slurm-operator itself are required.
 
 1. **The labeler** (oci-hpc-oke-utils) applies the `oci.oraclecloud.com/rdma.hpc_island_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.local_block_id` labels to each node from IMDS, as described in [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md). It first reads `/host/rdmaTopologyData`, then falls back to `/host`. The former returns legacy `customer*` locality fields; the latter can provide those embedded fields or the equivalent root `networkBlockId` and `rackId` fields.
-2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) uses the same IMDS lookup order and field mapping, then writes the `topology.slinky.slurm.net/spec` node annotation:
+2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) uses the same IMDS lookup order and field mapping. It writes the `topology.slinky.slurm.net/spec` node annotation only after the generated `topology.yaml` contains every requested unit:
    - Labeled node: `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>`
    - No locality data (no capacity topology, or a CPU worker): `tree:root:none,block:none`
 
    The `isl-` (HPC island), `nb-` (network block), and `lb-` (local block) prefixes keep switch names unique across tiers by construction; the value after each prefix is the corresponding node label value. Every tree path starts at a single `root` switch so the tree stays connected no matter how many islands exist.
 3. **The oke-utils controller** (a single Deployment, separate from the per-node annotator) lists nodes in the `oke-gpu`, `oke-rdma`, `oke-gmc`, and `oke-cpu` pools, reads their `rdma.*` labels, and generates one `topology.yaml` with three named topologies: `tree`, `block`, and `flat`. It patches the `topology.yaml` key of the `slurm-config-extra` ConfigMap in the Slurm namespace whenever the content changes.
-4. **slurm-operator 1.2** reads the `topology.slinky.slurm.net/spec` annotation on each node. A pod binding webhook copies it onto worker pods at schedule time, and slurmd receives it as `POD_TOPOLOGY` and registers with `Topology=<name>:<unit>,...`. A REST sync step also reconciles the annotation against already-registered nodes, so a changed annotation applies without restarting the pod.
+4. **slurm-operator 1.2** reads the `topology.slinky.slurm.net/spec` annotation on each node. Workers intentionally register with an empty `POD_TOPOLOGY` so Slurm remains usable while the projected topology file is loading. The operator's REST sync then applies the node annotation to the registered worker without restarting its pod.
 5. **The Slurm controller pod's reconfigure sidecar** (`controller.inplaceReconfigure: true`) watches `/etc/slurm` and runs `scontrol reconfigure` whenever a mounted config file, including `topology.yaml`, changes. This is what makes controller-generated updates take effect without a slurmctld restart.
 
 Nodes without RDMA locality data are not left out of the topologies: they carry the synthetic `none` unit so they stay inside both `tree` and `block` and remain schedulable, just without any real locality preference.
+
+During bootstrap, workers can briefly run without topology-aware placement. The annotator retries every five seconds while the generated file is unavailable, and normal topology reconciliation continues after the file is ready.
 
 ## Example: Generated topology.yaml
 
@@ -122,7 +124,7 @@ kubectl -n slurm exec slurm-controller-0 -c slurmctld -- scontrol show topology
 
 If the ConfigMap looks right but `scontrol show topology` does not match, check the Slurm controller pod's reconfigure sidecar logs; it is what applies changed files with `scontrol reconfigure`.
 
-If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment logs (`kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller`). The controller only patches the ConfigMap when the rendered content differs from what is already there. The topology sync runs every 120 seconds by default (`topology.syncInterval`); the OCI label refresh keeps its own separate 900 second interval.
+If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment logs (`kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller`). The controller only patches the ConfigMap when the rendered content differs from what is already there. The topology sync runs every 120 seconds by default (`topology.syncInterval`) and retries unavailable configuration every five seconds (`topology.retryInterval`). The OCI label refresh keeps its own separate 900 second interval.
 
 > [!NOTE]
 > A `helm upgrade` of the Slurm chart briefly reverts `topology.yaml` to the bootstrap skeleton (a bare `none` tree switch and a placeholder block), because the chart's `configFiles` value always re-applies that skeleton on deploy. The oke-utils controller rewrites it with real data on its next cycle, within about two minutes by default, so this window is normal and self-corrects; it is not a sign of a problem unless `topology.yaml` never leaves the skeleton state.
