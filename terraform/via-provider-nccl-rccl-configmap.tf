@@ -53,6 +53,21 @@ locals {
       NCCL_SOCKET_IFNAME        = "eth0"
       NCCL_IGNORE_CPU_AFFINITY  = "1"
     }
+    "BM.GPU.RTXPRO.8" = {
+      NCCL_MIN_NCHANNELS         = "8"
+      NCCL_DEBUG                 = "WARN"
+      NCCL_CUMEM_ENABLE          = "0"
+      NCCL_IB_SPLIT_DATA_ON_QPS  = "0"
+      NCCL_IB_QPS_PER_CONNECTION = "1"
+      NCCL_IB_GID_INDEX          = "3"
+      NCCL_IB_HCA                = "=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9"
+      NCCL_IB_TC                 = "41"
+      NCCL_IB_SL                 = "0"
+      NCCL_IB_TIMEOUT            = "22"
+      NCCL_NET_PLUGIN            = "none"
+      NCCL_SOCKET_IFNAME         = "eth0"
+      NCCL_IGNORE_CPU_AFFINITY   = "1"
+    }
     "BM.GPU.B4.8" = {
       NCCL_DEBUG                 = "WARN"
       NCCL_IB_SPLIT_DATA_ON_QPS  = "0"

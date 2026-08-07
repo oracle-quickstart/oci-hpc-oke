@@ -1496,11 +1496,11 @@ variables:
     title: Kubernetes version
     description: The Kubernetes version for the created OKE cluster and managed nodes.
     required: true
-    default: "v1.35.2"
+    default: "v1.36.1"
     enum:
+      - "v1.36.1"
       - "v1.35.2"
       - "v1.34.2"
-      - "v1.33.10"
   control_plane_allowed_cidrs:
     title: Kubernetes endpoint allowed CIDRs
     description: List of CIDR ranges for allowed Kubernetes endpoint communication.

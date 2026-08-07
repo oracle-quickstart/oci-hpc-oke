@@ -13,9 +13,11 @@ bandwidth. Go to the [NCCL Tests](#nccl-tests-nvidia-gpu-shapes) section for
 NVIDIA workers or the [RCCL Tests](#rccl-tests-amd-gpu-shapes) section for AMD
 workers.
 
-The examples below were validated on live clusters:
+We completed the following tests on live clusters:
 
 - NCCL on a `BM.GPU.B4.8` Slurm GPU NodeSet (two nodes, eight GPUs per node).
+- NCCL on a `BM.GPU.RTXPRO.8` Slurm GPU NodeSet with host networking (four nodes,
+  eight GPUs per node).
 - RCCL on a `BM.GPU.MI300X.8` Slurm GPU NodeSet (two nodes, eight GPUs per node).
 
 You can run either test in two ways:
@@ -86,15 +88,17 @@ Slurm account `users`. If you passed `--account <name>` to
 `slurm-add-user.sh`, or used a different `PROJECT` in the manual onboarding
 steps, set `SLURM_ACCOUNT` to that account instead.
 
-Slurm GPU workers mount the shape's parameters at both `/etc/nccl.conf`
-(NCCL) and `/etc/rccl.conf` (RCCL); each library reads its own path at
-initialization, and per-job environment variables override either file.
-Pyxis job steps run in the container filesystem and need
-`--container-mounts=/etc/nccl.conf` or `--container-mounts=/etc/rccl.conf`
-(whichever the job's library reads) to see it. The provided scripts still
-source `env.sh`, whose exports take precedence over the file. Changing a
-shape's parameters rolls the affected worker pods automatically, since
-Kubernetes does not refresh a `subPath` ConfigMap mount on its own.
+Slurm GPU workers mount the parameters for the shape at `/etc/nccl.conf` and
+`/etc/rccl.conf`. NCCL reads `/etc/nccl.conf`. RCCL reads `/etc/rccl.conf`.
+The environment variables for a job override the parameters in these files.
+
+Pyxis job steps use the container filesystem. For an NCCL job, mount
+`/etc/nccl.conf`. For an RCCL job, mount `/etc/rccl.conf`. The provided scripts
+source `env.sh`. The variables from `env.sh` override the parameters in the
+mounted file.
+
+If you change the ConfigMap data for a shape, the stack replaces the affected
+worker pods. Kubernetes does not refresh a ConfigMap mount that uses `subPath`.
 
 ## Worker Network Mode (hostNetwork vs SR-IOV VFs)
 
@@ -205,27 +209,33 @@ The output should be the `nvidia-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
-The following script uses Slurm for allocation and OpenMPI `mpirun` for rank
-launch inside that allocation. Do not run the MPI-enabled `all_reduce_perf`
-directly with `srun` unless your image's OpenMPI build is known to support the
-cluster's Slurm PMI/PMIx setup.
+The following script uses Slurm to allocate nodes. OpenMPI `mpirun` starts the
+ranks in the allocation.
+
+If you do not know that the OpenMPI build supports Slurm PMI/PMIx, do not use
+`srun`.
 
 The script sources `/opt/nccl-tests/env.sh` for the NCCL, HPCX (OpenMPI/UCX),
-and nccl-tests paths, then detects the OCI GPU shape and applies the matching
-`NCCL_IB_HCA` / `UCX_NET_DEVICES` tuning. It covers `BM.GPU.B4.8`,
+and nccl-tests paths. It gets the OCI GPU shape. It applies the matching
+`NCCL_IB_HCA` and `UCX_NET_DEVICES` values. It supports `BM.GPU.B4.8`,
 `BM.GPU.A100-v2.8`, `BM.GPU4.8`, `BM.GPU.H100.8`, `BM.GPU.H200.8`,
-`BM.GPU.B200.8`, and `BM.GPU.B300.8`, with two `mpirun` profiles: an A100-class
-profile (B4.8 / A100-v2.8 / GPU4.8) and an H100-and-newer profile
-(H100 / H200 / B200 / B300). The HCA lists match the per-shape manifests in
-[`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/); add a `case`
-arm there to support another shape.
+`BM.GPU.RTXPRO.8`, `BM.GPU.B200.8`, and `BM.GPU.B300.8`.
 
-Shape detection reads the OCI instance metadata service at `169.254.169.254`.
-The GPU worker pods run with `hostNetwork`, so IMDS is reachable, and `jq` ships
-in the worker image.
+The script uses three `mpirun` profiles. It uses the A100-class profile for
+B4.8, A100-v2.8, and GPU4.8. It uses the H100-and-newer profile for H100, H200,
+B200, and B300. It uses the rank-local HCA mapping for RTX PRO. The static HCA
+lists for the other profiles match the per-shape manifests in
+[`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/). A new shape
+requires a new `case` arm in the script.
 
-Set `EXEC=all_gather_perf` (or another `*_perf` binary) in the job environment
-to run a different collective; it defaults to `all_reduce_perf`.
+The script gets the shape from the instance metadata service at
+`169.254.169.254`. The GPU worker pods use `hostNetwork`. Thus, the pods can
+reach the instance metadata service. The worker image includes `jq`.
+
+The default collective is `all_reduce_perf`.
+
+If you use a different collective, set `EXEC=all_gather_perf` or another
+`*_perf` binary in the job environment.
 
 ```bash
 cat > "$HOME/nccl-slurm.sh" <<'EOF'
@@ -268,11 +278,13 @@ case "${shape}" in
   BM.GPU.H200.8|BM.GPU.B200.8)
     var_UCX_NET_DEVICES=eth0
     var_NCCL_IB_HCA="=mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11" ;;
+  BM.GPU.RTXPRO.8)
+    var_UCX_NET_DEVICES=eth0 ;;
   BM.GPU.B300.8)
     var_UCX_NET_DEVICES=eth0
     var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_12,mlx5_13,mlx5_14,mlx5_16,mlx5_17,mlx5_18,mlx5_19,mlx5_20,mlx5_21" ;;
   *)
-    echo "Unsupported shape ${shape}; set var_UCX_NET_DEVICES and var_NCCL_IB_HCA manually."; exit 1 ;;
+    echo "Unsupported shape ${shape}; set the RDMA tuning manually."; exit 1 ;;
 esac
 
 echo "date=$(date -Is)"
@@ -324,6 +336,40 @@ case "${shape}" in
       -x NCCL_IGNORE_CPU_AFFINITY=1 \
       -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
       "${EXEC_CMD}" -b 1G -e 16G -f 2 -g 1 -n 50 ;;
+  BM.GPU.RTXPRO.8)
+    # Two tests with the full HCA list stopped during communicator setup.
+    # Use the validated rank-local HCA mapping.
+    # shellcheck disable=SC2016
+    mpirun --mca pml ucx \
+      --bind-to numa \
+      --mca coll '^hcoll,ucc' \
+      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+      -x NCCL_MIN_NCHANNELS=8 \
+      -x NCCL_DEBUG \
+      -x NCCL_CUMEM_ENABLE=0 \
+      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+      -x NCCL_IB_QPS_PER_CONNECTION=1 \
+      -x NCCL_IB_GID_INDEX=3 \
+      -x NCCL_IB_TC=41 \
+      -x NCCL_IB_SL=0 \
+      -x NCCL_IB_TIMEOUT=22 \
+      -x NCCL_NET_PLUGIN=none \
+      -x HCOLL_ENABLE_MCAST_ALL=0 \
+      -x coll_hcoll_enable=0 \
+      -x UCX_TLS=tcp \
+      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
+      -x RX_QUEUE_LEN=8192 \
+      -x IB_RX_QUEUE_LEN=8192 \
+      -x NCCL_SOCKET_IFNAME=${var_UCX_NET_DEVICES} \
+      -x NCCL_IGNORE_CPU_AFFINITY=1 \
+      bash -c '
+        set -eu -o pipefail
+        gpu_idx=$((OMPI_COMM_WORLD_LOCAL_RANK % 8))
+        mlx_idx=$((gpu_idx + (gpu_idx > 3) * 2))
+        export NCCL_IB_HCA="=mlx5_${mlx_idx}"
+        exec "$@"
+      ' bash \
+      "${EXEC_CMD}" -b 512k -e 8G -f 2 -g 1 ;;
 esac
 EOF
 chmod 755 "$HOME/nccl-slurm.sh"
@@ -523,27 +569,33 @@ The output should be the `nvidia-smi` table listing the allocated GPU.
 
 #### Create the Slurm Batch Script
 
-The following script uses Slurm for allocation and OpenMPI `mpirun` for rank
-launch inside that allocation. Do not run the MPI-enabled `all_reduce_perf`
-directly with `srun` unless your image's OpenMPI build is known to support the
-cluster's Slurm PMI/PMIx setup.
+The following script uses Slurm to allocate nodes. OpenMPI `mpirun` starts the
+ranks in the allocation.
+
+If you do not know that the OpenMPI build supports Slurm PMI/PMIx, do not use
+`srun`.
 
 The script sources `/opt/nccl-tests/env.sh` for the NCCL, HPCX (OpenMPI/UCX),
-and nccl-tests paths, then detects the OCI GPU shape and applies the matching
-`NCCL_IB_HCA` / `UCX_NET_DEVICES` tuning. It covers `BM.GPU.B4.8`,
+and nccl-tests paths. It gets the OCI GPU shape. It applies the matching
+`NCCL_IB_HCA` and `UCX_NET_DEVICES` values. It supports `BM.GPU.B4.8`,
 `BM.GPU.A100-v2.8`, `BM.GPU4.8`, `BM.GPU.H100.8`, `BM.GPU.H200.8`,
-`BM.GPU.B200.8`, and `BM.GPU.B300.8`, with two `mpirun` profiles: an A100-class
-profile (B4.8 / A100-v2.8 / GPU4.8) and an H100-and-newer profile
-(H100 / H200 / B200 / B300). The HCA lists match the per-shape manifests in
-[`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/); add a `case`
-arm there to support another shape.
+`BM.GPU.RTXPRO.8`, `BM.GPU.B200.8`, and `BM.GPU.B300.8`.
 
-Shape detection reads the OCI instance metadata service at `169.254.169.254`.
-The GPU worker pods run with `hostNetwork`, so IMDS is reachable, and `jq` ships
-in the worker image.
+The script uses three `mpirun` profiles. It uses the A100-class profile for
+B4.8, A100-v2.8, and GPU4.8. It uses the H100-and-newer profile for H100, H200,
+B200, and B300. It uses the rank-local HCA mapping for RTX PRO. The static HCA
+lists for the other profiles match the per-shape manifests in
+[`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/). A new shape
+requires a new `case` arm in the script.
 
-Set `EXEC=all_gather_perf` (or another `*_perf` binary) in the job environment
-to run a different collective; it defaults to `all_reduce_perf`.
+The script gets the shape from the instance metadata service at
+`169.254.169.254`. The GPU worker pods use `hostNetwork`. Thus, the pods can
+reach the instance metadata service. The worker image includes `jq`.
+
+The default collective is `all_reduce_perf`.
+
+If you use a different collective, set `EXEC=all_gather_perf` or another
+`*_perf` binary in the job environment.
 
 ```bash
 kubectl -n "$SLURM_NAMESPACE" exec -i "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
@@ -587,11 +639,13 @@ case "${shape}" in
   BM.GPU.H200.8|BM.GPU.B200.8)
     var_UCX_NET_DEVICES=eth0
     var_NCCL_IB_HCA="=mlx5_0,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_9,mlx5_10,mlx5_11" ;;
+  BM.GPU.RTXPRO.8)
+    var_UCX_NET_DEVICES=eth0 ;;
   BM.GPU.B300.8)
     var_UCX_NET_DEVICES=eth0
     var_NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_12,mlx5_13,mlx5_14,mlx5_16,mlx5_17,mlx5_18,mlx5_19,mlx5_20,mlx5_21" ;;
   *)
-    echo "Unsupported shape ${shape}; set var_UCX_NET_DEVICES and var_NCCL_IB_HCA manually."; exit 1 ;;
+    echo "Unsupported shape ${shape}; set the RDMA tuning manually."; exit 1 ;;
 esac
 
 echo "date=$(date -Is)"
@@ -643,6 +697,40 @@ case "${shape}" in
       -x NCCL_IGNORE_CPU_AFFINITY=1 \
       -x NCCL_IB_HCA="${var_NCCL_IB_HCA}" \
       "${EXEC_CMD}" -b 1G -e 16G -f 2 -g 1 -n 50 ;;
+  BM.GPU.RTXPRO.8)
+    # Two tests with the full HCA list stopped during communicator setup.
+    # Use the validated rank-local HCA mapping.
+    # shellcheck disable=SC2016
+    mpirun --mca pml ucx \
+      --bind-to numa \
+      --mca coll '^hcoll,ucc' \
+      -np "${SLURM_NTASKS}" -npernode "${GPUS_PER_NODE}" \
+      -x NCCL_MIN_NCHANNELS=8 \
+      -x NCCL_DEBUG \
+      -x NCCL_CUMEM_ENABLE=0 \
+      -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+      -x NCCL_IB_QPS_PER_CONNECTION=1 \
+      -x NCCL_IB_GID_INDEX=3 \
+      -x NCCL_IB_TC=41 \
+      -x NCCL_IB_SL=0 \
+      -x NCCL_IB_TIMEOUT=22 \
+      -x NCCL_NET_PLUGIN=none \
+      -x HCOLL_ENABLE_MCAST_ALL=0 \
+      -x coll_hcoll_enable=0 \
+      -x UCX_TLS=tcp \
+      -x UCX_NET_DEVICES=${var_UCX_NET_DEVICES} \
+      -x RX_QUEUE_LEN=8192 \
+      -x IB_RX_QUEUE_LEN=8192 \
+      -x NCCL_SOCKET_IFNAME=${var_UCX_NET_DEVICES} \
+      -x NCCL_IGNORE_CPU_AFFINITY=1 \
+      bash -c '
+        set -eu -o pipefail
+        gpu_idx=$((OMPI_COMM_WORLD_LOCAL_RANK % 8))
+        mlx_idx=$((gpu_idx + (gpu_idx > 3) * 2))
+        export NCCL_IB_HCA="=mlx5_${mlx_idx}"
+        exec "$@"
+      ' bash \
+      "${EXEC_CMD}" -b 512k -e 8G -f 2 -g 1 ;;
 esac
 EOF
 ```
@@ -821,7 +909,24 @@ still take precedence over `/etc/nccl.conf`.
 
 ### Example Output
 
-This is representative output from a two-node `BM.GPU.B4.8` run with 16 ranks.
+The Kueue MPIJob for this shape passes the full HCA list to every rank.
+
+We did two four-node Slurm tests with the same full HCA list and 32 ranks. Both tests
+reported `invalid request local work queue error` for `mlx5_7` during NCCL
+communicator setup. The first test stopped after 11 seconds. It returned exit
+code `3:0`. The second test did not produce a data row. We canceled it after
+two minutes.
+
+We then did a test with the rank-local HCA mapping on the same four nodes and
+32 ranks. This test completed in 64 seconds. It returned exit code `0:0`. The
+error file contained no data. The 8 GiB result had zero errors:
+
+```text
+  8589934592    2147483648     float     sum      -1   589575   14.57   28.23       0   589660   14.57   28.22       0
+# Out of bounds values : 0 OK
+```
+
+This output is from a two-node `BM.GPU.B4.8` test with 16 ranks.
 At 8 GiB, the out-of-place and in-place bus bandwidth results are 189.60 GB/s
 and 189.50 GB/s.
 
@@ -951,11 +1056,16 @@ sbatch \
   "$HOME/nccl-pyxis.sh"
 ```
 
-The first run imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
-on stderr). A successful job ends `COMPLETED` with `ExitCode` `0:0`. Compare its
-8 GiB bus bandwidth with the native run. For another NVIDIA shape, replace the
-`NCCL_IB_HCA` list (see
-[Create the Slurm Batch Script](#create-the-slurm-batch-script)).
+The first job imports `ubuntu:24.04` (`pyxis: imported docker image: ubuntu:24.04`
+on stderr). A successful job has the state `COMPLETED`. It has exit code `0:0`.
+
+Compare its 8 GiB bus bandwidth with the native job. If you use a supported
+NVIDIA shape other than RTX PRO, replace the `NCCL_IB_HCA` list. See
+[Create the Slurm Batch Script](#create-the-slurm-batch-script). For RTX PRO,
+use the native workflow above.
+
+> [!NOTE]
+> We did not validate the Pyxis path for RTX PRO.
 
 #### GMC Pyxis variant
 

@@ -99,6 +99,7 @@ affinity:
                 - VM.GPU.A10.2
                 - VM.GPU.A100.80G.1
                 - BM.GPU.H200.8
+                - BM.GPU.RTXPRO.8
                 - BM.GPU.B200.8
                 - BM.GPU.B300.8
                 - BM.GPU.GB200.4

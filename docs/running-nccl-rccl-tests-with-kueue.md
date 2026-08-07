@@ -57,6 +57,35 @@ kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.B200.8.yaml
 ```
 
+### BM.GPU.RTXPRO.8
+
+> [!NOTE]
+> This manifest uses the LocalQueue for the RTX PRO pool with RDMA. The stack
+> creates this LocalQueue. The default namespace is `default`.
+
+Before you apply this manifest, set `install_kueue=true`.
+
+Set `worker_rdma_shape="BM.GPU.RTXPRO.8"`.
+
+Apply the manifest in the namespace that
+`kueue_local_queue_default_namespace` specifies.
+
+Before you submit the job, make sure that the queue exists:
+
+```sh
+export KUEUE_JOB_NAMESPACE=default
+
+kubectl -n "${KUEUE_JOB_NAMESPACE}" get localqueue \
+  bm-gpu-rtxpro-8-rdma-topology-aware
+
+kubectl -n "${KUEUE_JOB_NAMESPACE}" apply -f \
+  https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.RTXPRO.8.yaml
+```
+
+> [!NOTE]
+> This MPIJob passes the full RTX PRO HCA list to every rank. It does not use
+> the rank-local HCA mapping from the native Slurm example.
+
 ### BM.GPU.H200
 ```sh
 kubectl apply -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/manifests/nccl-tests/kueue/BM.GPU.H200.8.yaml
