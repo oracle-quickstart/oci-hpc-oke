@@ -67,18 +67,35 @@ locals {
   rule_type_cidr    = "CIDR_BLOCK"
   rule_type_service = "SERVICE_CIDR_BLOCK"
 
+  vcn_cidr = coalesce(data.oci_core_vcn.oke_vcn.cidr_blocks...)
+
   nsgs = merge(
     {
-      bastion  = var.create_bastion ? { create = "auto" } : { create = "never" }
-      operator = var.create_operator ? { create = "auto" } : { create = "never" }
-      int_lb   = { create = "auto" }
-      pub_lb   = { create = "auto" }
-      cp       = { create = "auto" }
-      workers  = { create = "auto" }
-      pods     = { create = "auto" }
+      bastion = var.create_bastion ? { create = "auto" } : { create = "never" }
+      operator = merge(
+        var.create_operator ? { create = "auto" } : { create = "never" },
+        var.create_operator && var.create_lustre ? {
+          rules = {
+            "Allow ingress from Lustre to OKE Operator" = {
+              protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, source = "lustre", source_type = local.rule_type_nsg,
+            },
+            "Allow egress from Operator to Lustre" = {
+              protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, destination = "lustre", destination_type = local.rule_type_nsg,
+            }
+          }
+        } : {}
+      )
+      int_lb  = { create = "auto" }
+      pub_lb  = { create = "auto" }
+      cp      = { create = "auto" }
+      workers = { create = "auto" }
+      pods    = { create = "auto" }
     },
     local.create_fss_effective ? {
       fss = { create = "always" }
+    } : {},
+    var.create_lustre ? {
+      lustre = { create = "always", rules = local.default_lustre_nsg_rules }
     } : {}
   )
 
@@ -179,7 +196,7 @@ locals {
     } : {},
     var.create_lustre ? {
       lustre = merge(
-        { create = "never" },
+        { create = "always" },
         (var.create_vcn && var.lustre_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 7, netnum = 1 } : {},
         var.create_vcn && var.lustre_sn_cidr != null ?
@@ -355,10 +372,10 @@ module "oke" {
 
   allow_rules_workers = var.create_lustre ? {
     "Allow ingress from Lustre to OKE Workers" = {
-      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, source = one(oci_core_network_security_group.lustre_nsg[*].id), source_type = local.rule_type_nsg,
+      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, source = "lustre", source_type = local.rule_type_nsg,
     }
     "Allow egress from Workers to Lustre" = {
-      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, destination = one(oci_core_network_security_group.lustre_nsg[*].id), destination_type = local.rule_type_nsg,
+      protocol = local.tcp_protocol, source_port_min = 512, source_port_max = 1023, destination_port_min = 988, destination_port_max = 988, destination = "lustre", destination_type = local.rule_type_nsg,
     }
   } : {}
 

@@ -30,8 +30,8 @@ func TestStorageLustre(t *testing.T) {
 	// State assertions
 	resources := terraformStateList(t, options)
 	requireStateHasPrefix(t, resources, "oci_lustre_file_storage_lustre_file_system.lustre")
-	requireStateHasPrefix(t, resources, "oci_core_network_security_group.lustre")
-	requireStateHasPrefix(t, resources, "oci_core_subnet.lustre_subnet")
+	requireStateHasPrefix(t, resources, `module.oke.module.network.oci_core_network_security_group.custom_nsgs["lustre"]`)
+	requireStateHasPrefix(t, resources, `module.oke.module.network.oci_core_subnet.oke["lustre"]`)
 	requireStateHasPrefix(t, resources, "kubectl_manifest.lustre_pv")
 
 	// Attribute validation
