@@ -76,22 +76,6 @@ NCCL_SOCKET_IFNAME=eth0
 NCCL_IGNORE_CPU_AFFINITY=1
 ```
 
-The Kueue MPIJob passes this full HCA list to every rank. It starts
-`all_reduce_perf` directly. It does not use the rank-local HCA mapping.
-
-If you use native Slurm workers in the current environment, use the rank-local
-HCA mapping in the Slurm guide.
-
-We did two four-node tests with the full HCA list and 32 ranks. NCCL 2.29.3
-reported `invalid request local work queue error` for `mlx5_7` during both
-tests. The first test stopped after 11 seconds. It returned exit code `3:0`.
-The second test did not produce a data row. We canceled it after two minutes.
-
-A third test used the rank-local HCA mapping. This test completed with zero
-errors. The
-[Slurm guide](./running-nccl-rccl-tests-from-slurm-operator.md) gives more
-information.
-
 ## BM.GPU.B4.8
 
 ```
