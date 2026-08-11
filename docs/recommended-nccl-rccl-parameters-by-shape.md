@@ -58,6 +58,44 @@ NCCL_SOCKET_IFNAME=eth0
 NCCL_IGNORE_CPU_AFFINITY=1
 ```
 
+## BM.GPU.RTXPRO.8
+
+```
+NCCL_MIN_NCHANNELS=8
+NCCL_DEBUG=WARN
+NCCL_CUMEM_ENABLE=0
+NCCL_IB_SPLIT_DATA_ON_QPS=0
+NCCL_IB_QPS_PER_CONNECTION=1
+NCCL_IB_GID_INDEX=3
+NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9
+NCCL_IB_TC=41
+NCCL_IB_SL=0
+NCCL_IB_TIMEOUT=22
+NCCL_NET_PLUGIN=none
+NCCL_SOCKET_IFNAME=eth0
+NCCL_IGNORE_CPU_AFFINITY=1
+```
+
+> [!NOTE]
+> The `NCCL_IB_HCA` list above is the per-node data-HCA set. Passing it to every
+> rank produced `all_reduce` bus bandwidth of ~21 GB/s and permits NCCL to use
+> non-local HCAs, including cross-NUMA (SYS) paths. For full bandwidth, pin each
+> rank to its single PXB-local NIC by MPI local rank instead of using the list:
+>
+> ```bash
+> gpu_idx=$(( OMPI_COMM_WORLD_LOCAL_RANK % 8 ))
+> mlx_idx=$(( gpu_idx + (gpu_idx > 3) * 2 ))
+> export NCCL_IB_HCA="=mlx5_${mlx_idx}"
+> ```
+>
+> Local ranks 0-7 map to `mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9`,
+> keeping every rank on its local PCIe switch. This selects the eight active
+> 400 Gb data HCAs; lower-speed or down HCAs are not selected. The value varies
+> per rank, so it cannot be a static `nccl.conf` line;
+> it must be computed at runtime (the Kueue MPIJob manifest does this). Validated
+> `all_reduce` bus bandwidth at 8 GiB: ~28 GB/s, versus ~21 GB/s with the static
+> list.
+
 ## BM.GPU.B4.8
 
 ```

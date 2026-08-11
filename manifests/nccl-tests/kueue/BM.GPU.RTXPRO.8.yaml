@@ -1,0 +1,129 @@
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: nccl-test
+  labels:
+    kueue.x-k8s.io/queue-name: bm-gpu-rtxpro-8-rdma-topology-aware
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: "Running"
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          tolerations:
+          - key: nvidia.com/gpu
+            operator: Equal
+            value: present
+            effect: NoSchedule
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
+            resources:
+              requests:
+                cpu: 100m
+            command: ["bash", "-c"]
+            # Open MPI 5 reads the worker SSH port from this environment variable.
+            env:
+            - name: PRTE_MCA_plm_ssh_args
+              value: "-p 2222"
+            args:
+              - |
+                NUM_GPUS=8
+                NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+                NP=$((NUM_HOSTS * NUM_GPUS))
+                workers_ready() {
+                  while read -r host _; do
+                    ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 "$host" exit 2>/dev/null || return 1
+                  done < /etc/mpi/hostfile
+                }
+                until workers_ready; do
+                  echo "Waiting for workers to be ready..."
+                  sleep 5
+                done
+                echo "All workers are ready!"
+                # BM.GPU.RTXPRO.8: each data-NIC pair (mlx5_0/1, 2/3, 6/7, 8/9) is
+                # PXB-local to two GPUs. Pin each rank to one HCA in its local pair instead
+                # of exposing every data HCA, which permits non-local NODE/SYS paths.
+                # Validated ~28 GB/s at 8 GiB (vs ~21 GB/s with the full list per rank).
+                mpirun --allow-run-as-root \
+                  --mca plm_rsh_args "-p 2222" \
+                  --mca pml ucx \
+                  --bind-to numa \
+                  --mca coll '^hcoll' \
+                  --hostfile /etc/mpi/hostfile \
+                  --np "$NP" \
+                  --npernode "$NUM_GPUS" \
+                  -x NCCL_MIN_NCHANNELS=8 \
+                  -x NCCL_DEBUG=WARN \
+                  -x NCCL_CUMEM_ENABLE=0 \
+                  -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
+                  -x NCCL_IB_QPS_PER_CONNECTION=1 \
+                  -x NCCL_IB_GID_INDEX=3 \
+                  -x NCCL_IB_TC=41 \
+                  -x NCCL_IB_SL=0 \
+                  -x NCCL_IB_TIMEOUT=22 \
+                  -x NCCL_NET_PLUGIN=none \
+                  -x HCOLL_ENABLE_MCAST_ALL=0 \
+                  -x coll_hcoll_enable=0 \
+                  -x UCX_TLS=tcp \
+                  -x UCX_NET_DEVICES=eth0 \
+                  -x RX_QUEUE_LEN=8192 \
+                  -x IB_RX_QUEUE_LEN=8192 \
+                  -x NCCL_SOCKET_IFNAME=eth0 \
+                  -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                  bash -c '
+                    set -eu
+                    gpu_idx=$(( OMPI_COMM_WORLD_LOCAL_RANK % 8 ))
+                    mlx_idx=$(( gpu_idx + (gpu_idx > 3) * 2 ))
+                    export NCCL_IB_HCA="=mlx5_${mlx_idx}"
+                    exec /workspace/nccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1
+                  '
+    Worker:
+      replicas: 4
+      template:
+        metadata:
+          labels:
+            nccl-test-replica: mpi-worker
+          annotations:
+            kueue.x-k8s.io/podset-preferred-topology: oci.oraclecloud.com/rdma.local_block_id
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          nodeSelector:
+            node.kubernetes.io/instance-type: BM.GPU.RTXPRO.8
+          tolerations:
+          - key: nvidia.com/gpu
+            operator: Equal
+            value: present
+            effect: NoSchedule
+          volumes:
+          - { name: devinf, hostPath: { path: /dev/infiniband } }
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 32Gi } }
+          containers:
+          - name: mpi-worker
+            image: iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            volumeMounts:
+            - { mountPath: /dev/infiniband, name: devinf }
+            - { mountPath: /dev/shm, name: shm }
+            securityContext:
+              privileged: true
+              capabilities:
+                add: ["IPC_LOCK"]
+            command:
+            - /bin/bash
+            - -c
+            - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+            resources:
+              limits:
+                nvidia.com/gpu: 8
