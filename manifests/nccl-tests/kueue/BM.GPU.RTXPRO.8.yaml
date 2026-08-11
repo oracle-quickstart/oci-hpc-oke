@@ -50,10 +50,9 @@ spec:
                   sleep 5
                 done
                 echo "All workers are ready!"
-                # BM.GPU.RTXPRO.8: each data-NIC pair (mlx5_0/1, 2/3, 6/7, 8/9) is
-                # PXB-local to two GPUs. Pin each rank to one HCA in its local pair instead
-                # of exposing every data HCA, which permits non-local NODE/SYS paths.
-                # Validated ~28 GB/s at 8 GiB (vs ~21 GB/s with the full list per rank).
+                # BM.GPU.RTXPRO.8: force the Tree algorithm for all_reduce. With the full
+                # data-HCA list and NCCL_MIN_NCHANNELS=8 it reaches ~34 GB/s bus BW at 8
+                # GiB, ~20% above the default Ring algorithm. Validated at 2 and 4 nodes.
                 mpirun --allow-run-as-root \
                   --mca plm_rsh_args "-p 2222" \
                   --mca pml ucx \
@@ -80,13 +79,9 @@ spec:
                   -x IB_RX_QUEUE_LEN=8192 \
                   -x NCCL_SOCKET_IFNAME=eth0 \
                   -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                  bash -c '
-                    set -eu
-                    gpu_idx=$(( OMPI_COMM_WORLD_LOCAL_RANK % 8 ))
-                    mlx_idx=$(( gpu_idx + (gpu_idx > 3) * 2 ))
-                    export NCCL_IB_HCA="=mlx5_${mlx_idx}"
-                    exec /workspace/nccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1
-                  '
+                  -x NCCL_ALGO=Tree \
+                  -x NCCL_IB_HCA==mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_6,mlx5_7,mlx5_8,mlx5_9 \
+                  /workspace/nccl-tests/build/all_reduce_perf -b 1G -e 8G -f 2 -g 1
     Worker:
       replicas: 4
       template:
