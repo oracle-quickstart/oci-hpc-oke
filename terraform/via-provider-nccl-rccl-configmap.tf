@@ -53,15 +53,9 @@ locals {
       NCCL_SOCKET_IFNAME        = "eth0"
       NCCL_IGNORE_CPU_AFFINITY  = "1"
     }
-    # BM.GPU.RTXPRO.8: NCCL_IB_HCA below is the per-node data-HCA set and a safe
-    # static fallback (~21 GB/s all_reduce bus BW). Full bandwidth (~28 GB/s)
-    # needs each rank pinned to its single PXB-local NIC by MPI local rank; that
-    # varies per rank and so cannot be a static nccl.conf value. It is computed
-    # per rank in the job instead — see
-    # manifests/nccl-tests/kueue/BM.GPU.RTXPRO.8.yaml and
-    # docs/recommended-nccl-rccl-parameters-by-shape.md.
     "BM.GPU.RTXPRO.8" = {
       NCCL_MIN_NCHANNELS         = "8"
+      NCCL_ALGO                  = "Tree"
       NCCL_DEBUG                 = "WARN"
       NCCL_CUMEM_ENABLE          = "0"
       NCCL_IB_SPLIT_DATA_ON_QPS  = "0"
