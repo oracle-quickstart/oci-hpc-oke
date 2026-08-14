@@ -640,6 +640,7 @@ settings:
         container_state_dir=/run/oke-npd
         uv_source=/root/.local/bin/uv
         uv_path=$bin_dir/uv
+        scripts_dir=/host/var/lib/oke-npd/scripts
         healthcheck_log_file=$log_dir/latest-${healthcheck_type}.log
         metrics_file=$metrics_dir/oke_npd_${healthcheck_type}.prom
 
@@ -680,11 +681,29 @@ settings:
                 -exec rm -f -- {} +
         }
 
+        prune_uv_cache() {
+            # Runs once per container start: stage_uv recreates the uv-staged marker
+            # in the container's /run right after this. uv does not reliably
+            # garbage-collect unused ephemeral environments on its own, so reclaim
+            # them here. Failures are logged but never fail the health check.
+            [ -x "$uv_path" ] || return 0
+            prune_log=$log_dir/uv-cache-prune.log
+            {
+                echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) pruning uv cache ==="
+                chroot /host \
+                    env UV_CACHE_DIR=/var/cache/oke-npd/uv \
+                    "${uv_path#/host}" cache prune
+            } >>"$prune_log" 2>&1 || true
+            chmod 0640 "$prune_log" || true
+        }
+
         stage_uv() {
             marker=$container_state_dir/uv-staged
             if [ -e "$marker" ] && [ -x "$uv_path" ]; then
                 return 0
             fi
+
+            prune_uv_cache
 
             uv_tmp=$(mktemp "$bin_dir/.uv.XXXXXX") || return 1
             if ! cp "$uv_source" "$uv_tmp" || ! chmod 0700 "$uv_tmp" || ! mv -f "$uv_tmp" "$uv_path"; then
@@ -694,7 +713,24 @@ settings:
             touch "$marker"
         }
 
-        install -d -m 0700 "$run_dir" "$bin_dir" "$cache_dir" "$log_dir" "$container_state_dir" || exit "$UNKNOWN"
+        stage_scripts() {
+            # Stage health-check files at a stable path (atomically replaced on
+            # every run) so uv reuses its cached ephemeral environment across
+            # runs instead of creating a new one per invocation. Re-staging
+            # every run keeps configmap updates propagating.
+            local f src dst tmp
+            for f in check_gpu_setup.py gpu_bw_test.py rdma_link_flapping.py shared_logging.py xid_checker.py xid_catalog_data.json; do
+                src=/config/$f
+                dst=$scripts_dir/$f
+                tmp=$scripts_dir/.${f}.tmp.$$
+                if ! cp "$src" "$tmp" || ! mv -f "$tmp" "$dst"; then
+                    rm -f "$tmp"
+                    return 1
+                fi
+            done
+        }
+
+        install -d -m 0700 "$run_dir" "$bin_dir" "$cache_dir" "$log_dir" "$container_state_dir" "$scripts_dir" || exit "$UNKNOWN"
         install -d -m 0755 "$metrics_dir" || exit "$UNKNOWN"
         if ! cleanup_abandoned_runs; then
             echo "Unable to clean abandoned NPD run directories"
@@ -708,15 +744,7 @@ settings:
         work_dir=$(mktemp -d "$run_dir/${healthcheck_type}.XXXXXX") || exit "$UNKNOWN"
         trap 'rm -rf "$work_dir"' EXIT
 
-        if ! cp \
-            /config/check_gpu_setup.py \
-            /config/gpu_bw_test.py \
-            /config/rdma_link_flapping.py \
-            /config/shared_logging.py \
-            /config/xid_checker.py \
-            /config/xid_catalog_data.json \
-            "$work_dir/"
-        then
+        if ! stage_scripts; then
             echo "Unable to stage NPD health-check files"
             exit "$UNKNOWN"
         fi
@@ -726,14 +754,14 @@ settings:
             exit "$UNKNOWN"
         fi
 
-        host_work_dir=${work_dir#/host}
+        host_scripts_dir=${scripts_dir#/host}
         host_uv_path=${uv_path#/host}
         work_log="$work_dir/output.log"
         if nsenter -n/host/proc/1/ns/net \
             chroot /host \
             env UV_CACHE_DIR=/var/cache/oke-npd/uv \
             "$host_uv_path" run \
-            "$host_work_dir/check_gpu_setup.py" \
+            "$host_scripts_dir/check_gpu_setup.py" \
             --dry-run \
             "--$healthcheck_type" >"$work_log" 2>&1
         then
