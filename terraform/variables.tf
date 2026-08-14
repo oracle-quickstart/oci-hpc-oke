@@ -85,7 +85,11 @@ variable "int_lb_sn_cidr" { default = null }
 variable "pub_lb_sn_cidr" { default = null }
 variable "cp_sn_cidr" { default = null }
 variable "workers_sn_cidr" { default = null }
-variable "pods_sn_cidr" { default = null }
+variable "pods_sn_cidrs" {
+  default     = null
+  description = "CIDR blocks for the pods subnet, comma-separated. With the NPN CNI exactly two CIDR blocks are required: the first holds the secondary VNIC primary IP of each node, the second provides the pod IPs. With flannel a single CIDR block is used. If not provided, the blocks are derived from the VCN CIDR."
+  type        = string
+}
 variable "fss_sn_cidr" { default = null }
 variable "lustre_sn_cidr" { default = null }
 variable "bastion_sn_id" { default = null }
@@ -440,6 +444,11 @@ variable "cni_type" {
   default = "npn"
   type    = string
 }
+variable "force_use_gva" {
+  default     = false
+  description = "Force GVA (Generic VNIC Attachment) secondary VNICs on all worker pools when using an existing pods subnet (custom_subnet_ids). The target subnet must support GVA (NPN CNI, and per OCI guidance two CIDR blocks when ip_count > 32). Ignored when the stack creates the pods subnet (GVA is already the default) or with the flannel CNI."
+  type        = bool
+}
 variable "control_plane_is_public" {
   type        = bool
   default     = true
@@ -447,7 +456,7 @@ variable "control_plane_is_public" {
 }
 variable "max_pods_per_node" {
   default     = 110
-  description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Ignored when when cni_type != 'npn'."
+  description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Used when cni_type is NPN and GVA is not active; ignored with the flannel CNI or when GVA is active (see force_use_gva and the worker_*_gva_ip_count variables)."
   type        = number
 }
 variable "services_cidr" {
@@ -663,10 +672,14 @@ variable "worker_ops_image_use_uri" {
   default = false
   type    = bool
 }
-variable "worker_ops_max_pods_per_node" {
-  default     = 110
-  description = "Maximum number of pods per node for the system worker pool. Max is 110."
+variable "worker_ops_gva_ip_count" {
+  default     = 64
+  description = "Pod IPs allocated per node through the GVA (Generic VNIC Attachment) secondary VNIC on the system worker pool. Must be a power of two from 1 to 256. Only used with the NPN CNI when the pods subnet is created by the stack; every node then gets a contiguous block of pod IPs and OCI recommends two CIDR blocks on the pod subnet when ip_count > 32 (see the pods subnet in oke-cluster.tf). With an existing pods subnet (unless force_use_gva=true) or the flannel CNI this value is ignored and max_pods_per_node is used instead."
   type        = number
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_ops_gva_ip_count)
+    error_message = "worker_ops_gva_ip_count must be a power of two from 1 to 256."
+  }
 }
 variable "worker_ops_kubernetes_version" {
   default     = null
@@ -729,10 +742,14 @@ variable "worker_cpu_image_platform_id" {
   default = null
   type    = string
 }
-variable "worker_cpu_max_pods_per_node" {
-  default     = 110
-  description = "Maximum number of pods per node for the CPU worker pool. Max is 110."
+variable "worker_cpu_gva_ip_count" {
+  default     = 64
+  description = "Pod IPs allocated per node through the GVA (Generic VNIC Attachment) secondary VNIC on the CPU worker pool. Must be a power of two from 1 to 256. Only used with the NPN CNI when the pods subnet is created by the stack; every node then gets a contiguous block of pod IPs and OCI recommends two CIDR blocks on the pod subnet when ip_count > 32 (see the pods subnet in oke-cluster.tf). With an existing pods subnet (unless force_use_gva=true) or the flannel CNI this value is ignored and max_pods_per_node is used instead."
   type        = number
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_cpu_gva_ip_count)
+    error_message = "worker_cpu_gva_ip_count must be a power of two from 1 to 256."
+  }
 }
 variable "worker_cpu_kubernetes_version" {
   default     = null
@@ -785,10 +802,14 @@ variable "worker_gpu_image_platform_id" {
   default = null
   type    = string
 }
-variable "worker_gpu_max_pods_per_node" {
+variable "worker_gpu_gva_ip_count" {
   default     = 64
-  description = "Maximum number of pods per node for the GPU worker pool. Max is 110."
+  description = "Pod IPs allocated per node through the GVA (Generic VNIC Attachment) secondary VNIC on the GPU worker pool. Must be a power of two from 1 to 256. Only used with the NPN CNI when the pods subnet is created by the stack; GVA removes the old 31-IPs-per-VNIC limit of standard VCN-native networking and a single GVA VNIC supports up to 256 pod IPs. With an existing pods subnet (unless force_use_gva=true) or the flannel CNI this value is ignored and max_pods_per_node is used instead."
   type        = number
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_gpu_gva_ip_count)
+    error_message = "worker_gpu_gva_ip_count must be a power of two from 1 to 256."
+  }
 }
 variable "worker_gpu_kubernetes_version" {
   default     = null
@@ -842,10 +863,14 @@ variable "worker_rdma_image_use_uri" {
   default = false
   type    = bool
 }
-variable "worker_rdma_max_pods_per_node" {
+variable "worker_rdma_gva_ip_count" {
   default     = 64
-  description = "Maximum number of pods per node for the RDMA worker pool. Max is 110."
+  description = "Pod IPs allocated per node through the GVA (Generic VNIC Attachment) secondary VNIC on the RDMA worker pool. Must be a power of two from 1 to 256. Only used with the NPN CNI when the pods subnet is created by the stack; GVA removes the old 31-IPs-per-VNIC limit of standard VCN-native networking and a single GVA VNIC supports up to 256 pod IPs. With an existing pods subnet (unless force_use_gva=true) or the flannel CNI this value is ignored and max_pods_per_node is used instead."
   type        = number
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_rdma_gva_ip_count)
+    error_message = "worker_rdma_gva_ip_count must be a power of two from 1 to 256."
+  }
 }
 variable "worker_rdma_kubernetes_version" {
   default     = null
@@ -890,10 +915,14 @@ variable "worker_gmc_boot_volume_vpus_per_gb" {
   description = "Boot volume VPUs/GB for the GMC worker pool."
   type        = number
 }
-variable "worker_gmc_max_pods_per_node" {
+variable "worker_gmc_gva_ip_count" {
   default     = 64
-  description = "Maximum number of pods per node for the GMC worker pool. Max is 110."
+  description = "Pod IPs allocated per node through the GVA (Generic VNIC Attachment) secondary VNIC on the GMC worker pool. Must be a power of two from 1 to 256. Only used with the NPN CNI when the pods subnet is created by the stack; every node then gets a contiguous block of pod IPs. With an existing pods subnet (unless force_use_gva=true) or the flannel CNI this value is ignored and max_pods_per_node is used instead."
   type        = number
+  validation {
+    condition     = contains([1, 2, 4, 8, 16, 32, 64, 128, 256], var.worker_gmc_gva_ip_count)
+    error_message = "worker_gmc_gva_ip_count must be a power of two from 1 to 256."
+  }
 }
 variable "worker_gmc_kubernetes_version" {
   default     = null

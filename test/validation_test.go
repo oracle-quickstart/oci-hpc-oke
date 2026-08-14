@@ -115,13 +115,35 @@ var validationTestCases = []validationTestCase{
 		expectedError: "fss_pv_unreachable",
 	},
 	{
+		// Dual-CIDR pods subnet: pod IPs come only from the second block
+		// (/30 = 4 IPs - 3 reserved = 1 usable). Default ops pool: 1 node × 64
+		// GVA pod IPs = 64 required > 1 capacity. The first block is large enough
+		// for the single VNIC attachment primary IP of 1 node.
 		name: "PodCapacityExceeded",
 		vars: map[string]interface{}{
-			// /30 subnet = 4 IPs - 3 reserved = 1 usable
-			// default ops pool: 1 node × 31 pods = 31 required > 1 capacity
-			"pods_sn_cidr": "10.240.0.0/30",
+			"pods_sn_cidrs": "10.240.0.0/24,10.240.1.0/30",
 		},
 		expectedError: "Total required pod IPs",
+	},
+	{
+		// With the NPN CNI (default) the pods subnet uses GVA, which requires
+		// exactly two CIDR blocks; a single block must be rejected.
+		name: "PodsSubnetRequiresTwoCidrs",
+		vars: map[string]interface{}{
+			"pods_sn_cidrs": "10.240.0.0/30",
+		},
+		expectedError: "requires exactly two",
+	},
+	{
+		// GVA VNIC attachment capacity: each node consumes one primary IP from
+		// the FIRST CIDR block (/30 = 4 IPs - 3 reserved = 1 usable); 2 nodes > 1.
+		// The second block is large enough for 2 × 64 pod IPs.
+		name: "GvaVnicPrimaryCapacityExceeded",
+		vars: map[string]interface{}{
+			"pods_sn_cidrs":       "10.240.0.0/30,10.240.1.0/24",
+			"worker_ops_pool_size": 2,
+		},
+		expectedError: "Total worker nodes",
 	},
 	{
 		name: "InvalidSlinkyTopologyBlockSizes",

@@ -31,12 +31,15 @@ locals {
     var.worker_rdma_image_use_uri && !anytrue([for prefix in local.allowed_image_uri_prefixes : startswith(local.image_uri_values.worker_rdma, prefix)]),
   ])
 
-  # Pods subnet capacity validation
-  pods_required_ops  = var.worker_ops_pool_size * local.worker_ops_max_pods_per_node
-  pods_required_cpu  = var.worker_cpu_enabled ? var.worker_cpu_pool_size * local.worker_cpu_max_pods_per_node : 0
-  pods_required_gpu  = var.worker_gpu_enabled ? var.worker_gpu_pool_size * var.worker_gpu_max_pods_per_node : 0
-  pods_required_rdma = var.worker_rdma_enabled ? var.worker_rdma_pool_size * var.worker_rdma_max_pods_per_node : 0
-  pods_required_gmc  = var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size * var.worker_gmc_max_pods_per_node : 0
+  # Pods subnet capacity validation.
+  # With GVA each node consumes its pool's gva_ip_count pod IPs from the two pod cidrs.
+  # One IP per VNIC attachment (the stack uses one VNIC attachment per node) and gva_ip_count from the second CIDR of the pod subnet.
+  # Without GVA the legacy max_pods_per_node applies (see the worker_*_pods_per_node locals in oke-workers.tf).
+  pods_required_ops  = var.worker_ops_pool_size * local.worker_ops_pods_per_node
+  pods_required_cpu  = var.worker_cpu_enabled ? var.worker_cpu_pool_size * local.worker_cpu_pods_per_node : 0
+  pods_required_gpu  = var.worker_gpu_enabled ? var.worker_gpu_pool_size * local.worker_gpu_pods_per_node : 0
+  pods_required_rdma = var.worker_rdma_enabled ? var.worker_rdma_pool_size * local.worker_rdma_pods_per_node : 0
+  pods_required_gmc  = var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size * local.worker_gmc_pods_per_node : 0
   total_pods_required = (
     local.pods_required_ops +
     local.pods_required_cpu +
@@ -45,12 +48,28 @@ locals {
     local.pods_required_gmc
   )
 
-  # Calculate pods subnet capacity (IPs available minus 3 reserved IPs)
-  vcn_prefix_length     = tonumber(split("/", var.vcn_cidrs)[1])
-  pods_subnet_prefix    = var.pods_sn_cidr != null ? tonumber(split("/", var.pods_sn_cidr)[1]) : local.vcn_prefix_length + 1
-  pods_subnet_capacity  = pow(2, 32 - local.pods_subnet_prefix) - 3
-  is_vcn_native_cni     = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
-  invalid_pods_capacity = local.is_vcn_native_cni && local.total_pods_required > local.pods_subnet_capacity
+  # User-provided pods CIDR blocks (pods_sn_cidrs, comma-separated). With the NPN CNI the
+  # pods subnet uses GVA, which requires exactly two CIDR blocks: the first holds one
+  # primary IP per node for its single VNIC attachment, the second provides the pod IPs.
+  # With flannel a single block is fine (the pods subnet carries no pod IPs), so this check
+  # is NPN-only.
+  is_vcn_native_cni   = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
+  invalid_pods_sn_cidrs = local.is_vcn_native_cni && var.pods_sn_cidrs != null && !(
+    length(local.pods_subnet_ipv4_cidrs) == 2 &&
+    alltrue([for c in local.pods_subnet_ipv4_cidrs : can(cidrhost(c, 0))]) &&
+    local.pods_subnet_ipv4_cidrs[0] != local.pods_subnet_ipv4_cidrs[1]
+  )
+
+  # Usable IP capacities of the pods subnet CIDR blocks (3 addresses reserved per block).
+  # With GVA, pod IPs are allocated only from the second block, and each node's single VNIC
+  # attachment consumes one primary IP from the first block. Capacities are null (checks
+  # skipped) when the blocks are unknown (existing pods subnet) or the user-provided blocks
+  # are malformed (rejected separately by validate_pods_sn_cidrs).
+  pods_cidr_block_prefixes       = [for c in local.pods_subnet_ipv4_cidrs : try(tonumber(split("/", c)[1]), null)]
+  gva_pods_ip_capacity           = length(local.pods_subnet_ipv4_cidrs) == 2 ? pow(2, 32 - local.pods_cidr_block_prefixes[1]) - 3 : null
+  gva_vnic_primary_ip_capacity   = length(local.pods_subnet_ipv4_cidrs) == 2 ? pow(2, 32 - local.pods_cidr_block_prefixes[0]) - 3 : null
+  invalid_pods_capacity          = local.is_vcn_native_cni && local.use_gva && local.gva_pods_ip_capacity != null && local.total_pods_required > local.gva_pods_ip_capacity
+  invalid_gva_vnic_primary_capacity = local.use_gva && local.gva_vnic_primary_ip_capacity != null && local.total_worker_nodes > local.gva_vnic_primary_ip_capacity
 
   # FSS PV cannot be created when all deploy paths are inactive (private endpoint, no operator, no ORM)
   fss_pv_unreachable = alltrue([
@@ -303,6 +322,27 @@ resource "null_resource" "validate_grace_blackwell_shape" {
   }
 }
 
+resource "null_resource" "validate_pods_sn_cidrs" {
+  count = local.invalid_pods_sn_cidrs ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Error: pods_sn_cidrs must contain two comma-separated CIDR blocks when using the NPN CNI' && exit 1"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_pods_sn_cidrs
+      error_message = <<-EOT
+        With the NPN CNI the pods subnet uses GVA, which requires exactly two comma-separated
+        CIDR blocks: the first holds the secondary VNIC primary IP of each node, the second
+        provides the pod IPs. Got '${var.pods_sn_cidrs}'. Example: 10.0.96.0/19,10.0.128.0/17.
+        Alternatively use the flannel CNI or leave pods_sn_cidrs unset to derive the dual CIDR
+        blocks from the VCN CIDR.
+      EOT
+    }
+  }
+}
+
 resource "null_resource" "validate_pods_capacity" {
   count = local.invalid_pods_capacity ? 1 : 0
 
@@ -314,14 +354,34 @@ resource "null_resource" "validate_pods_capacity" {
     precondition {
       condition     = !local.invalid_pods_capacity
       error_message = <<-EOT
-        Total required pod IPs (${local.total_pods_required}) exceeds pods subnet capacity (${local.pods_subnet_capacity}).
+        Total required pod IPs (${local.total_pods_required}) exceeds pods subnet capacity (${local.gva_pods_ip_capacity}).
+        With GVA, pod IPs are allocated only from the second CIDR block of the dual-CIDR pods
+        subnet; the first block holds the secondary VNIC primary IPs.
         Breakdown:
-          - oke-system: ${local.pods_required_ops} (${var.worker_ops_pool_size} nodes × ${var.worker_ops_max_pods_per_node} pods)
-          - oke-cpu: ${local.pods_required_cpu} (${var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0} nodes × ${var.worker_cpu_max_pods_per_node} pods)
-          - oke-gpu: ${local.pods_required_gpu} (${var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0} nodes × ${var.worker_gpu_max_pods_per_node} pods)
-          - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${var.worker_rdma_max_pods_per_node} pods)
-          - oke-gmc: ${local.pods_required_gmc} (${var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0} nodes × ${var.worker_gmc_max_pods_per_node} pods)
-        Consider increasing the pods subnet size or reducing max_pods_per_node/pool_size values.
+          - oke-system: ${local.pods_required_ops} (${var.worker_ops_pool_size} nodes × ${local.worker_ops_pods_per_node} pod IPs/node)
+          - oke-cpu: ${local.pods_required_cpu} (${var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0} nodes × ${local.worker_cpu_pods_per_node} pod IPs/node)
+          - oke-gpu: ${local.pods_required_gpu} (${var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0} nodes × ${local.worker_gpu_pods_per_node} pod IPs/node)
+          - oke-rdma: ${local.pods_required_rdma} (${var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0} nodes × ${local.worker_rdma_pods_per_node} pod IPs/node)
+          - oke-gmc: ${local.pods_required_gmc} (${var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0} nodes × ${local.worker_gmc_pods_per_node} pod IPs/node)
+        Consider larger pods CIDR blocks (the second block provides the pod IPs), or reducing the per-node pod IPs (gva_ip_count) or pool sizes.
+      EOT
+    }
+  }
+}
+
+resource "null_resource" "validate_gva_vnic_primary_ip_capacity" {
+  count = local.invalid_gva_vnic_primary_capacity ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Error: Total worker nodes exceeds secondary VNIC primary IP capacity' && exit 1"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_gva_vnic_primary_capacity
+      error_message = <<-EOT
+        Total worker nodes (${local.total_worker_nodes}) exceeds the capacity of the first CIDR block of the dual-CIDR pods subnet (${local.gva_vnic_primary_ip_capacity} IPs available for the VNIC attachment primary IP of each node).
+        Consider enlarging the first pods CIDR block (or the VCN CIDR when the blocks are derived) or reducing pool sizes.
       EOT
     }
   }

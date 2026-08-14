@@ -67,7 +67,10 @@ locals {
   rule_type_cidr    = "CIDR_BLOCK"
   rule_type_service = "SERVICE_CIDR_BLOCK"
 
-  vcn_cidr = coalesce(data.oci_core_vcn.oke_vcn.cidr_blocks...)
+  vcn_cidr = coalesce(
+    try(one(data.oci_core_vcn.existing_vcn[*].cidr_blocks...), null),
+    split(",", var.vcn_cidrs)[0]
+  )
 
   nsgs = merge(
     {
@@ -97,6 +100,33 @@ locals {
     var.create_lustre ? {
       lustre = { create = "always", rules = local.default_lustre_nsg_rules }
     } : {}
+  )
+
+  # GVA requires a dual-CIDR pods subnet: the first block holds one primary IP per node for
+  # the single VNIC attachment, the second provides the pod IPs. GVA is used whenever the
+  # stack creates the pods subnet - with derived dual CIDRs (cidrsubnet(vcn, 3, 3) +
+  # cidrsubnet(vcn, 1, 1)) or with user-provided pods_sn_cidrs (exactly two comma-separated
+  # blocks, validated in validation.tf with the NPN CNI). On an existing pods subnet
+  # (custom_subnet_ids / pods_sn_id) GVA requires an explicit force_use_gva opt-in; without
+  # it, or with the flannel CNI, worker pools fall back to the legacy max_pods_per_node
+  # configuration (see oke-workers.tf).
+  pods_subnet_stack_created = var.create_vcn || !var.custom_subnet_ids
+  use_gva                   = local.cni_type == "npn" && (local.pods_subnet_stack_created || var.force_use_gva)
+
+  # Dual-CIDR pods subnet for GVA (Generic VNIC Attachments): OCI recommends configuring the
+  # pod subnet with two CIDR blocks when a secondary VNIC allocates more than 32 pod IPs
+  # (ip_count > 32). The first CIDR block is used for the primary IP address of the secondary VNIC,
+  # while the secondary CIDR is used for IPv4 prefix allocation for the pods.
+  pods_ipv4_cidrs_default = [
+    cidrsubnet(local.vcn_cidr, 3, 3),
+    cidrsubnet(local.vcn_cidr, 1, 1)
+  ]
+
+  # The pods subnet IPv4 CIDR blocks when known at plan time: the two user-provided
+  # pods_sn_cidrs blocks, or the stack-derived dual blocks. Empty when the pods subnet is an
+  # existing subnet selected by id (its CIDR blocks are only known to OCI).
+  pods_subnet_ipv4_cidrs = !local.pods_subnet_stack_created ? [] : (
+    var.pods_sn_cidrs != null ? [for c in split(",", var.pods_sn_cidrs) : trimspace(c)] : local.pods_ipv4_cidrs_default
   )
 
   subnets = merge(
@@ -162,12 +192,13 @@ locals {
         lookup(var.subnet_advanced_attrs, "workers", {})
       )
       pods = merge(
-        { create = "auto" },
-        (var.create_vcn && var.pods_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
-        { newbits = 1, netnum = 1 } : {},
-        var.create_vcn && var.pods_sn_cidr != null ?
-        { cidr = var.pods_sn_cidr } : {},
-        !var.create_vcn && var.custom_subnet_ids ?
+        # With flannel the module never creates a pods subnet (its own create gate is
+        # cni_type == "npn"); "never" disables the entry outright so the module's subnet
+        # input validation does not require an address spec for it.
+        { create = local.cni_type == "npn" ? "auto" : "never" },
+        local.pods_subnet_stack_created && (var.pods_sn_cidrs != null || local.use_gva) ?
+        { ipv4_cidrs = local.pods_subnet_ipv4_cidrs } : {},
+        !local.pods_subnet_stack_created ?
         { id = var.pods_sn_id, create = "never" } : {},
         lookup(var.subnet_advanced_attrs, "pods", {})
       )
@@ -252,8 +283,11 @@ data "oci_core_image" "operator_selected" {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.5.0"
+  # TODO: switch back to the registry release once published:
+  #   source  = "oracle-terraform-modules/oke/oci"
+  #   version = ">= 5.5.1"
+  # Local checkout of the pending release (branch: networking_small_fixes) for GVA testing.
+  source = "../../terraform-oci-oke"
 
   providers = { oci.home = oci.home }
 
@@ -301,7 +335,6 @@ module "oke" {
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
-  max_pods_per_node                  = var.max_pods_per_node
   operator_image_type                = local.operator_image_type
   operator_image_id                  = local.operator_image_id
   operator_image_os                  = local.operator_image_operating_system

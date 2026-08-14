@@ -103,7 +103,7 @@ variableGroups:
       - workers_sn_cidr
       - fss_sn_cidr
       - lustre_sn_cidr
-      - pods_sn_cidr
+      - pods_sn_cidrs
       - bastion_sn_id
       - bastion_service_sn_id
       - operator_sn_id
@@ -639,7 +639,7 @@ variables:
     title: Subnet CIDR for the bastion subnet
     description: CIDR subnet to use for the bastion subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -654,7 +654,7 @@ variables:
     title: Subnet CIDR for the bastion service subnet
     description: CIDR subnet to use for the bastion service subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -669,7 +669,7 @@ variables:
     title: Subnet CIDR for the operator subnet
     description: CIDR subnet to use for the operator subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -684,7 +684,7 @@ variables:
     title: Subnet CIDR for the internal load balancer subnet
     description: CIDR subnet to use for the internal load balancer subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -699,7 +699,7 @@ variables:
     title: Subnet CIDR for the public load balancer subnet
     description: CIDR subnet to use for the public load balancer subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -714,7 +714,7 @@ variables:
     title: Subnet CIDR for the OKE control plane subnet
     description: CIDR subnet to use for the OKE control plane subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -729,7 +729,7 @@ variables:
     title: Subnet CIDR for the workers subnet
     description: CIDR subnet to use for the workers subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -740,11 +740,11 @@ variables:
       - and:
         - create_vcn
         - networking_advanced_options
-  pods_sn_cidr:
-    title: Subnet CIDR for the pods subnet
-    description: CIDR subnet to use for the pods subnet. If not provided a dynamic subnet will be created if required.
+  pods_sn_cidrs:
+    title: Subnet CIDRs for the pods subnet
+    description: Comma-separated CIDR blocks for the pods subnet. With the VCN-Native Pod Networking CNI exactly two CIDR blocks are required - the first holds the VNIC attachment primary IP of each node, the second provides the pod IPs. If not provided the blocks are derived from the VCN CIDR.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)(?:\\s*,\\s*(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30))?$"
     required: false
     visible:
       or:
@@ -759,7 +759,7 @@ variables:
     title: Subnet CIDR for the FSS subnet
     description: CIDR subnet to use for the FSS subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -774,7 +774,7 @@ variables:
     title: Subnet CIDR for the Lustre subnet
     description: CIDR subnet to use for the Lustre subnet. If not provided a dynamic subnet will be created if required.
     type: string
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
     visible:
       or:
@@ -1535,7 +1535,7 @@ variables:
     description: CIDR block for Kubernetes services.
     type: string
     default: "10.96.0.0/16"
-    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9])|(?:2[0-9])|(?:30)$"
+    pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:1[6-9]|2[0-9]|30)$"
     required: false
   preferred_kubernetes_services:
     type: enum
