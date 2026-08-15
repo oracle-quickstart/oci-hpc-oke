@@ -28,7 +28,7 @@ run_with_retry() {
             echo "oke bootstrap succeeded on attempt $attempt"
             return 0
         fi
-        
+
         if [[ $attempt -lt $max_attempts ]]; then
             echo "oke bootstrap failed, retrying in ${interval} seconds..."
             sleep $interval
@@ -69,15 +69,15 @@ download_oke_credential_provider_for_ocir() {
         return 1
         ;;
     esac
-    
+
     wget --tries=5 --waitretry=3 --retry-connrefused -O /usr/local/bin/credential-provider-oke \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/oke-credential-provider-for-ocir-linux-$ARCH && \
         chmod +x /usr/local/bin/credential-provider-oke || true
-    
+
     mkdir -p /etc/kubernetes/
     wget --tries=5 --waitretry=3 --retry-connrefused -P /etc/kubernetes/ \
         https://github.com/oracle-devrel/oke-credential-provider-for-ocir/releases/latest/download/credential-provider-config.yaml || true
-    
+
     if [[ -f /usr/local/bin/credential-provider-oke && -f /etc/kubernetes/credential-provider-config.yaml ]]; then
         return 0
     else
@@ -175,7 +175,7 @@ case "$ID" in
             oke_package_name="oci-oke-node-all-$oke_package_version"
 
             LOCAL_REPO_PATH="/opt/oke-node-client-packages/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
-            REMOTE_REPO_URL="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+            REMOTE_REPO_URL="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
 
             write_oke_apt_source() {
                 tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
@@ -194,7 +194,7 @@ EOF
                     echo "Waiting for dpkg/apt lock"
                     sleep 1
                 done
-                apt-get -y update && apt-get -y install "$oke_package_name"
+                apt-get -y update || apt-get -y install "$oke_package_name"
             }
 
             use_remote_repo=1
@@ -235,7 +235,7 @@ EOF
 
         if command -v oke >/dev/null 2>&1; then
             echo "[Oracle Linux] oke binary already present, running bootstrap only"
-            
+
             configure_crio_defaults "$kubernetes_version"
             if [[ -n "$kubelet_extra_args" ]]; then
                 run_with_retry oke bootstrap --kubelet-extra-args "$kubelet_extra_args"
@@ -255,7 +255,7 @@ EOF
             else
                 run_with_retry bash /var/run/oke-init.sh
             fi
-            
+
         fi
         ;;
     *)
