@@ -194,7 +194,8 @@ EOF
                     echo "Waiting for dpkg/apt lock"
                     sleep 1
                 done
-                apt-get -y update || apt-get -y install "$oke_package_name"
+                apt-get -y update || true
+                apt-get -y install "$oke_package_name"
             }
 
             use_remote_repo=1
