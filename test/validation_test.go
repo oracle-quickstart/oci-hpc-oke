@@ -109,7 +109,7 @@ var validationTestCases = []validationTestCase{
 		// making all three deploy paths inactive and triggering fss_pv_unreachable.
 		name: "FSSPVUnreachable",
 		vars: map[string]interface{}{
-			"create_fss":            true,
+			"create_fss":             true,
 			"deploy_to_oke_from_orm": true,
 		},
 		expectedError: "fss_pv_unreachable",
@@ -153,11 +153,10 @@ var validationTestCases = []validationTestCase{
 		// The second block is large enough for 2 × 64 pod IPs.
 		name: "GvaVnicPrimaryCapacityExceeded",
 		vars: map[string]interface{}{
-			"pods_sn_cidrs":       "10.240.0.0/30,10.240.1.0/24",
+			"pods_sn_cidrs":        "10.240.0.0/30,10.240.1.0/24",
 			"worker_ops_pool_size": 2,
 		},
 		expectedError: "Total worker nodes",
-	},
 	},
 	{
 		name: "InvalidSlinkyTopologyBlockSizes",
