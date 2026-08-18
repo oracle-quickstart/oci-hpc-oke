@@ -28,29 +28,40 @@ locals {
   ])
   hostname_override_effective = coalesce(var.hostname_override, false)
 
+  # The OKE module requires GVA ip_count to be a power of two. Keep the existing
+  # max-pods-per-node variables as the user-facing settings and round them down only
+  # when GVA is active. The module uses the GVA ip_count as the effective kubelet pod
+  # limit, so a requested value such as 110 becomes 64 with GVA and remains 110 with
+  # flannel/legacy networking.
+  worker_ops_gva_ip_count  = pow(2, floor(log(max(var.worker_ops_max_pods_per_node, 1), 2)))
+  worker_cpu_gva_ip_count  = pow(2, floor(log(max(var.worker_cpu_max_pods_per_node, 1), 2)))
+  worker_gpu_gva_ip_count  = pow(2, floor(log(max(var.worker_gpu_max_pods_per_node, 1), 2)))
+  worker_rdma_gva_ip_count = pow(2, floor(log(max(var.worker_rdma_max_pods_per_node, 1), 2)))
+  worker_gmc_gva_ip_count  = pow(2, floor(log(max(var.worker_gmc_max_pods_per_node, 1), 2)))
+
   worker_ops_gva_secondary_vnics = local.use_gva ? {
     pods = {
-      ip_count = var.worker_ops_gva_ip_count
+      ip_count = local.worker_ops_gva_ip_count
     }
   } : {}
   worker_cpu_gva_secondary_vnics = local.use_gva ? {
     pods = {
-      ip_count = var.worker_cpu_gva_ip_count
+      ip_count = local.worker_cpu_gva_ip_count
     }
   } : {}
   worker_gpu_gva_secondary_vnics = local.use_gva ? {
     pods = {
-      ip_count = var.worker_gpu_gva_ip_count
+      ip_count = local.worker_gpu_gva_ip_count
     }
   } : {}
   worker_rdma_gva_secondary_vnics = local.use_gva ? {
     pods = {
-      ip_count = var.worker_rdma_gva_ip_count
+      ip_count = local.worker_rdma_gva_ip_count
     }
   } : {}
   worker_gmc_gva_secondary_vnics = local.use_gva ? {
     pods = {
-      ip_count = var.worker_gmc_gva_ip_count
+      ip_count = local.worker_gmc_gva_ip_count
     }
   } : {}
 
@@ -59,23 +70,22 @@ locals {
   # are limited to (ocpus - 1) * 31 pod IPs per node by standard VCN-native pod networking
   # (minimum 31); other shapes use var.max_pods_per_node. The OKE API caps max_pods_per_node
   # at 110.
-  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? (var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31) : min(var.max_pods_per_node, 110)
-  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? (var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31) : min(var.max_pods_per_node, 110)
+  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? (var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31) : var.max_pods_per_node
+  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? (var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31) : var.max_pods_per_node
 
-  worker_ops_max_pods_per_node  = local.supported_worker_ops_max_pods_per_node
-  worker_cpu_max_pods_per_node  = local.supported_worker_cpu_max_pods_per_node
-  worker_gpu_max_pods_per_node  = min(var.max_pods_per_node, 110)
-  worker_rdma_max_pods_per_node = min(var.max_pods_per_node, 110)
-  worker_gmc_max_pods_per_node  = min(var.max_pods_per_node, 110)
+  worker_ops_max_pods_per_node  = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
+  worker_cpu_max_pods_per_node  = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
+  worker_gpu_max_pods_per_node  = min(var.worker_gpu_max_pods_per_node, 110)
+  worker_rdma_max_pods_per_node = min(var.worker_rdma_max_pods_per_node, 110)
+  worker_gmc_max_pods_per_node  = min(var.worker_gmc_max_pods_per_node, 110)
 
-  # Effective pod IPs required per node from the pods subnet: the GVA ip_count when GVA is
-  # active, otherwise the legacy max_pods_per_node value. Used for pods subnet capacity
-  # validation.
-  worker_ops_pods_per_node  = local.use_gva ? var.worker_ops_gva_ip_count : local.worker_ops_max_pods_per_node
-  worker_cpu_pods_per_node  = local.use_gva ? var.worker_cpu_gva_ip_count : local.worker_cpu_max_pods_per_node
-  worker_gpu_pods_per_node  = local.use_gva ? var.worker_gpu_gva_ip_count : local.worker_gpu_max_pods_per_node
-  worker_rdma_pods_per_node = local.use_gva ? var.worker_rdma_gva_ip_count : local.worker_rdma_max_pods_per_node
-  worker_gmc_pods_per_node  = local.use_gva ? var.worker_gmc_gva_ip_count : local.worker_gmc_max_pods_per_node
+  # Effective pod IPs required per node from the pods subnet: the derived GVA ip_count when
+  # GVA is active, otherwise the legacy max_pods_per_node value. Used for capacity validation.
+  worker_ops_pods_per_node  = local.use_gva ? local.worker_ops_gva_ip_count : local.worker_ops_max_pods_per_node
+  worker_cpu_pods_per_node  = local.use_gva ? local.worker_cpu_gva_ip_count : local.worker_cpu_max_pods_per_node
+  worker_gpu_pods_per_node  = local.use_gva ? local.worker_gpu_gva_ip_count : local.worker_gpu_max_pods_per_node
+  worker_rdma_pods_per_node = local.use_gva ? local.worker_rdma_gva_ip_count : local.worker_rdma_max_pods_per_node
+  worker_gmc_pods_per_node  = local.use_gva ? local.worker_gmc_gva_ip_count : local.worker_gmc_max_pods_per_node
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",

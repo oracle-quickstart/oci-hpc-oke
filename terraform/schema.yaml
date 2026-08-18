@@ -104,6 +104,7 @@ variableGroups:
       - fss_sn_cidr
       - lustre_sn_cidr
       - pods_sn_cidrs
+      - force_use_gva
       - bastion_sn_id
       - bastion_service_sn_id
       - operator_sn_id
@@ -755,6 +756,12 @@ variables:
       - and:
         - create_vcn
         - networking_advanced_options
+  force_use_gva:
+    title: Force GVA for existing pods subnets
+    description: Force Generic VNIC Attachments when using an existing pods subnet. Requires the NPN CNI and a pods subnet compatible with GVA.
+    type: boolean
+    default: false
+    required: false
   fss_sn_cidr:
     title: Subnet CIDR for the FSS subnet
     description: CIDR subnet to use for the FSS subnet. If not provided a dynamic subnet will be created if required.
