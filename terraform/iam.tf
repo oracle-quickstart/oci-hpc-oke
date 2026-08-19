@@ -32,7 +32,7 @@ locals {
   service_account_name           = format("oke-%s-svcacct", local.state_id)
   existing_dg_id                 = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
   should_create_dg               = var.create_dynamic_group && !var.use_existing_dynamic_group && local.existing_dg_id == null
-  lookup_identity_domain         = var.create_policies || local.should_create_dg
+  lookup_identity_domain         = local.existing_dg_id == null && (var.create_policies || local.should_create_dg)
   lookup_default_identity_domain = local.lookup_identity_domain && (var.use_default_identity_domain || var.identity_domain_id == null)
   selected_identity_domain_id = try(
     var.identity_domain_id != null ? var.identity_domain_id : one(data.oci_identity_domains.default[0].domains[*].id),
