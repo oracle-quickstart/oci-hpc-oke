@@ -5,11 +5,6 @@ data "oci_identity_availability_domains" "all" {
   compartment_id = var.tenancy_ocid
 }
 
-data "oci_identity_dynamic_groups" "all" {
-  count          = var.create_policies && local.existing_dg_id != null ? 1 : 0
-  compartment_id = var.tenancy_ocid
-}
-
 data "oci_identity_domains" "default" {
   count          = local.lookup_default_identity_domain ? 1 : 0
   compartment_id = var.tenancy_ocid
@@ -33,12 +28,11 @@ resource "random_string" "state_id" {
 
 
 locals {
-  dynamic_groups_list            = coalesce(one(data.oci_identity_dynamic_groups.all[*].dynamic_groups), [])
   state_id                       = random_string.state_id.id
   service_account_name           = format("oke-%s-svcacct", local.state_id)
   existing_dg_id                 = try(coalesce(var.dynamic_group_id, var.dynamic_group_id_input), null)
   should_create_dg               = var.create_dynamic_group && !var.use_existing_dynamic_group && local.existing_dg_id == null
-  lookup_identity_domain         = var.create_policies || local.should_create_dg
+  lookup_identity_domain         = local.existing_dg_id == null && (var.create_policies || local.should_create_dg)
   lookup_default_identity_domain = local.lookup_identity_domain && (var.use_default_identity_domain || var.identity_domain_id == null)
   selected_identity_domain_id = try(
     var.identity_domain_id != null ? var.identity_domain_id : one(data.oci_identity_domains.default[0].domains[*].id),
@@ -58,13 +52,14 @@ locals {
   domain_name = try(one(data.oci_identity_domain.selected[*].display_name), null)
 
   group_name = coalesce(
-    try(one([for dg in local.dynamic_groups_list : dg.name if dg.id == local.existing_dg_id]), null),
     local.use_identity_domain ? one(oci_identity_domains_dynamic_resource_group.oke_quickstart_all[*].display_name) : null,
     format("oke-gpu-%v", local.state_id)
   )
 
-  # For IAM policies, domain-scoped dynamic groups must be referenced as '<domain-name>'/'<group-name>'
-  policy_group_ref = local.use_identity_domain ? format("'%v'/'%v'", local.domain_name, local.group_name) : local.group_name
+  # Existing dynamic groups use their OCID, so their domain name is not required.
+  policy_group_ref = local.existing_dg_id != null ? format("id %v", local.existing_dg_id) : (
+    local.use_identity_domain ? format("'%v'/'%v'", local.domain_name, local.group_name) : local.group_name
+  )
 
   storage_group_name  = format("oke-gpu-%v-storage", local.state_id)
   compartment_matches = format("instance.compartment.id = '%v'", var.compartment_ocid)
