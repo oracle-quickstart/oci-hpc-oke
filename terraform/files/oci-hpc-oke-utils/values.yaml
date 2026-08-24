@@ -41,7 +41,10 @@ labeler:
     nodeSelectorLabel: ""
     nodeSelector: {}
     tolerations:
-      - operator: Exists
+      - key: nvidia.com/gpu
+        operator: Exists
+      - key: amd.com/gpu
+        operator: Exists
     resources:
       requests:
         cpu: 50m
