@@ -1,136 +1,123 @@
 # Managing Slurm Topology on OKE
 
-This guide explains how the stack feeds OCI RDMA network locality (Local Block, Network Block, and HPC Island) into Slurm scheduling for Slinky clusters, so jobs can be placed on nodes that are close together on the network.
+Slurm topology uses OCI RDMA locality to place workers close together.
 
-> [!IMPORTANT]
-> To get real locality data, your workers need usable RDMA locality metadata from IMDS. The legacy `rdmaTopologyData` fields are available only on nodes configured with a capacity topology. Other supported RDMA shapes can expose equivalent fields in the IMDS `/host` document. When neither form is available, the labeler writes `no-imds-data` placeholders and every worker shares a single synthetic `none` unit in both the tree and block topologies, so job scheduling behaves the same as it did before this feature existed.
+The topology setting is enabled by default. It requires these stack options and resources:
 
-Topology management is on by default (`slinky_topology_enabled = true`), but it only does anything when `install_slinky`, `slinky_install_slurm_cluster`, and `install_oci_hpc_oke_utils` are all also enabled. If any of those three is off, the feature is silently inactive: no annotator, no generated `topology.yaml`, no error.
+- `install_slinky = true`
+- `slinky_install_slurm_cluster = true`
+- `install_oci_hpc_oke_utils = true`
+- `install_rdma_labeler = true`
+- At least one enabled Slurm worker pool
+
+Workers need usable RDMA locality data from the instance metadata service (IMDS).
+See [Using RDMA Network Locality on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md).
+
+Workers without locality data use the synthetic `none` unit. These workers remain schedulable.
 
 ## How It Works
 
-Topology management is a small pipeline of existing oci-hpc-oke-utils and Slinky components. No changes to slurm-operator itself are required.
+1. OCI HPC OKE Utils reads OCI locality data and labels each node.
+2. Its controller generates `tree`, `block`, and `flat` topologies for Slurm.
+3. The annotator assigns workers to topology units. Slurm reloads topology changes automatically.
 
-1. **The labeler** (oci-hpc-oke-utils) applies the `oci.oraclecloud.com/rdma.hpc_island_id`, `oci.oraclecloud.com/rdma.network_block_id`, and `oci.oraclecloud.com/rdma.local_block_id` labels to each node from IMDS, as described in [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md). It first reads `/host/rdmaTopologyData`, then falls back to `/host`. The former returns legacy `customer*` locality fields; the latter can provide those embedded fields or the equivalent root `networkBlockId` and `rackId` fields.
-2. **The annotator** (oci-hpc-oke-utils, one DaemonSet pod per node) uses the same IMDS lookup order and field mapping. It writes the `topology.slinky.slurm.net/spec` node annotation only after the generated `topology.yaml` contains every requested unit:
-   - Labeled node: `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>`
-   - No locality data (no capacity topology, or a CPU worker): `tree:root:none,block:none`
+| Topology | Purpose |
+| --- | --- |
+| `tree` | Models Local Block, Network Block, and HPC Island levels. |
+| `block` | Groups workers by Local Block. |
+| `flat` | Disables locality placement for CPU workers. |
 
-   The `isl-` (HPC island), `nb-` (network block), and `lb-` (local block) prefixes keep switch names unique across tiers by construction; the value after each prefix is the corresponding node label value. Every tree path starts at a single `root` switch so the tree stays connected no matter how many islands exist.
-3. **The oke-utils controller** (a single Deployment, separate from the per-node annotator) lists nodes in the `oke-gpu`, `oke-rdma`, `oke-gmc`, and `oke-cpu` pools, reads their `rdma.*` labels, and generates one `topology.yaml` with three named topologies: `tree`, `block`, and `flat`. It patches the `topology.yaml` key of the `slurm-config-extra` ConfigMap in the Slurm namespace whenever the content changes.
-4. **slurm-operator 1.2** reads the `topology.slinky.slurm.net/spec` annotation on each node. Workers intentionally register with an empty `POD_TOPOLOGY` so Slurm remains usable while the projected topology file is loading. The operator's REST sync then applies the node annotation to the registered worker without restarting its pod.
-5. **The Slurm controller pod's reconfigure sidecar** (`controller.inplaceReconfigure: true`) watches `/etc/slurm` and runs `scontrol reconfigure` whenever a mounted config file, including `topology.yaml`, changes. This is what makes controller-generated updates take effect without a slurmctld restart.
-
-Nodes without RDMA locality data are not left out of the topologies: they carry the synthetic `none` unit so they stay inside both `tree` and `block` and remain schedulable, just without any real locality preference.
-
-During bootstrap, workers can briefly run without topology-aware placement. The annotator retries every five seconds while the generated file is unavailable, and normal topology reconciliation continues after the file is ready.
-
-## Example: Generated topology.yaml
-
-The following is a representative `topology.yaml` for a mixed fleet: two labeled GPU workers in the same local block, plus two CPU workers with no locality data.
-
-```yaml
-# Generated by oci-hpc-oke-utils; manual edits are overwritten.
-- topology: tree
-  cluster_default: true
-  tree:
-    switches:
-      - switch: root
-        children: isl-af7ubvouuyq,none
-      - switch: isl-af7ubvouuyq
-        children: nb-7xmzl4p4wba
-      - switch: nb-7xmzl4p4wba
-        children: lb-4tjxbt4s6ua
-      - switch: lb-4tjxbt4s6ua
-        nodes: gpu-worker-1,gpu-worker-2
-      - switch: none
-        nodes: cpu-worker-1,cpu-worker-2
-- topology: block
-  cluster_default: false
-  block:
-    block_sizes:
-      - 2
-    blocks:
-      - block: lb-4tjxbt4s6ua
-        nodes: gpu-worker-1,gpu-worker-2
-      - block: none
-        nodes: cpu-worker-1,cpu-worker-2
-- topology: flat
-  cluster_default: false
-  flat: true
-```
-
-The matching node annotation for `gpu-worker-1` and `gpu-worker-2` would be:
-
-```
-topology.slinky.slurm.net/spec: tree:root:isl-af7ubvouuyq:nb-7xmzl4p4wba:lb-4tjxbt4s6ua,block:lb-4tjxbt4s6ua
-```
+The CPU partition always uses `flat`. GPU, RDMA, and GMC partitions use the selected default topology.
 
 ## Configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `slinky_topology_enabled` | `true` | Master switch for the annotator's topology annotation and the oke-utils controller's `topology.yaml` generation. |
-| `slinky_topology_default` | `tree` | Which generated topology (`tree` or `block`) is marked `cluster_default`. Partitions without an explicit `Topology` setting use this one. |
-| `slinky_topology_block_sizes` | `auto` | `block_sizes` for the `block` topology. `auto` derives them from the current local block populations (smallest block size, doubling while the next size still fits the fleet). Otherwise use positive integers where each successive value is a larger power-of-two multiple of the previous value, for example `8,16,32`, `8,32`, or `30,120`. |
+The default OKE path does not need a topology override.
 
-Topology management is validated against Slurm 26.05 image profiles; 25.11 uses the same slurm-operator mechanism but has seen less production use with dynamic topology, so prefer 26.05 profiles when enabling it.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `slinky_topology_enabled` | `true` | Enable Slurm topology management. |
+| `slinky_topology_default` | `tree` | Select the default `tree` or `block` topology. |
+| `slinky_topology_block_sizes` | `auto` | Derive block sizes or use a list such as `8,16,32`. |
 
-The CPU partition is always pinned to `Topology: flat` in its partition configuration, since CPU workers have no RDMA locality. The GPU, RDMA, and GMC partitions (including the GMC aggregate partition) set no explicit `Topology` and inherit whichever topology is marked `cluster_default`.
+To use the block topology, set this value and apply the stack again:
 
-## Using Topology in Jobs
+```hcl
+slinky_topology_default = "block"
+```
 
-Slurm's dynamic topology support lets `sbatch` steer placement toward the active topology:
+## Use Topology in Jobs
 
-- On partitions using the `tree` topology (the default), request nodes within a limited number of leaf switches with `--switches`:
+Slurm uses the selected topology when it allocates nodes. Most jobs do not need a topology option.
 
-  ```bash
-  sbatch --switches=1 my_job.sh
-  ```
+### Tree Topology
 
-  This asks the scheduler to pack the job's nodes under as few tree switches as possible, favoring the same local block, then network block, then HPC island.
+Use `--switches` to request a maximum number of Local Blocks.
+Add a wait limit so the request does not delay the job without a bound.
 
-- On partitions using the `block` topology, request a bounded segment size with `--segment`:
+```bash
+sbatch --switches=1@00:05:00 my_job.sh
+```
 
-  ```bash
-  sbatch --segment=2 my_job.sh
-  ```
+This example requests one Local Block and waits up to five minutes.
+Slurm can use more Local Blocks after the wait limit expires.
 
-  This keeps the job within a block of the given size, as defined by `block_sizes` in `topology.yaml`.
+### Block Topology
 
-To switch the cluster-wide default from `tree` to `block` (or back), change `slinky_topology_default` and re-apply. The oke-utils controller regenerates `topology.yaml` with the new `cluster_default` flag on its next cycle.
+Use `--segment` to divide a node allocation into equal segments.
+
+```bash
+sbatch --nodes=4 --segment=2 my_job.sh
+```
+
+This example creates two segments with two nodes in each segment.
+The node count must be divisible by the segment size.
+The complete job does not have to stay in one block.
 
 ## Troubleshooting
 
-Check the annotation on a node:
+Check the topology annotation on a worker:
 
 ```bash
-kubectl get node <node-name> -o jsonpath='{.metadata.annotations.topology\.slinky\.slurm\.net/spec}'
+kubectl get node "<node-name>" \
+  -o jsonpath='{.metadata.annotations.topology\.slinky\.slurm\.net/spec}{"\n"}'
 ```
 
-A healthy node shows either `tree:root:isl-<island>:nb-<netblock>:lb-<localblock>,block:lb-<localblock>` (locality available) or `tree:root:none,block:none` (no capacity topology for this node, for example a CPU worker). If the annotation is missing entirely, the annotator has not completed its first sync yet, or IMDS was unreachable and there was no prior value to keep.
+A worker with locality data shows `tree:root:isl-<island>:nb-<network-block>:lb-<local-block>,block:lb-<local-block>`.
+A worker without usable locality data shows `tree:root:none,block:none`.
 
-Check the generated `topology.yaml` in the ConfigMap the Slurm controller reads:
+Check the generated topology file:
 
 ```bash
-kubectl -n slurm get configmap slurm-config-extra -o jsonpath='{.data.topology\.yaml}'
+kubectl -n slurm get configmap slurm-config-extra \
+  -o jsonpath='{.data.topology\.yaml}{"\n"}'
 ```
 
-Check what Slurm itself sees:
+Check the topology loaded by Slurm:
 
 ```bash
-kubectl -n slurm exec slurm-controller-0 -c slurmctld -- scontrol show topology
+kubectl -n slurm exec slurm-controller-0 -c slurmctld -- \
+  scontrol show topology
 ```
 
-If the ConfigMap looks right but `scontrol show topology` does not match, check the Slurm controller pod's reconfigure sidecar logs; it is what applies changed files with `scontrol reconfigure`.
-
-If the ConfigMap looks stale or wrong, check the oke-utils controller Deployment logs (`kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller`). The controller only patches the ConfigMap when the rendered content differs from what is already there. The topology sync runs every 120 seconds by default (`topology.syncInterval`) and retries unavailable configuration every five seconds (`topology.retryInterval`). The OCI label refresh keeps its own separate 900 second interval.
-
-> [!NOTE]
-> A `helm upgrade` of the Slurm chart briefly reverts `topology.yaml` to the bootstrap skeleton (a bare `none` tree switch and a placeholder block), because the chart's `configFiles` value always re-applies that skeleton on deploy. The oke-utils controller rewrites it with real data on its next cycle, within about two minutes by default, so this window is normal and self-corrects; it is not a sign of a problem unless `topology.yaml` never leaves the skeleton state.
-
-Disabling the feature (`slinky_topology_enabled = false`) removes `topology.yaml` and the reconfigure sidecar on the next apply, but existing `topology.slinky.slurm.net/spec` node annotations are not removed automatically. Remove them manually if workers will keep running, so slurmd does not register with a topology that no longer exists:
+If the generated file is stale, check the OCI HPC OKE Utils controller logs:
 
 ```bash
-kubectl annotate nodes -l 'oke.oraclecloud.com/pool.name in (oke-gpu,oke-rdma,oke-gmc,oke-cpu)' topology.slinky.slurm.net/spec-
+kubectl -n kube-system logs deployment/oci-hpc-oke-utils-controller
+```
+
+After a Helm upgrade, `topology.yaml` can temporarily contain bootstrap data.
+OCI HPC OKE Utils restores the generated data within approximately two minutes.
+
+## Disable Topology Management
+
+Set `slinky_topology_enabled = false` and apply the stack again.
+
+The apply removes `topology.yaml` and its reconfigure sidecar. It does not remove existing node annotations.
+
+Remove the annotations if the workers continue to run:
+
+```bash
+kubectl annotate nodes \
+  -l 'oke.oraclecloud.com/pool.name in (oke-gpu,oke-rdma,oke-gmc,oke-cpu)' \
+  topology.slinky.slurm.net/spec-
 ```
