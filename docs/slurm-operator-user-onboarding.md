@@ -1,404 +1,228 @@
 # Slurm User Onboarding
 
-This runbook creates a regular Slurm user on an OKE Slurm Operator cluster that
-uses OpenLDAP, SSSD, FSS-backed home directories, and SlurmDBD accounting.
+Use this guide to add a regular user to an OKE Slurm cluster.
 
-It was validated on a live test cluster with:
+The onboarding script configures these services:
 
-- OpenLDAP in the `identity` namespace;
-- Slurm in the `slurm` namespace;
-- `sshPublicKey` from the OpenSSH LPK schema for SSH key lookup;
-- FSS mounted at `/home`;
-- one ready Slurm worker pod.
+- OpenLDAP for the user identity and SSH public key
+- SSSD for identity lookup
+- File Storage Service (FSS) for the home directory
+- SlurmDBD for the user account association
 
-LDAP SSH keys must use `sshPublicKey`, not `description`.
+Root SSH access to the Slurm login service is disabled. Use a regular LDAP user for SSH access.
 
-Root SSH access to the Slurm login service is intentionally disabled. Use the
-operator or `kubectl exec` for administration; the login service accepts
-regular LDAP users through SSSD.
+## Quick Start
 
-## Quick Start (script)
+Run these commands on the operator node. You can also use another host with `kubectl` access.
 
-The [`slurm-add-user.sh`](./files/slurm-add-user.sh) script performs every step
-in this runbook from a username and an SSH public key. Run it from the operator
-node or another shell with `kubectl` access to the cluster.
+### 1. Download the Script
 
 ```bash
 curl -LO https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/docs/files/slurm-add-user.sh
+
 chmod +x slurm-add-user.sh
-
-# create user "alice" with a sample public key, in the default "users" account
-./slurm-add-user.sh alice --ssh-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMfyLyppRwwk+pRIk/ZBKbh03o16dQ8KmCbYi1rNiP5l alice@example.com"
 ```
 
-The only required inputs are the `<username>` and one SSH key source
-(`--ssh-key`, `--ssh-key-file`, or `--ssh-key-stdin`). The SSH key can be passed
-inline with `--ssh-key "<key>"` or piped in with `--ssh-key-stdin`.
+### 2. Add the User
 
-All of the following flags are optional:
-
-- `--account <name>` (default `users`): the Slurm account / LDAP project group.
-  The account and its project group are created automatically if they do not
-  exist.
-- `--full-name "<cn>"`: the `cn` for the LDAP entry (default: derived from the
-  username).
-- `--kube-context <ctx>`: the kubectl context to use. Defaults to your current
-  kubectl context, so you only need this when your kubeconfig has multiple
-  contexts and you must target a specific cluster.
-- `--dry-run`: print the exact LDAP and Slurm changes without applying them.
-
-The script:
-
-- allocates the next free UID/GID and creates a per-user primary group;
-- creates the LDAP user with `sshPublicKey` and adds it to the project group;
-- creates the FSS-backed home directory with the correct ownership and mode;
-- creates the SlurmDBD association;
-- validates identity resolution on the controller and login pods (and on a
-  worker, when one is ready), the SSH key actually served for the user, the home
-  directory, and the Slurm association before exiting.
-
-It is idempotent, so it is safe to re-run (for example to repair a
-partially-created user or to rotate an SSH key). It exits non-zero if any
-validation fails.
-
-If the FSS home export uses root squash, the script cannot set home-directory
-ownership from a pod. It stops before that step with a clear message; the LDAP
-user and Slurm association are already created, so create
-`/home/<username>` (owner `<uid>:<gid>`, mode `0700`) through the storage admin
-path and re-run.
-
-## How It Works / Manual Steps
-
-The sections below document each step the script performs, for reference and as
-a fallback when the script's assumptions do not hold. You do not need to run
-them if you used the Quick Start above.
-
-### 1. Set Variables
-
-Run from the operator node or another shell with `kubectl` access.
+Use this command format:
 
 ```bash
-export PATH=/home/ubuntu/bin:$PATH
-export OCI_CLI_AUTH=instance_principal
-
-export IDENTITY_NAMESPACE=identity
-export SLURM_NAMESPACE=slurm
-export OPENLDAP_POD=openldap-0
-export OPENLDAP_CONTAINER=openldap-stack-ha
-export LDAP_BASE='dc=example,dc=org'
-export LDAP_PEOPLE_OU="ou=People,${LDAP_BASE}"
-export LDAP_GROUPS_OU="ou=Groups,${LDAP_BASE}"
-export LDAP_ADMIN_DN="cn=admin,${LDAP_BASE}"
-export HOME_PVC=slurm-home
-
-export LOGIN_SERVICE=slurm-login-slinky
-export CONTROLLER_POD=slurm-controller-0
-export CONTROLLER_CONTAINER=slurmctld
-export LOGIN_CONTAINER=login
-export WORKER_CONTAINER=slurmd
-export SBATCH_PARTITION=cpu
-
-export PROJECT=project-a
-export PROJECT_GID=13001
-export PROJECT_ORG=example
-
-export USERNAME=alice
-export USER_CN='Alice Slurm'
-export USER_SN='Slurm'
-export USER_UID=12001
-export USER_GID=12001
-export PRIMARY_GROUP=alice
-export PRIMARY_GROUP_GID=12001
-export LOGIN_SHELL=/bin/bash
-export HOME_DIR=/home/alice
-export SSH_PUBLIC_KEY='ssh-ed25519 AAAA_REPLACE_ME alice@example'
-
-export LDAP_ADMIN_PASSWORD="$(
-  kubectl -n "$IDENTITY_NAMESPACE" get secret openldap \
-    -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d
-)"
+./slurm-add-user.sh "<USERNAME>" \
+  --ssh-key-file "<PATH TO SSH PUBLIC KEY>"
 ```
 
-The stack generates unique OpenLDAP admin and `cn=config` passwords when they
-are not supplied explicitly. They are available as sensitive Resource Manager
-outputs (`slinky_openldap_admin_password` and
-`slinky_openldap_config_password`). The admin password can also be retrieved
-from the `openldap` Secret as shown above.
-
-SSSD clients do not receive either administrator password. The stack creates a
-separate `cn=sssd,ou=ServiceAccounts,<base DN>` account whose ACL permits LDAP
-reads but denies writes and access to password attributes.
-
-Use stable UID/GID allocation. Do not reuse IDs while old files may exist on
-FSS, in backups, or in accounting history.
-
-### 2. Define LDAP Helpers
-
-These helpers run the Bitnami LDAP tools inside `openldap-0`, which avoids
-requiring LDAP client tools on the operator host.
+For example:
 
 ```bash
-ldapsearch_primary() {
-  kubectl -n "$IDENTITY_NAMESPACE" exec "$OPENLDAP_POD" -c "$OPENLDAP_CONTAINER" -- \
-    /opt/bitnami/openldap/bin/ldapsearch \
-      -x -H ldap://127.0.0.1:1389 \
-      -D "$LDAP_ADMIN_DN" -w "$LDAP_ADMIN_PASSWORD" "$@"
-}
-
-ldapadd_primary() {
-  kubectl -n "$IDENTITY_NAMESPACE" exec -i "$OPENLDAP_POD" -c "$OPENLDAP_CONTAINER" -- \
-    /opt/bitnami/openldap/bin/ldapadd \
-      -x -H ldap://127.0.0.1:1389 \
-      -D "$LDAP_ADMIN_DN" -w "$LDAP_ADMIN_PASSWORD"
-}
-
-ldapmodify_primary() {
-  kubectl -n "$IDENTITY_NAMESPACE" exec -i "$OPENLDAP_POD" -c "$OPENLDAP_CONTAINER" -- \
-    /opt/bitnami/openldap/bin/ldapmodify \
-      -x -H ldap://127.0.0.1:1389 \
-      -D "$LDAP_ADMIN_DN" -w "$LDAP_ADMIN_PASSWORD"
-}
-
-ldap_entry_exists() {
-  ldapsearch_primary -LLL -b "$1" -s base dn >/dev/null 2>&1
-}
+./slurm-add-user.sh alice \
+  --ssh-key-file /path/to/alice.pub
 ```
 
-### 3. Create the Project
+For a new user, the script creates the `users` association and makes it the default.
 
-Create the LDAP project group:
+The script validates the user before it exits. A successful run ends with this message:
 
-```bash
-if ! ldap_entry_exists "cn=${PROJECT},${LDAP_GROUPS_OU}"; then
-  printf '%s\n' \
-    "dn: cn=${PROJECT},${LDAP_GROUPS_OU}" \
-    'objectClass: top' \
-    'objectClass: posixGroup' \
-    "cn: ${PROJECT}" \
-    "gidNumber: ${PROJECT_GID}" | ldapadd_primary
-fi
+```text
+SUCCESS: alice onboarded and validated
 ```
 
-Create the Slurm account:
+### 3. Test SSH Access
+
+Get the login service IP:
 
 ```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  sacctmgr -nP show account "$PROJECT" format=Account | grep -qx "$PROJECT" || \
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  sacctmgr -i add account "$PROJECT" Organization="$PROJECT_ORG"
+kubectl -n slurm get service slurm-login-slinky \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}{"\n"}'
 ```
 
-### 4. Create the LDAP User
-
-Create the user's primary POSIX group:
+Connect as the new user:
 
 ```bash
-if ! ldap_entry_exists "cn=${PRIMARY_GROUP},${LDAP_GROUPS_OU}"; then
-  printf '%s\n' \
-    "dn: cn=${PRIMARY_GROUP},${LDAP_GROUPS_OU}" \
-    'objectClass: top' \
-    'objectClass: posixGroup' \
-    "cn: ${PRIMARY_GROUP}" \
-    "gidNumber: ${PRIMARY_GROUP_GID}" \
-    "memberUid: ${USERNAME}" | ldapadd_primary
-fi
+ssh "alice@<login-service-ip>"
 ```
 
-Create the LDAP user. The key pieces are `objectClass: ldapPublicKey` and
-`sshPublicKey:`.
+### 4. Submit a Test Job
+
+Run these commands in the login pod:
 
 ```bash
-if ! ldap_entry_exists "uid=${USERNAME},${LDAP_PEOPLE_OU}"; then
-  printf '%s\n' \
-    "dn: uid=${USERNAME},${LDAP_PEOPLE_OU}" \
-    'objectClass: top' \
-    'objectClass: inetOrgPerson' \
-    'objectClass: posixAccount' \
-    'objectClass: shadowAccount' \
-    'objectClass: ldapPublicKey' \
-    "cn: ${USER_CN}" \
-    "sn: ${USER_SN}" \
-    "uid: ${USERNAME}" \
-    "uidNumber: ${USER_UID}" \
-    "gidNumber: ${USER_GID}" \
-    "homeDirectory: ${HOME_DIR}" \
-    "loginShell: ${LOGIN_SHELL}" \
-    "sshPublicKey: ${SSH_PUBLIC_KEY}" | ldapadd_primary
-fi
+JOB_ID="$(sbatch --parsable --wait \
+  --nodes=1 \
+  --ntasks=1 \
+  --time=00:05:00 \
+  --output="$HOME/onboarding-test-%j.out" \
+  --wrap='whoami; id; pwd; hostname')"
+
+sacct -j "$JOB_ID" \
+  --format=JobID,User,Account,State,ExitCode,NodeList \
+  --parsable2
+
+cat "$HOME/onboarding-test-${JOB_ID}.out"
 ```
 
-Add the user to the project group:
+## Script Options
+
+The script requires a username and one SSH key source.
+
+| Option | Purpose |
+| --- | --- |
+| `--ssh-key "<key>"` | Read the public key from the command line. |
+| `--ssh-key-file <path>` | Read the public key from a file. |
+| `--ssh-key-stdin` | Read the public key from standard input. |
+| `--account <name>` | Set the LDAP project group and Slurm account. The default is `users`. |
+| `--full-name "<name>"` | Set the LDAP common name. The default comes from the username. |
+| `--kube-context <context>` | Select a Kubernetes context. The current context is the default. |
+| `--dry-run` | Show planned changes without changing the cluster. |
+
+For example, add `alice` to the `research` account:
 
 ```bash
-if ! ldapsearch_primary -LLL -b "cn=${PROJECT},${LDAP_GROUPS_OU}" memberUid \
-  | grep -qx "memberUid: ${USERNAME}"; then
-  printf '%s\n' \
-    "dn: cn=${PROJECT},${LDAP_GROUPS_OU}" \
-    'changetype: modify' \
-    'add: memberUid' \
-    "memberUid: ${USERNAME}" | ldapmodify_primary
-fi
+./slurm-add-user.sh alice \
+  --ssh-key-file /path/to/alice.pub \
+  --account research
 ```
 
-### 5. Create the Home Directory
+If the association is new, the script makes `research` the user's default account.
+If the association exists, the script leaves the current default account unchanged.
 
-Create or repair `/home/$USERNAME` on the FSS-backed home PVC:
+Specify `--account` in `sbatch` only when the user must select another valid account.
+
+## What the Script Changes
+
+The script performs these actions:
+
+1. It checks the required namespaces, pods, secrets, and persistent volume claim.
+2. It creates the LDAP project group when necessary.
+3. It allocates the next available UID and GID.
+4. It creates the LDAP user and primary group.
+5. It stores the SSH key in the LDAP `sshPublicKey` attribute.
+6. It creates the SlurmDBD user association.
+7. It creates `/home/<username>` with mode `0700`.
+8. It validates identity lookup, the SSH key, the home directory, and the Slurm association.
+
+The script uses a Kubernetes Lease during UID and GID allocation. This prevents concurrent runs from selecting the same ID.
+
+Run the script again if an earlier run stopped before completion.
+The script also replaces the SSH public key.
+It does not repair conflicting LDAP, Slurm, or home directory data.
+
+## Verify an Existing User
+
+Set the username:
 
 ```bash
-kubectl -n "$SLURM_NAMESPACE" delete pod home-admin --ignore-not-found --wait=true
-
-kubectl -n "$SLURM_NAMESPACE" run home-admin \
-  --image=docker.io/library/ubuntu:24.04 \
-  --restart=Never \
-  --overrides="$(
-    cat <<EOF
-{"spec":{"containers":[{"name":"home-admin","image":"docker.io/library/ubuntu:24.04","command":["sleep","infinity"],"volumeMounts":[{"name":"home","mountPath":"/home"}]}],"volumes":[{"name":"home","persistentVolumeClaim":{"claimName":"${HOME_PVC}"}}]}}
-EOF
-  )"
-
-kubectl -n "$SLURM_NAMESPACE" wait --for=condition=Ready pod/home-admin --timeout=120s
-kubectl -n "$SLURM_NAMESPACE" exec home-admin -- install -d -m 0711 /home
-kubectl -n "$SLURM_NAMESPACE" exec home-admin -- \
-  install -d -o "$USER_UID" -g "$USER_GID" -m 0700 "$HOME_DIR"
-kubectl -n "$SLURM_NAMESPACE" exec home-admin -- ls -ld /home "$HOME_DIR"
-kubectl -n "$SLURM_NAMESPACE" delete pod home-admin --wait=true
+export SLURM_USER=alice
 ```
 
-If the FSS export uses root squash, create or repair ownership through the
-storage administration path instead of a Kubernetes pod.
-
-### 6. Create the Slurm Association
-
-Create the SlurmDBD user association:
+Find the login pod:
 
 ```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  sacctmgr -nP show assoc user="$USERNAME" account="$PROJECT" format=User,Account \
-  | grep -qx "${USERNAME}|${PROJECT}" || \
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  sacctmgr -i add user name="$USERNAME" account="$PROJECT" defaultaccount="$PROJECT"
-```
-
-### 7. Validate
-
-Find the login and worker pods:
-
-```bash
-export LOGIN_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods -o name \
-    | grep "^pod/${LOGIN_SERVICE}-" \
-    | head -1 \
-    | cut -d/ -f2
-)"
-
-export WORKER_POD="$(
-  kubectl -n "$SLURM_NAMESPACE" get pods \
-    -l app.kubernetes.io/name=slurmd,app.kubernetes.io/component=worker \
+LOGIN_POD="$(
+  kubectl -n slurm get pods \
+    -l app.kubernetes.io/name=login \
     -o jsonpath='{.items[0].metadata.name}'
 )"
 ```
 
-Clear SSSD cache if the image has `sss_cache`. Some Slinky images do not include
-it; that is fine.
+Check identity lookup, the SSH key, and the home directory:
 
 ```bash
-for target in \
-  "$CONTROLLER_POD:$CONTROLLER_CONTAINER" \
-  "$LOGIN_POD:$LOGIN_CONTAINER" \
-  "$WORKER_POD:$WORKER_CONTAINER"
-do
-  pod="${target%%:*}"
-  container="${target##*:}"
-  kubectl -n "$SLURM_NAMESPACE" exec "$pod" -c "$container" -- \
-    sh -lc 'command -v sss_cache >/dev/null 2>&1 && sss_cache -u "$1" || true' \
-    sh "$USERNAME"
-done
+kubectl -n slurm exec "$LOGIN_POD" -c login -- getent passwd "$SLURM_USER"
+kubectl -n slurm exec "$LOGIN_POD" -c login -- sss_ssh_authorizedkeys "$SLURM_USER"
+kubectl -n slurm exec "$LOGIN_POD" -c login -- ls -ld "/home/$SLURM_USER"
 ```
 
-Check LDAP:
+Check the Slurm association and default account:
 
 ```bash
-ldapsearch_primary -LLL -b "$LDAP_PEOPLE_OU" "(uid=${USERNAME})" \
-  uid uidNumber gidNumber homeDirectory loginShell sshPublicKey
-
-ldapsearch_primary -LLL -b "$LDAP_GROUPS_OU" "(memberUid=${USERNAME})" \
-  cn gidNumber memberUid
+kubectl -n slurm exec slurm-controller-0 -c slurmctld -- \
+  sacctmgr -nP show user "$SLURM_USER" \
+  format=User,DefaultAccount,AdminLevel
 ```
 
-Check controller, login, and worker identity resolution:
+## Root-Squash Recovery
+
+FSS can block ownership changes from Kubernetes pods. The script reports the required UID and GID when this occurs.
+
+Create the directory through the storage administration path:
+
+```text
+Path:  /home/<username>
+Owner: <uid>:<gid>
+Mode:  0700
+```
+
+Run `slurm-add-user.sh` again after you create the directory. The script detects the correct directory and continues validation.
+
+## Troubleshooting
+
+### SSH Access Fails
+
+Confirm that LDAP returns the expected public key:
 
 ```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  getent passwd "$USERNAME"
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  id "$USERNAME"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  getent passwd "$USERNAME"
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  id "$USERNAME"
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  sss_ssh_authorizedkeys "$USERNAME"
-kubectl -n "$SLURM_NAMESPACE" exec "$LOGIN_POD" -c "$LOGIN_CONTAINER" -- \
-  ls -ld /home "$HOME_DIR"
-
-kubectl -n "$SLURM_NAMESPACE" exec "$WORKER_POD" -c "$WORKER_CONTAINER" -- \
-  getent passwd "$USERNAME"
-kubectl -n "$SLURM_NAMESPACE" exec "$WORKER_POD" -c "$WORKER_CONTAINER" -- \
-  id "$USERNAME"
+kubectl -n slurm exec "$LOGIN_POD" -c login -- \
+  sss_ssh_authorizedkeys "$SLURM_USER"
 ```
 
-Check the Slurm association:
+LDAP must store SSH keys in `sshPublicKey`. Do not store SSH keys in `description`.
+
+### The Login Pod Cannot Resolve the User
+
+Run the script again. It clears the SSSD cache when the image provides `sss_cache`.
+
+You can also check the user directly:
 
 ```bash
-kubectl -n "$SLURM_NAMESPACE" exec "$CONTROLLER_POD" -c "$CONTROLLER_CONTAINER" -- \
-  sacctmgr -nP show assoc user="$USERNAME" format=User,Account,DefaultQOS,QOS
+kubectl -n slurm exec "$LOGIN_POD" -c login -- getent passwd "$SLURM_USER"
 ```
 
-If there is no ready worker pod yet, stop here and run the job test after a CPU
-or GPU worker pool exists.
+### Slurm Rejects the Account
 
-### 8. Test SSH and Submit a Job
-
-Set the private key that matches `SSH_PUBLIC_KEY`:
+Check the user's associations:
 
 ```bash
-export SSH_PRIVATE_KEY=/path/to/private/key
-export LOGIN_ADDR="$(
-  kubectl -n "$SLURM_NAMESPACE" get svc "$LOGIN_SERVICE" \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-)"
+kubectl -n slurm exec slurm-controller-0 -c slurmctld -- \
+  sacctmgr -nP show association user="$SLURM_USER" \
+  format=User,Account,Cluster,Partition
 ```
 
-Verify SSH login:
+Check the default account:
 
 ```bash
-ssh -n -i "$SSH_PRIVATE_KEY" "${USERNAME}@${LOGIN_ADDR}" \
-  'whoami; id; pwd; getent passwd "$USER"'
+kubectl -n slurm exec slurm-controller-0 -c slurmctld -- \
+  sacctmgr -nP show user "$SLURM_USER" format=User,DefaultAccount
 ```
 
-Submit a small Slurm job and wait for it to finish:
+### No Worker Pod Is Ready
 
-```bash
-JOB="$(
-  ssh -n -i "$SSH_PRIVATE_KEY" "${USERNAME}@${LOGIN_ADDR}" \
-    "sbatch --parsable --wait --partition=${SBATCH_PARTITION} --account=${PROJECT} \
-     --cpus-per-task=1 --time=00:05:00 --output=${HOME_DIR}/onboarding-test-%j.out \
-     --wrap='whoami; id; pwd; hostname; touch \$HOME/onboarding-test-\$SLURM_JOB_ID'"
-)"
+The script skips worker validation when no worker pod is ready. Run the script again after a worker becomes ready.
 
-ssh -n -i "$SSH_PRIVATE_KEY" "${USERNAME}@${LOGIN_ADDR}" \
-  "sacct -j ${JOB} --format=JobID,User,Account,State,ExitCode,AllocTRES%80,NodeList -P"
+## Security Notes
 
-ssh -n -i "$SSH_PRIVATE_KEY" "${USERNAME}@${LOGIN_ADDR}" \
-  "cat ${HOME_DIR}/onboarding-test-${JOB}.out"
-```
-
-Expected result:
-
-- `sss_ssh_authorizedkeys "$USERNAME"` returns the key from `sshPublicKey`.
-- `id` shows the primary group and project group from LDAP.
-- `/home/$USERNAME` is owned by the user's UID/GID and is mode `700`.
-- Controller, login, and worker pods resolve the same UID/GID.
-- `sacct` shows the top-level job row as `COMPLETED` for the expected user and
-  account.
+- The stack generates the OpenLDAP administrator passwords unless you supply them.
+- Resource Manager outputs mark these passwords as sensitive.
+- SSSD uses a separate read-only LDAP service account.
+- The SSSD account cannot read password attributes.
+- The login service accepts regular LDAP users only.
