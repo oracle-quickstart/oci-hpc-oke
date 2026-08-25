@@ -40,13 +40,20 @@ run_with_retry() {
     return 1
 }
 
-# Fix for CRI-O short name mode not being disabled for Kubernetes versions >= 1.34
+# Configure CRI-O defaults for OKE nodes.
 configure_crio_defaults() {
     local version="$1"
 
+    # Allow NRI plugins enough time for interface setup and IPv6 SLAAC when using Dranet.
+    mkdir -p /etc/crio/crio.conf.d
+    cat >/etc/crio/crio.conf.d/99-nri-timeout.conf <<'EOF'
+[crio.nri]
+nri_plugin_request_timeout = "30s"
+EOF
+
+    # Disable CRI-O short-name mode for Kubernetes 1.34 and later.
     if version_ge "$version" "v1.34"; then
         echo "Configuring CRI-O defaults for Kubernetes version $version"
-        mkdir -p /etc/crio/crio.conf.d
         cat >/etc/crio/crio.conf.d/11-default.conf <<'EOF'
 [crio.image]
 short_name_mode = "disabled"
