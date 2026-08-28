@@ -8,7 +8,8 @@ function(title, promql, legend, gridPos, id=null, perPage=25, valueMap={
   g.panel.stateTimeline.new(title)
   + g.panel.stateTimeline.queryOptions.withTargets([
     g.query.prometheus.new('$PROMETHEUS_DS', promql)
-    + g.query.prometheus.withLegendFormat(legend),
+    + g.query.prometheus.withLegendFormat(legend)
+    + { refId: 'A', range: true },
   ])
   + g.panel.stateTimeline.options.withShowValue('never')
   + g.panel.stateTimeline.options.withPerPage(value=perPage)
@@ -16,6 +17,8 @@ function(title, promql, legend, gridPos, id=null, perPage=25, valueMap={
     g.panel.stateTimeline.standardOptions.mapping.ValueMap.withType()
     + g.panel.stateTimeline.standardOptions.mapping.ValueMap.withOptions(valueMap)
   )
+  + g.panel.stateTimeline.standardOptions.thresholds.withMode('absolute')
+  + g.panel.stateTimeline.standardOptions.thresholds.withSteps([{ color: 'green', value: 0 }, { color: 'red', value: 80 }])
   + g.panel.stateTimeline.gridPos.withW(gridPos.w)
   + g.panel.stateTimeline.gridPos.withH(gridPos.h)
   + g.panel.stateTimeline.gridPos.withX(gridPos.x)

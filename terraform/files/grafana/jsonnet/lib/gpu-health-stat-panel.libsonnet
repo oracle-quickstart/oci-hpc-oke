@@ -6,7 +6,8 @@ function(title, promql, gridPos, id=null)
     g.query.prometheus.new(
       '$PROMETHEUS_DS',
       promql,
-    ),
+    )
+    + { refId: 'A', range: true },
   ])
   + g.panel.stat.options.withOrientation('vertical')
   + g.panel.stat.standardOptions.withDisplayName('${__field.labels.gpu_id}')
@@ -18,6 +19,8 @@ function(title, promql, gridPos, id=null)
     })
   )
   + g.panel.stat.standardOptions.withUnit('none')
+  + g.panel.stat.standardOptions.thresholds.withMode('absolute')
+  + g.panel.stat.standardOptions.thresholds.withSteps([{ color: 'green', value: 0 }, { color: 'red', value: 80 }])
   + g.panel.stat.gridPos.withW(gridPos.w)
   + g.panel.stat.gridPos.withH(gridPos.h)
   + g.panel.stat.gridPos.withX(gridPos.x)

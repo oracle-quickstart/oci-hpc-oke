@@ -8,7 +8,8 @@ function(title, promql, legend, gridPos, panelLinks, fieldLinks, id=null, valueM
   g.panel.stat.new(title)
   + g.panel.stat.queryOptions.withTargets([
     g.query.prometheus.new('$PROMETHEUS_DS', promql)
-    + g.query.prometheus.withLegendFormat(legend),
+    + g.query.prometheus.withLegendFormat(legend)
+    + { refId: 'A', instant: true, range: false },
   ])
   + g.panel.stat.standardOptions.withUnit('none')
   + g.panel.stat.options.withTextMode('name')
@@ -24,4 +25,11 @@ function(title, promql, legend, gridPos, panelLinks, fieldLinks, id=null, valueM
   + g.panel.stat.gridPos.withY(gridPos.y)
   + g.panel.stat.panelOptions.withLinks(panelLinks)
   + g.panel.stat.standardOptions.withLinks(fieldLinks)
+  + g.panel.stat.standardOptions.thresholds.withMode('absolute')
+  + g.panel.stat.standardOptions.thresholds.withSteps([{ color: 'green', value: 0 }, { color: 'red', value: 80 }])
+  + { options+: {
+    justifyMode: 'auto',
+    orientation: 'auto',
+    reduceOptions: { calcs: ['lastNotNull'], fields: '', values: false },
+  } }
   + (if id == null then {} else { id: id })

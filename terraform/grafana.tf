@@ -3,27 +3,33 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  grafana_common_dashboard_dir = "${path.module}/files/grafana/dashboards/common"
-  grafana_gpu_dashboard_dir    = "${path.module}/files/grafana/dashboards/gpu"
-  grafana_oci_dashboard_dir    = "${path.module}/files/grafana/dashboards/oci"
+  grafana_jsonnet_dir       = "${path.module}/files/grafana/jsonnet"
+  grafana_jsonnet_cache_dir = abspath("${path.root}/.terraform/grafana-jsonnet")
+  grafana_jsonnet_build_dir = "${local.grafana_jsonnet_cache_dir}/rendered"
 
-  grafana_common_dashboard_files = fileset("${local.grafana_common_dashboard_dir}", "*.json")
-  grafana_gpu_dashboard_files    = fileset("${local.grafana_gpu_dashboard_dir}", "*.json")
-  grafana_oci_dashboard_files    = fileset("${local.grafana_oci_dashboard_dir}", "*.json")
+  grafana_legacy_common_dashboard_dir = "${path.module}/files/grafana/legacy-dashboard-backups/common"
+  grafana_legacy_gpu_dashboard_dir    = "${path.module}/files/grafana/legacy-dashboard-backups/gpu"
+  grafana_legacy_oci_dashboard_dir    = "${path.module}/files/grafana/legacy-dashboard-backups/oci"
 
-  grafana_common_dashboard_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_common_dashboard_files : join("/", ["${local.grafana_common_dashboard_dir}", f])] : []
-  grafana_gpu_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_gpu_dashboard_files : join("/", ["${local.grafana_gpu_dashboard_dir}", f])] : []
-  grafana_oci_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? [for f in local.grafana_oci_dashboard_files : join("/", ["${local.grafana_oci_dashboard_dir}", f])] : []
+  grafana_legacy_common_dashboard_files = fileset(local.grafana_legacy_common_dashboard_dir, "*.json")
+  grafana_legacy_gpu_dashboard_files    = fileset(local.grafana_legacy_gpu_dashboard_dir, "*.json")
+  grafana_legacy_oci_dashboard_files    = fileset(local.grafana_legacy_oci_dashboard_dir, "*.json")
 
-  grafana_common_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
-    for f in local.grafana_common_dashboard_files :
-    f => file(join("/", ["${local.grafana_common_dashboard_dir}", f]))
-  } : {}
-  grafana_gpu_dashboard_sources = {
-    for f in local.grafana_gpu_dashboard_files :
-    f => file(join("/", ["${local.grafana_gpu_dashboard_dir}", f]))
-  }
-  grafana_gpu_health_dashboard = jsondecode(local.grafana_gpu_dashboard_sources["gpu-health-status.json"])
+  grafana_legacy_common_dashboard_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_legacy_common_dashboard_files : "${local.grafana_legacy_common_dashboard_dir}/${f}"] : []
+  grafana_legacy_gpu_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_legacy_gpu_dashboard_files : "${local.grafana_legacy_gpu_dashboard_dir}/${f}"] : []
+  grafana_legacy_oci_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? [for f in local.grafana_legacy_oci_dashboard_files : "${local.grafana_legacy_oci_dashboard_dir}/${f}"] : []
+
+  grafana_rendered_dashboards = try(jsondecode(data.external.grafana_dashboards[0].result.dashboards), {
+    common = {}
+    gpu    = {}
+    oci    = {}
+  })
+  grafana_jsonnet_source_hash = try(data.external.grafana_dashboards[0].result.source_hash, "disabled")
+
+  grafana_common_dashboards     = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? try(local.grafana_rendered_dashboards.common, {}) : {}
+  grafana_gpu_dashboard_sources = try(local.grafana_rendered_dashboards.gpu, {})
+  grafana_oci_dashboard_sources = try(local.grafana_rendered_dashboards.oci, {})
+  grafana_gpu_health_dashboard  = try(jsondecode(local.grafana_gpu_dashboard_sources["gpu-health-status.json"]), { panels = [] })
   grafana_gpu_health_panels = [
     for panel in local.grafana_gpu_health_dashboard.panels : panel
     if(panel.id != 7 || local.has_nvidia_gpu) && (panel.id != 23 || local.has_amd_gpu)
@@ -43,9 +49,19 @@ locals {
       panels = local.grafana_gpu_health_panels_reflowed
     })) : content
   } : {}
-  grafana_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? {
-    for f in local.grafana_oci_dashboard_files :
-    f => file(join("/", ["${local.grafana_oci_dashboard_dir}", f]))
+  grafana_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? local.grafana_oci_dashboard_sources : {}
+
+  grafana_legacy_common_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
+    for f in local.grafana_legacy_common_dashboard_files :
+    f => file("${local.grafana_legacy_common_dashboard_dir}/${f}")
+  } : {}
+  grafana_legacy_gpu_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
+    for f in local.grafana_legacy_gpu_dashboard_files :
+    f => file("${local.grafana_legacy_gpu_dashboard_dir}/${f}")
+  } : {}
+  grafana_legacy_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? {
+    for f in local.grafana_legacy_oci_dashboard_files :
+    f => file("${local.grafana_legacy_oci_dashboard_dir}/${f}")
   } : {}
 
   grafana_alert_dir   = "${path.module}/files/grafana/alerts"
@@ -76,6 +92,37 @@ locals {
   } : {}
 
   grafana_alert_files_path = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? [for f in local.grafana_alert_files_filtered : join("/", ["${local.grafana_alert_dir}", f])] : []
+}
+
+data "external" "grafana_dashboards" {
+  count = var.install_monitoring && var.install_grafana ? 1 : 0
+
+  program = ["python3", "${local.grafana_jsonnet_dir}/render_dashboards.py", "--external"]
+  query = {
+    cache_dir  = local.grafana_jsonnet_cache_dir
+    output_dir = local.grafana_jsonnet_build_dir
+  }
+}
+
+resource "terraform_data" "validate_grafana_dashboard_render" {
+  count = var.install_monitoring && var.install_grafana && var.install_grafana_dashboards ? 1 : 0
+
+  input = local.grafana_jsonnet_source_hash
+
+  lifecycle {
+    precondition {
+      condition     = length(setsubtract(local.grafana_legacy_common_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.common, {}))))) == 0
+      error_message = "A legacy common dashboard backup has no rendered Jsonnet replacement."
+    }
+    precondition {
+      condition     = length(setsubtract(local.grafana_legacy_gpu_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.gpu, {}))))) == 0
+      error_message = "A legacy GPU dashboard backup has no rendered Jsonnet replacement."
+    }
+    precondition {
+      condition     = length(setsubtract(local.grafana_legacy_oci_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.oci, {}))))) == 0
+      error_message = "A legacy OCI dashboard backup has no rendered Jsonnet replacement."
+    }
+  }
 }
 
 resource "random_password" "grafana_admin_password" {
