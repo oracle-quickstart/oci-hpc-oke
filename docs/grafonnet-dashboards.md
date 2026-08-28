@@ -1,66 +1,246 @@
-# Developing Grafana dashboards with Grafonnet
+# Operating and developing Grafana dashboards
 
-The Grafonnet package under `terraform/files/grafana/jsonnet` provides
-source-controlled Jsonnet definitions for the Grafana dashboards shipped with
-OKE. It uses the same composition model as the Slurm dashboards: a dashboard
-is assembled from Grafonnet constructors and small reusable `.libsonnet`
-helpers, while PromQL and panel layout remain visible in the dashboard source.
+OKE stores dashboard source as Grafonnet/Jsonnet and deploys dashboards to
+Grafana as JSON in Kubernetes ConfigMaps. This guide covers two workflows:
 
-The package currently compiles dashboards into an isolated, ignored `build`
-directory. It does not overwrite the checked-in dashboard JSON under
-`terraform/files/grafana/dashboards` or change the Terraform deployment path.
+- an operator changing a dashboard in an already-running cluster; and
+- a developer making a durable dashboard change for a future OKE deployment.
 
-## Compilation sequence
+## Important deployment boundary
+
+The current Kubernetes manifests do not compile Jsonnet. There is no Jsonnet
+init container or Jsonnet compiler in the deployed monitoring stack.
+
+`make compile` writes generated JSON to the ignored
+`terraform/files/grafana/jsonnet/build` directory. Terraform continues to read
+the checked-in JSON under `terraform/files/grafana/dashboards`. Therefore a
+developer must copy a reviewed build artifact into the appropriate checked-in
+dashboard directory before the change can be deployed by Terraform.
+
+This boundary keeps compilers and source dependencies out of the cluster. It
+also means that compiling Jsonnet by itself does not change a running cluster
+or a subsequent Terraform deployment.
+
+## What happens during OKE deployment
 
 ```mermaid
 sequenceDiagram
     actor Developer
-    participant Make as Makefile
-    participant JB as jsonnet-bundler
-    participant Source as Dashboard .jsonnet
-    participant Library as Shared .libsonnet
-    participant Grafonnet as Pinned Grafonnet vendor
-    participant Jsonnet as Jsonnet compiler
-    participant Build as build/*.json
+    actor Operator
+    participant Jsonnet as Grafonnet/Jsonnet source
+    participant Static as Checked-in dashboard JSON
+    participant Terraform
+    participant Apply as Kubernetes provider or operator host
+    participant API as Kubernetes API
+    participant CM as Dashboard ConfigMap
+    participant Sidecar as grafana-sc-dashboard
+    participant Grafana
 
-    Developer->>Make: make bootstrap
-    Make->>JB: jb install
-    JB->>Grafonnet: Install locked dependency into vendor/
-    Developer->>Make: make fmt-check
-    Make->>Source: Check .jsonnet formatting
-    Make->>Library: Check .libsonnet formatting
-    Developer->>Make: make compile
-    loop Every dashboard source
-        Make->>Jsonnet: jsonnet -J vendor dashboard.jsonnet
-        Jsonnet->>Source: Evaluate dashboard composition
-        Source->>Library: Import shared constructors and variables
-        Library->>Grafonnet: Build Grafana objects
-        Grafonnet-->>Jsonnet: Return dashboard object
-        Jsonnet-->>Build: Write build/<dashboard>.json
+    Developer->>Jsonnet: Edit dashboard and shared libraries
+    Developer->>Jsonnet: make compile
+    Jsonnet-->>Developer: build/<dashboard>.json
+    Developer->>Static: Promote reviewed JSON
+    Terraform->>Static: fileset() and file()
+    Terraform->>Terraform: Filter gpu-health-status panels 7 and 23
+    alt Direct, local, or ORM deployment
+        Terraform->>API: kubernetes_config_map_v1
+    else Operator deployment
+        Terraform->>Apply: Copy JSON and generate kustomization.yaml
+        Apply->>API: kubectl apply -k .
     end
-    Build-->>Developer: Generated JSON for validation
+    API->>CM: Store JSON with dashboard label and folder annotation
+    Sidecar->>API: Watch labeled ConfigMaps
+    API-->>Sidecar: Dashboard added or changed
+    Sidecar->>Grafana: Write JSON into provisioned dashboard folder
+    Grafana-->>Operator: Dashboard available in Grafana
 ```
 
-The Grafonnet revision is pinned by `jsonnetfile.json` and
-`jsonnetfile.lock.json`. The `vendor` and `build` directories are intentionally
-ignored by Git.
+Terraform performs this flow only when monitoring, Grafana, dashboard
+installation, and the kube-prometheus-stack deployment path are enabled. OCI
+dashboards are additionally conditional on the OCI metrics exporter. GPU
+ConfigMaps are created only when the configured cluster contains an AMD or
+NVIDIA GPU.
 
-## Prerequisites
+### Components that make deployment work
 
-Install these commands and make sure they are available on `PATH`:
+| Component | Responsibility |
+| --- | --- |
+| `terraform/files/grafana/jsonnet` | Grafonnet/Jsonnet source, shared libraries, dependency lock, and local compiler commands. It is a build-time component, not a Kubernetes workload. |
+| `terraform/files/grafana/dashboards/{common,gpu,oci}` | Reviewed JSON artifacts consumed by Terraform. |
+| `terraform/grafana.tf` | Discovers dashboard JSON and prepares its content. It also filters and reflows `gpu-health-status.json` for the configured GPU vendor. |
+| `terraform/via-provider-grafana.tf` | Creates dashboard ConfigMaps directly with the Kubernetes provider for direct, local, and ORM deployments. |
+| `terraform/via-operator-grafana.tf` | Builds a Kustomize manifest, copies dashboard files to the operator host, and runs `kubectl apply -k .` for operator deployments. |
+| `terraform/files/kube-prometheus/values.yaml.tftpl` | Enables the Grafana dashboard sidecar and configures `grafana_dashboard_folder` as its folder annotation. |
+| Dashboard ConfigMap | Contains one JSON dashboard, the label `grafana_dashboard=1`, and a `grafana_dashboard_folder` annotation. |
+| `grafana-sc-dashboard` | Watches matching ConfigMaps and makes their JSON available to Grafana. A ConfigMap update triggers a dashboard reload. |
+| Grafana container | Provisions the JSON into the annotated Grafana folder. |
 
-- `jsonnet`
-- `jsonnetfmt`
-- `jb` from jsonnet-bundler
-- `make`
+The kube-prometheus-stack values enable the watcher and tell it which annotation
+contains the folder name:
 
-From the repository root, install the pinned dependencies once:
+```yaml
+grafana:
+  sidecar:
+    dashboards:
+      enabled: true
+      folderAnnotation: grafana_dashboard_folder
+      provider:
+        allowUiUpdates: true
+        disableDelete: false
+        foldersFromFilesStructure: true
+```
+
+Both Terraform deployment paths ultimately create the equivalent of this
+manifest. The name and JSON key change for each dashboard:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-gpu-metrics
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_dashboard_folder: GPU Nodes
+data:
+  gpu-metrics.json: |-
+    { "uid": "...", "title": "...", "panels": [] }
+```
+
+For direct, local, and ORM deployments, the ConfigMap is a
+`kubernetes_config_map_v1` resource and depends on the kube-prometheus-stack
+Helm release. For operator deployments, Terraform waits for the monitoring
+module, transfers the JSON and generated `kustomization.yaml` to the operator
+host, and applies them with `kubectl apply -k .`. In both cases, the runtime
+contract seen by the Grafana sidecar is the same ConfigMap label, annotation,
+and JSON data.
+
+The folder mappings created by Terraform are:
+
+| Source directory | ConfigMap annotation |
+| --- | --- |
+| `dashboards/common` | `grafana_dashboard_folder=Kubernetes` |
+| `dashboards/gpu` | `grafana_dashboard_folder=GPU Nodes` |
+| `dashboards/oci` | `grafana_dashboard_folder=OCI Metrics` |
+
+## Operator workflow on a running cluster
+
+An operator can add or change a dashboard without reinstalling Grafana. The
+sidecar watches ConfigMaps, so applying a correctly labeled ConfigMap is enough
+to update the runtime dashboard.
+
+Treat this as an operational override. A later Terraform apply will reconcile
+the ConfigMap from the checked-in JSON and can replace the runtime change. A
+change that must survive redeployment also needs the developer workflow below.
+
+### Inspect the deployed dashboard source
+
+Set the namespace used by the monitoring deployment and list the managed
+dashboard ConfigMaps:
+
+```bash
+MONITORING_NAMESPACE=monitoring
+kubectl get configmaps \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --selector grafana_dashboard=1
+```
+
+Back up one dashboard before changing it. The ConfigMap is named
+`dashboard-<dashboard-name>` and its data key is `<dashboard-name>.json`:
+
+```bash
+DASHBOARD_NAME=gpu-metrics
+kubectl get configmap "dashboard-${DASHBOARD_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --output json |
+  jq -r --arg key "${DASHBOARD_NAME}.json" '.data[$key]' \
+  > "/tmp/${DASHBOARD_NAME}.before.json"
+```
+
+### Compile and apply a panel or dashboard change
+
+Compile the Jsonnet source on an operator workstation or development host. The
+compiler is not run in the cluster:
 
 ```bash
 make -C terraform/files/grafana/jsonnet bootstrap
+make -C terraform/files/grafana/jsonnet fmt-check
+make -C terraform/files/grafana/jsonnet compile
 ```
 
-## Package layout
+Apply one compiled GPU dashboard as a ConfigMap:
+
+```bash
+MONITORING_NAMESPACE=monitoring
+DASHBOARD_NAME=gpu-metrics
+DASHBOARD_FILE="terraform/files/grafana/jsonnet/build/${DASHBOARD_NAME}.json"
+DASHBOARD_FOLDER="GPU Nodes"
+
+kubectl create configmap "dashboard-${DASHBOARD_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --from-file="${DASHBOARD_NAME}.json=${DASHBOARD_FILE}" \
+  --dry-run=client --output yaml |
+kubectl label --filename - --local --dry-run=client --output yaml \
+  grafana_dashboard=1 |
+kubectl annotate --filename - --local --dry-run=client --output yaml \
+  "grafana_dashboard_folder=${DASHBOARD_FOLDER}" |
+kubectl apply --filename -
+```
+
+Use `Kubernetes`, `GPU Nodes`, or `OCI Metrics` for the folder according to the
+table above. Keep the dashboard UID unchanged when replacing a dashboard;
+changing the UID creates a different Grafana dashboard instead of updating the
+existing one.
+
+Do not hot-apply the unfiltered `build/gpu-health-status.json` to a single-vendor
+cluster. Terraform normally removes panel `7` for non-NVIDIA clusters, removes
+panel `23` for non-AMD clusters, and reflows the remaining stat panels. Deploy
+that dashboard through the normal Terraform path unless the operator has
+deliberately reproduced the same vendor rendering.
+
+### Verify the runtime update
+
+Confirm that the ConfigMap contains the expected UID and that the sidecar saw
+the update:
+
+```bash
+kubectl get configmap "dashboard-${DASHBOARD_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --output json |
+  jq -r --arg key "${DASHBOARD_NAME}.json" '.data[$key]' |
+  jq '{uid, title, panelCount: (.panels | length)}'
+
+kubectl logs \
+  --namespace "${MONITORING_NAMESPACE}" \
+  statefulset/kube-prometheus-stack-grafana \
+  --container grafana-sc-dashboard \
+  --tail 100
+```
+
+Open Grafana and verify the dashboard in its annotated folder. The deployment
+outputs include the Grafana URL, credentials, and port-forward command where
+applicable.
+
+To roll back, apply the backed-up JSON with the same ConfigMap name, label, and
+folder annotation. A normal Terraform apply also restores the repository-owned
+version.
+
+### Editing in the Grafana UI
+
+The chart sets `allowUiUpdates: true`, so an operator may prototype a panel
+change in Grafana. UI changes are not the durable source of truth and may be
+overwritten when the sidecar reprovisions the ConfigMap. Export the prototype,
+transfer its PromQL, layout, and styling into the Jsonnet source, and complete
+the developer workflow for a permanent change.
+
+## Developer workflow for durable changes
+
+The Grafonnet package follows the Slurm composition model: dashboards are made
+from Grafonnet constructors and focused `.libsonnet` helpers, while PromQL and
+panel placement remain visible in each dashboard source.
+
+### Package layout
 
 ```text
 terraform/files/grafana/jsonnet/
@@ -76,28 +256,24 @@ terraform/files/grafana/jsonnet/
 └── Makefile
 ```
 
-Every dashboard filename must be unique across all three dashboard directories.
-The compiler writes outputs using only the basename, for example
-`dashboards/gpu/gpu-metrics.jsonnet` becomes `build/gpu-metrics.json`.
+Every dashboard filename must be unique across the three source directories
+because compilation writes outputs by basename.
 
-## Add a dashboard
+### Add a dashboard or panel
 
-1. Select the appropriate directory under `dashboards`.
-1. Create `<dashboard-name>.jsonnet`. Start with the shared Grafonnet import and
-   reuse existing panel and variable helpers when their behavior matches the
-   new dashboard.
-1. Set the dashboard title and stable UID with `g.dashboard.new()` and
-   `g.dashboard.withUid()`.
-1. Add variables with Grafonnet variable constructors. Put variables reused by
-   the dashboard in a focused `.libsonnet` file under `lib`.
-1. Add panels through the existing shared constructors. Keep each panel's
-   PromQL, unit, legend, and `{ w, h, x, y }` position visible at the call site.
-1. Assign explicit panel IDs when an existing dashboard or Terraform behavior
-   depends on them. Finish the panel list with `setPanelIDs=false` when IDs are
-   supplied by the source.
-1. Compile and inspect the generated JSON before committing.
+1. Add or edit the `.jsonnet` source in `dashboards/common`, `dashboards/gpu`,
+   or `dashboards/oci`.
+2. Construct dashboards, variables, and panels with Grafonnet. Reuse focused
+   helpers from `lib`; add a shared helper when multiple dashboards need the
+   same behavior.
+3. Keep PromQL, units, legends, and `{ w, h, x, y }` positions visible at the
+   dashboard call site.
+4. Preserve dashboard UID and existing panel IDs. In particular,
+   `gpu-health-status` panel IDs `7` and `23` are part of Terraform's vendor
+   filtering and reflow contract.
+5. Compile all dashboards after changing a shared library.
 
-A dashboard follows this general form:
+A panel normally looks like this at its call site:
 
 ```jsonnet
 local g = import '../../lib/g.libsonnet';
@@ -105,8 +281,6 @@ local timeseriesPanel = import '../../lib/timeseries-panel.libsonnet';
 
 g.dashboard.new('Example Metrics')
 + g.dashboard.withUid('example-metrics')
-+ g.dashboard.withTimezone('browser')
-+ g.dashboard.time.withFrom('now-5m')
 + g.dashboard.withPanels([
   timeseriesPanel(
     'Request Rate',
@@ -119,71 +293,56 @@ g.dashboard.new('Example Metrics')
 ], setPanelIDs=false)
 ```
 
-Do not copy an entire exported Grafana dashboard into a Jsonnet object. Use
-Grafonnet constructors and extract reusable behavior into `.libsonnet` files.
-Raw object additions should be limited to Grafana behavior that Grafonnet does
-not expose, such as a specialized transformation or uncommon panel option.
+Avoid embedding a complete Grafana export as a raw Jsonnet object. Raw object
+additions should be limited to behavior that the pinned Grafonnet library does
+not expose.
 
-## Add or change a panel
+### Build and validate
 
-For an existing dashboard:
-
-1. Open its `.jsonnet` source under `dashboards`.
-1. Reuse the closest shared panel constructor from `lib`.
-1. Keep the PromQL and grid position in the dashboard source. Preserve an
-   existing panel ID when modifying or replacing a panel.
-1. If several dashboards need the same behavior, update or add a narrowly
-   scoped helper instead of duplicating the panel construction.
-1. If a change affects a shared helper, compile all dashboards because every
-   importing dashboard can change.
-
-The GPU health dashboard has an additional compatibility requirement: panel
-IDs `7` and `23` must remain unchanged because Terraform uses them for GPU
-vendor filtering and panel reflow.
-
-## Format and compile
-
-Run these commands from the repository root:
+Install the pinned dependency once, then format and compile:
 
 ```bash
-# Format Jsonnet sources in place.
+make -C terraform/files/grafana/jsonnet bootstrap
 make -C terraform/files/grafana/jsonnet fmt
-
-# Verify formatting without modifying files.
 make -C terraform/files/grafana/jsonnet fmt-check
-
-# Compile every dashboard into terraform/files/grafana/jsonnet/build/.
 make -C terraform/files/grafana/jsonnet compile
 ```
 
-To compile one dashboard while iterating:
+Compilation proves that the Grafonnet objects evaluate; it does not prove that
+PromQL returns data in a cluster. Inspect the generated dashboard's UID, title,
+panel IDs, targets, variables, links, datasource UIDs, units, and grid
+positions. Test PromQL against a representative Prometheus datasource and use
+an isolated Grafana instance for visual changes.
+
+### Promote JSON into the deployment input
+
+After reviewing the build artifact, copy it into the category consumed by
+Terraform:
 
 ```bash
-jsonnet \
-  -J terraform/files/grafana/jsonnet/vendor \
-  --output-file /tmp/gpu-metrics.json \
-  terraform/files/grafana/jsonnet/dashboards/gpu/gpu-metrics.jsonnet
+cp terraform/files/grafana/jsonnet/build/gpu-metrics.json \
+  terraform/files/grafana/dashboards/gpu/gpu-metrics.json
 ```
 
-Clean all generated package outputs with:
+Use `dashboards/common`, `dashboards/gpu`, or `dashboards/oci` consistently with
+the source category. A new JSON filename is automatically discovered by
+Terraform's `fileset`; no per-dashboard Terraform resource is required.
 
-```bash
-make -C terraform/files/grafana/jsonnet clean
-```
+Review both the Jsonnet source diff and the generated JSON diff. Commit the
+source, shared libraries, and promoted deployment JSON together. Do not commit
+`build` or `vendor`.
 
-## Validate generated dashboards
+Run the repository's relevant Terraform formatting, validation, and plan checks
+before deployment. The subsequent Terraform apply creates or updates the
+ConfigMap, and the existing Grafana sidecar performs the runtime reload shown in
+the deployment sequence above.
 
-Compilation proves that the Jsonnet and Grafonnet objects evaluate successfully;
-it does not prove that PromQL returns data in a running cluster. Before review:
+## Choosing the right workflow
 
-1. Confirm the generated dashboard has the intended title and UID.
-1. Compare panel IDs, titles, grid positions, targets, units, variables, links,
-   and datasource UIDs with the dashboard being replaced.
-1. Import the generated JSON into an isolated Grafana instance when changing
-   panel styling, transformations, mappings, or links.
-1. Test PromQL against a representative Prometheus datasource.
-1. Run `git diff --check` and confirm that `build` and `vendor` remain untracked.
-
-Grafana exports many default fields that Grafonnet intentionally omits. Review
-behavioral differences rather than requiring byte-for-byte equality when an
-omitted field is a Grafana default.
+| Need | Action | Persistence |
+| --- | --- | --- |
+| Inspect what is running | Read the labeled ConfigMap and sidecar logs. | Read-only |
+| Test an urgent panel adjustment | Compile JSON and update one dashboard ConfigMap. | Temporary; Terraform can overwrite it |
+| Prototype visually | Edit in Grafana, then export the result. | Temporary; ConfigMap provisioning can overwrite it |
+| Add or change a shipped dashboard | Update Grafonnet, compile, promote JSON, validate, and deploy through Terraform. | Durable and reproducible |
+| Change `gpu-health-status` | Preserve IDs `7` and `23` and use Terraform's vendor-aware deployment path. | Durable and vendor-correct |
