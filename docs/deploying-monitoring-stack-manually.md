@@ -321,28 +321,10 @@ temporary and remains under the ignored `build` directory:
 ```bash
 make -C terraform/files/grafana/jsonnet verify
 DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
-LEGACY_DASHBOARD_PATH="terraform/files/grafana/legacy-dashboard-backups"
 ```
 
-During the transition, create inactive backups of the previous static
-dashboards before switching the active ConfigMaps. The Grafana sidecar ignores
-these because they do not have `grafana_dashboard=1`:
-
-```bash
-for category in common gpu; do
-  for dashboard in "${LEGACY_DASHBOARD_PATH}/${category}"/*.json; do
-    kubectl create configmap "dashboard-backup-$(basename "$dashboard" .json)" \
-      --from-file="$(basename "$dashboard")=${dashboard}" \
-      --namespace "${MONITORING_NAMESPACE}" \
-      --dry-run=client --output yaml |
-    kubectl label --filename - --local --dry-run=client --output yaml \
-      grafana_dashboard_backup=1 |
-    kubectl annotate --filename - --local --dry-run=client --output yaml \
-      dashboard_backup_source=legacy-static-json |
-    kubectl apply --filename -
-  done
-done
-```
+The static JSON under `terraform/files/grafana/dashboards` is retained in the
+repository for comparison only. Do not create ConfigMaps from it.
 
 ### 5.1 Deploy Kubernetes Dashboards
 
@@ -423,9 +405,6 @@ trap - EXIT
 ```bash
 # List all dashboard ConfigMaps
 kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
-
-# List inactive transition backups
-kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard_backup=1
 
 # Show the vendor-specific GPU Health panels that were deployed
 kubectl get configmap dashboard-gpu-health-status \

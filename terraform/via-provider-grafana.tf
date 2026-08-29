@@ -2,28 +2,9 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 
-resource "kubernetes_config_map_v1" "grafana_common_dashboard_backups" {
-  for_each   = alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_legacy_common_dashboards : {}
-  depends_on = [helm_release.prometheus]
-
-  metadata {
-    name      = format("dashboard-backup-%s", trimsuffix(each.key, ".json"))
-    namespace = var.monitoring_namespace
-    annotations = {
-      grafana_dashboard_folder = "Kubernetes"
-      dashboard_backup_source  = "legacy-static-json"
-    }
-    labels = {
-      grafana_dashboard_backup = "1"
-    }
-  }
-
-  data = { (each.key) = each.value }
-}
-
 resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
   for_each   = alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_common_dashboards : {}
-  depends_on = [helm_release.prometheus, kubernetes_config_map_v1.grafana_common_dashboard_backups, terraform_data.validate_grafana_dashboard_render]
+  depends_on = [helm_release.prometheus]
   metadata {
     name      = format("dashboard-%s", trimsuffix(each.key, ".json"))
     namespace = var.monitoring_namespace
@@ -37,36 +18,13 @@ resource "kubernetes_config_map_v1" "grafana_common_dashboards" {
   data = { (each.key) = each.value }
 }
 
-resource "kubernetes_config_map_v1" "grafana_gpu_dashboard_backups" {
-  for_each = (
-    (local.has_amd_gpu || local.has_nvidia_gpu) &&
-    alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_legacy_gpu_dashboards : {}
-  )
-
-  depends_on = [helm_release.prometheus]
-
-  metadata {
-    name      = format("dashboard-backup-%s", trimsuffix(each.key, ".json"))
-    namespace = var.monitoring_namespace
-    annotations = {
-      grafana_dashboard_folder = "GPU Nodes"
-      dashboard_backup_source  = "legacy-static-json"
-    }
-    labels = {
-      grafana_dashboard_backup = "1"
-    }
-  }
-
-  data = { (each.key) = each.value }
-}
-
 resource "kubernetes_config_map_v1" "grafana_gpu_dashboards" {
   for_each = (
     (local.has_amd_gpu || local.has_nvidia_gpu) &&
     alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_gpu_dashboards : {}
   )
 
-  depends_on = [helm_release.prometheus, kubernetes_config_map_v1.grafana_gpu_dashboard_backups, terraform_data.validate_grafana_dashboard_render]
+  depends_on = [helm_release.prometheus]
 
   metadata {
     name      = format("dashboard-%s", trimsuffix(each.key, ".json"))
@@ -89,30 +47,10 @@ moved {
   to   = kubernetes_config_map_v1.grafana_gpu_dashboards
 }
 
-resource "kubernetes_config_map_v1" "grafana_oci_dashboard_backups" {
-  for_each = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_legacy_oci_dashboards : {}
-
-  depends_on = [helm_release.prometheus]
-
-  metadata {
-    name      = format("dashboard-backup-%s", trimsuffix(each.key, ".json"))
-    namespace = var.monitoring_namespace
-    annotations = {
-      grafana_dashboard_folder = "OCI Metrics"
-      dashboard_backup_source  = "legacy-static-json"
-    }
-    labels = {
-      grafana_dashboard_backup = "1"
-    }
-  }
-
-  data = { (each.key) = each.value }
-}
-
 resource "kubernetes_config_map_v1" "grafana_oci_dashboards" {
   for_each = alltrue([var.install_node_problem_detector_kube_prometheus_stack, var.setup_oci_metrics_exporter, local.deploy_from_local || local.deploy_from_orm]) ? local.grafana_oci_dashboards : {}
 
-  depends_on = [helm_release.prometheus, kubernetes_config_map_v1.grafana_oci_dashboard_backups, terraform_data.validate_grafana_dashboard_render]
+  depends_on = [helm_release.prometheus]
 
   metadata {
     name      = format("dashboard-%s", trimsuffix(each.key, ".json"))

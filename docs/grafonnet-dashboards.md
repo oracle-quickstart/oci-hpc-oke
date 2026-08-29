@@ -5,9 +5,9 @@ OKE dashboard source is maintained as Grafonnet/Jsonnet under
 during deployment and puts the generated JSON into Kubernetes ConfigMaps.
 Generated JSON is temporary and must not be committed.
 
-The previous static dashboards are retained temporarily as inactive backup
-ConfigMaps. They are rollback data only and will be removed after the dashboard
-conversion has been proven across the agreed transition releases.
+The previous static dashboard JSON remains unchanged under
+`terraform/files/grafana/dashboards` as a repository reference. Terraform does
+not read, copy, or deploy those files. No backup ConfigMaps are created.
 
 ## Deployment sequence
 
@@ -17,7 +17,6 @@ sequenceDiagram
     participant Renderer as render_dashboards.py
     participant GitHub as Pinned release assets
     participant Grafonnet as Locked Grafonnet dependencies
-    participant Backup as dashboard-backup-* ConfigMaps
     participant Active as dashboard-* ConfigMaps
     participant Sidecar as grafana-sc-dashboard
     participant Grafana
@@ -27,10 +26,7 @@ sequenceDiagram
     Renderer->>Grafonnet: jb install from committed lock
     Renderer->>Renderer: Compile every dashboard to temporary JSON
     Renderer-->>Terraform: Return JSON by common, gpu, and oci category
-    Terraform->>Terraform: Validate legacy dashboards have replacements
     Terraform->>Terraform: Filter and reflow gpu-health-status for GPU vendor
-    Terraform->>Backup: Create inactive backups from legacy static JSON
-    Note over Backup: grafana_dashboard_backup=1<br/>No grafana_dashboard label
     Terraform->>Active: Create or update canonical dashboard ConfigMaps
     Note over Active: grafana_dashboard=1<br/>Existing names and folders retained
     Sidecar->>Active: Detect ConfigMap update
@@ -50,9 +46,8 @@ The Terraform execution environment requires Python 3 and outbound HTTPS access
 to GitHub for an uncached tool or dependency installation. Developers also need
 `make` for the local convenience targets.
 
-If tool installation, dependency installation, Jsonnet evaluation, JSON
-parsing, or dashboard-set validation fails, Terraform stops before changing an
-active dashboard ConfigMap.
+If tool installation, dependency installation, Jsonnet evaluation, or JSON
+parsing fails, Terraform stops before changing an active dashboard ConfigMap.
 
 ## Components involved
 
@@ -62,11 +57,11 @@ active dashboard ConfigMap.
 | `terraform/files/grafana/jsonnet/lib` | Shared Grafonnet panel, target, variable, threshold, and layout helpers. |
 | `render_dashboards.py` | Installs pinned tools and dependencies, compiles all dashboards, validates JSON, and returns the generated content to Terraform. |
 | `jsonnetfile.json` and `jsonnetfile.lock.json` | Pin Grafonnet and transitive Jsonnet dependencies. |
-| `terraform/grafana.tf` | Invokes the renderer, validates replacement coverage, and performs GPU vendor filtering and panel reflow. |
-| `terraform/via-provider-grafana.tf` | Creates backup ConfigMaps first and active ConfigMaps second for local and ORM deployments. |
-| `terraform/via-operator-grafana.tf` | Creates backup ConfigMaps, transfers generated JSON to the operator host, and applies the active Kustomize manifest. |
+| `terraform/grafana.tf` | Invokes the renderer and performs GPU vendor filtering and panel reflow. |
+| `terraform/via-provider-grafana.tf` | Creates active ConfigMaps from generated JSON for local and ORM deployments. |
+| `terraform/via-operator-grafana.tf` | Transfers generated JSON to the operator host and applies the active Kustomize manifest. |
 | `terraform/files/kube-prometheus/values.yaml.tftpl` | Enables the Grafana dashboard sidecar and its folder annotation. |
-| `terraform/files/grafana/legacy-dashboard-backups` | Temporary, immutable legacy JSON used only for rollback ConfigMaps. |
+| `terraform/files/grafana/dashboards` | Unchanged static JSON retained only as a repository comparison reference; it is not a deployment input. |
 
 The Grafana chart enables this existing sidecar behavior:
 
@@ -82,22 +77,15 @@ grafana:
         foldersFromFilesStructure: true
 ```
 
-## Active and backup ConfigMaps
-
-Each converted dashboard has two ConfigMaps during the transition:
-
-| Purpose | Example name | Label | Sidecar behavior |
-| --- | --- | --- | --- |
-| Active generated dashboard | `dashboard-gpu-metrics` | `grafana_dashboard=1` | Loaded by Grafana |
-| Legacy rollback copy | `dashboard-backup-gpu-metrics` | `grafana_dashboard_backup=1` | Ignored by Grafana |
+## Active ConfigMaps
 
 The active ConfigMap retains the pre-conversion name, JSON data key, dashboard
 UID, and folder annotation. Only its JSON data changes from checked-in static
 JSON to deployment-generated Jsonnet output.
 
-Backup ConfigMaps intentionally do not have `grafana_dashboard=1`. Loading both
-copies would expose the same dashboard UID twice and make provisioning order
-ambiguous.
+For example, `dashboard-gpu-metrics` retains the label
+`grafana_dashboard=1` and is loaded by the Grafana sidecar. There is no
+corresponding `dashboard-backup-gpu-metrics` deployment resource.
 
 Folder annotations remain:
 
@@ -115,9 +103,7 @@ dashboards are deployed only when the cluster contains an AMD or NVIDIA GPU.
 For local and OCI Resource Manager deployments, Terraform:
 
 1. Compiles Jsonnet through the external data source.
-2. Creates `kubernetes_config_map_v1` backup resources from legacy JSON.
-3. Waits for backup creation.
-4. Updates the existing `kubernetes_config_map_v1` active resources with the
+2. Updates the existing `kubernetes_config_map_v1` active resources with the
    generated content.
 
 ### Operator deployment path
@@ -125,17 +111,16 @@ For local and OCI Resource Manager deployments, Terraform:
 For private-control-plane deployments through the operator host, Terraform:
 
 1. Compiles Jsonnet on the Terraform execution host.
-2. Applies a backup-only Kustomization on the operator host.
-3. Transfers the temporary generated JSON to the operator host.
-4. Overwrites the generated `gpu-health-status.json` with Terraform's
+2. Transfers the temporary generated JSON to the operator host.
+3. Overwrites the generated `gpu-health-status.json` with Terraform's
    vendor-filtered and reflowed rendering.
-5. Applies the active dashboards and alerts with `kubectl apply -k .`.
+4. Applies the active dashboards and alerts with `kubectl apply -k .`.
 
-Both deployment paths produce the same active and backup ConfigMap contracts.
+Both deployment paths produce the same active ConfigMap contract.
 
 ## Operator workflow after deployment
 
-### Verify active and backup dashboards
+### Verify active dashboards
 
 ```bash
 MONITORING_NAMESPACE=monitoring
@@ -143,22 +128,7 @@ MONITORING_NAMESPACE=monitoring
 kubectl get configmaps \
   --namespace "${MONITORING_NAMESPACE}" \
   --selector grafana_dashboard=1
-
-kubectl get configmaps \
-  --namespace "${MONITORING_NAMESPACE}" \
-  --selector grafana_dashboard_backup=1
 ```
-
-Confirm that a backup is not visible to the sidecar:
-
-```bash
-kubectl get configmap dashboard-backup-gpu-metrics \
-  --namespace "${MONITORING_NAMESPACE}" \
-  --output jsonpath='{.metadata.labels}'
-```
-
-The result must contain `grafana_dashboard_backup: 1` and must not contain
-`grafana_dashboard: 1`.
 
 Inspect the active dashboard identity:
 
@@ -213,36 +183,6 @@ the committed Jsonnet source. Do not hot-apply raw `gpu-health-status.json` to a
 single-vendor cluster because Terraform normally performs vendor filtering and
 reflow.
 
-### Restore one legacy backup temporarily
-
-Copy the backup data into the canonical active ConfigMap. Do not add the active
-sidecar label to the backup ConfigMap itself.
-
-```bash
-DASHBOARD_NAME=gpu-metrics
-BACKUP_FILE="/tmp/${DASHBOARD_NAME}-legacy.json"
-
-kubectl get configmap "dashboard-backup-${DASHBOARD_NAME}" \
-  --namespace "${MONITORING_NAMESPACE}" \
-  --output json |
-jq -r --arg key "${DASHBOARD_NAME}.json" '.data[$key]' \
-  > "${BACKUP_FILE}"
-
-kubectl create configmap "dashboard-${DASHBOARD_NAME}" \
-  --namespace "${MONITORING_NAMESPACE}" \
-  --from-file="${DASHBOARD_NAME}.json=${BACKUP_FILE}" \
-  --dry-run=client --output yaml |
-kubectl label --filename - --local --dry-run=client --output yaml \
-  grafana_dashboard=1 |
-kubectl annotate --filename - --local --dry-run=client --output yaml \
-  "grafana_dashboard_folder=GPU Nodes" |
-kubectl apply --filename -
-```
-
-This rollback is also temporary. The next Terraform apply returns the active
-ConfigMap to generated Jsonnet output. Use the previous OKE release for a
-release-level rollback.
-
 ### Grafana UI edits
 
 `allowUiUpdates` permits UI experiments, but ConfigMap provisioning remains the
@@ -280,7 +220,7 @@ terraform/files/grafana/jsonnet/
 5. Preserve query mode as well as PromQL. Instant stat queries and range time
    series queries are not interchangeable.
 6. Reuse a shared helper when behavior is common across dashboards.
-7. Do not add generated JSON or a new legacy backup for a new dashboard.
+7. Do not add generated JSON. Static JSON is not required for a new dashboard.
 
 `gpu-health-status` must retain panel IDs `7` and `23`. Terraform uses those IDs
 to select NVIDIA and AMD panels respectively and then reflows the remaining stat
@@ -293,9 +233,10 @@ make -C terraform/files/grafana/jsonnet fmt
 make -C terraform/files/grafana/jsonnet verify
 ```
 
-`make verify` checks formatting, compiles all dashboards, compares the converted
-dashboards with their transition backups, and tests AMD-only, NVIDIA-only, and
-mixed GPU-health behavior.
+`make verify` checks formatting, compiles all dashboards, compares converted
+dashboards with the retained static repository references, and tests AMD-only,
+NVIDIA-only, and mixed GPU-health behavior. This comparison is a developer test;
+Terraform does not read the static JSON during deployment.
 
 To test the package from an isolated directory with a clean dependency install:
 
@@ -317,17 +258,3 @@ Before review, also run focused Terraform formatting and validation. Compilation
 proves that the Jsonnet evaluates; representative-cluster testing is still
 required to prove that PromQL returns the expected data and that Grafana renders
 the intended visual behavior.
-
-## Removing the transition backups
-
-After the converted dashboards have been validated across the agreed releases,
-a separate cleanup change should:
-
-1. Remove `terraform/files/grafana/legacy-dashboard-backups`.
-2. Remove the provider backup ConfigMap resources.
-3. Remove the operator backup Kustomization and transfer steps.
-4. Delete `dashboard-backup-*` ConfigMaps during the upgrade.
-5. Remove the backup verification and rollback sections from this guide.
-
-The active `dashboard-*` ConfigMap names and Jsonnet deployment path do not need
-to change during that cleanup.

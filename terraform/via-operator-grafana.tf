@@ -2,66 +2,6 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  kustomize_dashboard_backup_configmap_generator = {
-    apiVersion = "kustomize.config.k8s.io/v1beta1"
-    kind       = "Kustomization"
-    configMapGenerator = concat(
-      [for cdk, cdv in local.grafana_legacy_common_dashboards :
-        {
-          name      = "dashboard-backup-${trimsuffix(cdk, ".json")}",
-          namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${local.operator_user}/grafana/backups/dashboards/common", cdk])]
-          options = {
-            labels = {
-              grafana_dashboard_backup = "1"
-            }
-            annotations = {
-              grafana_dashboard_folder = "Kubernetes"
-              dashboard_backup_source  = "legacy-static-json"
-            }
-            disableNameSuffixHash = true
-          }
-        }
-      ],
-      local.has_amd_gpu || local.has_nvidia_gpu ?
-      [for cdk, cdv in local.grafana_legacy_gpu_dashboards :
-        {
-          name      = "dashboard-backup-${trimsuffix(cdk, ".json")}",
-          namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${local.operator_user}/grafana/backups/dashboards/gpu", cdk])]
-          options = {
-            labels = {
-              grafana_dashboard_backup = "1"
-            }
-            annotations = {
-              grafana_dashboard_folder = "GPU Nodes"
-              dashboard_backup_source  = "legacy-static-json"
-            }
-            disableNameSuffixHash = true
-          }
-        }
-      ] : [],
-      var.setup_oci_metrics_exporter ?
-      [for cdk, cdv in local.grafana_legacy_oci_dashboards :
-        {
-          name      = "dashboard-backup-${trimsuffix(cdk, ".json")}",
-          namespace = var.monitoring_namespace,
-          files     = [join("/", ["/home/${local.operator_user}/grafana/backups/dashboards/oci", cdk])]
-          options = {
-            labels = {
-              grafana_dashboard_backup = "1"
-            }
-            annotations = {
-              grafana_dashboard_folder = "OCI Metrics"
-              dashboard_backup_source  = "legacy-static-json"
-            }
-            disableNameSuffixHash = true
-          }
-        }
-      ] : [],
-    )
-  }
-
   kustomize_configmap_generator = {
     apiVersion = "kustomize.config.k8s.io/v1beta1"
     kind       = "Kustomization"
@@ -131,97 +71,6 @@ locals {
       ],
     )
   }
-}
-
-resource "null_resource" "deploy_grafana_dashboard_backups_from_operator" {
-  count = alltrue([var.install_monitoring, var.install_grafana, var.install_grafana_dashboards, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
-
-  triggers = {
-    backup_md5 = sha256(join(".", [for entry in sort(flatten([
-      local.grafana_legacy_common_dashboard_files_path,
-      local.grafana_legacy_gpu_dashboard_files_path,
-      local.grafana_legacy_oci_dashboard_files_path,
-    ])) : filemd5(entry)]))
-    namespace       = var.monitoring_namespace
-    bastion_host    = module.oke.bastion_public_ip
-    bastion_user    = local.bastion_user
-    ssh_private_key = tls_private_key.stack_key.private_key_openssh
-    operator_host   = module.oke.operator_private_ip
-    operator_user   = local.operator_user
-  }
-
-  connection {
-    bastion_host        = self.triggers.bastion_host
-    bastion_user        = self.triggers.bastion_user
-    bastion_private_key = self.triggers.ssh_private_key
-    host                = self.triggers.operator_host
-    user                = self.triggers.operator_user
-    private_key         = self.triggers.ssh_private_key
-    timeout             = "40m"
-    type                = "ssh"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "mkdir -p /home/${self.triggers.operator_user}/grafana/backups/dashboards/common",
-      "mkdir -p /home/${self.triggers.operator_user}/grafana/backups/dashboards/gpu",
-      "mkdir -p /home/${self.triggers.operator_user}/grafana/backups/dashboards/oci",
-    ]
-  }
-
-  provisioner "file" {
-    source      = "${local.grafana_legacy_common_dashboard_dir}/"
-    destination = "/home/${self.triggers.operator_user}/grafana/backups/dashboards/common"
-  }
-
-  provisioner "file" {
-    source      = "${local.grafana_legacy_gpu_dashboard_dir}/"
-    destination = "/home/${self.triggers.operator_user}/grafana/backups/dashboards/gpu"
-  }
-
-  provisioner "file" {
-    source      = "${local.grafana_legacy_oci_dashboard_dir}/"
-    destination = "/home/${self.triggers.operator_user}/grafana/backups/dashboards/oci"
-  }
-
-  provisioner "file" {
-    content     = yamlencode(local.kustomize_dashboard_backup_configmap_generator)
-    destination = "/home/${self.triggers.operator_user}/grafana/backups/kustomization.yaml"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
-      "export OCI_CLI_AUTH=instance_principal",
-      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
-      "cd /home/${self.triggers.operator_user}/grafana/backups/",
-      "kubectl apply -k .",
-    ]
-  }
-
-  provisioner "remote-exec" {
-    when = destroy
-    inline = [
-      "export PATH=$PATH:/home/${self.triggers.operator_user}/bin",
-      "export OCI_CLI_AUTH=instance_principal",
-      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
-      "cd /home/${self.triggers.operator_user}/grafana/backups/",
-      "kubectl delete -k ."
-    ]
-    on_failure = continue
-  }
-
-  lifecycle {
-    ignore_changes = [
-      triggers["bastion_host"],
-      triggers["bastion_user"],
-      triggers["ssh_private_key"],
-      triggers["operator_host"],
-      triggers["operator_user"]
-    ]
-  }
-
-  depends_on = [module.kube_prometheus_stack]
 }
 
 resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
@@ -324,5 +173,5 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
     ]
   }
 
-  depends_on = [module.kube_prometheus_stack, null_resource.deploy_grafana_dashboard_backups_from_operator, terraform_data.validate_grafana_dashboard_render]
+  depends_on = [module.kube_prometheus_stack]
 }

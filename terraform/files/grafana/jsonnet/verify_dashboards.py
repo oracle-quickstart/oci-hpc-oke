@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify generated dashboard contracts against transition backup JSON."""
+"""Verify generated dashboard contracts against retained static JSON."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 BUILD_DIR = PACKAGE_DIR / "build"
-BACKUP_DIR = PACKAGE_DIR.parent / "legacy-dashboard-backups"
+STATIC_DIR = PACKAGE_DIR.parent / "dashboards"
 CATEGORIES = ("common", "gpu", "oci")
 
 
@@ -186,13 +186,13 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
 def main() -> int:
     failures: list[str] = []
     for category in CATEGORIES:
-        backups = {path.name: path for path in (BACKUP_DIR / category).glob("*.json")}
+        static_dashboards = {path.name: path for path in (STATIC_DIR / category).glob("*.json")}
         generated = {path.name: path for path in (BUILD_DIR / category).glob("*.json")}
-        if not backups.keys() <= generated.keys():
-            failures.append(f"{category}: a backup has no generated dashboard replacement")
+        if not static_dashboards.keys() <= generated.keys():
+            failures.append(f"{category}: a static dashboard has no generated dashboard replacement")
             continue
-        for name, backup in backups.items():
-            verify_dashboard(backup, generated[name], failures)
+        for name, static_dashboard in static_dashboards.items():
+            verify_dashboard(static_dashboard, generated[name], failures)
 
     verify_gpu_vendor_contract(failures)
     if failures:

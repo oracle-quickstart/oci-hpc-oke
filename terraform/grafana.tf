@@ -7,18 +7,6 @@ locals {
   grafana_jsonnet_cache_dir = abspath("${path.root}/.terraform/grafana-jsonnet")
   grafana_jsonnet_build_dir = "${local.grafana_jsonnet_cache_dir}/rendered"
 
-  grafana_legacy_common_dashboard_dir = "${path.module}/files/grafana/legacy-dashboard-backups/common"
-  grafana_legacy_gpu_dashboard_dir    = "${path.module}/files/grafana/legacy-dashboard-backups/gpu"
-  grafana_legacy_oci_dashboard_dir    = "${path.module}/files/grafana/legacy-dashboard-backups/oci"
-
-  grafana_legacy_common_dashboard_files = fileset(local.grafana_legacy_common_dashboard_dir, "*.json")
-  grafana_legacy_gpu_dashboard_files    = fileset(local.grafana_legacy_gpu_dashboard_dir, "*.json")
-  grafana_legacy_oci_dashboard_files    = fileset(local.grafana_legacy_oci_dashboard_dir, "*.json")
-
-  grafana_legacy_common_dashboard_files_path = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_legacy_common_dashboard_files : "${local.grafana_legacy_common_dashboard_dir}/${f}"] : []
-  grafana_legacy_gpu_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? [for f in local.grafana_legacy_gpu_dashboard_files : "${local.grafana_legacy_gpu_dashboard_dir}/${f}"] : []
-  grafana_legacy_oci_dashboard_files_path    = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? [for f in local.grafana_legacy_oci_dashboard_files : "${local.grafana_legacy_oci_dashboard_dir}/${f}"] : []
-
   grafana_rendered_dashboards = try(jsondecode(data.external.grafana_dashboards[0].result.dashboards), {
     common = {}
     gpu    = {}
@@ -50,19 +38,6 @@ locals {
     })) : content
   } : {}
   grafana_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? local.grafana_oci_dashboard_sources : {}
-
-  grafana_legacy_common_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
-    for f in local.grafana_legacy_common_dashboard_files :
-    f => file("${local.grafana_legacy_common_dashboard_dir}/${f}")
-  } : {}
-  grafana_legacy_gpu_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
-    for f in local.grafana_legacy_gpu_dashboard_files :
-    f => file("${local.grafana_legacy_gpu_dashboard_dir}/${f}")
-  } : {}
-  grafana_legacy_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? {
-    for f in local.grafana_legacy_oci_dashboard_files :
-    f => file("${local.grafana_legacy_oci_dashboard_dir}/${f}")
-  } : {}
 
   grafana_alert_dir   = "${path.module}/files/grafana/alerts"
   grafana_alert_files = fileset(local.grafana_alert_dir, "*.yaml")
@@ -101,27 +76,6 @@ data "external" "grafana_dashboards" {
   query = {
     cache_dir  = local.grafana_jsonnet_cache_dir
     output_dir = local.grafana_jsonnet_build_dir
-  }
-}
-
-resource "terraform_data" "validate_grafana_dashboard_render" {
-  count = var.install_monitoring && var.install_grafana && var.install_grafana_dashboards ? 1 : 0
-
-  input = local.grafana_jsonnet_source_hash
-
-  lifecycle {
-    precondition {
-      condition     = length(setsubtract(local.grafana_legacy_common_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.common, {}))))) == 0
-      error_message = "A legacy common dashboard backup has no rendered Jsonnet replacement."
-    }
-    precondition {
-      condition     = length(setsubtract(local.grafana_legacy_gpu_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.gpu, {}))))) == 0
-      error_message = "A legacy GPU dashboard backup has no rendered Jsonnet replacement."
-    }
-    precondition {
-      condition     = length(setsubtract(local.grafana_legacy_oci_dashboard_files, toset(keys(try(local.grafana_rendered_dashboards.oci, {}))))) == 0
-      error_message = "A legacy OCI dashboard backup has no rendered Jsonnet replacement."
-    }
   }
 }
 
