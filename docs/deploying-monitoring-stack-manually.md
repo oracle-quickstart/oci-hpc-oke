@@ -1053,6 +1053,13 @@ for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
 done
 ```
 
+For a single-dashboard change on a running cluster, patch only the dashboard
+JSON in the existing ConfigMap. This preserves its labels and folder annotation
+and avoids a Terraform apply. The Grafana sidecar normally reloads the changed
+dashboard without restarting the Grafana pod. See
+[Operating and Developing Grafana Dashboards](./grafonnet-dashboards.md#update-a-running-cluster-without-terraform)
+for the compile, patch, verification, rollback, and durability workflow.
+
 Update GPU dashboards by rerunning the vendor-aware render and apply commands
 from Step 5.2. Do not apply the unfiltered GPU Health build artifact directly to
 a single-vendor cluster.

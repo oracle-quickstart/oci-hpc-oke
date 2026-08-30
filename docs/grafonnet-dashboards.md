@@ -7,7 +7,7 @@ Generated JSON is temporary and must not be committed.
 
 The previous static dashboard JSON remains unchanged under
 `terraform/files/grafana/dashboards` as a repository reference. Terraform does
-not read, copy, or deploy those files. No backup ConfigMaps are created.
+not read, copy, or deploy those files.
 
 ## Deployment sequence
 
@@ -84,8 +84,7 @@ UID, and folder annotation. Only its JSON data changes from checked-in static
 JSON to deployment-generated Jsonnet output.
 
 For example, `dashboard-gpu-metrics` retains the label
-`grafana_dashboard=1` and is loaded by the Grafana sidecar. There is no
-corresponding `dashboard-backup-gpu-metrics` deployment resource.
+`grafana_dashboard=1` and is loaded by the Grafana sidecar.
 
 Folder annotations remain:
 
@@ -118,7 +117,16 @@ For private-control-plane deployments through the operator host, Terraform:
 
 Both deployment paths produce the same active ConfigMap contract.
 
-## Operator workflow after deployment
+## Update a running cluster without Terraform
+
+A dashboard-only update does not require `terraform apply`. Compile the changed
+dashboard on a workstation, patch only the JSON value in its existing
+ConfigMap, and let the Grafana sidecar reprovision it. Patching `.data` preserves
+the ConfigMap name, `grafana_dashboard=1` label, folder annotation, and all
+other metadata managed by the deployment.
+
+This is the preferred way to validate a dashboard change in a running cluster
+before scheduling a durable stack update. It changes no cluster infrastructure.
 
 ### Verify active dashboards
 
@@ -150,38 +158,127 @@ kubectl logs \
   --tail 100
 ```
 
-### Change a dashboard in the runtime system
+### Patch one dashboard
 
-The durable operational path is to update the Jsonnet source and run the normal
-Terraform deployment. Terraform recompiles all dashboards and updates only
-ConfigMaps whose generated content changed.
-
-For an emergency experiment, an operator may compile locally and apply one
-generated JSON file to the canonical ConfigMap. Generated paths preserve the
-category:
+Compile and verify the source first. This example updates GPU Metrics:
 
 ```bash
-make -C terraform/files/grafana/jsonnet compile
+make -C terraform/files/grafana/jsonnet verify
 
+MONITORING_NAMESPACE=monitoring
 DASHBOARD_NAME=gpu-metrics
 DASHBOARD_FILE="terraform/files/grafana/jsonnet/build/gpu/${DASHBOARD_NAME}.json"
-DASHBOARD_FOLDER="GPU Nodes"
+CONFIGMAP_NAME="dashboard-${DASHBOARD_NAME}"
+CURRENT_DASHBOARD="/tmp/${DASHBOARD_NAME}-before.json"
+PATCH_FILE="$(mktemp)"
 
-kubectl create configmap "dashboard-${DASHBOARD_NAME}" \
+# Keep the currently deployed JSON locally for immediate rollback.
+kubectl get configmap "${CONFIGMAP_NAME}" \
   --namespace "${MONITORING_NAMESPACE}" \
-  --from-file="${DASHBOARD_NAME}.json=${DASHBOARD_FILE}" \
-  --dry-run=client --output yaml |
-kubectl label --filename - --local --dry-run=client --output yaml \
-  grafana_dashboard=1 |
-kubectl annotate --filename - --local --dry-run=client --output yaml \
-  "grafana_dashboard_folder=${DASHBOARD_FOLDER}" |
-kubectl apply --filename -
+  --output json |
+jq -r --arg key "${DASHBOARD_NAME}.json" '.data[$key]' \
+  > "${CURRENT_DASHBOARD}"
+
+# Change only the ConfigMap data entry. Existing labels and annotations remain.
+jq --null-input \
+  --arg key "${DASHBOARD_NAME}.json" \
+  --rawfile dashboard "${DASHBOARD_FILE}" \
+  '{data: {($key): $dashboard}}' \
+  > "${PATCH_FILE}"
+
+kubectl patch configmap "${CONFIGMAP_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --type merge \
+  --patch-file "${PATCH_FILE}"
+
+rm -f "${PATCH_FILE}"
 ```
 
-This is temporary: the next Terraform apply restores the content compiled from
-the committed Jsonnet source. Do not hot-apply raw `gpu-health-status.json` to a
-single-vendor cluster because Terraform normally performs vendor filtering and
-reflow.
+The dashboard sidecar watches ConfigMaps with `grafana_dashboard=1`, writes the
+updated file into the Grafana provisioning directory, and causes Grafana to
+reload it. A Grafana pod restart is normally unnecessary.
+
+Do not patch the raw `gpu-health-status.json` build artifact into a
+single-vendor cluster. Terraform normally filters panel ID `7` for NVIDIA and
+panel ID `23` for AMD and then reflows the remaining stat panels. Use the
+vendor-aware rendering procedure in
+`docs/deploying-monitoring-stack-manually.md`, Step 5.2, for that dashboard.
+
+### Verify the runtime update
+
+Confirm the ConfigMap contains the expected dashboard identity:
+
+```bash
+kubectl get configmap "${CONFIGMAP_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --output json |
+jq -r --arg key "${DASHBOARD_NAME}.json" '.data[$key]' |
+jq '{uid, title, panelCount: (.panels | length)}'
+```
+
+Then inspect the sidecar log and Grafana UI:
+
+```bash
+kubectl logs \
+  --namespace "${MONITORING_NAMESPACE}" \
+  statefulset/kube-prometheus-stack-grafana \
+  --container grafana-sc-dashboard \
+  --since 5m
+```
+
+If the ConfigMap is correct but the sidecar does not process it, inspect the
+sidecar logs and labels first. Restart Grafana only as a recovery step:
+
+```bash
+kubectl rollout restart \
+  statefulset/kube-prometheus-stack-grafana \
+  --namespace "${MONITORING_NAMESPACE}"
+
+kubectl rollout status \
+  statefulset/kube-prometheus-stack-grafana \
+  --namespace "${MONITORING_NAMESPACE}"
+```
+
+### Roll back the runtime update
+
+Patch the saved JSON back into the same ConfigMap:
+
+```bash
+PATCH_FILE="$(mktemp)"
+jq --null-input \
+  --arg key "${DASHBOARD_NAME}.json" \
+  --rawfile dashboard "${CURRENT_DASHBOARD}" \
+  '{data: {($key): $dashboard}}' \
+  > "${PATCH_FILE}"
+
+kubectl patch configmap "${CONFIGMAP_NAME}" \
+  --namespace "${MONITORING_NAMESPACE}" \
+  --type merge \
+  --patch-file "${PATCH_FILE}"
+
+rm -f "${PATCH_FILE}"
+```
+
+### Make the change durable
+
+A direct ConfigMap patch is intentionally a runtime override. It remains until
+another process changes or recreates that ConfigMap. The next Terraform apply
+will restore the JSON compiled from the Terraform configuration being applied.
+
+After runtime validation:
+
+1. Commit the Jsonnet change to source control and complete code review.
+2. Include it in the OKE release or Terraform configuration used by the stack.
+3. For an OCI Resource Manager stack, upload the updated Terraform
+   configuration, review a plan, and apply it during the normal maintenance
+   process.
+4. For a locally managed stack, use the updated checkout, review
+   `terraform plan`, and run `terraform apply` during the normal maintenance
+   process.
+
+There is no agent in the running cluster that pulls Jsonnet from GitHub. The
+ConfigMap patch is the low-risk validation path; the reviewed stack update is
+the durable deployment path.
 
 ### Grafana UI edits
 
@@ -191,6 +288,56 @@ targets, variables, links, and styling into Jsonnet. A later sidecar update can
 replace UI-only changes.
 
 ## Developer workflow
+
+### Download the current released source
+
+For a change intended for an existing cluster, start with the release recorded
+by that stack's `stack_version` output. Using a newer release may introduce
+unrelated differences. For development against the latest published release,
+the GitHub CLI can discover its tag. Set `RELEASE_TAG` using one of these paths:
+
+```bash
+# Existing locally managed stack
+RELEASE_TAG="$(terraform -chdir=terraform output -raw stack_version)"
+
+# Or, for development against the latest published release
+RELEASE_TAG="$(gh release view \
+  --repo oracle-quickstart/oci-hpc-oke \
+  --json tagName \
+  --jq '.tagName')"
+```
+
+For OCI Resource Manager, obtain `stack_version` from the existing stack's
+outputs. Then download that release's source archive, extract it into a new
+directory, and enter the directory:
+
+```bash
+REPOSITORY="oracle-quickstart/oci-hpc-oke"
+SOURCE_DIR="oci-hpc-oke-${RELEASE_TAG}-source"
+SOURCE_ARCHIVE="${SOURCE_DIR}.tar.gz"
+
+gh release download "${RELEASE_TAG}" \
+  --repo "${REPOSITORY}" \
+  --archive tar.gz \
+  --output "${SOURCE_ARCHIVE}"
+
+mkdir "${SOURCE_DIR}"
+tar --extract \
+  --gzip \
+  --file "${SOURCE_ARCHIVE}" \
+  --directory "${SOURCE_DIR}" \
+  --strip-components 1
+
+cd "${SOURCE_DIR}"
+```
+
+GitHub also provides a **Source code (zip)** archive on each release page. If
+using the zip, extract it with the operating system's archive tool and enter the
+single `oci-hpc-oke-*` directory it creates.
+
+A release archive has no `.git` history. It is sufficient for compiling and
+testing a runtime change. For a contribution, clone the repository, check out
+the release tag used by the cluster, and create a feature branch instead.
 
 ### Package layout
 
@@ -258,3 +405,7 @@ Before review, also run focused Terraform formatting and validation. Compilation
 proves that the Jsonnet evaluates; representative-cluster testing is still
 required to prove that PromQL returns the expected data and that Grafana renders
 the intended visual behavior.
+
+To validate against a deployed cluster without applying Terraform, follow
+**Update a running cluster without Terraform** above and patch only the changed
+dashboard ConfigMap.
