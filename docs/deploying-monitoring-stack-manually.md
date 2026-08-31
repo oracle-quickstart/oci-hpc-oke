@@ -311,16 +311,24 @@ kubectl get pods -n ${MONITORING_NAMESPACE} \
 
 ## Step 5: Deploy Custom Grafana Dashboards
 
-The repository includes pre-configured dashboards for:
+The repository includes Grafonnet dashboards for:
 - **Common**: Kubernetes API server, CoreDNS, Kubelet, Pods, PVs, Prometheus, Scheduling
 - **GPU**: Cluster metrics, Command Center, GPU health, GPU metrics, and host metrics for AMD and NVIDIA clusters
+
+Compile the Jsonnet sources before creating ConfigMaps. Generated JSON is
+temporary and remains under the ignored `build` directory:
+
+```bash
+make -C terraform/files/grafana/jsonnet verify
+DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
+```
+
+The static JSON under `terraform/files/grafana/dashboards` is retained in the
+repository for comparison only. Do not create ConfigMaps from it.
 
 ### 5.1 Deploy Kubernetes Dashboards
 
 ```bash
-# Set the path to the dashboards directory (adjust if needed)
-DASHBOARD_PATH="terraform/files/grafana/dashboards"
-
 # Deploy each common dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
@@ -1026,11 +1034,13 @@ helm upgrade oke-ons-webhook terraform/files/oke-ons-webhook \
 
 ### Update Dashboards and Alerts
 
-Dashboards and alerts are deployed as ConfigMaps, not Helm releases. Re-running the `kubectl apply` loops will update them in place:
+Dashboards and alerts are deployed as ConfigMaps, not Helm releases. Recompile
+the Jsonnet source and rerun the `kubectl apply` loops to update them in place:
 
 ```bash
 # Update common dashboards
-DASHBOARD_PATH="terraform/files/grafana/dashboards"
+make -C terraform/files/grafana/jsonnet verify
+DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
 
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
@@ -1041,18 +1051,18 @@ for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
   kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="Kubernetes" | \
   kubectl apply -f -
 done
-
-# Update AMD/NVIDIA GPU dashboards (if applicable)
-for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
-  kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
-    --from-file="$(basename "$dashboard")=${dashboard}" \
-    --namespace ${MONITORING_NAMESPACE} \
-    --dry-run=client -o yaml | \
-  kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 | \
-  kubectl annotate -f - --dry-run=client -o yaml --local grafana_dashboard_folder="GPU Nodes" | \
-  kubectl apply -f -
-done
 ```
+
+For a single-dashboard change on a running cluster, patch only the dashboard
+JSON in the existing ConfigMap. This preserves its labels and folder annotation
+and avoids a Terraform apply. The Grafana sidecar normally reloads the changed
+dashboard without restarting the Grafana pod. See
+[Operating and Developing Grafana Dashboards](./grafonnet-dashboards.md#update-a-running-cluster-without-terraform)
+for the compile, patch, verification, rollback, and durability workflow.
+
+Update GPU dashboards by rerunning the vendor-aware render and apply commands
+from Step 5.2. Do not apply the unfiltered GPU Health build artifact directly to
+a single-vendor cluster.
 
 Update alert rules by rerunning the vendor-aware loop from Step 6.1.
 

@@ -43,6 +43,7 @@ Engine (OKE). For deployment and project overview, see the
 - [Running GPU & RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md): Continuous GPU and RDMA health checks via Node Problem Detector.
 - [Running ib_write_bw Tests Between Nodes](./running-ib-write-bw-test.md): Run ib_write_bw RDMA bandwidth tests between nodes.
 - [Manual Deployment: Prometheus & Grafana Stack](./deploying-monitoring-stack-manually.md): Manually deploy the Prometheus and Grafana monitoring stack with dashboards and alerts.
+- [Operating and Developing Grafana Dashboards](./grafonnet-dashboards.md): Understand deployment-time provisioning, update dashboards in a running cluster, and develop durable Grafonnet changes.
 
 ## Security advisories
 
