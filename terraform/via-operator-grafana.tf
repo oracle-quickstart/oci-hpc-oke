@@ -74,10 +74,11 @@ locals {
 }
 
 resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
-  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
+  count = alltrue([var.install_monitoring, var.install_grafana, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_operator]) ? 1 : 0
 
   triggers = {
-    manifest_md5      = sha256(join(".", [for entry in sort(flatten([local.grafana_common_dashboard_files_path, local.grafana_gpu_dashboard_files_path, local.grafana_oci_dashboard_files_path, local.grafana_alert_files_path])) : filemd5(entry)]))
+    manifest_md5      = sha256(join(".", [for entry in sort(local.grafana_alert_files_path) : filemd5(entry)]))
+    jsonnet_source    = local.grafana_jsonnet_source_hash
     gpu_dashboard_md5 = sha256(join(".", [for name in sort(keys(local.grafana_gpu_dashboards)) : md5(local.grafana_gpu_dashboards[name])]))
     dashboard_layout  = "gpu"
     namespace         = var.monitoring_namespace
@@ -110,12 +111,12 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   }
 
   provisioner "file" {
-    source      = "${local.grafana_common_dashboard_dir}/"
+    source      = "${local.grafana_jsonnet_build_dir}/common/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/common"
   }
 
   provisioner "file" {
-    source      = "${local.grafana_gpu_dashboard_dir}/"
+    source      = "${local.grafana_jsonnet_build_dir}/gpu/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu"
   }
 
@@ -125,7 +126,7 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
   }
 
   provisioner "file" {
-    source      = "${local.grafana_oci_dashboard_dir}/"
+    source      = "${local.grafana_jsonnet_build_dir}/oci/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/oci"
   }
 
