@@ -337,9 +337,27 @@ def _remove_stale_mounts(desired_uids: set[str]) -> None:
     host_root = Path("/host", os.environ["HOST_MOUNT_ROOT"].lstrip("/"))
     if not host_root.exists():
         return
-    for path in host_root.iterdir():
-        if not path.is_dir() or path.name in desired_uids:
+    try:
+        mount_paths = list(host_root.iterdir())
+    except OSError as exc:
+        LOG.warning("could not list peer mount root %s: %s", host_root, exc)
+        return
+    for path in mount_paths:
+        # A desired peer is retained regardless of whether a transient NFS I/O
+        # error prevents pathlib from statting its mount point.
+        if path.name in desired_uids:
             continue
+        try:
+            if not path.is_dir():
+                continue
+        except OSError as exc:
+            # A stale NFS mount can return EIO on stat. It must not prevent the
+            # rest of reconciliation from publishing the node's ready status.
+            LOG.warning(
+                "could not inspect stale peer mount %s: %s; attempting lazy unmount",
+                path.name,
+                exc,
+            )
         try:
             _host_command(
                 ["umount", "-l", str(Path(os.environ["HOST_MOUNT_ROOT"], path.name))],

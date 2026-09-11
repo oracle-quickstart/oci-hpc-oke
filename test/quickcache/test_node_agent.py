@@ -146,6 +146,32 @@ class NodeAgentPathTests(unittest.TestCase):
             timeout=7,
         )
 
+    def test_unreadable_stale_mount_is_lazily_unmounted(self):
+        host_root = mock.Mock()
+        host_root.exists.return_value = True
+        stale_mount = mock.Mock()
+        stale_mount.name = "stale-peer"
+        stale_mount.is_dir.side_effect = OSError(5, "Input/output error")
+        host_root.iterdir.return_value = [stale_mount]
+
+        def path_factory(*parts):
+            if parts == ("/host", "var/lib/ociqc/mounts"):
+                return host_root
+            return Path(*parts)
+
+        environment = {"HOST_MOUNT_ROOT": "/var/lib/ociqc/mounts"}
+        with (
+            mock.patch.dict(node_agent.os.environ, environment, clear=False),
+            mock.patch.object(node_agent, "Path", side_effect=path_factory),
+            mock.patch.object(node_agent, "_host_command") as host_command,
+        ):
+            node_agent._remove_stale_mounts(set())
+
+        host_command.assert_called_once_with(
+            ["umount", "-l", "/var/lib/ociqc/mounts/stale-peer"], timeout=30
+        )
+        stale_mount.rmdir.assert_called_once_with()
+
     def test_shard_map_changes_are_appended_to_the_host_audit_log(self):
         environment = {
             "NODE_NAME": "worker-a",

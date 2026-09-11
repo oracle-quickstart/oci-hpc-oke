@@ -1,0 +1,153 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quickcache-latency-test
+  labels:
+    app: quickcache-latency-test
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: quickcache-latency-test
+    spec:
+      restartPolicy: Never
+      securityContext:
+        supplementalGroups: [1500]
+      nodeSelector:
+        oci-hpc-oke.oracle.com/quickcache-ready: "true"
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: latency-test
+          image: ghcr.io/astral-sh/uv:0.7.12-python3.12-bookworm-slim
+          command: ["uv", "run", "--with", "boto3", "python", "-c"]
+          args:
+            - |
+              import json
+              import os
+              import statistics
+              import time
+
+              import boto3
+              from botocore.config import Config
+
+              prefix = os.environ.get("S3_PREFIX", "qc/")
+              warm_passes = int(os.environ.get("QC_WARM_PASSES", "1"))
+              if warm_passes < 1:
+                  raise ValueError("QC_WARM_PASSES must be at least 1")
+
+              client = boto3.client(
+                  "s3",
+                  endpoint_url=os.environ["S3_ENDPOINT_URL"],
+                  region_name=os.environ["AWS_DEFAULT_REGION"],
+                  config=Config(
+                      signature_version="s3v4",
+                      s3={"addressing_style": "path"},
+                      request_checksum_calculation="when_required",
+                      response_checksum_validation="when_required",
+                  ),
+              )
+              bucket = os.environ["S3_BUCKET"]
+              paginator = client.get_paginator("list_objects_v2")
+              keys = [
+                  entry["Key"]
+                  for page in paginator.paginate(Bucket=bucket, Prefix=prefix)
+                  for entry in page.get("Contents", [])
+              ]
+              if not keys:
+                  raise ValueError(f"no objects found in s3://{bucket}/{prefix}")
+              print(f"objects={len(keys)} prefix=s3://{bucket}/{prefix}")
+
+              def read_once(key):
+                  started = time.perf_counter()
+                  response = client.get_object(Bucket=bucket, Key=key)
+                  from_cache = bool(getattr(response["Body"], "from_cache", False))
+                  first_byte = response["Body"].read(1)
+                  ttfb_ms = (time.perf_counter() - started) * 1000
+                  remainder = response["Body"].read()
+                  response["Body"].close()
+                  return {
+                      "key": key,
+                      "from_cache": from_cache,
+                      "bytes": len(first_byte) + len(remainder),
+                      "ttfb_ms": round(ttfb_ms, 3),
+                      "full_read_ms": round((time.perf_counter() - started) * 1000, 3),
+                  }
+
+              def aggregate(entries):
+                  ttfb = [entry["ttfb_ms"] for entry in entries]
+                  full = [entry["full_read_ms"] for entry in entries]
+                  return {
+                      "reads": len(entries),
+                      "cache_hits": sum(entry["from_cache"] for entry in entries),
+                      "bytes": sum(entry["bytes"] for entry in entries),
+                      "ttfb_ms": {
+                          "min": min(ttfb),
+                          "p50": round(statistics.median(ttfb), 3),
+                          "max": max(ttfb),
+                      },
+                      "full_read_ms": {
+                          "min": min(full),
+                          "p50": round(statistics.median(full), 3),
+                          "max": max(full),
+                      },
+                  }
+
+              first_pass = [read_once(key) for key in keys]
+              warm_results = [read_once(key) for _ in range(warm_passes) for key in keys]
+              first_summary = aggregate(first_pass)
+              warm_summary = aggregate(warm_results)
+              summary = {
+                  "prefix": f"s3://{bucket}/{prefix}",
+                  "objects": len(keys),
+                  "first_pass": first_summary,
+                  "warm_passes": warm_passes,
+                  "warm_pass": warm_summary,
+              }
+              print(json.dumps(summary, indent=2, sort_keys=True))
+              if first_summary["cache_hits"]:
+                  print("WARNING: some first-pass reads were already cached; use a new S3_PREFIX for a cold-pass measurement")
+              if warm_summary["cache_hits"] != warm_summary["reads"]:
+                  raise AssertionError("not every warm-pass read was served by QuickCache")
+          envFrom:
+            - secretRef:
+                name: quickcache-s3
+          env:
+            - name: S3_PREFIX
+              value: qc/
+            - name: QC_WARM_PASSES
+              value: "1"
+            - name: PYTHONPATH
+              value: /opt/ociqc
+            - name: OCI_QC_ENV_PATH
+              value: /etc/ociqc/env.json
+          volumeMounts:
+            - name: quickcache-runtime
+              mountPath: /opt/ociqc
+              readOnly: true
+            - name: quickcache-config
+              mountPath: /etc/ociqc
+              readOnly: true
+            - name: quickcache-peers
+              mountPath: /var/lib/ociqc/mounts
+              mountPropagation: HostToContainer
+            - name: quickcache-logs
+              mountPath: /var/log/ociqc
+      volumes:
+        - name: quickcache-runtime
+          hostPath:
+            path: /var/lib/ociqc/runtime
+            type: Directory
+        - name: quickcache-config
+          hostPath:
+            path: /var/lib/ociqc/config
+            type: Directory
+        - name: quickcache-peers
+          hostPath:
+            path: /var/lib/ociqc/mounts
+            type: Directory
+        - name: quickcache-logs
+          hostPath:
+            path: /var/lib/ociqc/logs
+            type: Directory
