@@ -253,7 +253,7 @@ data "oci_core_image" "operator_selected" {
 
 module "oke" {
   source  = "oracle-terraform-modules/oke/oci"
-  version = "5.5.0"
+  version = "5.5.1"
 
   providers = { oci.home = oci.home }
 
