@@ -161,11 +161,18 @@ done
 # exit 15 (ISCSI_ERR_SESS_EXISTS) and is treated as a hard failure, leaving
 # StatefulSet pods stuck in PodInitializing. Force logout on each node so the
 # CSI driver can re-login cleanly on the next NodeStageVolume call.
-echo "  Clearing stale iSCSI sessions on each node..."
+# Newer CSI drivers (Kubernetes 1.36 and later) re-stage volumes with the
+# boot-time session. Logging out under a mounted volume takes it offline, so
+# only clear sessions on nodes that have no CSI mounts.
+echo "  Clearing stale iSCSI sessions on nodes without CSI mounts..."
 CSI_PODS=$(kubectl get pod -n kube-system -l app=csi-oci-node \
   -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}')
 while IFS=$'\t' read -r csi_pod node_name; do
   [ -z "$csi_pod" ] && continue
+  if kubectl exec -n kube-system "$csi_pod" -- grep -q 'kubernetes.io~csi' /proc/mounts 2>/dev/null; then
+    echo "    $node_name: CSI volumes mounted, keeping iSCSI sessions"
+    continue
+  fi
   if kubectl exec -n kube-system "$csi_pod" -- iscsiadm -m node -u >/dev/null 2>&1; then
     echo "    $node_name: iSCSI sessions logged out"
   else
