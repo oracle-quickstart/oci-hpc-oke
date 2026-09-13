@@ -4,6 +4,10 @@ Guides for deploying and operating GPU and RDMA workloads on Oracle Kubernetes
 Engine (OKE). For deployment and project overview, see the
 [main README](../README.md).
 
+## Architecture
+
+- [Architecture and Sequence Diagrams](./architecture-sequence-diagram.md): Source-backed provisioning, worker bootstrap, scheduling, monitoring, and teardown flows.
+
 ## Cluster access and operations
 
 - [Accessing a Private OKE Cluster via OCI Bastion Service](./accessing-private-oke-cluster-via-oci-bastion-service.md): Reach a private cluster's API server through the OCI Bastion service.
