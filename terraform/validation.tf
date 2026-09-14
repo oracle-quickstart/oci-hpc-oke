@@ -189,7 +189,7 @@ locals {
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
 
-  invalid_gpu_operator_without_nfd     = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
+  invalid_gpu_operator_without_nfd     = local.deploy_nvidia_gpu_operator_addon && !var.deploy_node_feature_discovery
   invalid_network_operator_without_nfd = var.deploy_nvidia_network_operator && !var.deploy_node_feature_discovery
   invalid_nvidia_dra_without_nfd       = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
 }

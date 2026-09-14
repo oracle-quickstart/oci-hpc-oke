@@ -1566,7 +1566,7 @@ variables:
   deploy_nvidia_gpu_operator:
     title: Install NVIDIA GPU Operator add-on
     type: boolean
-    description: Install the NVIDIA GPU Operator OKE add-on. Requires the Node Feature Discovery add-on.
+    description: Install the NVIDIA GPU Operator OKE add-on for enabled NVIDIA pools. Requires the Node Feature Discovery add-on.
     default: true
     visible:
       - deploy_node_feature_discovery

@@ -253,7 +253,7 @@ module "node_problem_detector_nvidia" {
 
 
 resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
-  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.deploy_nvidia_gpu_operator, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true", local.has_nvidia_gpu]) ? 1 : 0
+  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_nvidia_gpu_operator_addon, lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true"]) ? 1 : 0
 
   triggers = {
     manifest_md5    = md5(local.nvidia_dcgm_exporter_service_monitor_manifest)

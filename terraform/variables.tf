@@ -483,7 +483,7 @@ variable "deploy_node_feature_discovery" {
 variable "deploy_nvidia_gpu_operator" {
   type        = bool
   default     = true
-  description = "Deploy the NvidiaGpuOperator OKE addon."
+  description = "Deploy the NvidiaGpuOperator OKE addon for enabled NVIDIA worker pools."
 }
 
 variable "nvidia_gpu_operator_advanced_options" {
