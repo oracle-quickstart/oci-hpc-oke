@@ -186,7 +186,10 @@ module "kube_prometheus_stack" {
       } : {})
     }
   ) : ""
-  depends_on = [module.ingress]
+  # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
+  # admission hook Jobs fail with "no endpoints available for service
+  # kueue-webhook-service" while Kueue is still starting.
+  depends_on = [module.ingress, module.kueue]
 }
 
 

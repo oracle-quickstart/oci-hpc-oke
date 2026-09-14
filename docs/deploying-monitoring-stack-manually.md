@@ -1285,6 +1285,31 @@ kubectl logs -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=oke-ons-webhoo
 - Check logs for any authentication errors
 - Verify `GRAFANA_INITIAL_PASSWORD` is correct and base64-encoded
 
+### Terraform Apply Fails With "cannot re-use a name that is still in use"
+
+**Issue**: A Terraform apply that installs `kube-prometheus-stack` fails. One known cause is the Kueue webhook rejecting the chart's admission hook Job with `no endpoints available for service "kueue-webhook-service"`. The next apply then fails with:
+
+```
+Error: cannot re-use a name that is still in use
+```
+
+**Cause**: The Helm provider does not save a release with a failed status to the Terraform state. Helm keeps the failed release. The next apply tries to install a new release with the same name.
+
+This applies to local and OCI Resource Manager deployments, which use the Helm provider. Operator-based deployments use `helm upgrade --install`, which can retry the failed release.
+
+**Solution**:
+1. Confirm that the release is in the failed state:
+   ```bash
+   helm list -n ${MONITORING_NAMESPACE} --failed
+   ```
+2. Uninstall the failed release:
+   ```bash
+   helm uninstall kube-prometheus-stack -n ${MONITORING_NAMESPACE} --wait --timeout 5m
+   ```
+3. Run the Terraform apply again.
+
+For Resource Manager stacks with a private cluster, run the `helm` commands from the operator host.
+
 ## Cleanup
 
 To remove the entire monitoring stack:

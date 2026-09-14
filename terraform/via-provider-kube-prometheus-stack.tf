@@ -3,9 +3,14 @@
 
 resource "helm_release" "prometheus" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
+  # admission hook Jobs fail with "no endpoints available for service
+  # kueue-webhook-service" while Kueue is still starting.
   depends_on = [
     helm_release.ingress,
-    time_sleep.wait_for_ingress_lb
+    time_sleep.wait_for_ingress_lb,
+    helm_release.kueue,
+    kubectl_manifest.kueue_webhook_probe,
   ]
   namespace  = var.monitoring_namespace
   name       = "kube-prometheus-stack"
