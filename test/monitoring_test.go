@@ -19,11 +19,10 @@ func TestMonitoring(t *testing.T) {
 	options := newTerraformOptions(t, map[string]interface{}{
 		"install_monitoring": true,
 		"install_node_problem_detector_kube_prometheus_stack": true,
-		"install_grafana":                     true,
-		"install_grafana_dashboards":          true,
-		"install_amd_device_metrics_exporter": false,
-		"preferred_kubernetes_services":       "internal",
-		"setup_alerting":                      false,
+		"install_grafana":               true,
+		"install_grafana_dashboards":    true,
+		"preferred_kubernetes_services": "internal",
+		"setup_alerting":                false,
 	})
 
 	defer terraform.Destroy(t, options)
