@@ -11,7 +11,7 @@ This guide provides step-by-step instructions to deploy the same Prometheus and 
 - [Step 1: Prepare Your Environment](#step-1-prepare-your-environment)
 - [Step 2: Deploy kube-prometheus-stack](#step-2-deploy-kube-prometheus-stack)
 - [Step 3: Deploy NVIDIA DCGM Exporter ServiceMonitor](#step-3-deploy-nvidia-dcgm-exporter-servicemonitor)
-- [Step 3b: Deploy AMD Device Metrics Exporter](#step-3b-deploy-amd-device-metrics-exporter)
+- [Step 3b: Deploy AMD Device Metrics Exporter ServiceMonitor](#step-3b-deploy-amd-device-metrics-exporter-servicemonitor)
 - [Step 4: Deploy Node Problem Detector](#step-4-deploy-node-problem-detector)
 - [Step 5: Deploy Custom Grafana Dashboards](#step-5-deploy-custom-grafana-dashboards)
 - [Step 6: Deploy Grafana Alert Rules](#step-6-deploy-grafana-alert-rules)
@@ -29,7 +29,7 @@ This deployment includes:
 
 - **kube-prometheus-stack**: Complete monitoring solution with Prometheus, Grafana, and exporters
 - **NVIDIA DCGM Exporter**: GPU metrics collection for NVIDIA GPUs
-- **AMD Device Metrics Exporter**: GPU metrics collection for AMD GPUs (MI300X and MI355X)
+- **AMD Device Metrics Exporter ServiceMonitor**: Prometheus scrape configuration for the exporter deployed by the AMD GPU Operator addon (MI300X and MI355X)
 - **Node Problem Detector**: Custom health checks for GPU, RDMA, and PCIe issues
 - **Custom Dashboards**: Pre-configured dashboards for Kubernetes, GPU nodes (NVIDIA/AMD), and cluster metrics
 - **Alert Rules**: Grafana alert rules for GPU health, RDMA issues, and node problems
@@ -212,49 +212,42 @@ kubectl get servicemonitor -n gpu-operator nvidia-dcgm-exporter-oke
 kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ```
 
-## Step 3b: Deploy AMD Device Metrics Exporter
+## Step 3b: Deploy AMD Device Metrics Exporter ServiceMonitor
 
-**Note**: This step is required for AMD MI300X and MI355X nodes. Skip it on NVIDIA-only clusters.
+**Note**: This step is only required if you have AMD MI300X or MI355X nodes in your cluster with the AmdGpuOperator OKE addon enabled. The AMD GPU Operator addon deploys the device metrics exporter DaemonSet automatically in the `kube-amd-gpu` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
 
-### 3b.1 Add AMD Device Metrics Exporter Helm Repository
+### 3b.1 Configure the Metric Prefix
+
+The GPU dashboards query `amd_gpu_*` metrics. The exporter emits `gpu_*` metrics unless a ConfigMap sets the prefix. The Terraform stack creates this ConfigMap and references it from the addon. For an addon that was created outside this Terraform stack, create the ConfigMap:
 
 ```bash
-# Add AMD Device Metrics Exporter Helm repository
-helm repo add amd-device-metrics-exporter https://rocm.github.io/device-metrics-exporter
-
-# Update repositories
-helm repo update
+kubectl apply -f terraform/files/amd-device-metrics-exporter/metrics-config.yaml
 ```
 
-### 3b.2 Review and Customize Values
-
-The values file is located at `terraform/files/amd-device-metrics-exporter/values.yaml`. Key configurations:
-
-- **ServiceMonitor**: Enabled with relabelings for OCI-specific labels
-- **Node affinity**: Targets `BM.GPU.MI300X.8`, `BM.GPU.MI355X-v1.8`, and `BM.GPU.MI355X.8`
-- **Tolerations**: Configured to run on GPU nodes with taints
-- **Service**: Exposes metrics on port 5000
-- **Image**: Uses `docker.io/rocm/device-metrics-exporter:v1.5.0`
-
-### 3b.3 Install AMD Device Metrics Exporter
+Then set `metricsExporter.config.name` to `metrics-config` in the addon configuration. See the [AMD GPU Operator configuration arguments](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/configuration-arguments-amd-gpu-operator.htm). Verify the reference:
 
 ```bash
-helm upgrade --install amd-device-metrics-exporter \
-  amd-device-metrics-exporter/device-metrics-exporter-charts \
-  --version v1.5.0 \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/amd-device-metrics-exporter/values.yaml \
-  --wait
+kubectl get deviceconfigs.amd.com -n kube-amd-gpu -o jsonpath='{.items[0].spec.metricsExporter.config.name}'
 ```
 
-### 3b.4 Verify AMD Device Metrics Exporter
+### 3b.2 Locate the ServiceMonitor Manifest
+
+The ServiceMonitor manifest is available at `terraform/files/amd-device-metrics-exporter/service-monitor.yaml`.
+
+### 3b.3 Apply the ServiceMonitor
 
 ```bash
-# Check if AMD device metrics exporter pods are running on GPU nodes
-kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=device-metrics-exporter
+kubectl apply -f terraform/files/amd-device-metrics-exporter/service-monitor.yaml
+```
 
+### 3b.4 Verify the ServiceMonitor
+
+```bash
 # Verify ServiceMonitor is created
-kubectl get servicemonitor -n ${MONITORING_NAMESPACE} device-metrics-exporter
+kubectl get servicemonitor -n kube-amd-gpu amd-device-metrics-exporter-oke
+
+# Check device metrics exporter pods are running (deployed by AMD GPU Operator)
+kubectl get pods -n kube-amd-gpu -l app.kubernetes.io/name=metrics-exporter
 ```
 
 ## Step 4: Deploy Node Problem Detector
@@ -858,7 +851,7 @@ kubectl get secret -n ${MONITORING_NAMESPACE} kube-prometheus-stack-grafana \
 2. Open http://localhost:9090/targets and verify all targets are UP:
    - node-exporter
    - nvidia-dcgm-exporter (if NVIDIA GPUs, in gpu-operator namespace)
-   - device-metrics-exporter (if AMD GPUs)
+   - amd-device-metrics-exporter-oke (if AMD GPUs, in kube-amd-gpu namespace)
    - node-problem-detector
    - kubelet
    - kube-state-metrics
@@ -917,7 +910,6 @@ You have two options:
    ```bash
    # Remove monitoring resources from Terraform state
    terraform state rm 'helm_release.prometheus[0]'
-   terraform state rm 'helm_release.amd_device_metrics_exporter[0]'
    terraform state rm 'helm_release.node_problem_detector_amd[0]'
    terraform state rm 'helm_release.node_problem_detector_nvidia[0]'
    terraform state rm 'helm_release.oke-ons-webhook[0]'
@@ -976,17 +968,12 @@ The DCGM exporter DaemonSet is managed by the NvidiaGpuOperator OKE addon. To up
 kubectl apply -f terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml
 ```
 
-### Update AMD Device Metrics Exporter
+### Update AMD Device Metrics Exporter ServiceMonitor
+
+The device metrics exporter DaemonSet is managed by the AmdGpuOperator OKE addon. To update the ServiceMonitor:
 
 ```bash
-helm repo update
-
-helm upgrade amd-device-metrics-exporter \
-  amd-device-metrics-exporter/device-metrics-exporter-charts \
-  --version v1.5.0 \
-  --namespace ${MONITORING_NAMESPACE} \
-  --values terraform/files/amd-device-metrics-exporter/values.yaml \
-  --wait
+kubectl apply -f terraform/files/amd-device-metrics-exporter/service-monitor.yaml
 ```
 
 ### Update Node Problem Detector
@@ -1083,7 +1070,7 @@ helm rollback kube-prometheus-stack -n monitoring
 helm rollback kube-prometheus-stack 1 -n monitoring
 ```
 
-The same `helm history` and `helm rollback` commands work for all Helm-managed components, including `gpu-rdma-node-problem-detector-amd`, `gpu-rdma-node-problem-detector-nvidia`, `oke-ons-webhook`, and `amd-device-metrics-exporter`.
+The same `helm history` and `helm rollback` commands work for all Helm-managed components, including `gpu-rdma-node-problem-detector-amd`, `gpu-rdma-node-problem-detector-nvidia`, and `oke-ons-webhook`.
 
 ### Verify the Update
 
@@ -1158,25 +1145,29 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
 **Issue**: AMD GPU metrics are not showing in Prometheus
 
 **Solution**:
-1. Verify AMD device metrics exporter pods are running on GPU nodes:
+1. Verify device metrics exporter pods are running on GPU nodes (deployed by AMD GPU Operator):
    ```bash
-   kubectl get pods -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=device-metrics-exporter -o wide
+   kubectl get pods -n kube-amd-gpu -l app.kubernetes.io/name=metrics-exporter -o wide
    ```
 
 2. Check if ServiceMonitor exists:
    ```bash
-   kubectl get servicemonitor -n ${MONITORING_NAMESPACE} device-metrics-exporter
+   kubectl get servicemonitor -n kube-amd-gpu amd-device-metrics-exporter-oke
    ```
 
-3. Verify GPU nodes have the correct instance type label:
+3. Verify GPU nodes have the label:
    ```bash
-   kubectl get nodes -L node.kubernetes.io/instance-type | \
-     grep -E 'BM.GPU.MI300X.8|BM.GPU.MI355X-v1.8|BM.GPU.MI355X.8'
+   kubectl get nodes -l feature.node.kubernetes.io/amd-gpu=true
    ```
 
 4. Check pod logs for any errors:
    ```bash
-   kubectl logs -n ${MONITORING_NAMESPACE} -l app.kubernetes.io/name=device-metrics-exporter
+   kubectl logs -n kube-amd-gpu -l app.kubernetes.io/name=metrics-exporter
+   ```
+
+5. Verify the metric prefix. Metrics named `gpu_*` instead of `amd_gpu_*` mean the addon does not reference the `metrics-config` ConfigMap (see Step 3b.1):
+   ```bash
+   kubectl get deviceconfigs.amd.com -n kube-amd-gpu -o jsonpath='{.items[0].spec.metricsExporter.config.name}'
    ```
 
 ### Alerts Not Firing
@@ -1328,8 +1319,8 @@ helm uninstall gpu-rdma-node-problem-detector-nvidia -n ${MONITORING_NAMESPACE}
 # Delete DCGM Exporter ServiceMonitor (if deployed)
 kubectl delete servicemonitor nvidia-dcgm-exporter-oke -n gpu-operator --ignore-not-found
 
-# Uninstall AMD Device Metrics Exporter (if deployed)
-helm uninstall amd-device-metrics-exporter -n ${MONITORING_NAMESPACE}
+# Delete AMD Device Metrics Exporter ServiceMonitor (if deployed)
+kubectl delete servicemonitor amd-device-metrics-exporter-oke -n kube-amd-gpu --ignore-not-found
 
 # Uninstall OKE ONS Webhook (if deployed)
 helm uninstall oke-ons-webhook -n ${MONITORING_NAMESPACE}

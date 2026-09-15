@@ -130,6 +130,25 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "larger power-of-two",
 	},
+	{
+		name: "AmdGpuOperatorRequiresNfd",
+		vars: map[string]interface{}{
+			"worker_gpu_enabled":            true,
+			"worker_gpu_shape":              "BM.GPU.MI300X.8",
+			"deploy_node_feature_discovery": false,
+			"deploy_nvidia_gpu_operator":    false,
+		},
+		expectedError: "AMD GPU Operator addon requires Node Feature Discovery",
+	},
+	{
+		name: "AmdGpuOperatorRequiresKubernetes134",
+		vars: map[string]interface{}{
+			"worker_gpu_enabled": true,
+			"worker_gpu_shape":   "BM.GPU.MI300X.8",
+			"kubernetes_version": "v1.33.1",
+		},
+		expectedError: "AMD GPU Operator addon requires Kubernetes 1.34",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests

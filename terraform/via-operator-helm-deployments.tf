@@ -319,33 +319,71 @@ resource "null_resource" "nvidia_dcgm_exporter_service_monitor" {
 }
 
 
-module "amd_device_metrics_exporter" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, var.install_amd_device_metrics_exporter && ((var.worker_rdma_enabled && contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) || (var.worker_gpu_enabled && contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape)))]) ? 1 : 0
-  source = "./helm-module"
+resource "null_resource" "amd_device_metrics_exporter_service_monitor" {
+  count = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_amd_gpu_operator_addon, local.amd_device_metrics_exporter_enabled]) ? 1 : 0
 
-  bastion_host    = module.oke.bastion_public_ip
-  bastion_user    = local.bastion_user
-  operator_host   = module.oke.operator_private_ip
-  operator_user   = local.operator_user
-  ssh_private_key = tls_private_key.stack_key.private_key_openssh
+  triggers = {
+    manifest_md5    = md5(local.amd_device_metrics_exporter_service_monitor_manifest)
+    namespace       = local.amd_gpu_operator_namespace
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
 
-  deployment_name     = "amd-device-metrics-exporter"
-  helm_chart_name     = "device-metrics-exporter-charts"
-  namespace           = var.monitoring_namespace
-  helm_repository_url = "https://rocm.github.io/device-metrics-exporter"
-  helm_chart_version  = var.amd_device_metrics_exporter_chart_version
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
 
-  pre_deployment_commands = [
-    "export PATH=$PATH:/home/${local.operator_user}/bin",
-    "export OCI_CLI_AUTH=instance_principal"
+  provisioner "file" {
+    content     = local.amd_device_metrics_exporter_service_monitor_manifest
+    destination = "/tmp/amd-device-metrics-exporter-service-monitor.yaml"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export PATH=\"$PATH:/usr/local/bin:/home/${local.operator_user}/bin\"",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl apply -f /tmp/amd-device-metrics-exporter-service-monitor.yaml",
+      "rm -f /tmp/amd-device-metrics-exporter-service-monitor.yaml",
+    ]
+  }
+
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "set -e",
+      "export PATH=\"$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin\"",
+      "export OCI_CLI_AUTH=instance_principal",
+      "kubectl delete servicemonitor amd-device-metrics-exporter-oke -n ${self.triggers.namespace} --ignore-not-found",
+    ]
+    on_failure = continue
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [
+    module.oke,
+    module.kube_prometheus_stack,
+    oci_containerengine_addon.amd_gpu_operator,
   ]
-  deployment_extra_args    = ["--force", "--dependency-update", "--history-max 1"]
-  post_deployment_commands = []
-
-  helm_template_values_override = file("${path.module}/files/amd-device-metrics-exporter/values.yaml")
-  helm_user_values_override     = ""
-
-  depends_on = [module.kube_prometheus_stack]
 }
 
 

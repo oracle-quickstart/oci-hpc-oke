@@ -1,19 +1,15 @@
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
-resource "helm_release" "amd_device_metrics_exporter" {
-  count             = alltrue([var.install_monitoring, var.install_amd_device_metrics_exporter && ((var.worker_rdma_enabled && contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_rdma_shape)) || (var.worker_gpu_enabled && contains(["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"], var.worker_gpu_shape))), var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
-  depends_on        = [helm_release.prometheus]
-  namespace         = var.monitoring_namespace
-  name              = "amd-device-metrics-exporter"
-  chart             = "device-metrics-exporter-charts"
-  repository        = "https://rocm.github.io/device-metrics-exporter"
-  version           = var.amd_device_metrics_exporter_chart_version
-  values            = ["${file("${path.module}/files/amd-device-metrics-exporter/values.yaml")}"]
-  create_namespace  = false
-  recreate_pods     = true
-  force_update      = true
-  dependency_update = true
-  wait              = false
-  max_history       = 1
+resource "kubectl_manifest" "amd_device_metrics_exporter_service_monitor" {
+  count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_amd_gpu_operator_addon, local.amd_device_metrics_exporter_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  yaml_body = local.amd_device_metrics_exporter_service_monitor_manifest
+
+  depends_on = [
+    module.oke,
+    helm_release.prometheus,
+    oci_containerengine_addon.amd_gpu_operator,
+    data.oci_resourcemanager_private_endpoint_reachable_ip.oke,
+  ]
 }

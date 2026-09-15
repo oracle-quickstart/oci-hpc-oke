@@ -29,6 +29,7 @@ locals {
         var.install_kueue,
         var.install_oci_hpc_oke_utils,
         var.install_nvidia_dra_driver,
+        local.configure_amd_device_metrics,
         local.deploy_nccl_rccl_param_configmap,
       ])
     ]),
