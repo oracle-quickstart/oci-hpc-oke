@@ -60,6 +60,14 @@ locals {
     !local.deploy_from_operator,
   ])
 
+  # The worker-node SSH ingress rule for the OCI Bastion Service is added to the
+  # workers NSG, which does not exist when NSG creation is disabled.
+  invalid_bastion_service_worker_ssh = alltrue([
+    var.create_oci_bastion_service,
+    var.bastion_service_allow_worker_ssh,
+    !local.create_nsgs_effective,
+  ])
+
   invalid_slinky_deploy_path = alltrue([
     var.install_slinky,
     !local.slinky_deploy_from_operator,
@@ -338,6 +346,21 @@ resource "null_resource" "warn_fss_pv_unreachable" {
     precondition {
       condition     = !local.fss_pv_unreachable
       error_message = "create_fss=true but the Kubernetes API server is unreachable from this context (private endpoint, no operator, no ORM private endpoint). The FSS PersistentVolume will not be created. To resolve: enable the operator (create_operator=true with create_bastion=true), use a public control plane endpoint, or enable deploy_to_oke_from_orm=true when deploying via ORM."
+    }
+  }
+}
+
+resource "null_resource" "validate_bastion_service_worker_ssh" {
+  count = local.invalid_bastion_service_worker_ssh ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Error: bastion_service_allow_worker_ssh=true requires the workers network security group' && exit 1"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_bastion_service_worker_ssh
+      error_message = "bastion_service_allow_worker_ssh=true adds an SSH ingress rule to the workers network security group, which is not created when `create_nsgs=false`. Please set `create_nsgs=true` or set `bastion_service_allow_worker_ssh=false` and allow SSH from the bastion service subnet with your own rules."
     }
   }
 }

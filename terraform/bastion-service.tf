@@ -115,7 +115,7 @@ resource "oci_core_security_list" "bastion_service" {
 }
 
 resource "oci_core_network_security_group_security_rule" "bastion_service_worker_ssh" {
-  count = var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh ? 1 : 0
+  count = alltrue([var.create_oci_bastion_service, var.bastion_service_allow_worker_ssh, local.create_nsgs_effective]) ? 1 : 0
 
   network_security_group_id = module.oke.worker_nsg_id
   direction                 = "INGRESS"

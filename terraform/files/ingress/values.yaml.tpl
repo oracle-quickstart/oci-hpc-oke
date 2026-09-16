@@ -25,7 +25,9 @@ envoy:
       service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "${max_bw}"
       service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
       oci.oraclecloud.com/initial-freeform-tags-override: '{"state_id": "${state_id}", "application": "contour", "role": "contour_ingress_lb"}'
+%{ if lb_nsg_id != "" ~}
       oci.oraclecloud.com/oci-network-security-groups: "${lb_nsg_id}"
+%{ endif ~}
 
 contour:
   resourcesPreset: "none"

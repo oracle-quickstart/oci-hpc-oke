@@ -97,7 +97,7 @@ module "ingress" {
     {
       min_bw    = 10,
       max_bw    = 100,
-      lb_nsg_id = module.oke.pub_lb_nsg_id,
+      lb_nsg_id = local.lb_nsg_id_pub,
       state_id  = local.state_id
     }
   )
@@ -158,7 +158,9 @@ module "kube_prometheus_stack" {
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
-        format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", module.oke.int_lb_nsg_id)
+        local.create_nsgs_effective ? [
+          format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", local.lb_nsg_id_int)
+        ] : []
     ]) : []
   ])
 

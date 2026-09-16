@@ -124,6 +124,19 @@ var validationTestCases = []validationTestCase{
 		expectedError: "Total required pod IPs",
 	},
 	{
+		// create_nsgs=false is only honored with an existing VCN, and it removes
+		// the workers NSG that bastion_service_allow_worker_ssh needs for its
+		// SSH ingress rule.
+		name: "BastionServiceWorkerSSHWithoutNSGs",
+		vars: map[string]interface{}{
+			"create_vcn":                       false,
+			"create_nsgs":                      false,
+			"create_oci_bastion_service":       true,
+			"bastion_service_allow_worker_ssh": true,
+		},
+		expectedError: "bastion_service_allow_worker_ssh=true",
+	},
+	{
 		name: "InvalidSlinkyTopologyBlockSizes",
 		vars: map[string]interface{}{
 			"slinky_topology_block_sizes": "8,12",

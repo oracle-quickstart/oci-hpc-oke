@@ -12,7 +12,7 @@ resource "oci_resourcemanager_private_endpoint" "oke" {
 
   description                                = "ORM Endpoint used to access the OKE cluster control plane"
   is_used_with_configuration_source_provider = false
-  nsg_id_list                                = [module.oke.control_plane_nsg_id]
+  nsg_id_list                                = compact([module.oke.control_plane_nsg_id])
 
   lifecycle {
     ignore_changes = [defined_tags]

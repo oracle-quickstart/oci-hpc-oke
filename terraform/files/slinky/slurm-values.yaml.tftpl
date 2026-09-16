@@ -272,7 +272,9 @@ loginsets:
 %{ if login_load_balancer_internal ~}
           oci-network-load-balancer.oraclecloud.com/internal: "true"
 %{ endif ~}
+%{ if login_load_balancer_nsg_id != "" ~}
           oci-network-load-balancer.oraclecloud.com/oci-network-security-groups: ${jsonencode(login_load_balancer_nsg_id)}
+%{ endif ~}
       spec:
         type: LoadBalancer
         externalTrafficPolicy: Local
