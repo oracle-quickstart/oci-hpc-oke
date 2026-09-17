@@ -118,11 +118,165 @@ locals {
     }
   ]
 
-  amd_gpu_plugin_shapes = ["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"]
-  deploy_amd_gpu_plugin_addon = anytrue([
-    contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape),
-    contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)
+  deploy_amd_gpu_operator_addon = var.deploy_amd_gpu_operator && local.has_amd_gpu
+
+  amd_gpu_operator_device_plugin_override    = try(jsondecode(var.amd_gpu_operator_configuration["devicePlugin"]), {})
+  amd_gpu_operator_controller_override       = try(jsondecode(var.amd_gpu_operator_configuration["controllerManager"]), {})
+  amd_gpu_operator_metrics_exporter_override = try(jsondecode(var.amd_gpu_operator_configuration["metricsExporter"]), {})
+  amd_device_metrics_exporter_enabled        = try(tobool(local.amd_gpu_operator_metrics_exporter_override.enable), true)
+
+  # The operator image is amd64 only. Without an amd64 system or CPU pool, the
+  # controller can only run on the tainted AMD GPU nodes.
+  amd_gpu_operator_has_amd64_pool = anytrue([
+    var.worker_ops_pool_size > 0 && !can(regex("^(VM|BM)\\.Standard\\.(A1|A2|Ampere)\\.", var.worker_ops_shape)),
+    var.worker_cpu_enabled && var.worker_cpu_pool_size > 0 && !can(regex("^(VM|BM)\\.Standard\\.(A1|A2|Ampere)\\.", var.worker_cpu_shape)),
   ])
+
+  # ServiceMonitor settings come from metricsExporter.prometheus.serviceMonitor,
+  # like dcgmExporter.serviceMonitor.* for NVIDIA.
+  amd_device_metrics_exporter_service_monitor                  = try(local.amd_gpu_operator_metrics_exporter_override.prometheus.serviceMonitor, {})
+  amd_device_metrics_exporter_service_monitor_labels           = try(local.amd_device_metrics_exporter_service_monitor.labels, { release = "kube-prometheus-stack" })
+  amd_device_metrics_exporter_service_monitor_interval         = try(local.amd_device_metrics_exporter_service_monitor.interval, "30s")
+  amd_device_metrics_exporter_service_monitor_honor_labels     = try(tobool(local.amd_device_metrics_exporter_service_monitor.honorLabels), true)
+  amd_device_metrics_exporter_service_monitor_honor_timestamps = try(tobool(local.amd_device_metrics_exporter_service_monitor.honorTimestamps), true)
+  amd_device_metrics_exporter_service_monitor_default_relabelings = [
+    {
+      action       = "replace"
+      sourceLabels = ["__meta_kubernetes_pod_node_name"]
+      targetLabel  = "hostname"
+    },
+    {
+      action       = "replace"
+      sourceLabels = ["__meta_kubernetes_node_label_oci_oraclecloud_com_host_serial_number"]
+      targetLabel  = "host_serial_number"
+    },
+    {
+      action       = "replace"
+      sourceLabels = ["__meta_kubernetes_node_label_node_kubernetes_io_instance_type"]
+      targetLabel  = "instance_shape"
+    },
+  ]
+  amd_device_metrics_exporter_service_monitor_relabelings = try(
+    local.amd_device_metrics_exporter_service_monitor.relabelings,
+    local.amd_device_metrics_exporter_service_monitor_default_relabelings,
+  )
+
+  amd_gpu_operator_namespace                   = "kube-amd-gpu"
+  amd_device_metrics_exporter_metrics_config   = "metrics-config"
+  amd_device_metrics_exporter_metrics_filename = "config.json"
+  amd_device_metrics_exporter_metrics = jsonencode({
+    CommonConfig = {
+      MetricsFieldPrefix = "amd_"
+    }
+  })
+  configure_amd_device_metrics = alltrue([
+    local.deploy_amd_gpu_operator_addon,
+    local.amd_device_metrics_exporter_enabled,
+    !can(local.amd_gpu_operator_metrics_exporter_override.config),
+  ])
+
+  amd_gpu_operator_addon_configurations = [
+    for k, v in merge(
+      var.amd_gpu_operator_configuration,
+      {
+        skipNodeFeatureDiscoveryDependencyCheck = tostring(var.amd_gpu_operator_skip_nfd_dependency_check)
+        devicePlugin = jsonencode(merge(
+          {
+            enableDevicePlugin      = true
+            enableNodeLabeller      = true
+            devicePluginTolerations = [{ operator = "Exists", effect = "NoSchedule" }]
+            nodeLabellerTolerations = [{ operator = "Exists", effect = "NoSchedule" }]
+          },
+          local.amd_gpu_operator_device_plugin_override,
+          {
+            devicePluginArguments = merge(
+              { resource_naming_strategy = "single" },
+              try(local.amd_gpu_operator_device_plugin_override.devicePluginArguments, {}),
+            )
+          },
+        ))
+        controllerManager = jsonencode(merge(
+          local.amd_gpu_operator_controller_override,
+          {
+            nodeSelector = merge(
+              try(local.amd_gpu_operator_controller_override.nodeSelector, {}),
+              { "kubernetes.io/arch" = "amd64" },
+            )
+          },
+          local.amd_gpu_operator_has_amd64_pool ? {} : {
+            tolerations = concat(
+              try(local.amd_gpu_operator_controller_override.tolerations, []),
+              [{ key = "amd.com/gpu", operator = "Exists", effect = "NoSchedule" }],
+            )
+          },
+        ))
+        # Terraform manages the ServiceMonitor, as it does for NVIDIA.
+        metricsExporter = jsonencode(merge(
+          {
+            enable      = true
+            serviceType = "ClusterIP"
+            port        = 5000
+            config      = { name = local.amd_device_metrics_exporter_metrics_config }
+            tolerations = [{ operator = "Exists", effect = "NoSchedule" }]
+          },
+          local.amd_gpu_operator_metrics_exporter_override,
+          {
+            prometheus = merge(
+              try(local.amd_gpu_operator_metrics_exporter_override.prometheus, {}),
+              { serviceMonitor = merge(local.amd_device_metrics_exporter_service_monitor, { enable = false }) },
+            )
+          },
+        ))
+      },
+    ) : { key = k, value = v }
+  ]
+
+  amd_device_metrics_exporter_service_monitor_manifest = yamlencode({
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "ServiceMonitor"
+    metadata = {
+      name      = "amd-device-metrics-exporter-oke"
+      namespace = local.amd_gpu_operator_namespace
+      labels    = local.amd_device_metrics_exporter_service_monitor_labels
+    }
+    spec = {
+      attachMetadata = {
+        node = true
+      }
+      namespaceSelector = {
+        matchNames = [local.amd_gpu_operator_namespace]
+      }
+      # The DeviceConfig name is not fixed, so match the Service label suffix.
+      selector = {
+        matchExpressions = [{
+          key      = "app.kubernetes.io/service"
+          operator = "Exists"
+        }]
+      }
+      endpoints = [{
+        port            = "exporter-port"
+        path            = "/metrics"
+        interval        = local.amd_device_metrics_exporter_service_monitor_interval
+        honorLabels     = local.amd_device_metrics_exporter_service_monitor_honor_labels
+        honorTimestamps = local.amd_device_metrics_exporter_service_monitor_honor_timestamps
+        relabelings = concat(
+          [{
+            action    = "keep"
+            separator = ";"
+            regex     = ".+-metrics-exporter;metrics-exporter"
+            sourceLabels = [
+              "__meta_kubernetes_service_label_app_kubernetes_io_service",
+              "__meta_kubernetes_pod_label_app_kubernetes_io_name",
+            ]
+          }],
+          local.amd_device_metrics_exporter_service_monitor_relabelings,
+        )
+      }]
+    }
+  })
+
+  amd_gpu_plugin_shapes       = ["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"]
+  deploy_amd_gpu_plugin_addon = !var.deploy_amd_gpu_operator && local.has_amd_gpu
 
   has_amd_gpu = (
     (var.worker_rdma_enabled && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape)) ||
@@ -136,6 +290,7 @@ locals {
 
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
+    local.deploy_amd_gpu_operator_addon,
     var.deploy_nvidia_gpu_operator,
     var.deploy_nvidia_network_operator,
   ])
@@ -315,6 +470,113 @@ resource "null_resource" "nvidia_dcgm_exporter_metrics_via_operator" {
   ]
 }
 
+resource "kubectl_manifest" "amd_gpu_operator_namespace" {
+  count = alltrue([local.configure_amd_device_metrics, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  apply_only = true
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = local.amd_gpu_operator_namespace
+    }
+  })
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+  ]
+}
+
+resource "kubectl_manifest" "amd_device_metrics_exporter_metrics" {
+  count = alltrue([local.configure_amd_device_metrics, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata = {
+      name      = local.amd_device_metrics_exporter_metrics_config
+      namespace = local.amd_gpu_operator_namespace
+    }
+    data = {
+      (local.amd_device_metrics_exporter_metrics_filename) = local.amd_device_metrics_exporter_metrics
+    }
+  })
+
+  depends_on = [kubectl_manifest.amd_gpu_operator_namespace]
+}
+
+resource "null_resource" "amd_device_metrics_exporter_metrics_via_operator" {
+  count = alltrue([local.configure_amd_device_metrics, local.deploy_from_operator]) ? 1 : 0
+
+  triggers = {
+    metrics_md5     = md5(local.amd_device_metrics_exporter_metrics)
+    config_name     = local.amd_device_metrics_exporter_metrics_config
+    config_key      = local.amd_device_metrics_exporter_metrics_filename
+    namespace       = local.amd_gpu_operator_namespace
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+    metrics_target  = "/tmp/amd-device-metrics-exporter-${local.amd_device_metrics_exporter_metrics_filename}"
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "file" {
+    content     = local.amd_device_metrics_exporter_metrics
+    destination = self.triggers.metrics_target
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "export PATH=\"$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin\"",
+      "bash -o pipefail -c 'kubectl create namespace ${self.triggers.namespace} --dry-run=client -o yaml | kubectl apply -f -'",
+      "bash -o pipefail -c 'kubectl create configmap ${self.triggers.config_name} --namespace ${self.triggers.namespace} --from-file=${self.triggers.config_key}=${self.triggers.metrics_target} --dry-run=client -o yaml | kubectl apply -f -'",
+      "rm -f ${self.triggers.metrics_target}",
+    ]
+  }
+
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "set -e",
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "export PATH=\"$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin\"",
+      "kubectl delete configmap ${self.triggers.config_name} --namespace ${self.triggers.namespace} --ignore-not-found",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+  ]
+}
+
 resource "oci_containerengine_addon" "coredns" {
   count = local.deploy_coredns_addon_override ? 1 : 0
 
@@ -463,6 +725,36 @@ resource "oci_containerengine_addon" "nvidia_gpu_operator" {
     kubectl_manifest.nvidia_dcgm_exporter_metrics,
     null_resource.nvidia_dcgm_exporter_metrics_via_operator,
     oci_containerengine_addon.node_feature_discovery,
+  ]
+}
+
+resource "oci_containerengine_addon" "amd_gpu_operator" {
+  count = local.deploy_amd_gpu_operator_addon ? 1 : 0
+
+  addon_name = "AmdGpuOperator"
+  cluster_id = module.oke.cluster_id
+
+  override_existing                = true
+  remove_addon_resources_on_delete = true
+  version                          = var.amd_gpu_operator_addon_version
+
+  dynamic "configurations" {
+    for_each = local.amd_gpu_operator_addon_configurations
+
+    content {
+      key   = configurations.value.key
+      value = configurations.value.value
+    }
+  }
+
+  # Remove the AmdGpuPlugin addon before installing its replacement.
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+    kubectl_manifest.amd_device_metrics_exporter_metrics,
+    null_resource.amd_device_metrics_exporter_metrics_via_operator,
+    oci_containerengine_addon.node_feature_discovery,
+    oci_containerengine_addon.amd_gpu_plugin,
   ]
 }
 

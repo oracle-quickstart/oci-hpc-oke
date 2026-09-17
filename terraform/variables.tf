@@ -333,11 +333,6 @@ variable "install_grafana_dashboards" {
   type    = bool
 }
 
-variable "install_amd_device_metrics_exporter" {
-  default = true
-  type    = bool
-}
-
 variable "install_mpi_operator" {
   default     = true
   type        = bool
@@ -374,11 +369,6 @@ variable "node_problem_detector_chart_version" {
 
 variable "prometheus_stack_chart_version" {
   default = "87.2.1"
-  type    = string
-}
-
-variable "amd_device_metrics_exporter_chart_version" {
-  default = "v1.5.0"
   type    = string
 }
 
@@ -573,6 +563,46 @@ variable "nvidia_gpu_operator_configuration" {
     "hostPaths.driverInstallDir"                   = "/run/nvidia/driver"
   }
   description = "Additional configuration key-value pairs for the NvidiaGpuOperator OKE addon. These are merged with the individual variables above, which take precedence."
+}
+
+variable "deploy_amd_gpu_operator" {
+  type        = bool
+  default     = true
+  description = "Deploy the AmdGpuOperator OKE addon for enabled AMD worker pools. When false, the AmdGpuPlugin addon is deployed instead and no AMD metrics exporter is installed."
+}
+
+variable "amd_gpu_operator_advanced_options" {
+  type        = bool
+  default     = false
+  description = "Show advanced AMD GPU Operator configuration options in the ORM UI."
+}
+
+variable "amd_gpu_operator_addon_version" {
+  type        = string
+  default     = "v1.5.0"
+  description = "Version of the AmdGpuOperator OKE addon."
+}
+
+variable "amd_gpu_operator_skip_nfd_dependency_check" {
+  type        = bool
+  default     = false
+  description = "Skip the NodeFeatureDiscovery dependency check in the AmdGpuOperator addon. Use only with an existing compatible NodeFeatureDiscovery installation."
+}
+
+variable "amd_gpu_operator_configuration" {
+  type        = map(string)
+  default     = {}
+  description = "Additional configuration key-value pairs for the AmdGpuOperator OKE addon. Values must be JSON objects. The stack sets skipNodeFeatureDiscoveryDependencyCheck from the variable above, adds the controller amd64 node selector, and disables metricsExporter.prometheus.serviceMonitor.enable because it manages the ServiceMonitor. Set metricsExporter.enable to false to disable the metrics exporter."
+
+  validation {
+    condition     = alltrue([for value in values(var.amd_gpu_operator_configuration) : can(keys(jsondecode(value)))])
+    error_message = "AmdGpuOperator addon configuration values must be JSON objects."
+  }
+
+  validation {
+    condition     = try(tobool(jsondecode(var.amd_gpu_operator_configuration["metricsExporter"]).rbacConfig.enable), false) != true
+    error_message = "The stack's AMD ServiceMonitor uses HTTP. Keep metricsExporter.rbacConfig.enable disabled."
+  }
 }
 
 variable "deploy_nvidia_network_operator" {

@@ -183,6 +183,11 @@ variableGroups:
       - nvidia_gpu_operator_skip_nfd_dependency_check
       - nvidia_gpu_operator_mig_manager_enabled
       - nvidia_gpu_operator_mig_strategy
+      - deploy_amd_gpu_operator
+      - amd_gpu_operator_advanced_options
+      - amd_gpu_operator_addon_version
+      - amd_gpu_operator_skip_nfd_dependency_check
+      - amd_gpu_operator_configuration
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kueue
@@ -303,8 +308,6 @@ variableGroups:
     - monitoring_advanced_options
     - monitoring_namespace
     - install_node_problem_detector_kube_prometheus_stack
-    - install_amd_device_metrics_exporter
-    - amd_device_metrics_exporter_chart_version
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
     - ingress_chart_version
@@ -1355,24 +1358,6 @@ variables:
     type: map(string)
     description: Additional configuration key-value pairs for the NVIDIA GPU Operator OKE add-on.
     visible: false
-  install_amd_device_metrics_exporter:
-    title: Install AMD Device Metrics Exporter
-    type: boolean
-    required: true
-    default: ${install_monitoring}
-    visible:
-      and:
-      - install_monitoring
-      - monitoring_advanced_options
-  amd_device_metrics_exporter_chart_version:
-    title: AMD Device Metrics Exporter chart version
-    type: string
-    required: true
-    default: "v1.5.0"
-    visible: false
-      # and:
-      # - monitoring_advanced_options
-      # - install_amd_device_metrics_exporter
   node_problem_detector_chart_version:
     title: Node Problem Detector chart version
     type: string
@@ -1388,18 +1373,12 @@ variables:
     required: true
     default: "87.2.1"
     visible: false
-      # and:
-      # - monitoring_advanced_options
-      # - install_amd_device_metrics_exporter
   ingress_chart_version:
     title: Ingress Controller helm chart version
     type: string
     required: true
     default: "0.6.0"
     visible: false
-      # and:
-      # - monitoring_advanced_options
-      # - install_amd_device_metrics_exporter
   install_grafana:
     title: Grafana
     description: Install Grafana
@@ -1561,8 +1540,49 @@ variables:
   deploy_node_feature_discovery:
     title: Install Node Feature Discovery add-on
     type: boolean
-    description: Install the Node Feature Discovery OKE add-on. This is a prerequisite for NVIDIA GPU Operator and Network Operator add-ons.
+    description: Install Node Feature Discovery for the AMD GPU Operator, NVIDIA GPU Operator, and NVIDIA Network Operator add-ons.
     default: true
+  deploy_amd_gpu_operator:
+    title: Install AMD GPU Operator add-on
+    type: boolean
+    description: Install the AMD GPU Operator OKE add-on for enabled AMD pools. It replaces the AmdGpuPlugin add-on. Requires Kubernetes 1.34 or later and the Node Feature Discovery add-on.
+    default: true
+    visible:
+      - deploy_node_feature_discovery
+  amd_gpu_operator_advanced_options:
+    title: AMD GPU Operator advanced options
+    type: boolean
+    description: Show advanced AMD GPU Operator configuration options.
+    default: false
+    required: false
+    visible:
+      - deploy_amd_gpu_operator
+  amd_gpu_operator_addon_version:
+    title: AMD GPU Operator add-on version
+    type: enum
+    description: Version of the AMD GPU Operator OKE add-on.
+    default: "v1.5.0"
+    required: true
+    enum:
+      - "v1.5.0"
+    visible:
+      and:
+      - deploy_amd_gpu_operator
+      - amd_gpu_operator_advanced_options
+  amd_gpu_operator_skip_nfd_dependency_check:
+    title: Skip NFD dependency check in AMD GPU Operator
+    type: boolean
+    description: Skip the Node Feature Discovery dependency check in the AMD GPU Operator add-on.
+    default: false
+    visible:
+      and:
+      - deploy_amd_gpu_operator
+      - amd_gpu_operator_advanced_options
+  amd_gpu_operator_configuration:
+    title: AMD GPU Operator add-on advanced configurations
+    type: map(string)
+    description: Additional configuration key-value pairs for the AMD GPU Operator OKE add-on.
+    visible: false
   deploy_nvidia_gpu_operator:
     title: Install NVIDIA GPU Operator add-on
     type: boolean

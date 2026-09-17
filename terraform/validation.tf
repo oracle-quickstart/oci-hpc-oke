@@ -186,12 +186,20 @@ locals {
     ]),
   ])
 
+  # OKE offers the AmdGpuOperator addon for Kubernetes 1.34 and later.
+  invalid_amd_gpu_operator_kubernetes_version = local.deploy_amd_gpu_operator_addon && !try(
+    tonumber(split(".", trimprefix(var.kubernetes_version, "v"))[0]) == 1 &&
+    tonumber(split(".", trimprefix(var.kubernetes_version, "v"))[1]) >= 34,
+    false
+  )
+
   # Check if the ssh_public_key has comment
   ssh_public_key_has_comment = can(regex("\\S+\\s+\\S+\\s+\\S+\\s?", var.ssh_public_key))
 
   invalid_gpu_operator_without_nfd     = var.deploy_nvidia_gpu_operator && !var.deploy_node_feature_discovery
   invalid_network_operator_without_nfd = var.deploy_nvidia_network_operator && !var.deploy_node_feature_discovery
   invalid_nvidia_dra_without_nfd       = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
+  invalid_amd_gpu_operator_without_nfd = local.deploy_amd_gpu_operator_addon && !var.deploy_node_feature_discovery && !var.amd_gpu_operator_skip_nfd_dependency_check
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -529,6 +537,28 @@ resource "null_resource" "validate_nvidia_dra_requires_nfd" {
     precondition {
       condition     = !local.invalid_nvidia_dra_without_nfd
       error_message = "NVIDIA DRA driver requires Node Feature Discovery for GPU node selection. Please set `deploy_node_feature_discovery=true` or set `install_nvidia_dra_driver=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_amd_gpu_operator_requires_nfd" {
+  count = local.invalid_amd_gpu_operator_without_nfd ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_amd_gpu_operator_without_nfd
+      error_message = "AMD GPU Operator addon requires Node Feature Discovery. Please set `deploy_node_feature_discovery=true`, set `amd_gpu_operator_skip_nfd_dependency_check=true` for an existing Node Feature Discovery installation, or set `deploy_amd_gpu_operator=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_amd_gpu_operator_kubernetes_version" {
+  count = local.invalid_amd_gpu_operator_kubernetes_version ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_amd_gpu_operator_kubernetes_version
+      error_message = "AMD GPU Operator addon requires Kubernetes 1.34 or later. Please upgrade `kubernetes_version` or set `deploy_amd_gpu_operator=false` to keep the AmdGpuPlugin addon."
     }
   }
 }

@@ -78,7 +78,6 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 		vars["create_operator"] = false
 		vars["create_policies"] = false
 		vars["deploy_to_oke_from_orm"] = false
-		vars["install_amd_device_metrics_exporter"] = false
 		vars["install_grafana"] = false
 		vars["install_grafana_dashboards"] = false
 		vars["install_monitoring"] = false
