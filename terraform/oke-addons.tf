@@ -8,8 +8,11 @@ locals {
   nvidia_dcgm_exporter_metrics_config   = lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.config.name", "metrics-config")
   nvidia_dcgm_exporter_metrics_filename = "dcgm-metrics.csv"
   nvidia_dcgm_exporter_metrics          = file("${path.module}/files/nvidia-gpu-operator/${local.nvidia_dcgm_exporter_metrics_filename}")
+  # Deploy the operator only when an enabled pool has NVIDIA GPUs.
+  deploy_nvidia_gpu_operator_addon = var.deploy_nvidia_gpu_operator && local.has_nvidia_gpu
+
   configure_nvidia_dcgm_metrics = alltrue([
-    var.deploy_nvidia_gpu_operator,
+    local.deploy_nvidia_gpu_operator_addon,
     lookup(var.nvidia_gpu_operator_configuration, "dcgmExporter.enabled", "true") == "true",
     local.nvidia_dcgm_exporter_metrics_config != "",
   ])
@@ -291,7 +294,7 @@ locals {
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     local.deploy_amd_gpu_operator_addon,
-    var.deploy_nvidia_gpu_operator,
+    local.deploy_nvidia_gpu_operator_addon,
     var.deploy_nvidia_network_operator,
   ])
 
@@ -701,7 +704,7 @@ resource "oci_containerengine_addon" "node_feature_discovery" {
 }
 
 resource "oci_containerengine_addon" "nvidia_gpu_operator" {
-  count = var.deploy_nvidia_gpu_operator ? 1 : 0
+  count = local.deploy_nvidia_gpu_operator_addon ? 1 : 0
 
   addon_name = "NvidiaGpuOperator"
   cluster_id = module.oke.cluster_id
@@ -766,7 +769,7 @@ resource "oci_containerengine_addon" "amd_gpu_operator" {
 # local/ORM has no shell so it waits a fixed buffer.
 resource "null_resource" "wait_for_gpu_operator_toolkit" {
   count = alltrue([
-    var.deploy_nvidia_gpu_operator,
+    local.deploy_nvidia_gpu_operator_addon,
     var.nvidia_gpu_operator_toolkit_enabled,
     var.deploy_nvidia_network_operator,
     local.deploy_from_operator,
@@ -823,7 +826,7 @@ resource "null_resource" "wait_for_gpu_operator_toolkit" {
 
 resource "time_sleep" "wait_for_gpu_operator_toolkit" {
   count = alltrue([
-    var.deploy_nvidia_gpu_operator,
+    local.deploy_nvidia_gpu_operator_addon,
     var.nvidia_gpu_operator_toolkit_enabled,
     var.deploy_nvidia_network_operator,
     local.deploy_from_local || local.deploy_from_orm,
