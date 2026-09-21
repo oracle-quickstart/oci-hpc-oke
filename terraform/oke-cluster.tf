@@ -76,8 +76,9 @@ locals {
 
   # NSG IDs used in Kubernetes LoadBalancer service annotations, normalized to an
   # empty string so the annotations can be omitted when no NSGs are created.
-  lb_nsg_id_int       = coalesce(module.oke.int_lb_nsg_id, "")
-  lb_nsg_id_pub       = coalesce(module.oke.pub_lb_nsg_id, "")
+  # coalesce() cannot do this: it rejects "" as a fallback along with null.
+  lb_nsg_id_int       = module.oke.int_lb_nsg_id == null ? "" : module.oke.int_lb_nsg_id
+  lb_nsg_id_pub       = module.oke.pub_lb_nsg_id == null ? "" : module.oke.pub_lb_nsg_id
   lb_nsg_id_preferred = var.preferred_kubernetes_services == "public" ? local.lb_nsg_id_pub : local.lb_nsg_id_int
 
   nsgs = merge(
