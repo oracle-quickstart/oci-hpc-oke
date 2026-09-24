@@ -89,6 +89,7 @@ variableGroups:
       - create_vcn
       - vcn_compartment_ocid
       - vcn_id
+      - create_nsgs
       - vcn_name
       - vcn_cidrs
       - create_public_subnets
@@ -502,6 +503,13 @@ variables:
     required: true
     dependsOn:
       compartmentId: ${vcn_compartment_ocid}
+    visible: { not: [create_vcn] }
+  create_nsgs:
+    title: Create network security groups
+    description: "Create the network security groups (NSGs) for the cluster components. Uncheck to manage network security yourself: no NSGs are created (including the File Storage and Lustre NSGs) and the existing subnets must already permit the traffic the cluster needs."
+    type: boolean
+    default: true
+    required: false
     visible: { not: [create_vcn] }
   networking_advanced_options:
     title: Subnets advanced settings

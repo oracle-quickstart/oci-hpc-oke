@@ -152,7 +152,7 @@ locals {
     login_image_repository       = var.slinky_login_image_repository
     login_image_tag              = local.slinky_login_image_tag
     login_load_balancer_internal = var.preferred_kubernetes_services == "internal"
-    login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
+    login_load_balancer_nsg_id   = local.lb_nsg_id_preferred
     gpu_autodetect               = local.slinky_gpu_autodetect
     login_enabled                = var.slinky_login_enabled
     worker_nodesets_yaml         = local.slinky_worker_nodesets_yaml

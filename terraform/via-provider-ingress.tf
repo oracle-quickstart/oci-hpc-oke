@@ -17,7 +17,7 @@ resource "helm_release" "ingress" {
       {
         min_bw    = 10,
         max_bw    = 100,
-        lb_nsg_id = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id
+        lb_nsg_id = local.lb_nsg_id_preferred
         state_id  = local.state_id
       }
     )

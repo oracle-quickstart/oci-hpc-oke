@@ -62,6 +62,11 @@ variable "ssh_public_key" {
 
 # Network
 variable "create_vcn" { default = true }
+variable "create_nsgs" {
+  type        = bool
+  default     = true
+  description = "Create network security groups (NSGs) for the cluster components. Only honored when create_vcn = false; a created VCN always gets its NSGs. When disabled, no NSGs (including the FSS and Lustre NSGs) are created and the bring-your-own subnets must already permit the required traffic."
+}
 variable "enable_ipv6" { default = false }
 
 variable "vcn_compartment_ocid" {

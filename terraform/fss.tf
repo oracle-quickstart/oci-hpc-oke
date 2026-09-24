@@ -49,7 +49,7 @@ resource "oci_file_storage_mount_target" "fss_mt" {
   compartment_id      = var.compartment_ocid
   subnet_id           = module.oke.fss_subnet_id
   display_name        = "${local.cluster_name}-mt"
-  nsg_ids             = [module.oke.fss_nsg_id]
+  nsg_ids             = compact([module.oke.fss_nsg_id])
 }
 
 resource "oci_file_storage_export" "FSSExport" {

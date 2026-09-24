@@ -95,7 +95,19 @@ locals {
   worker_ops_max_pods_per_node = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
   worker_cpu_max_pods_per_node = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
 
+  # The workers module defaults each pool's pod_nsg_ids to its module-level
+  # list, which is [null] under VCN-native pod networking when no pods NSG was
+  # created. That null breaks the join() building node metadata for the
+  # self-managed paths (cluster networks, GPU memory clusters), so pin the
+  # pool-level value to an empty list instead.
+  worker_pool_pod_nsgs = local.create_nsgs_effective ? {} : { pod_nsg_ids = [] }
+
   worker_pools = {
+    for pool_name, pool in local.worker_pools_base :
+    pool_name => merge(pool, local.worker_pool_pod_nsgs)
+  }
+
+  worker_pools_base = {
     "oke-system" = {
       create                       = local.create_workers
       description                  = "OKE-managed VM Node Pool for cluster operations and monitoring"

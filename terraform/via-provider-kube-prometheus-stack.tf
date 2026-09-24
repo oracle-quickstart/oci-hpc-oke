@@ -58,44 +58,45 @@ resource "helm_release" "prometheus" {
       name  = "grafana.ingress.tls[0].secretName",
       value = "grafana-tls"
     }
-    ] : [
-    {
-      name  = "grafana.service.type",
-      value = "LoadBalancer"
-    },
-    {
-      name  = "grafana.service.annotations.oci\\.oraclecloud\\.com\\/load-balancer-type",
-      value = "lb"
-    },
-    {
-      name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal",
-      type  = "string"
-      value = "true"
-    },
-    {
-      name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape",
-      value = "flexible"
-    },
-    {
-      name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min",
-      type  = "string"
-      value = "100"
-    },
-    {
-      name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max",
-      type  = "string"
-      value = "100"
-    },
-    {
-      name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode",
-      type  = "string"
-      value = "None"
-    },
-    {
-      name  = "grafana.service.annotations.oci\\.oraclecloud\\.com\\/oci-network-security-groups"
-      value = "${module.oke.int_lb_nsg_id}"
-    }
-  ]) : []
+    ] : concat([
+      {
+        name  = "grafana.service.type",
+        value = "LoadBalancer"
+      },
+      {
+        name  = "grafana.service.annotations.oci\\.oraclecloud\\.com\\/load-balancer-type",
+        value = "lb"
+      },
+      {
+        name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal",
+        type  = "string"
+        value = "true"
+      },
+      {
+        name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape",
+        value = "flexible"
+      },
+      {
+        name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min",
+        type  = "string"
+        value = "100"
+      },
+      {
+        name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max",
+        type  = "string"
+        value = "100"
+      },
+      {
+        name  = "grafana.service.annotations.service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode",
+        type  = "string"
+        value = "None"
+      },
+      ], local.create_nsgs_effective ? [
+      {
+        name  = "grafana.service.annotations.oci\\.oraclecloud\\.com\\/oci-network-security-groups"
+        value = local.lb_nsg_id_int
+      }
+  ] : [])) : []
   set_sensitive = var.install_grafana ? [
     {
       name  = "grafana.adminPassword"

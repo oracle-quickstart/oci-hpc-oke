@@ -70,11 +70,23 @@ locals {
 
   vcn_cidr = coalesce(data.oci_core_vcn.oke_vcn.cidr_blocks...)
 
+  # NSG creation can only be opted out of when bringing an existing VCN; a VCN
+  # created by this stack always gets its NSGs.
+  create_nsgs_effective = anytrue([var.create_vcn, var.create_nsgs])
+  nsg_create_default    = local.create_nsgs_effective ? "auto" : "never"
+
+  # NSG IDs used in Kubernetes LoadBalancer service annotations, normalized to an
+  # empty string so the annotations can be omitted when no NSGs are created.
+  # coalesce() cannot do this: it rejects "" as a fallback along with null.
+  lb_nsg_id_int       = module.oke.int_lb_nsg_id == null ? "" : module.oke.int_lb_nsg_id
+  lb_nsg_id_pub       = module.oke.pub_lb_nsg_id == null ? "" : module.oke.pub_lb_nsg_id
+  lb_nsg_id_preferred = var.preferred_kubernetes_services == "public" ? local.lb_nsg_id_pub : local.lb_nsg_id_int
+
   nsgs = merge(
     {
-      bastion = var.create_bastion ? { create = "auto" } : { create = "never" }
+      bastion = var.create_bastion ? { create = local.nsg_create_default } : { create = "never" }
       operator = merge(
-        var.create_operator ? { create = "auto" } : { create = "never" },
+        var.create_operator ? { create = local.nsg_create_default } : { create = "never" },
         var.create_operator && var.create_lustre ? {
           rules = {
             "Allow ingress from Lustre to OKE Operator" = {
@@ -86,16 +98,19 @@ locals {
           }
         } : {}
       )
-      int_lb  = { create = "auto" }
-      pub_lb  = { create = "auto" }
-      cp      = { create = "auto" }
-      workers = { create = "auto" }
-      pods    = { create = "auto" }
+      int_lb  = { create = local.nsg_create_default }
+      pub_lb  = { create = local.nsg_create_default }
+      cp      = { create = local.nsg_create_default }
+      workers = { create = local.nsg_create_default }
+      pods    = { create = local.nsg_create_default }
     },
-    local.create_fss_effective ? {
+    # Lustre is a custom NSG, so it has to be left out of the map entirely
+    # rather than marked "never": the module reports "n/a" as the ID of a
+    # custom NSG it was asked about but did not create.
+    local.create_fss_effective && local.create_nsgs_effective ? {
       fss = { create = "always" }
     } : {},
-    var.create_lustre ? {
+    var.create_lustre && local.create_nsgs_effective ? {
       lustre = { create = "always", rules = local.default_lustre_nsg_rules }
     } : {}
   )
