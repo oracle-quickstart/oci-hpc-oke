@@ -429,7 +429,7 @@ variable "monitoring_advanced_options" {
 
 # OKE Cluster Setup
 variable "cluster_name" { default = "oke-gpu-quickstart" }
-variable "kubernetes_version" { default = "v1.36.1" }
+variable "kubernetes_version" { default = "v1.36.4" }
 variable "control_plane_allowed_cidrs" { default = ["0.0.0.0/0"] }
 variable "cni_type" {
   default = "npn"
