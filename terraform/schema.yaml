@@ -1483,9 +1483,9 @@ variables:
     title: Kubernetes version
     description: The Kubernetes version for the created OKE cluster and managed nodes.
     required: true
-    default: "v1.36.1"
+    default: "v1.36.4"
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
   control_plane_allowed_cidrs:
@@ -1832,7 +1832,7 @@ variables:
     required: false
     default: ${kubernetes_version}
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
 
@@ -2026,7 +2026,7 @@ variables:
     default: ${kubernetes_version}
     visible: ${worker_cpu_enabled}
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
 
@@ -2145,7 +2145,7 @@ variables:
     default: ${kubernetes_version}
     visible: ${worker_gpu_enabled}
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
 
@@ -2308,7 +2308,7 @@ variables:
     default: ${kubernetes_version}
     visible: ${worker_rdma_enabled}
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
 
@@ -2356,7 +2356,7 @@ variables:
     default: ${kubernetes_version}
     visible: ${worker_gmc_enabled}
     enum:
-      - "v1.36.1"
+      - "v1.36.4"
       - "v1.35.2"
       - "v1.34.2"
   worker_gmc_image_id:
