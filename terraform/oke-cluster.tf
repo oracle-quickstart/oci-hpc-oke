@@ -68,8 +68,12 @@ locals {
   rule_type_cidr    = "CIDR_BLOCK"
   rule_type_service = "SERVICE_CIDR_BLOCK"
 
+  # With a stack-created VCN the CIDR comes from var.vcn_cidrs. With an existing
+  # VCN use its actual first IPv4 CIDR block: one() rejects a VCN with multiple
+  # CIDR blocks and try() would swallow that error and silently fall back to
+  # var.vcn_cidrs below, deriving pods CIDRs that lie outside the real VCN.
   vcn_cidr = coalesce(
-    try(one(data.oci_core_vcn.existing_vcn[*].cidr_blocks...), null),
+    try(data.oci_core_vcn.existing_vcn[0].cidr_blocks[0], null),
     split(",", var.vcn_cidrs)[0]
   )
 

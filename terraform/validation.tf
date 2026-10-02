@@ -53,11 +53,17 @@ locals {
   # primary IP per node for its single VNIC attachment, the second provides the pod IPs.
   # With flannel a single block is fine (the pods subnet carries no pod IPs), so this check
   # is NPN-only.
-  is_vcn_native_cni   = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
-  invalid_pods_sn_cidrs = local.is_vcn_native_cni && var.pods_sn_cidrs != null && !(
+  is_vcn_native_cni = contains(["npn", "VCN-Native Pod Networking"], var.cni_type)
+  # NOTE: Terraform's && / || do not short-circuit - every operand is evaluated even
+  # when an earlier one is false. Every operand below must therefore be total: no
+  # indexing (the two-blocks-distinct check uses distinct() instead of [0] != [1])
+  # and no arithmetic on possibly-null capacities (the gva_* locals use lazy
+  # conditional expressions), or Terraform 1.5.x (the CI version) errors the whole
+  # plan instead of producing the validation message.
+  invalid_pods_sn_cidrs = local.is_vcn_native_cni && var.pods_sn_cidrs != null && local.pods_subnet_stack_created && !(
     length(local.pods_subnet_ipv4_cidrs) == 2 &&
-    alltrue([for c in local.pods_subnet_ipv4_cidrs : can(cidrhost(c, 0))]) &&
-    local.pods_subnet_ipv4_cidrs[0] != local.pods_subnet_ipv4_cidrs[1]
+    length(distinct(local.pods_subnet_ipv4_cidrs)) == 2 &&
+    alltrue([for c in local.pods_subnet_ipv4_cidrs : can(cidrhost(c, 0))])
   )
 
   # Usable IP capacities of the pods subnet CIDR blocks (3 addresses reserved per block).
@@ -65,11 +71,16 @@ locals {
   # attachment consumes one primary IP from the first block. Capacities are null (checks
   # skipped) when the blocks are unknown (existing pods subnet) or the user-provided blocks
   # are malformed (rejected separately by validate_pods_sn_cidrs).
-  pods_cidr_block_prefixes       = [for c in local.pods_subnet_ipv4_cidrs : try(tonumber(split("/", c)[1]), null)]
-  gva_pods_ip_capacity           = length(local.pods_subnet_ipv4_cidrs) == 2 ? pow(2, 32 - local.pods_cidr_block_prefixes[1]) - 3 : null
-  gva_vnic_primary_ip_capacity   = length(local.pods_subnet_ipv4_cidrs) == 2 ? pow(2, 32 - local.pods_cidr_block_prefixes[0]) - 3 : null
-  invalid_pods_capacity          = local.is_vcn_native_cni && local.use_gva && local.gva_pods_ip_capacity != null && local.total_pods_required > local.gva_pods_ip_capacity
-  invalid_gva_vnic_primary_capacity = local.use_gva && local.gva_vnic_primary_ip_capacity != null && local.total_worker_nodes > local.gva_vnic_primary_ip_capacity
+  pods_cidr_block_prefixes     = [for c in local.pods_subnet_ipv4_cidrs : try(tonumber(split("/", c)[1]), null)]
+  gva_capacity_known           = length(local.pods_subnet_ipv4_cidrs) == 2 && alltrue([for p in local.pods_cidr_block_prefixes : p != null])
+  gva_pods_ip_capacity         = local.gva_capacity_known ? pow(2, 32 - local.pods_cidr_block_prefixes[1]) - 3 : null
+  gva_vnic_primary_ip_capacity = local.gva_capacity_known ? pow(2, 32 - local.pods_cidr_block_prefixes[0]) - 3 : null
+  invalid_pods_capacity = local.is_vcn_native_cni && local.use_gva && (
+    local.gva_pods_ip_capacity == null ? false : local.total_pods_required > local.gva_pods_ip_capacity
+  )
+  invalid_gva_vnic_primary_capacity = local.use_gva && (
+    local.gva_vnic_primary_ip_capacity == null ? false : local.total_worker_nodes > local.gva_vnic_primary_ip_capacity
+  )
 
   # FSS PV cannot be created when all deploy paths are inactive (private endpoint, no operator, no ORM)
   fss_pv_unreachable = alltrue([
