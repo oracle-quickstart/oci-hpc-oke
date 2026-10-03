@@ -39,7 +39,7 @@ locals {
       destination_port_min = 988
       destination_port_max = 988
     }
-  }, var.create_operator ? {
+    }, var.create_operator ? {
     "Ingress from OKE Operator 512-1023 to Lustre 988" = {
       protocol             = local.tcp_protocol
       source               = "operator"

@@ -28,6 +28,39 @@ locals {
   ])
   hostname_override_effective = coalesce(var.hostname_override, false)
 
+  # The OKE module requires GVA ip_count to be a power of two. Keep the existing
+  # max-pods-per-node variables as the user-facing settings and round them down only
+  # when GVA is active. The module uses the GVA ip_count as the effective kubelet
+  # pod limit, so a requested value such as 110 becomes 64 with GVA and
+  # remains 110 with flannel/legacy networking.
+  worker_ops_gva_ip_count  = pow(2, floor(log(max(var.worker_ops_max_pods_per_node, 1), 2)))
+  worker_cpu_gva_ip_count  = pow(2, floor(log(max(var.worker_cpu_max_pods_per_node, 1), 2)))
+  worker_gpu_gva_ip_count  = pow(2, floor(log(max(var.worker_gpu_max_pods_per_node, 1), 2)))
+  worker_rdma_gva_ip_count = pow(2, floor(log(max(var.worker_rdma_max_pods_per_node, 1), 2)))
+  worker_gmc_gva_ip_count  = pow(2, floor(log(max(var.worker_gmc_max_pods_per_node, 1), 2)))
+
+  # Legacy pod networking (pre-GVA behavior, used when GVA is not active): worker pools are
+  # configured with max_pods_per_node instead of GVA secondary VNICs. Flex/Generic VM shapes
+  # are limited to (ocpus - 1) * 31 pod IPs per node by standard VCN-native pod networking
+  # (minimum 31); other shapes use var.max_pods_per_node. The OKE API caps max_pods_per_node
+  # at 110.
+  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? (var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31) : var.max_pods_per_node
+  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? (var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31) : var.max_pods_per_node
+
+  worker_ops_max_pods_per_node  = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
+  worker_cpu_max_pods_per_node  = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
+  worker_gpu_max_pods_per_node  = min(var.worker_gpu_max_pods_per_node, 110)
+  worker_rdma_max_pods_per_node = min(var.worker_rdma_max_pods_per_node, 110)
+  worker_gmc_max_pods_per_node  = min(var.worker_gmc_max_pods_per_node, 110)
+
+  # Effective pod IPs required per node from the pods subnet: the derived GVA ip_count when
+  # GVA is active, otherwise the legacy max_pods_per_node value. Used for capacity validation.
+  worker_ops_pods_per_node  = local.use_gva ? local.worker_ops_gva_ip_count : local.worker_ops_max_pods_per_node
+  worker_cpu_pods_per_node  = local.use_gva ? local.worker_cpu_gva_ip_count : local.worker_cpu_max_pods_per_node
+  worker_gpu_pods_per_node  = local.use_gva ? local.worker_gpu_gva_ip_count : local.worker_gpu_max_pods_per_node
+  worker_rdma_pods_per_node = local.use_gva ? local.worker_rdma_gva_ip_count : local.worker_rdma_max_pods_per_node
+  worker_gmc_pods_per_node  = local.use_gva ? local.worker_gmc_gva_ip_count : local.worker_gmc_max_pods_per_node
+
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
     var.kubernetes_version, var.setup_credential_provider_for_ocir, local.hostname_override_effective
@@ -89,12 +122,6 @@ locals {
     var.oke_post_bootstrap_script != "" ? { "post_oke" : base64encode(var.oke_post_bootstrap_script) } : {},
   )
 
-  supported_worker_ops_max_pods_per_node = anytrue([strcontains(var.worker_ops_shape, "Flex"), strcontains(var.worker_ops_shape, "Generic")]) ? (var.worker_ops_ocpus <= 2 ? 31 : (var.worker_ops_ocpus - 1) * 31) : var.max_pods_per_node
-  supported_worker_cpu_max_pods_per_node = alltrue([anytrue([strcontains(var.worker_cpu_shape, "Flex"), strcontains(var.worker_cpu_shape, "Generic")]), !strcontains(var.worker_cpu_shape, "DenseIO")]) ? (var.worker_cpu_ocpus <= 2 ? 31 : (var.worker_cpu_ocpus - 1) * 31) : var.max_pods_per_node
-
-  worker_ops_max_pods_per_node = min(local.supported_worker_ops_max_pods_per_node, var.worker_ops_max_pods_per_node)
-  worker_cpu_max_pods_per_node = min(local.supported_worker_cpu_max_pods_per_node, var.worker_cpu_max_pods_per_node)
-
   # The workers module defaults each pool's pod_nsg_ids to its module-level
   # list, which is [null] under VCN-native pod networking when no pods NSG was
   # created. That null breaks the join() building node metadata for the
@@ -109,21 +136,24 @@ locals {
 
   worker_pools_base = {
     "oke-system" = {
-      create                       = local.create_workers
-      description                  = "OKE-managed VM Node Pool for cluster operations and monitoring"
-      placement_ads                = [substr(var.worker_ops_ad, -1, 0)]
-      mode                         = "node-pool"
-      size                         = var.worker_ops_pool_size
-      shape                        = var.worker_ops_shape
-      ocpus                        = var.worker_ops_ocpus
-      memory                       = var.worker_ops_memory
-      boot_volume_size             = var.worker_ops_boot_volume_size
-      image_type                   = local.worker_ops_image_type
-      os                           = var.worker_ops_image_os
-      os_version                   = var.worker_ops_image_os_version
-      image_id                     = local.worker_ops_image_id
-      max_pods_per_node            = local.worker_ops_max_pods_per_node
-      kubernetes_version           = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
+      create             = local.create_workers
+      description        = "OKE-managed VM Node Pool for cluster operations and monitoring"
+      placement_ads      = [substr(var.worker_ops_ad, -1, 0)]
+      mode               = "node-pool"
+      size               = var.worker_ops_pool_size
+      shape              = var.worker_ops_shape
+      ocpus              = var.worker_ops_ocpus
+      memory             = var.worker_ops_memory
+      boot_volume_size   = var.worker_ops_boot_volume_size
+      image_type         = local.worker_ops_image_type
+      os                 = var.worker_ops_image_os
+      os_version         = var.worker_ops_image_os_version
+      image_id           = local.worker_ops_image_id
+      kubernetes_version = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
+      max_pods_per_node  = local.worker_ops_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_ops_gva_ip_count }
+      } : {}
       node_cycling_enabled         = var.worker_ops_node_cycling_enabled
       node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
@@ -135,21 +165,24 @@ locals {
       cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
     }
     "oke-cpu" = {
-      create                       = local.create_workers && var.worker_cpu_enabled
-      description                  = "OKE-managed CPU Node Pool"
-      placement_ads                = [substr(var.worker_cpu_ad, -1, 0)]
-      mode                         = "node-pool"
-      size                         = var.worker_cpu_pool_size
-      shape                        = var.worker_cpu_shape
-      ocpus                        = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
-      memory                       = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
-      boot_volume_size             = var.worker_cpu_boot_volume_size
-      image_type                   = local.worker_cpu_image_type
-      os                           = var.worker_cpu_image_os
-      os_version                   = var.worker_cpu_image_os_version
-      image_id                     = local.worker_cpu_image_id
-      max_pods_per_node            = local.worker_cpu_max_pods_per_node
-      kubernetes_version           = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
+      create             = local.create_workers && var.worker_cpu_enabled
+      description        = "OKE-managed CPU Node Pool"
+      placement_ads      = [substr(var.worker_cpu_ad, -1, 0)]
+      mode               = "node-pool"
+      size               = var.worker_cpu_pool_size
+      shape              = var.worker_cpu_shape
+      ocpus              = lookup(local.worker_cpu_denseio_ocpus, var.worker_cpu_shape, var.worker_cpu_ocpus)
+      memory             = lookup(local.worker_cpu_denseio_memory, var.worker_cpu_shape, var.worker_cpu_memory)
+      boot_volume_size   = var.worker_cpu_boot_volume_size
+      image_type         = local.worker_cpu_image_type
+      os                 = var.worker_cpu_image_os
+      os_version         = var.worker_cpu_image_os_version
+      image_id           = local.worker_cpu_image_id
+      kubernetes_version = coalesce(var.worker_cpu_kubernetes_version, var.kubernetes_version)
+      max_pods_per_node  = local.worker_cpu_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_cpu_gva_ip_count }
+      } : {}
       node_cycling_enabled         = var.worker_cpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_cpu_node_cycling_max_surge
       node_cycling_max_unavailable = var.worker_cpu_node_cycling_max_unavailable
@@ -173,8 +206,11 @@ locals {
       os                 = var.worker_gpu_image_os
       os_version         = var.worker_gpu_image_os_version
       image_id           = local.worker_gpu_image_id
-      max_pods_per_node  = var.worker_gpu_max_pods_per_node
       kubernetes_version = coalesce(var.worker_gpu_kubernetes_version, var.kubernetes_version)
+      max_pods_per_node  = local.worker_gpu_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_gpu_gva_ip_count }
+      } : {}
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gpu_hostname_prefix } : {},
@@ -202,11 +238,14 @@ locals {
       boot_volume_vpus_per_gb        = var.worker_rdma_boot_volume_vpus_per_gb
       image_type                     = "custom" # only custom is supported.
       image_id                       = local.worker_rdma_image_id
-      max_pods_per_node              = var.worker_rdma_max_pods_per_node
       kubernetes_version             = coalesce(var.worker_rdma_kubernetes_version, var.kubernetes_version)
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
-      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata                  = local.node_metadata
+      max_pods_per_node              = local.worker_rdma_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_rdma_gva_ip_count }
+      } : {}
+      cloud_init    = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata = local.node_metadata
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_rdma_hostname_prefix } : {},
@@ -246,11 +285,14 @@ locals {
       boot_volume_vpus_per_gb        = var.worker_gmc_boot_volume_vpus_per_gb
       image_type                     = "custom"
       image_id                       = var.worker_gmc_image_id
-      max_pods_per_node              = var.worker_gmc_max_pods_per_node
       kubernetes_version             = coalesce(var.worker_gmc_kubernetes_version, var.kubernetes_version)
       legacy_imds_endpoints_disabled = var.legacy_imds_endpoints_disabled
-      cloud_init                     = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata                  = local.node_metadata
+      max_pods_per_node              = local.worker_gmc_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_gmc_gva_ip_count }
+      } : {}
+      cloud_init    = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata = local.node_metadata
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gmc_hostname_prefix } : {},

@@ -48,6 +48,7 @@ data "oci_load_balancer_load_balancers" "internal_lbs" {
   depends_on = [module.kube_prometheus_stack]
 }
 
-data "oci_core_vcn" "oke_vcn" {
-  vcn_id = coalesce(var.vcn_id, module.oke.vcn_id)
+data "oci_core_vcn" "existing_vcn" {
+  count  = var.create_vcn ? 0 : 1
+  vcn_id = var.vcn_id
 }

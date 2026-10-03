@@ -212,6 +212,9 @@ jobs:
           rm tf.zip
           terraform version
 
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive terraform
+
       - name: Cache Terraform providers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:

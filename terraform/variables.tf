@@ -90,7 +90,11 @@ variable "int_lb_sn_cidr" { default = null }
 variable "pub_lb_sn_cidr" { default = null }
 variable "cp_sn_cidr" { default = null }
 variable "workers_sn_cidr" { default = null }
-variable "pods_sn_cidr" { default = null }
+variable "pods_sn_cidrs" {
+  default     = null
+  description = "CIDR blocks for the pods subnet, comma-separated. With the NPN CNI exactly two CIDR blocks are required: the first holds the secondary VNIC primary IP of each node, the second provides the pod IPs. With flannel a single CIDR block is used. If not provided, the blocks are derived from the VCN CIDR."
+  type        = string
+}
 variable "fss_sn_cidr" { default = null }
 variable "lustre_sn_cidr" { default = null }
 variable "bastion_sn_id" { default = null }
@@ -435,6 +439,11 @@ variable "cni_type" {
   default = "npn"
   type    = string
 }
+variable "force_use_gva" {
+  default     = false
+  description = "Force GVA (Generic VNIC Attachment) secondary VNICs on all worker pools when using an existing pods subnet (custom_subnet_ids). The target subnet must support GVA (NPN CNI, and per OCI guidance two CIDR blocks when ip_count > 32). Ignored when the stack creates the pods subnet (GVA is already the default) or with the flannel CNI."
+  type        = bool
+}
 variable "control_plane_is_public" {
   type        = bool
   default     = true
@@ -442,7 +451,7 @@ variable "control_plane_is_public" {
 }
 variable "max_pods_per_node" {
   default     = 110
-  description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Ignored when when cni_type != 'npn'."
+  description = "The default maximum number of pods to deploy per node when unspecified on a pool. Absolute maximum is 110. Used when cni_type is NPN and GVA is not active; ignored with the flannel CNI or when GVA is active. Each worker pool's max-pods setting is rounded down to the closest power of two for its GVA allocation."
   type        = number
 }
 variable "services_cidr" {
@@ -700,8 +709,12 @@ variable "worker_ops_image_use_uri" {
 }
 variable "worker_ops_max_pods_per_node" {
   default     = 110
-  description = "Maximum number of pods per node for the system worker pool. Max is 110."
+  description = "Maximum number of pods per node for the system worker pool. Max is 110 with legacy pod networking. When GVA is active, the value is rounded down to the closest power of two for the GVA allocation."
   type        = number
+  validation {
+    condition     = var.worker_ops_max_pods_per_node >= 1 && var.worker_ops_max_pods_per_node <= 110
+    error_message = "worker_ops_max_pods_per_node must be between 1 and 110."
+  }
 }
 variable "worker_ops_kubernetes_version" {
   default     = null
@@ -766,8 +779,12 @@ variable "worker_cpu_image_platform_id" {
 }
 variable "worker_cpu_max_pods_per_node" {
   default     = 110
-  description = "Maximum number of pods per node for the CPU worker pool. Max is 110."
+  description = "Maximum number of pods per node for the CPU worker pool. Max is 110 with legacy pod networking. When GVA is active, the value is rounded down to the closest power of two for the GVA allocation."
   type        = number
+  validation {
+    condition     = var.worker_cpu_max_pods_per_node >= 1 && var.worker_cpu_max_pods_per_node <= 110
+    error_message = "worker_cpu_max_pods_per_node must be between 1 and 110."
+  }
 }
 variable "worker_cpu_kubernetes_version" {
   default     = null
@@ -822,8 +839,12 @@ variable "worker_gpu_image_platform_id" {
 }
 variable "worker_gpu_max_pods_per_node" {
   default     = 64
-  description = "Maximum number of pods per node for the GPU worker pool. Max is 110."
+  description = "Maximum number of pods per node for the GPU worker pool. Max is 110 with legacy pod networking. When GVA is active, the value is rounded down to the closest power of two for the GVA allocation."
   type        = number
+  validation {
+    condition     = var.worker_gpu_max_pods_per_node >= 1 && var.worker_gpu_max_pods_per_node <= 110
+    error_message = "worker_gpu_max_pods_per_node must be between 1 and 110."
+  }
 }
 variable "worker_gpu_kubernetes_version" {
   default     = null
@@ -879,8 +900,12 @@ variable "worker_rdma_image_use_uri" {
 }
 variable "worker_rdma_max_pods_per_node" {
   default     = 64
-  description = "Maximum number of pods per node for the RDMA worker pool. Max is 110."
+  description = "Maximum number of pods per node for the RDMA worker pool. Max is 110 with legacy pod networking. When GVA is active, the value is rounded down to the closest power of two for the GVA allocation."
   type        = number
+  validation {
+    condition     = var.worker_rdma_max_pods_per_node >= 1 && var.worker_rdma_max_pods_per_node <= 110
+    error_message = "worker_rdma_max_pods_per_node must be between 1 and 110."
+  }
 }
 variable "worker_rdma_kubernetes_version" {
   default     = null
@@ -927,8 +952,12 @@ variable "worker_gmc_boot_volume_vpus_per_gb" {
 }
 variable "worker_gmc_max_pods_per_node" {
   default     = 64
-  description = "Maximum number of pods per node for the GMC worker pool. Max is 110."
+  description = "Maximum number of pods per node for the GMC worker pool. Max is 110 with legacy pod networking. When GVA is active, the value is rounded down to the closest power of two for the GVA allocation."
   type        = number
+  validation {
+    condition     = var.worker_gmc_max_pods_per_node >= 1 && var.worker_gmc_max_pods_per_node <= 110
+    error_message = "worker_gmc_max_pods_per_node must be between 1 and 110."
+  }
 }
 variable "worker_gmc_kubernetes_version" {
   default     = null
