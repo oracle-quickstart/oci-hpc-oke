@@ -2415,7 +2415,7 @@ variables:
   # Kueue
   install_kueue:
     title: Install Kueue
-    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the active GPU worker pool."
+    description: "Install Kueue with Topology Aware Scheduling (TAS) and create a Topology, ResourceFlavor, ClusterQueue, and LocalQueue for the active GPU worker pool. The TAS resources need a GPU RDMA or GMC pool and the RDMA labeler."
     type: boolean
     default: true
   install_rdma_labeler:
@@ -2424,12 +2424,12 @@ variables:
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
-    default: "0.18.2"
+    default: "0.20.0"
     required: true
     visible: false
   kueue_local_queue_default_namespace:
     title: LocalQueue namespace
-    description: "The namespace where the Kueue default LocalQueue will be created."
+    description: "The namespace where the Kueue LocalQueue will be created."
     type: string
     default: "default"
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$"

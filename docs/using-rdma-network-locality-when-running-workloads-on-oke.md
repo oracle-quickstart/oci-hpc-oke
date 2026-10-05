@@ -76,7 +76,8 @@ This is the recommended approach because:
 ### Step 1: Install Kueue
 
 ```sh
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.18.2" --create-namespace --namespace=kueue-system
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.0" --create-namespace --namespace=kueue-system \
+  -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/terraform/files/kueue/values.yaml
 ```
 
 ### Step 2: Create a Topology
@@ -84,7 +85,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.18.2" -
 Define how nodes are grouped at different hierarchy levels.
 
 ```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: Topology
 metadata:
   name: "oci-rdma"
@@ -108,7 +109,7 @@ Define a flavor for your node type and reference the topology.
 > The examples below use `BM.GPU.H100.8` as the shape. Change the shape and resource names to match your GPU shape (e.g., `BM.GPU.B200.8`, `BM.GPU.MI300X.8`).
 
 ```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ResourceFlavor
 metadata:
   name: "bm-gpu-h100-8"
@@ -127,7 +128,7 @@ kubectl apply -f resourceflavor.yaml
 Define a shared queue of resources available to all namespaces.
 
 ```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: ClusterQueue
 metadata:
   name: "bm-gpu-h100-8"
@@ -155,7 +156,7 @@ kubectl apply -f clusterqueue.yaml
 Create a namespace-specific queue linked to the cluster queue.
 
 ```yaml
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: bm-gpu-h100-8
@@ -170,6 +171,11 @@ kubectl apply -f localqueue.yaml
 ### Step 6: Submit a Job
 
 Add the `kueue.x-k8s.io/queue-name` label and the `kueue.x-k8s.io/podset-preferred-topology` annotation to your workload. Kueue will prefer placing all pods within the same topology domain. If that is not possible, Kueue will progressively move up the hierarchy until it finds a level where the job fits.
+
+The example uses the `bm-gpu-h100-8` LocalQueue from Step 5. The stack (v26.3.0 or later) creates a LocalQueue with a different name. It uses the GPU shape in lowercase, with dots replaced by dashes, plus `-rdma-topology-aware`. For example, `BM.GPU.H100.8` gives `bm-gpu-h100-8-rdma-topology-aware`. The LocalQueue is in the namespace that `kueue_local_queue_default_namespace` sets (default `default`). To list the LocalQueues, run `kubectl get localqueues -A`.
+
+> [!NOTE]
+> The stack ClusterQueue uses only a TAS flavor, so Kueue applies TAS to every pod group of a job. Each pod group must request a resource, or Kueue rejects the job with "no TAS flavor assigned". An MPIJob launcher on the stack queue therefore needs a request, for example `cpu: 100m`, and a toleration for the GPU taint. Kueue then places the launcher on a GPU node. To keep the launcher off the GPU nodes, for example with `hostNetwork`, use your own ClusterQueue with a second flavor without a topology for the launcher. The [NCCL test manifests](../manifests/nccl-tests/host-network/) use this pattern.
 
 ```yaml
 apiVersion: batch/v1

@@ -56,7 +56,7 @@ To use the RDMA interfaces in your pods, see [Using RDMA Network Interfaces in M
 
 ## Optional: Deploy Kueue & MPI Operator to Run NCCL Tests
 
-See [Running NCCL and RCCL Tests with Kueue and MPI Operator](./docs/running-nccl-rccl-tests-with-kueue.md) for deployment steps, per-shape test manifests, and example output.
+See [Running NCCL and RCCL Tests](./docs/running-nccl-rccl-tests.md) for deployment steps and the test manifests for each network type and shape.
 
 ## Documentation
 

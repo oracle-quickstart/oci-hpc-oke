@@ -136,7 +136,7 @@ affected worker pods automatically; no manual restart is needed.
 ## Worked example: BM.GPU.H100.8 NCCL test
 
 The sample manifest
-[manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml](../manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml)
+[manifests/nccl-tests/host-network/kueue/BM.GPU.H100.8.yaml](../manifests/nccl-tests/host-network/kueue/BM.GPU.H100.8.yaml)
 hard-codes the parameters as inline `mpirun -x VAR=value` flags. To drive it from
 the ConfigMap instead, make two changes.
 
@@ -210,7 +210,7 @@ Before:
                 -x IB_RX_QUEUE_LEN=8192 \
                 -x NCCL_SOCKET_IFNAME=eth0 \
                 -x NCCL_IGNORE_CPU_AFFINITY=1 \
-                /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+                /workspace/nccl-tests/build/all_reduce_perf -b 4G -e 16G -f 2 -g 1 -c 1
 ```
 
 After:
@@ -225,7 +225,7 @@ After:
                 -x UCX_NET_DEVICES=eth0 \
                 -x RX_QUEUE_LEN=8192 \
                 -x IB_RX_QUEUE_LEN=8192 \
-                /workspace/nccl-tests/build/all_reduce_perf -b 8 -f 2 -g 1 -e 4G -c 1
+                /workspace/nccl-tests/build/all_reduce_perf -b 4G -e 16G -f 2 -g 1 -c 1
 ```
 
 Every NCCL/RCCL setting is gone from the manifest. The five remaining flags are
@@ -281,7 +281,7 @@ spec:
   the SR-IOV pieces the standard manifest does not have: the
   `k8s.v1.cni.cncf.io/networks: rdma-vf,...` pod annotation and the
   `nvidia.com/rdma-vf` resource requests. See the manifests under
-  [manifests/nccl-tests/kueue/virtual-functions/](../manifests/nccl-tests/kueue/virtual-functions/)
+  [manifests/nccl-tests/virtual-functions/kueue/](../manifests/nccl-tests/virtual-functions/kueue/)
   for the full VF layout. The ConfigMap handles the parameter values; it does not
   change pod networking or resources.
 

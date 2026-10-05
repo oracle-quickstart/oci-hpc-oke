@@ -52,7 +52,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -62,7 +62,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.MI300X.8
         amd.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -83,7 +83,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "12800Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring

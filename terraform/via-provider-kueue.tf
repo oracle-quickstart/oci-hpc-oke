@@ -2,11 +2,16 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 locals {
-  kueue_amd_shapes   = ["BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8"]
   kueue_shape        = var.worker_gmc_enabled ? var.worker_gmc_shape : var.worker_rdma_shape
-  kueue_is_amd       = contains(local.kueue_amd_shapes, local.kueue_shape)
+  kueue_is_amd       = contains(local.amd_gpu_plugin_shapes, local.kueue_shape)
   kueue_gpu_resource = local.kueue_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
   kueue_flavor_name  = "${lower(replace(local.kueue_shape, ".", "-"))}-rdma-topology-aware"
+  # TAS only uses nodes with all topology labels, which the RDMA labeler sets.
+  kueue_queues_enabled = alltrue([
+    var.worker_gmc_enabled || (var.worker_rdma_enabled && can(regex("GPU", coalesce(var.worker_rdma_shape, "")))),
+    var.install_oci_hpc_oke_utils,
+    var.install_rdma_labeler,
+  ])
 }
 
 resource "helm_release" "kueue" {
@@ -34,10 +39,14 @@ resource "helm_release" "kueue" {
   wait        = false
   timeout     = 300
   max_history = 1
+  # Manager config with the DRA deviceClassMappings.
+  values = [file("${path.module}/files/kueue/values.yaml")]
 }
 
 resource "kubectl_manifest" "kueue_webhook_probe" {
   count = alltrue([var.install_kueue, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  # v1beta1 to v1beta2 updates the object in place instead of deleting and recreating it.
+  upgrade_api_version = true
 
   # Apply a harmless Kueue resource first so kubectl provider retries absorb
   # webhook CA propagation races before the real Kueue objects are created.
@@ -46,12 +55,11 @@ resource "kubectl_manifest" "kueue_webhook_probe" {
 }
 
 # Kueue Topology for RDMA-aware scheduling. The topology, flavor, and queues
-# are only created when an RDMA-capable pool exists: the flavor binds to the
-# oci-rdma topology whose node labels only RDMA-networked nodes carry, and
-# gating also prevents creating a flavor from the worker_rdma_shape default
-# for a pool that does not exist.
+# are only created for a GPU RDMA or GMC pool with the RDMA labeler, because
+# the flavor binds to the oci-rdma topology whose labels the labeler sets.
 resource "kubectl_manifest" "kueue_topology" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count               = alltrue([var.install_kueue, local.kueue_queues_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  upgrade_api_version = true
 
   yaml_body  = file("${path.module}/files/kueue/topology.yaml")
   depends_on = [helm_release.kueue, kubectl_manifest.kueue_webhook_probe]
@@ -59,7 +67,8 @@ resource "kubectl_manifest" "kueue_topology" {
 
 # ResourceFlavor matching the active GPU worker pool shape
 resource "kubectl_manifest" "kueue_resource_flavor" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count               = alltrue([var.install_kueue, local.kueue_queues_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  upgrade_api_version = true
 
   yaml_body = templatefile("${path.module}/files/kueue/resource-flavor.yaml.tpl", {
     flavor_name   = local.kueue_flavor_name
@@ -72,24 +81,41 @@ resource "kubectl_manifest" "kueue_resource_flavor" {
 
 # ClusterQueue with resource quotas
 resource "kubectl_manifest" "kueue_cluster_queue" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count               = alltrue([var.install_kueue, local.kueue_queues_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  upgrade_api_version = true
 
   yaml_body = templatefile("${path.module}/files/kueue/cluster-queue.yaml.tpl", {
     flavor_name  = local.kueue_flavor_name
     gpu_resource = local.kueue_gpu_resource
+    rdma_vf      = local.deploy_nvidia_network_operator_manifests
   })
 
   depends_on = [helm_release.kueue, kubectl_manifest.kueue_resource_flavor]
 }
 
+# The LocalQueue namespace, when it is not default. apply_only keeps it on
+# destroy, because it can hold other workloads.
+resource "kubectl_manifest" "kueue_local_queue_namespace" {
+  count = alltrue([var.install_kueue, local.kueue_queues_enabled, var.kueue_local_queue_default_namespace != "default", local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata   = { name = var.kueue_local_queue_default_namespace }
+  })
+  apply_only = true
+  depends_on = [helm_release.kueue]
+}
+
 # LocalQueue in the user-specified namespace
 resource "kubectl_manifest" "kueue_local_queue" {
-  count = alltrue([var.install_kueue, var.worker_rdma_enabled || var.worker_gmc_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count               = alltrue([var.install_kueue, local.kueue_queues_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  upgrade_api_version = true
 
   yaml_body = templatefile("${path.module}/files/kueue/local-queue.yaml.tpl", {
     flavor_name = local.kueue_flavor_name
     namespace   = var.kueue_local_queue_default_namespace
   })
 
-  depends_on = [helm_release.kueue, kubectl_manifest.kueue_cluster_queue]
+  depends_on = [helm_release.kueue, kubectl_manifest.kueue_cluster_queue, kubectl_manifest.kueue_local_queue_namespace]
 }

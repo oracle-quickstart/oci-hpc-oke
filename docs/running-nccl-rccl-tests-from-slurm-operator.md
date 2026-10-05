@@ -336,7 +336,7 @@ The output must list the allocated GPU.
 
 This script contains the tuning for `BM.GPU.MI300X.8`.
 
-For another shape, use the matching values from [`manifests/rccl-tests/kueue/`](../manifests/rccl-tests/kueue/).
+For another shape, use the matching values from [`manifests/rccl-tests/host-network/kueue/`](../manifests/rccl-tests/host-network/kueue/).
 
 ```bash
 cat > "$HOME/rccl-slurm.sh" <<'EOF'

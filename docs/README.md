@@ -33,7 +33,7 @@ Engine (OKE). For deployment and project overview, see the
 
 - [Recommended NCCL/RCCL Parameters by Shape](./recommended-nccl-rccl-parameters-by-shape.md): Recommended NCCL/RCCL tuning parameters per GPU shape.
 - [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./using-nccl-rccl-parameters-configmap.md): Consume the auto-generated parameters ConfigMap from job manifests.
-- [Running NCCL and RCCL Tests with Kueue and MPI Operator](./running-nccl-rccl-tests-with-kueue.md): Run NCCL/RCCL bandwidth tests with Kueue and MPI Operator.
+- [Running NCCL and RCCL Tests](./running-nccl-rccl-tests.md): Run NCCL/RCCL bandwidth tests with Kueue and MPI Operator, using host network or SR-IOV virtual functions.
 
 ## Slurm
 

@@ -290,7 +290,7 @@ sequenceDiagram
         Deploy->>API: Apply oci-rdma Topology
         Deploy->>API: Apply ResourceFlavor for shape and GPU label
         Deploy->>API: Apply ClusterQueue with configured template quotas
-        Deploy->>API: Apply default LocalQueue in selected namespace
+        Deploy->>API: Apply LocalQueue in selected namespace
     end
 ```
 
@@ -327,7 +327,7 @@ sequenceDiagram
 
 The manifest brings together host networking, shape selection, GPU requests, and RDMA settings for the benchmark. For AMD nodes, the RCCL examples provide their own images and parameters.
 
-Sources: [H100 NCCL manifest](../manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml), [MI300X RCCL manifest](../manifests/rccl-tests/kueue/BM.GPU.MI300X.8.yaml), [provider MPI Operator installation](../terraform/via-provider-mpi-operator.tf), [operator MPI Operator installation](../terraform/via-operator-mpi-operator.tf).
+Sources: [H100 NCCL manifest](../manifests/nccl-tests/host-network/kueue/BM.GPU.H100.8.yaml), [MI300X RCCL manifest](../manifests/rccl-tests/host-network/kueue/BM.GPU.MI300X.8.yaml), [provider MPI Operator installation](../terraform/via-provider-mpi-operator.tf), [operator MPI Operator installation](../terraform/via-operator-mpi-operator.tf).
 
 ### 8. Monitoring and Grafana Alert Delivery
 

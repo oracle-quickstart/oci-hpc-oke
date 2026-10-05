@@ -1005,11 +1005,11 @@ variable "worker_gmc_scale_is_downsize_enabled" {
 variable "install_kueue" {
   default     = true
   type        = bool
-  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue)."
+  description = "Install Kueue and create Topology Aware Scheduling resources (Topology, ResourceFlavor, ClusterQueue, LocalQueue). The TAS resources need a GPU RDMA or GMC pool and the RDMA labeler."
 }
 
 variable "kueue_chart_version" {
-  default = "0.18.2"
+  default = "0.20.0"
   type    = string
 }
 
