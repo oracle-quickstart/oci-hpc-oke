@@ -366,6 +366,18 @@ variable "nvidia_dra_driver_chart_version" {
   description = "NVIDIA DRA driver Helm chart version."
 }
 
+variable "install_dranet" {
+  default     = false
+  type        = bool
+  description = "Preview. Install Dranet, the Kubernetes DRA network driver, and set the RDMA subsystem to shared network namespace mode on the worker nodes. Requires a single-stack IPv4 cluster, or a BM.GPU.GB200.4 GPU Memory Cluster pool. Cannot be combined with deploy_nvidia_network_operator."
+}
+
+variable "dranet_chart_version" {
+  default     = "v1.5.0"
+  type        = string
+  description = "Dranet Helm chart version."
+}
+
 variable "monitoring_namespace" {
   default = "monitoring"
   type    = string

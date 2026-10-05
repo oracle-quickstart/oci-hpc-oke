@@ -24,16 +24,18 @@ Engine (OKE). For deployment and project overview, see the
 
 ## Running GPU and RDMA workloads
 
-- [Using RDMA Network Interfaces in Manifests](./using-rdma-network-interfaces-in-manifests.md): Manifest sections needed to use the RDMA interfaces in pods with `hostNetwork` or SR-IOV virtual functions.
+- [Using RDMA Network Interfaces in Manifests](./using-rdma-network-interfaces-in-manifests.md): Manifest sections needed to use the RDMA interfaces in pods with `hostNetwork`, SR-IOV virtual functions, or Dranet.
 - [Running PyTorch Jobs on OKE Using Host Network with RDMA](./running-pytorch-jobs-on-oke-using-hostnetwork-with-rdma.md): Run PyTorch distributed jobs over the host network with RDMA.
 - [Using RDMA Network Locality When Running Workloads on OKE](./using-rdma-network-locality-when-running-workloads-on-oke.md): Schedule workloads using RDMA network topology and locality.
 - [Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink](./using-dynamic-resource-allocation-for-multi-node-nvlink-imex.md): Use DRA for multi-node NVLink (IMEX).
+- [Using Dranet for RDMA Network Interfaces (Preview)](./using-dranet.md): Install Dranet and give pods IPvlan children of the RDMA NICs.
+- [Installing Dranet Manually on OKE (Preview)](./installing-dranet-manually.md): Install Dranet with Helm on an OKE cluster that the stack did not create.
 
 ## NCCL and RCCL
 
 - [Recommended NCCL/RCCL Parameters by Shape](./recommended-nccl-rccl-parameters-by-shape.md): Recommended NCCL/RCCL tuning parameters per GPU shape.
 - [Using the NCCL/RCCL Parameters ConfigMap in Job Manifests](./using-nccl-rccl-parameters-configmap.md): Consume the auto-generated parameters ConfigMap from job manifests.
-- [Running NCCL and RCCL Tests](./running-nccl-rccl-tests.md): Run NCCL/RCCL bandwidth tests with Kueue and MPI Operator, using host network or SR-IOV virtual functions.
+- [Running NCCL and RCCL Tests](./running-nccl-rccl-tests.md): Run NCCL/RCCL bandwidth tests with Kueue and MPI Operator, using host network, SR-IOV virtual functions, or Dranet.
 
 ## Slurm
 

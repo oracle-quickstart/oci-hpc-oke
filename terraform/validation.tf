@@ -238,6 +238,12 @@ locals {
   invalid_network_operator_without_nfd = var.deploy_nvidia_network_operator && !var.deploy_node_feature_discovery
   invalid_nvidia_dra_without_nfd       = var.install_nvidia_dra_driver && var.worker_gmc_enabled && !var.deploy_node_feature_discovery
   invalid_amd_gpu_operator_without_nfd = local.deploy_amd_gpu_operator_addon && !var.deploy_node_feature_discovery && !var.amd_gpu_operator_skip_nfd_dependency_check
+
+  # Dranet has no IPv6 support yet, so it needs a single-stack IPv4 cluster.
+  # GB200.4 uses native InfiniBand and is the exception.
+  invalid_dranet_ip_stack = var.install_dranet && var.enable_ipv6 && !(var.worker_gmc_enabled && var.worker_gmc_shape == "BM.GPU.GB200.4")
+  # Dranet needs shared RDMA netns mode and the Network Operator needs exclusive mode.
+  invalid_dranet_with_network_operator = var.install_dranet && var.deploy_nvidia_network_operator
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -631,6 +637,28 @@ resource "null_resource" "validate_nvidia_dra_requires_nfd" {
     precondition {
       condition     = !local.invalid_nvidia_dra_without_nfd
       error_message = "NVIDIA DRA driver requires Node Feature Discovery for GPU node selection. Please set `deploy_node_feature_discovery=true` or set `install_nvidia_dra_driver=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_dranet_ip_stack" {
+  count = local.invalid_dranet_ip_stack ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_dranet_ip_stack
+      error_message = "Dranet (preview) supports single-stack IPv4 clusters only, or a GPU Memory Cluster pool with the BM.GPU.GB200.4 shape. Please set `enable_ipv6=false` or set `install_dranet=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_dranet_with_network_operator" {
+  count = local.invalid_dranet_with_network_operator ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_dranet_with_network_operator
+      error_message = "Dranet (preview) needs the shared RDMA netns mode, and the NVIDIA Network Operator needs the exclusive mode, so they cannot be enabled together. Please set `install_dranet=false` or `deploy_nvidia_network_operator=false`."
     }
   }
 }

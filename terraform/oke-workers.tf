@@ -76,12 +76,17 @@ locals {
     local.fss_export_path, var.fss_mount_path, local.fss_mount_ip
   ) : ""
 
+  # Dranet claims need shared RDMA netns mode, the Network Operator's SR-IOV VFs need exclusive mode.
+  # Node pool metadata values are limited to 255 characters, so the step ships in cloud-init.
+  rdma_netns_mode   = var.install_dranet ? "shared" : (var.deploy_nvidia_network_operator ? "exclusive" : "")
+  runcmd_rdma_netns = local.rdma_netns_mode != "" ? "bash /var/run/oke-rdma-netns.sh ${local.rdma_netns_mode} || echo 'Error setting the RDMA netns mode' >&2" : ""
+
   runcmd_lustre_mount = var.create_lustre && local.lustre_mount_ip != "" ? format(
     "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
     local.lustre_mount_ip, var.lustre_file_system_name, var.lustre_mount_path
   ) : ""
 
-  write_files = [
+  write_files = concat([
     {
       content = local.cluster_apiserver,
       path    = "/etc/oke/oke-apiserver",
@@ -103,11 +108,19 @@ locals {
       path        = "/etc/systemd/networkd.conf",
       permissions = "0644"
     }
-  ]
+    ], local.rdma_netns_mode != "" ? [
+    {
+      content     = file("${path.module}/files/rdma/rdma-netns.sh")
+      owner       = "root:root"
+      path        = "/var/run/oke-rdma-netns.sh"
+      permissions = "0755"
+    }
+  ] : [])
   cloud_init = {
     ssh_authorized_keys = local.ssh_authorized_keys
     runcmd = compact([
       local.runcmd_nvme_raid,
+      local.runcmd_rdma_netns,
       local.runcmd_bootstrap,
       local.runcmd_fss_mount,
       local.runcmd_lustre_mount,

@@ -38,6 +38,7 @@ Choose the manifests that match how the pods get the RDMA NICs. Each folder has 
 |---|---|---|---|---|
 | Host network | The RDMA NICs of the host | None | [host-network](../manifests/nccl-tests/host-network/) | [host-network](../manifests/rccl-tests/host-network/) |
 | SR-IOV virtual functions | One VF for each RDMA NIC | `deploy_nvidia_network_operator = true` | [virtual-functions](../manifests/nccl-tests/virtual-functions/) | [virtual-functions](../manifests/rccl-tests/virtual-functions/) |
+| Dranet (preview) | One IPvlan child for each claimed RDMA NIC | `install_dranet = true` | [dranet](../manifests/nccl-tests/dranet/) | [dranet](../manifests/rccl-tests/dranet/) |
 
 ### NCCL Tests
 | Image Tag                                                                 | CUDA   |

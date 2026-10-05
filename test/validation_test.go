@@ -184,6 +184,22 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "AMD GPU Operator addon requires Kubernetes 1.34",
 	},
+	{
+		name: "DranetRequiresSingleStackIPv4",
+		vars: map[string]interface{}{
+			"install_dranet": true,
+			"enable_ipv6":    true,
+		},
+		expectedError: "Dranet (preview) supports single-stack IPv4 clusters only",
+	},
+	{
+		name: "DranetConflictsWithNetworkOperator",
+		vars: map[string]interface{}{
+			"install_dranet":                 true,
+			"deploy_nvidia_network_operator": true,
+		},
+		expectedError: "Dranet (preview) needs the shared RDMA netns mode",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests
