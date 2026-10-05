@@ -37,6 +37,8 @@ variableGroups:
       - kueue_local_queue_default_namespace
       # NVIDIA DRA Driver
       - nvidia_dra_driver_chart_version
+      # Dranet
+      - dranet_chart_version
       # OCI HPC OKE Utils
       - install_image_prepuller
       - install_hostexec
@@ -328,6 +330,7 @@ variableGroups:
     variables:
       - deploy_nvidia_network_operator
       - nvidia_network_operator_addon_version
+      - install_dranet
       - install_slinky
       - slinky_advanced_options
       - hostname_override
@@ -2464,6 +2467,18 @@ variables:
     title: NVIDIA DRA Driver Helm chart version
     type: string
     default: "0.4.0"
+    visible: false
+
+  # Dranet
+  install_dranet:
+    title: Install Dranet
+    description: "Install Dranet, the Kubernetes DRA network driver, and create the dra.net DeviceClass. Worker nodes with RDMA NICs are set to shared RDMA network namespace mode at boot. Supports single-stack IPv4 clusters only, or a BM.GPU.GB200.4 GPU Memory Cluster pool. Cannot be combined with the NVIDIA Network Operator."
+    type: boolean
+    default: false
+  dranet_chart_version:
+    title: Dranet Helm chart version
+    type: string
+    default: "v1.5.0"
     visible: false
 
   # Slinky / Slurm Operator

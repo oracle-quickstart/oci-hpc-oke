@@ -119,3 +119,9 @@ Here's the worker template from the [BM.GPU.H100.8 NCCL test manifest with virtu
                 nvidia.com/gpu: 8
                 nvidia.com/rdma-vf: 16
 ```
+
+## Using Dranet
+
+If the cluster is deployed with Dranet (`install_dranet = true`, preview), a pod claims the RDMA NICs through a ResourceClaim. Each claimed NIC gives the pod an IPvlan child, so `hostNetwork`, the `/dev/infiniband` mount and `privileged: true` are not needed. The pod still needs the `IPC_LOCK` capability.
+
+See [Using Dranet for RDMA Network Interfaces](using-dranet.md) for a claim example. For a complete example, see the [Dranet NCCL test manifests](../manifests/nccl-tests/dranet/).
