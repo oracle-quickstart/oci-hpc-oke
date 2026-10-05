@@ -1,0 +1,123 @@
+apiVersion: kubeflow.org/v2beta1
+kind: MPIJob
+metadata:
+  name: rccl-tests
+spec:
+  slotsPerWorker: 8
+  runPolicy:
+    cleanPodPolicy: "Running"
+  sshAuthMountPath: /root/.ssh
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            rccl-tests-replica: mpi-launcher
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 2
+          containers:
+          - name: mpi-launcher
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
+            imagePullPolicy: Always
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            command: ["bash", "-c"]
+            args:
+            - |
+              set -e -o pipefail
+              trap 'exit 1' SIGINT
+              NUM_GPUS=8
+              NUM_HOSTS=$(sed -n '$=' /etc/mpi/hostfile)
+              NP=$(($NUM_HOSTS*$NUM_GPUS))
+
+              while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do
+                ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p 2222 $host exit 2>/dev/null || exit 1
+              done); do
+                echo "Waiting for workers to be ready..."
+                sleep 5
+              done
+              echo "All workers are ready!"
+
+              mpirun \
+                --allow-run-as-root \
+                --bind-to numa \
+                -mca plm_rsh_args '-p 2222' \
+                -mca pml ucx \
+                -mca btl ^openib \
+                -x UCX_NET_DEVICES=eth0 \
+                -x RX_QUEUE_LEN=8192 \
+                -x IB_RX_QUEUE_LEN=8192 \
+                -x coll_hcoll_enable=0 \
+                -x HCOLL_ENABLE_MCAST_ALL=0 \
+                -x NCCL_MIN_NCHANNELS=32 \
+                -x NCCL_IB_QPS_PER_CONNECTION=1 \
+                -x NCCL_SOCKET_IFNAME=eth0 \
+                -x NCCL_IB_SL=0 \
+                -x NCCL_IB_GID_INDEX=3 \
+                -x NCCL_IB_TC=41 \
+                -x NCCL_IGNORE_CPU_AFFINITY=1 \
+                -x NCCL_IB_HCA="=mlx5_0,mlx5_1,mlx5_2,mlx5_3,mlx5_4,mlx5_5,mlx5_6,mlx5_7" \
+                -N $NUM_GPUS \
+                -np $NP \
+                /workspace/rccl-tests/build/all_reduce_perf -b 1G -e 16G -f 4
+            resources:
+              limits:
+                ephemeral-storage: 32Gi
+              requests:
+                cpu: 2
+                ephemeral-storage: 32Gi
+                memory: 2Gi
+            securityContext:
+              privileged: true
+              capabilities:
+                add: [IPC_LOCK, SYS_PTRACE]
+            volumeMounts:
+            - { mountPath: /dev/shm, name: shm }
+            workingDir: /workspace
+          volumes:
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}
+    Worker:
+      replicas: 2
+      template:
+        metadata:
+          labels:
+            rccl-tests-replica: mpi-worker
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 2
+          nodeSelector:
+            node.kubernetes.io/instance-type: BM.GPU.MI355X-v1.8
+          containers:
+          - name: mpi-worker
+            image: iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
+            imagePullPolicy: Always
+            ports:
+            - { name: mpijob-port, containerPort: 2222, protocol: TCP }
+            command:
+            - /bin/bash
+            - -c
+            - mkdir -p /var/run/sshd; /usr/sbin/sshd -D -p 2222
+            resources:
+              limits:
+                ephemeral-storage: 32Gi
+                amd.com/gpu: 8
+              requests:
+                cpu: 200
+                ephemeral-storage: 32Gi
+                memory: 1024Gi
+                amd.com/gpu: 8
+            securityContext:
+              privileged: true
+              capabilities:
+                add: [IPC_LOCK, SYS_PTRACE]
+            volumeMounts:
+            - { mountPath: /dev/shm, name: shm }
+            workingDir: /workspace
+          volumes:
+          - { name: shm, emptyDir: { medium: Memory, sizeLimit: 128Gi }}

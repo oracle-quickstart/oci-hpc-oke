@@ -82,7 +82,7 @@ NCCL_IGNORE_CPU_AFFINITY=1
 > Combined with the full data-HCA list and `NCCL_MIN_NCHANNELS=8`, Tree reaches
 > ~34 GB/s bus bandwidth at 8 GiB on 2-4 nodes, versus ~21 GB/s with the default
 > Ring algorithm. Validated on the Kueue MPIJob manifest
-> ([`BM.GPU.RTXPRO.8.yaml`](../manifests/nccl-tests/kueue/BM.GPU.RTXPRO.8.yaml)).
+> ([`BM.GPU.RTXPRO.8.yaml`](../manifests/nccl-tests/host-network/kueue/BM.GPU.RTXPRO.8.yaml)).
 
 ## BM.GPU.B4.8
 

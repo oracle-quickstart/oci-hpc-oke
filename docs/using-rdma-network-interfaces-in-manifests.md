@@ -26,9 +26,9 @@ spec:
     - { mountPath: /dev/shm, name: shm }
 ```
 
-For complete examples, see the NCCL and RCCL test manifests in [manifests/nccl-tests/kueue](../manifests/nccl-tests/kueue/) and [manifests/rccl-tests/kueue](../manifests/rccl-tests/kueue/).
+For complete examples, see the NCCL and RCCL test manifests in [manifests/nccl-tests/host-network/kueue](../manifests/nccl-tests/host-network/kueue/) and [manifests/rccl-tests/host-network/kueue](../manifests/rccl-tests/host-network/kueue/).
 
-Here's the worker template from the [BM.GPU.H100.8 NCCL test manifest](../manifests/nccl-tests/kueue/BM.GPU.H100.8.yaml):
+Here's the worker template from the [BM.GPU.H100.8 NCCL test manifest](../manifests/nccl-tests/host-network/kueue/BM.GPU.H100.8.yaml):
 
 ```yaml
     Worker:
@@ -81,9 +81,9 @@ Nodes advertise one VF per RDMA physical function: 16 on dual-port shapes (BM.GP
 > [!NOTE]
 > The `rdma-vf` network attachment is created in the `default` namespace. For pods in other namespaces, use `default/rdma-vf` in the annotation.
 
-For complete examples, see the NCCL and RCCL test manifests using virtual functions in [manifests/nccl-tests/kueue/virtual-functions](../manifests/nccl-tests/kueue/virtual-functions/) and [manifests/rccl-tests/kueue/virtual-functions](../manifests/rccl-tests/kueue/virtual-functions/).
+For complete examples, see the NCCL and RCCL test manifests using virtual functions in [manifests/nccl-tests/virtual-functions/kueue](../manifests/nccl-tests/virtual-functions/kueue/) and [manifests/rccl-tests/virtual-functions/kueue](../manifests/rccl-tests/virtual-functions/kueue/).
 
-Here's the worker template from the [BM.GPU.H100.8 NCCL test manifest with virtual functions](../manifests/nccl-tests/kueue/virtual-functions/BM.GPU.H100.8.yaml), which requests 16 VFs:
+Here's the worker template from the [BM.GPU.H100.8 NCCL test manifest with virtual functions](../manifests/nccl-tests/virtual-functions/kueue/BM.GPU.H100.8.yaml), which requests 16 VFs:
 
 ```yaml
     Worker:

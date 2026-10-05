@@ -16,6 +16,15 @@ locals {
         }
       }
     ]
+    # Same exec args as the providers, so oci_profile applies.
+    "users" = [
+      for u in local.kube_config["users"] : {
+        "name" = u["name"]
+        "user" = {
+          "exec" = merge(u["user"]["exec"], { "args" = local.kube_exec_args })
+        }
+      }
+    ]
   })
 }
 
@@ -32,12 +41,15 @@ resource "null_resource" "kueue_predestroy_drain_via_orm" {
     on_failure  = continue
     interpreter = ["/bin/bash", "-c"]
     command     = <<-EOT
-      TMPKUBE="$(mktemp --suffix=.yaml)"
-      printf '%s' '${self.triggers.kubeconfig}' > "$TMPKUBE"
-      export KUBECONFIG="$TMPKUBE"
+      # Stop on any error, so kubectl never falls back to ~/.kube/config.
+      set -euo pipefail
+      WORKDIR="$(mktemp -d "$${TMPDIR:-/tmp}/kueue-drain.XXXXXX")"
+      trap 'rm -rf "$WORKDIR"' EXIT
+      printf '%s' '${self.triggers.kubeconfig}' > "$WORKDIR/kubeconfig"
+      export KUBECONFIG="$WORKDIR/kubeconfig"
       export PYTHONWARNINGS="ignore:the 'strict' parameter::urllib3.poolmanager"
-      printf '%s' '${base64encode(self.triggers.drain_script)}' | base64 -d > /tmp/kueue-predestroy-drain.sh
-      bash /tmp/kueue-predestroy-drain.sh
+      printf '%s' '${base64encode(self.triggers.drain_script)}' | base64 -d > "$WORKDIR/drain.sh"
+      bash "$WORKDIR/drain.sh"
     EOT
   }
 

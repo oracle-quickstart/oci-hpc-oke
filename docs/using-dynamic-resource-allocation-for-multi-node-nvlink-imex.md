@@ -1,6 +1,6 @@
 # Using Dynamic Resource Allocation (DRA) for Multi-Node NVLink
 
-The [`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/) directory contains NCCL test manifests for various OCI GPU shapes. The Slurm Operator deployment also uses DRA for long-running GPU Memory Cluster workers.
+The [`manifests/nccl-tests/host-network/kueue/`](../manifests/nccl-tests/host-network/kueue/) directory contains NCCL test manifests for various OCI GPU shapes. The Slurm Operator deployment also uses DRA for long-running GPU Memory Cluster workers.
 
 This guide explains the DRA pieces used by both deployment paths, why they are there, and how to adapt them.
 
@@ -76,7 +76,7 @@ The classic `nvidia.com/gpu` limit is still required. DRA handles only the IMEX 
 
 With `numNodes: 0`, pods are admitted as soon as their local IMEX daemon is up; they do not wait for peers. The workload itself must confirm that all peers are online before triggering any cross-node IMEX interaction (cross-node GPU memory sharing). How you do this depends on the launcher:
 
-- **mpirun-based workloads**: need an explicit check, because `mpirun` will try to SSH into unready workers and fail. For example, the four NCCL manifests in [`manifests/nccl-tests/kueue/`](../manifests/nccl-tests/kueue/) use an SSH probe loop in the launcher before invoking `mpirun`:
+- **mpirun-based workloads**: need an explicit check, because `mpirun` will try to SSH into unready workers and fail. For example, the four NCCL manifests in [`manifests/nccl-tests/host-network/kueue/`](../manifests/nccl-tests/host-network/kueue/) use an SSH probe loop in the launcher before invoking `mpirun`:
 
   ```bash
   while ! (for host in $(awk '{print $1}' /etc/mpi/hostfile); do \
@@ -169,16 +169,10 @@ DRA object names in these manifests follow a predictable scheme keyed off the sh
 
 When creating a manifest for a new MNNVL shape, keep this scheme so the four references stay consistent: `ComputeDomain.spec.channel.resourceClaimTemplate.name` must equal `pod.spec.resourceClaims[].resourceClaimTemplateName`, and `pod.spec.resourceClaims[].name` must equal `container.resources.claims[].name`.
 
-## Adapting a manifest for a new MNNVL shape
-
-1. Copy the closest existing DRA-enabled manifest (prefer [`BM.GPU.GB300.4.yaml`](../manifests/nccl-tests/kueue/BM.GPU.GB300.4.yaml) or [`BM.GPU.GB200-v3.4.yaml`](../manifests/nccl-tests/kueue/BM.GPU.GB200-v3.4.yaml)).
-2. Replace the shape name everywhere: `ResourceFlavor.spec.nodeLabels`, `nodeSelector`, queue names, and the DRA object names.
-3. Set `Worker.replicas` to the number of nodes you want to exercise. Leave `ComputeDomain.spec.numNodes` at `0`.
-4. Update NCCL and mpirun flags as appropriate for the shape (NIC list, `NCCL_NET_PLUGIN`, `NCCL_NVLS_ENABLE`, and so on). These differ per-shape and are not DRA-related.
-5. Verify the DRA driver is installed and reports the target nodes as schedulable for the channel device class before applying.
-
 ## Troubleshooting
 
 - **Worker pods stuck in `ContainerCreating`**: check the DRA driver pods (`kubectl get pods -n <dra-driver-ns>`) and the node's kubelet plugin socket.
+- **Workload `Inadmissible` with "DeviceClass ... is not mapped in DRA configuration"**: install Kueue with [`terraform/files/kueue/values.yaml`](../terraform/files/kueue/values.yaml), which maps the channel DeviceClass.
+- **Workload admitted, but worker pods stay `Pending` with an unallocated `ResourceClaim`**: Kueue does not check before admission that a node has the claimed devices free. That check (`KueueDRADeviceFeasibility`) is an alpha feature and is off. Kueue evicts and requeues the job when its pods are not ready within 30 minutes (`waitForPodsReady`).
 - **`ResourceClaim` not found**: confirm the `ComputeDomain` was created and that `channel.resourceClaimTemplate.name` matches the pod's `resourceClaimTemplateName` exactly.
 - **`mpirun` fails with NCCL errors after pods start**: MNNVL fabric is probably not ready. The launcher's SSH wait loop only proves workers are reachable, not that the IMEX mesh is complete. Retry, and check IMEX daemon logs on the worker nodes.

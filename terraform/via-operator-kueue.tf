@@ -43,11 +43,9 @@ module "kueue" {
       "  exit 1",
       "fi",
     ]),
-    # Topology, ResourceFlavor, and queues only when an RDMA-capable pool
-    # exists: the flavor binds to the oci-rdma topology whose node labels only
-    # RDMA-networked nodes carry, and gating also prevents creating a flavor
-    # from the worker_rdma_shape default for a pool that does not exist.
-    var.worker_rdma_enabled || var.worker_gmc_enabled ? flatten([
+    # Topology, ResourceFlavor, and queues only for a GPU RDMA or GMC pool
+    # with the RDMA labeler (see local.kueue_queues_enabled).
+    local.kueue_queues_enabled ? flatten([
       # Deploy Kueue Topology
       "cat <<'EOF' | kubectl apply -f -",
       split("\n", file("${path.module}/files/kueue/topology.yaml")),
@@ -65,9 +63,11 @@ module "kueue" {
       split("\n", templatefile("${path.module}/files/kueue/cluster-queue.yaml.tpl", {
         flavor_name  = local.kueue_flavor_name
         gpu_resource = local.kueue_gpu_resource
+        rdma_vf      = local.deploy_nvidia_network_operator_manifests
       })),
       "EOF",
-      # Deploy LocalQueue
+      # Deploy LocalQueue, creating its namespace if it does not exist
+      "kubectl create namespace ${var.kueue_local_queue_default_namespace} --dry-run=client -o yaml | kubectl apply -f -",
       "cat <<'EOF' | kubectl apply -f -",
       split("\n", templatefile("${path.module}/files/kueue/local-queue.yaml.tpl", {
         flavor_name = local.kueue_flavor_name
@@ -77,7 +77,7 @@ module "kueue" {
     ]) : []
   ])
 
-  helm_template_values_override = ""
+  helm_template_values_override = file("${path.module}/files/kueue/values.yaml")
   helm_user_values_override     = ""
 
   depends_on = [module.oke, module.certmanager]

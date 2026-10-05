@@ -52,7 +52,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -62,7 +62,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.GB200.4
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -83,7 +83,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -227,7 +227,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -237,7 +237,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU4.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -258,7 +258,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -398,7 +398,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -408,7 +408,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.H100.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -429,7 +429,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -535,7 +535,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -545,7 +545,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.A100-v2.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -566,7 +566,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -668,7 +668,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -678,7 +678,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.B200.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -699,7 +699,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -804,7 +804,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -814,7 +814,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.B4.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -835,7 +835,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -937,7 +937,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -947,7 +947,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.H200.8
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -968,7 +968,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
@@ -1073,7 +1073,7 @@ metadata:
   namespace: monitoring
 data:
   job.yaml: |-
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
     metadata:
       namespace: monitoring
@@ -1083,7 +1083,7 @@ data:
         node.kubernetes.io/instance-type: BM.GPU.GB200-v2.4
         nvidia.com/gpu: "true"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: ClusterQueue
     metadata:
       namespace: monitoring
@@ -1104,7 +1104,7 @@ data:
           - name: ephemeral-storage
             nominalQuota: "1000Gi"
     ---
-    apiVersion: kueue.x-k8s.io/v1beta1
+    apiVersion: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     metadata:
       namespace: monitoring
