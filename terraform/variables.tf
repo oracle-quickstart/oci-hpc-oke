@@ -734,7 +734,7 @@ variable "worker_ops_kubernetes_version" {
   type        = string
 }
 variable "worker_ops_node_cycling_enabled" {
-  default     = false
+  default     = true
   description = "Enable node cycling for the system worker pool."
   type        = bool
 }
@@ -804,7 +804,7 @@ variable "worker_cpu_kubernetes_version" {
   type        = string
 }
 variable "worker_cpu_node_cycling_enabled" {
-  default     = false
+  default     = true
   description = "Enable node cycling for the CPU worker pool."
   type        = bool
 }
