@@ -83,7 +83,7 @@ kubectl create namespace monitoring
 
 ```bash
 export MONITORING_NAMESPACE="monitoring"
-export PROMETHEUS_STACK_CHART_VERSION="87.2.1"
+export PROMETHEUS_STACK_CHART_VERSION="92.0.0"
 
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"

@@ -1,6 +1,11 @@
 alertmanager:
   enabled: false
 
+# helm upgrade does not update CRDs. This job applies the CRDs of the chart version before install and upgrade.
+crds:
+  upgradeJob:
+    enabled: true
+
 defaultRules:
   create: false
 
@@ -32,6 +37,11 @@ prometheus:
               storage: 500Gi
 
 prometheus-node-exporter:
+  # The chart default rolls one node at a time, which takes longer than helm --wait on large clusters.
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
   prometheus:
     monitor:
       relabelings:

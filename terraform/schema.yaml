@@ -1429,7 +1429,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "87.2.1"
+    default: "92.0.0"
     visible: false
   ingress_chart_version:
     title: Ingress Controller helm chart version
