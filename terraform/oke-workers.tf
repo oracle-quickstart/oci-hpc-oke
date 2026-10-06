@@ -81,6 +81,11 @@ locals {
   rdma_netns_mode   = var.install_dranet ? "shared" : (var.deploy_nvidia_network_operator ? "exclusive" : "")
   runcmd_rdma_netns = local.rdma_netns_mode != "" ? "bash /var/run/oke-rdma-netns.sh ${local.rdma_netns_mode} || echo 'Error setting the RDMA netns mode' >&2" : ""
 
+  # IPv6 setup for the RDMA rails (see files/rdma/rdma-ipv6.sh). OCA loads its override file, which turns on
+  # IPv6 policy routing for B300, before runcmd, so the file ships in write_files. A unit reruns the script on reboots.
+  rdma_ipv6_setup  = local.cni_type == "npn" && local.cluster_uses_ipv6
+  runcmd_rdma_ipv6 = local.rdma_ipv6_setup ? "systemctl enable oke-rdma-ipv6.service; bash /usr/local/sbin/oke-rdma-ipv6.sh || echo 'Error setting up IPv6 on the RDMA rails' >&2" : ""
+
   runcmd_lustre_mount = var.create_lustre && local.lustre_mount_ip != "" ? format(
     "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
     local.lustre_mount_ip, var.lustre_file_system_name, var.lustre_mount_path
@@ -115,10 +120,30 @@ locals {
       path        = "/var/run/oke-rdma-netns.sh"
       permissions = "0755"
     }
+    ] : [], local.rdma_ipv6_setup ? [
+    {
+      content     = file("${path.module}/files/rdma/rdma-ipv6.sh")
+      owner       = "root:root"
+      path        = "/usr/local/sbin/oke-rdma-ipv6.sh"
+      permissions = "0755"
+    },
+    {
+      content     = file("${path.module}/files/rdma/oke-rdma-ipv6.service")
+      owner       = "root:root"
+      path        = "/etc/systemd/system/oke-rdma-ipv6.service"
+      permissions = "0644"
+    },
+    {
+      content     = file("${path.module}/files/rdma/rdma_features_enable.json")
+      owner       = "root:root"
+      path        = "/etc/oracle-cloud-agent/plugins/oci-hpc/oci-hpc-configure/rdma_features_enable.json"
+      permissions = "0644"
+    }
   ] : [])
   cloud_init = {
     ssh_authorized_keys = local.ssh_authorized_keys
     runcmd = compact([
+      local.runcmd_rdma_ipv6,
       local.runcmd_nvme_raid,
       local.runcmd_rdma_netns,
       local.runcmd_bootstrap,

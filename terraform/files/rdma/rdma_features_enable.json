@@ -1,0 +1,32 @@
+{
+  "host_serial_based_rdma_ips": false,
+  "ipv4_topology_based_rdma_ips": false,
+  "bring_up_vcn_nics": false,
+  "ipv6_fabric_policy_based_routing": false,
+  "ipv6_fabric_policy_based_routing_default_shapes": [
+    "BM.GPU.RTXPRO.8",
+    "BM.GPU.B300.8"
+  ],
+  "ipv6_fabric_policy_based_routing_table": 10,
+  "custom_vf_enable": false,
+  "custom_vf_configuration": [
+    {
+      "pf_name": "rdma1",
+      "vf_name": {
+        "vf1": "rdma1_vf1"
+      }
+    },
+    {
+      "pf_name": "rdma2",
+      "vf_name": {
+        "vf1": "rdma2_vf2"
+      }
+    },
+    {
+      "pf_name": "rdma3",
+      "vf_name": {
+        "vf1": "rdma3_vf3"
+      }
+    }
+  ]
+}
