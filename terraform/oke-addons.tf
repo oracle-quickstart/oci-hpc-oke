@@ -290,12 +290,14 @@ locals {
     (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
     (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
   )
+  deploy_gpu_health_monitoring_addon = var.deploy_gpu_health_monitoring && (local.has_nvidia_gpu || local.has_amd_gpu)
 
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     local.deploy_amd_gpu_operator_addon,
     local.deploy_nvidia_gpu_operator_addon,
     var.deploy_nvidia_network_operator,
+    local.deploy_gpu_health_monitoring_addon,
   ])
 
   managed_addon_non_gpu_pool_ids = compact([
@@ -693,6 +695,23 @@ resource "oci_containerengine_addon" "node_feature_discovery" {
 
   addon_name = "NodeFeatureDiscovery"
   cluster_id = module.oke.cluster_id
+
+  override_existing                = true
+  remove_addon_resources_on_delete = true
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+  ]
+}
+
+# Reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes.
+resource "oci_containerengine_addon" "gpu_health_monitoring" {
+  count = local.deploy_gpu_health_monitoring_addon ? 1 : 0
+
+  addon_name = "GpuHealthMonitoring"
+  cluster_id = module.oke.cluster_id
+  version    = var.gpu_health_monitoring_addon_version
 
   override_existing                = true
   remove_addon_resources_on_delete = true
