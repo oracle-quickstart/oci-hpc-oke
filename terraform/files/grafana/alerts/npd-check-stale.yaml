@@ -19,8 +19,8 @@ groups:
                 expr: >-
                   (
                     max by(hostname, check) (
-                      (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile"})
-                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile"} + 60, 300)
+                      (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|instance-rdma-plugins|rdma-gid-index"})
+                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|bus-stat|gpu-count|gpu-pcie|bad-page|rocminfo-check|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|instance-rdma-plugins|rdma-gid-index"} + 60, 300)
                     )
                     and on(hostname)
                     label_replace(
@@ -33,8 +33,8 @@ groups:
                   or
                   (
                     max by(hostname, check) (
-                      (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex"})
-                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex"} + 60, 300)
+                      (time() - oke_npd_check_last_run_timestamp_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex|instance-rdma-plugins|rdma-gid-index|rdma-ovs-mtu"})
+                      > bool clamp_min(2 * oke_npd_check_expected_interval_seconds{check=~"ecc-err|rowremap-err|bus-stat|gpu-count|gpu-pcie|fabric-mgr|xid-err|rdmalink-stat|rdmalink-flap|wpa-auth|rttcc-stat|ip-address|oca-ver|cpu-profile|nvlink-speed|dcgmi-health|rdma-vf-routes|rdma-vf-counters|imex|instance-rdma-plugins|rdma-gid-index|rdma-ovs-mtu"} + 60, 300)
                     )
                     and on(hostname)
                     label_replace(
@@ -160,6 +160,26 @@ groups:
                       label_replace(
                         label_replace(
                           max by(node) (
+                            kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"} > 0
+                          ) * 0 + 1,
+                          "hostname", "$1", "node", "(.*)"
+                        ),
+                        "check", "instance-rdma-plugins", "hostname", ".*"
+                      )
+                      or
+                      label_replace(
+                        label_replace(
+                          max by(node) (
+                            kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"} > 0
+                          ) * 0 + 1,
+                          "hostname", "$1", "node", "(.*)"
+                        ),
+                        "check", "rdma-gid-index", "hostname", ".*"
+                      )
+                      or
+                      label_replace(
+                        label_replace(
+                          max by(node) (
                             kube_node_status_capacity{resource="amd_com_gpu"} > 0
                           ) * 0 + 1,
                           "hostname", "$1", "node", "(.*)"
@@ -255,6 +275,16 @@ groups:
                           "hostname", "$1", "node", "(.*)"
                         ),
                         "check", "imex", "hostname", ".*"
+                      )
+                      or
+                      label_replace(
+                        label_replace(
+                          max by(node) (
+                            kube_node_status_capacity{resource="nvidia_com_gpu"} > 0
+                          ) * 0 + 1,
+                          "hostname", "$1", "node", "(.*)"
+                        ),
+                        "check", "rdma-ovs-mtu", "hostname", ".*"
                       )
                     )
                     unless on(hostname, check)

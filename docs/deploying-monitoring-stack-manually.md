@@ -448,7 +448,7 @@ case "${GPU_VENDOR}" in
     kubectl delete configmap -n ${MONITORING_NAMESPACE} \
       alert-dcgm-health alert-gpu-fabric-manager alert-gpu-imex \
       alert-gpu-row-remap alert-gpu-xid alert-nvlink-speed \
-      alert-rdma-vf-counters alert-rdma-vf-routes \
+      alert-rdma-ovs-mtu alert-rdma-vf-counters alert-rdma-vf-routes \
       alert-npd-delete-amd-alerts --ignore-not-found
     ;;
   nvidia)
@@ -467,7 +467,7 @@ for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
 
   case "${GPU_VENDOR}:${alert_name}" in
-    amd:dcgm-health.yaml|amd:gpu-fabric-manager.yaml|amd:gpu-imex.yaml|amd:gpu-row-remap.yaml|amd:gpu-xid.yaml|amd:nvlink-speed.yaml|amd:rdma-vf-counters.yaml|amd:rdma-vf-routes.yaml|amd:npd-delete-amd-alerts.yaml)
+    amd:dcgm-health.yaml|amd:gpu-fabric-manager.yaml|amd:gpu-imex.yaml|amd:gpu-row-remap.yaml|amd:gpu-xid.yaml|amd:nvlink-speed.yaml|amd:rdma-ovs-mtu.yaml|amd:rdma-vf-counters.yaml|amd:rdma-vf-routes.yaml|amd:npd-delete-amd-alerts.yaml)
       continue
       ;;
     nvidia:gpu-bad-pages.yaml|nvidia:npd-delete-nvidia-alerts.yaml)
@@ -1230,7 +1230,7 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_alert=1
    ```yaml
    image:
      repository: iad.ocir.io/idxzjcdglx2s/oke-npd
-     tag: v1.35.2-5
+     tag: v1.36.0-1
    ```
 
 3. Check the vendor-specific release and DaemonSet:

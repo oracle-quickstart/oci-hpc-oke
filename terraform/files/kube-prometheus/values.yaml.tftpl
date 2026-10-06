@@ -304,7 +304,7 @@ additionalPrometheusRulesMap:
                   (
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="true"} == bool 1)
+                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="true"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                       )
@@ -314,7 +314,7 @@ additionalPrometheusRulesMap:
                     or
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="true"} == bool 1)
+                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="true"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                       )
@@ -332,7 +332,7 @@ additionalPrometheusRulesMap:
                   (
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="unknown"} == bool 1)
+                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="unknown"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                       )
@@ -342,7 +342,7 @@ additionalPrometheusRulesMap:
                     or
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="unknown"} == bool 1)
+                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="unknown"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                       )
@@ -361,7 +361,7 @@ additionalPrometheusRulesMap:
                     (
                       count by(node) (
                         max by(node, condition) (
-                          kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaWpaAuth|Rocminfo"}
+                          kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo"}
                           and on(node)
                           (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                         )
@@ -373,7 +373,7 @@ additionalPrometheusRulesMap:
                     (
                       count by(node) (
                         max by(node, condition) (
-                          kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaLink|RdmaLinkFlapping|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"}
+                          kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"}
                           and on(node)
                           (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                         )
@@ -390,9 +390,9 @@ additionalPrometheusRulesMap:
               max by(hostname) (
                 label_replace(
                   (
-                    (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0) + 13)
+                    (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0) + 15)
                     or
-                    (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0) + 19)
+                    (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0) + 22)
                   ),
                   "hostname", "$1", "node", "(.*)"
                 )
