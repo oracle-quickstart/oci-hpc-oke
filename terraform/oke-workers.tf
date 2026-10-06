@@ -257,8 +257,11 @@ locals {
       gva_secondary_vnics = local.use_gva ? {
         pods = { ip_count = local.worker_rdma_gva_ip_count }
       } : {}
-      cloud_init    = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata = local.node_metadata
+      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
+        local.node_metadata
+      )
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_rdma_hostname_prefix } : {},
