@@ -150,7 +150,7 @@ module "kube_prometheus_stack" {
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"
       ] :
-      [
+      concat([
         "--set grafana.service.type=LoadBalancer",
         "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
@@ -158,10 +158,9 @@ module "kube_prometheus_stack" {
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
-        local.create_nsgs_effective ? [
-          format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", local.lb_nsg_id_int)
-        ] : []
-    ]) : []
+        ], local.create_nsgs_effective ? [
+        format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", local.lb_nsg_id_int)
+    ] : [])) : []
   ])
 
   post_deployment_commands = []
