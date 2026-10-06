@@ -314,8 +314,8 @@ data "oci_core_image" "operator_selected" {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.5.1"
+  # OKE module 5.5.1 with the fix for subnets that set ipv6_cidrs, from a fork until the fix is released.
+  source = "git::https://github.com/OguzPastirmaci/terraform-oci-oke.git?ref=d830e2006faf9626f52f8fbb49f3bf31cafa28df"
 
   providers = { oci.home = oci.home }
 
