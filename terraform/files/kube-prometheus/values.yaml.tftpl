@@ -9,6 +9,9 @@ prometheus:
     enableAdminAPI: false
     retention: 30d
     retentionSize: 450GB
+    resources:
+      requests:
+        memory: ${prometheus_memory_request}
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
@@ -43,7 +46,16 @@ prometheus-node-exporter:
           action: replace
       attachMetadata:
         node: true
+      # No dashboard or rule uses guest CPU time; it adds 2 series per CPU thread.
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: node_cpu_guest_seconds_total
+          action: drop
   extraArgs:
+    # Unused collectors with high per-node series counts on large GPU hosts.
+    - --no-collector.ipvs
+    - --no-collector.cpufreq
+    - --no-collector.thermal_zone
     - --collector.mountstats
     - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
     - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)

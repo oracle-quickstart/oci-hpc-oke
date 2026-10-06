@@ -169,6 +169,7 @@ module "kube_prometheus_stack" {
     install_grafana               = var.install_grafana
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
+    prometheus_memory_request     = local.prometheus_memory_request
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(

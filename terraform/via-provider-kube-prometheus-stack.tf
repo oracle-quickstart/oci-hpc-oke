@@ -21,6 +21,7 @@ resource "helm_release" "prometheus" {
     install_grafana               = var.install_grafana
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
+    prometheus_memory_request     = local.prometheus_memory_request
   })]
   create_namespace  = true
   recreate_pods     = false
