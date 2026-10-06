@@ -241,9 +241,11 @@ locals {
 
   # Dranet has no IPv6 support yet, so it needs a single-stack IPv4 cluster.
   # GB200.4 uses native InfiniBand and is the exception.
-  invalid_dranet_ip_stack = var.install_dranet && var.enable_ipv6 && !(var.worker_gmc_enabled && var.worker_gmc_shape == "BM.GPU.GB200.4")
+  invalid_dranet_ip_stack = var.install_dranet && local.cluster_uses_ipv6 && !(var.worker_gmc_enabled && var.worker_gmc_shape == "BM.GPU.GB200.4")
   # Dranet needs shared RDMA netns mode and the Network Operator needs exclusive mode.
   invalid_dranet_with_network_operator = var.install_dranet && var.deploy_nvidia_network_operator
+  # OKE needs public subnets for IPv6, and IPv6 egress goes through the internet gateway.
+  invalid_ipv6_without_public_subnets = local.cluster_uses_ipv6 && var.create_vcn && !var.create_public_subnets
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -647,7 +649,18 @@ resource "null_resource" "validate_dranet_ip_stack" {
   lifecycle {
     precondition {
       condition     = !local.invalid_dranet_ip_stack
-      error_message = "Dranet (preview) supports single-stack IPv4 clusters only, or a GPU Memory Cluster pool with the BM.GPU.GB200.4 shape. Please set `enable_ipv6=false` or set `install_dranet=false`."
+      error_message = "Dranet (preview) supports single-stack IPv4 clusters only, or a GPU Memory Cluster pool with the BM.GPU.GB200.4 shape. Please set `ip_families=IPv4` and `enable_ipv6=false`, or set `install_dranet=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_ipv6_public_subnets" {
+  count = local.invalid_ipv6_without_public_subnets ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_ipv6_without_public_subnets
+      error_message = "Dual stack and IPv6 clusters need public subnets and an internet gateway. Please set `create_public_subnets=true`, or set `ip_families=IPv4` and `enable_ipv6=false`."
     }
   }
 }

@@ -167,6 +167,7 @@ variableGroups:
       - cluster_name
       - kubernetes_version
       - cni_type
+      - ip_families
       - services_cidr
       - control_plane_is_public
       - control_plane_allowed_cidrs
@@ -1517,6 +1518,15 @@ variables:
     - VCN-Native Pod Networking
     - Flannel
     default: VCN-Native Pod Networking
+  ip_families:
+    title: IP families
+    description: IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. Dual stack makes the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. Changing this value replaces the cluster.
+    required: true
+    type: enum
+    enum:
+    - IPv4
+    - IPv4,IPv6
+    default: IPv4
   control_plane_is_public:
     title: Create the Kubernetes control plane endpoint in a public subnet and assign it a public IP address
     type: boolean
