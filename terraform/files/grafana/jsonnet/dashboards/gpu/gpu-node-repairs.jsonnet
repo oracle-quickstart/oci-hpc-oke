@@ -26,10 +26,10 @@ local tableConfig(renames, timeColumns, sortColumn=null) = {
   fieldConfig: {
     defaults: {
       custom: { align: 'auto', cellOptions: { type: 'auto' }, inspect: false },
-      // Some signals have no fault code (user-initiated repair) or no action (hpcFault). Show "none" in those cells.
+      // Some fields do not apply, for example the fault code of a user-initiated repair or the action of an hpcFault. Show N/A.
       mappings: [
-        { type: 'special', options: { match: 'null+nan', result: { text: 'none', index: 0 } } },
-        { type: 'special', options: { match: 'empty', result: { text: 'none', index: 1 } } },
+        { type: 'special', options: { match: 'null+nan', result: { text: 'N/A', index: 0 } } },
+        { type: 'special', options: { match: 'empty', result: { text: 'N/A', index: 1 } } },
       ],
     },
     overrides: [
