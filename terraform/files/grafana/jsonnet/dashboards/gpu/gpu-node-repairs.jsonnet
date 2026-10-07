@@ -53,26 +53,38 @@ g.dashboard.new('GPU Node Repairs')
   statPanel(
     'Nodes in Repair',
     'count(oke_node_health_report_repair_info{phase!="", terminal_state=""}) or vector(0)',
-    { w: 6, h: 4, x: 0, y: 0 },
+    { w: 4, h: 4, x: 0, y: 0 },
     id=1,
   ),
   statPanel(
     'Nodes with Faults (last 15m)',
     'count(count by(node) (time() - oke_node_health_report_signal_last_observed_timestamp_seconds < 900)) or vector(0)',
-    { w: 6, h: 4, x: 6, y: 0 },
+    { w: 4, h: 4, x: 4, y: 0 },
     id=2,
   ),
   statPanel(
     'Repairs Completed (time range)',
     'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{dry_run="false", result="Completed"}\n)\nor vector(0)',
-    { w: 6, h: 4, x: 12, y: 0 },
+    { w: 4, h: 4, x: 8, y: 0 },
     id=3,
   ),
   statPanel(
     'Repairs Failed (time range)',
     'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{result="Failed"}\n)\nor vector(0)',
-    { w: 6, h: 4, x: 18, y: 0 },
+    { w: 4, h: 4, x: 12, y: 0 },
     id=4,
+  ),
+  statPanel(
+    'Nodes with Stale Health Results',
+    'count(max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900)) or vector(0)',
+    { w: 4, h: 4, x: 16, y: 0 },
+    id=10,
+  ),
+  statPanel(
+    'Fault Monitor Scan Errors (time range)',
+    '(sum(increase(gfm_scan_total{result!="success"}[$__range])) or vector(0))\n+\n(sum(increase(gfm_hpc_scan_total{result!="success"}[$__range])) or vector(0))',
+    { w: 4, h: 4, x: 20, y: 0 },
+    id=11,
   ),
   panel.table(
     'Repair Status',

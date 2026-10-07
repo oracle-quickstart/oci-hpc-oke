@@ -57,10 +57,18 @@ locals {
     "rdma-vf-counters.yaml",
     "rdma-vf-routes.yaml",
   ]
+  # These alerts read the node conditions and NodeHealthReports of the GPU Health Monitoring add-on.
+  grafana_gpu_health_alert_files = [
+    "gpu-fault-monitor-stale.yaml",
+    "gpu-health-fault.yaml",
+    "gpu-health-unavailable.yaml",
+    "gpu-node-repair-failed.yaml",
+  ]
   grafana_alert_files_filtered = [
     for f in local.grafana_alert_files : f
     if(!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
     (!contains(local.grafana_nvidia_alert_files, f) || local.has_nvidia_gpu) &&
+    (!contains(local.grafana_gpu_health_alert_files, f) || local.deploy_gpu_health_monitoring_addon) &&
     (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
   ]
