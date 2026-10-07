@@ -36,6 +36,8 @@ locals {
     f => f == "gpu-health-status.json" ? jsonencode(merge(local.grafana_gpu_health_dashboard, {
       panels = local.grafana_gpu_health_panels_reflowed
     })) : content
+    # The node repairs dashboard reads NodeHealthReports, which exist only with the GPU Health Monitoring add-on.
+    if f != "gpu-node-repairs.json" || local.deploy_gpu_health_monitoring_addon
   } : {}
   grafana_oci_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards && var.setup_oci_metrics_exporter) ? local.grafana_oci_dashboard_sources : {}
 

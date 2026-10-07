@@ -199,7 +199,7 @@ def main() -> int:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
         return 1
-    print("Verified 21 dashboard contracts and AMD/NVIDIA/mixed GPU variants")
+    print("Verified 22 dashboard contracts and AMD/NVIDIA/mixed GPU variants")
     return 0
 
 
