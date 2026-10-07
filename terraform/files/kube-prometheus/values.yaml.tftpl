@@ -204,6 +204,7 @@ kube-state-metrics:
                     labelsFromPath:
                       fault_code: [faultCode]
                       action: [action]
+                      description: [faultDescription]
               - name: signal_last_observed_timestamp_seconds
                 help: Last time a fault signal was seen.
                 commonLabels:
@@ -217,6 +218,7 @@ kube-state-metrics:
                     labelsFromPath:
                       fault_code: [faultCode]
                       action: [action]
+                      description: [faultDescription]
               - name: signal_first_observed_timestamp_seconds
                 help: First time a fault signal was seen.
                 commonLabels:
@@ -230,6 +232,7 @@ kube-state-metrics:
                     labelsFromPath:
                       fault_code: [faultCode]
                       action: [action]
+                      description: [faultDescription]
               - name: signal_last_observed_timestamp_seconds
                 help: Last time a fault signal was seen.
                 commonLabels:
@@ -243,6 +246,7 @@ kube-state-metrics:
                     labelsFromPath:
                       fault_code: [faultCode]
                       action: [action]
+                      description: [faultDescription]
               - name: signal_first_observed_timestamp_seconds
                 help: First time a fault signal was seen.
                 commonLabels:

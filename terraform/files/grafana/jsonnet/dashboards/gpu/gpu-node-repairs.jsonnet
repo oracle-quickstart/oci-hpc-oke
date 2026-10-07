@@ -109,15 +109,15 @@ g.dashboard.new('GPU Node Repairs')
     'Fault Signals',
     [
       // Group by the signal labels, because each kube-state-metrics restart starts new series for the same signal.
-      instantTable('max by(node, source, fault_code, action) (max_over_time(oke_node_health_report_signal_last_observed_timestamp_seconds[$__range]) > time() - $__range_s) * 1000', 'A'),
+      instantTable('max by(node, source, fault_code, description, action) (max_over_time(oke_node_health_report_signal_last_observed_timestamp_seconds[$__range]) > time() - $__range_s) * 1000', 'A'),
       instantTable(
-        'min by(node, source, fault_code, action) (min_over_time(oke_node_health_report_signal_first_observed_timestamp_seconds[$__range])) * 1000\nand\nmax by(node, source, fault_code, action) (max_over_time(oke_node_health_report_signal_last_observed_timestamp_seconds[$__range]) > time() - $__range_s)',
+        'min by(node, source, fault_code, description, action) (min_over_time(oke_node_health_report_signal_first_observed_timestamp_seconds[$__range])) * 1000\nand\nmax by(node, source, fault_code, description, action) (max_over_time(oke_node_health_report_signal_last_observed_timestamp_seconds[$__range]) > time() - $__range_s)',
         'B'
       ),
     ],
     { w: 24, h: 8, x: 0, y: 11 },
     6,
-    config=tableConfig({ 'Value #A': 'Last Seen', 'Value #B': 'First Seen', node: 'Node', source: 'Source', fault_code: 'Fault Code', action: 'Action' }, ['Last Seen', 'First Seen']),
+    config=tableConfig({ 'Value #A': 'Last Seen', 'Value #B': 'First Seen', node: 'Node', source: 'Source', fault_code: 'Fault Code', description: 'Description', action: 'Action' }, ['Last Seen', 'First Seen']),
   ),
   panel.table(
     'Last Repair Attempts',
