@@ -70,13 +70,13 @@ g.dashboard.new('GPU Node Repairs')
     id=2,
   ),
   statPanel(
-    'Repairs Completed (time range)',
+    'Repairs Completed',
     'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{dry_run="false", result="Completed"}\n)\nor vector(0)',
     { w: 4, h: 4, x: 8, y: 0 },
     id=3,
   ),
   statPanel(
-    'Repairs Failed (time range)',
+    'Repairs Failed',
     'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{result="Failed"}\n)\nor vector(0)',
     { w: 4, h: 4, x: 12, y: 0 },
     id=4,
