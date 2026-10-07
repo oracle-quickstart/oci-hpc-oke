@@ -134,11 +134,11 @@ g.dashboard.new('GPU Node Repairs')
   panel.table(
     'Maintenance Events',
     [
-      instantTable('max by(node, action, maintenance_state) (max_over_time(oke_node_health_report_maintenance_event_last_observed_timestamp_seconds[$__range]) > time() - $__range_s) * 1000', 'A'),
+      instantTable('max by(node, maintenance_event_id, action, maintenance_state) (max_over_time(oke_node_health_report_maintenance_event_last_observed_timestamp_seconds[$__range]) > time() - $__range_s) * 1000', 'A'),
     ],
     { w: 12, h: 7, x: 12, y: 19 },
     8,
-    config=tableConfig({ Value: 'Last Seen', node: 'Node', action: 'Action', maintenance_state: 'State' }, ['Last Seen']),
+    config=tableConfig({ Value: 'Last Seen', node: 'Node', maintenance_event_id: 'Event ID', action: 'Action', maintenance_state: 'State' }, ['Last Seen']),
   ),
   stateTimelinePanel(
     'Repair Phase History',
