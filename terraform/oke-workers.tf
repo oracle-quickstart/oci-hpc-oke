@@ -134,7 +134,13 @@ locals {
       permissions = "0644"
     },
     {
-      content     = file("${path.module}/files/rdma/rdma_features_enable.json")
+      # OCA replaces its defaults with this file, and keys left out keep OCA's default behavior.
+      # On an IPv6-only primary VNIC OCA stops with an error if the file exists and host_serial_based_rdma_ips is false.
+      # OCA uses host serial based RDMA IPs there anyway, so true changes nothing else.
+      content = jsonencode(merge(
+        { ipv6_fabric_policy_based_routing_default_shapes = ["BM.GPU.RTXPRO.8", "BM.GPU.B300.8"] },
+        contains(local.ip_families, "IPv4") ? {} : { host_serial_based_rdma_ips = true },
+      ))
       owner       = "root:root"
       path        = "/etc/oracle-cloud-agent/plugins/oci-hpc/oci-hpc-configure/rdma_features_enable.json"
       permissions = "0644"
