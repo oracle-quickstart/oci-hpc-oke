@@ -43,6 +43,7 @@ Choose the manifests that match how the pods get the RDMA NICs. Each folder has 
 ### NCCL Tests
 | Image Tag                                                                 | CUDA   |
 |---------------------------------------------------------------------------|--------|
+| iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.4.1-ubuntu-24.04-nccl-2.32.3-100526.0 | 13.4.1 |
 | iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.3.0-ubuntu-24.04-nccl-2.30.4-071626.0 | 13.3.0 |
 | iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-12.9.1-ubuntu-24.04-nccl-2.29.3-020926.1 | 12.9.1 |
 
