@@ -22,15 +22,22 @@ local hiddenColumns = {
   service: true,
 };
 
-local tableConfig(renames, timeColumns) = {
+local tableConfig(renames, timeColumns, sortColumn=null) = {
   fieldConfig: {
-    defaults: { custom: { align: 'auto', cellOptions: { type: 'auto' }, inspect: false } },
+    defaults: {
+      custom: { align: 'auto', cellOptions: { type: 'auto' }, inspect: false },
+      // Some signals have no fault code (user-initiated repair) or no action (hpcFault). Show "none" in those cells.
+      mappings: [
+        { type: 'special', options: { match: 'null+nan', result: { text: 'none', index: 0 } } },
+        { type: 'special', options: { match: 'empty', result: { text: 'none', index: 1 } } },
+      ],
+    },
     overrides: [
       { matcher: { id: 'byName', options: name }, properties: [{ id: 'unit', value: 'dateTimeAsIso' }] }
       for name in timeColumns
     ],
   },
-  options: { cellHeight: 'sm', showHeader: true, sortBy: [{ displayName: timeColumns[0], desc: true }] },
+  options: { cellHeight: 'sm', showHeader: true, sortBy: [{ displayName: if sortColumn != null then sortColumn else timeColumns[0], desc: true }] },
   transformations: [
     { id: 'merge', options: {} },
     { id: 'organize', options: { excludeByName: hiddenColumns, renameByName: renames } },
@@ -81,8 +88,8 @@ g.dashboard.new('GPU Node Repairs')
     id=10,
   ),
   statPanel(
-    'Fault Monitor Scan Errors (time range)',
-    '(sum(increase(gfm_scan_total{result!="success"}[$__range])) or vector(0))\n+\n(sum(increase(gfm_hpc_scan_total{result!="success"}[$__range])) or vector(0))',
+    'Nodes with Scan Errors (last 15m)',
+    'count(\n  count by(hostname) (\n    (increase(gfm_scan_total{result!="success"}[15m]) > 0)\n    or\n    (increase(gfm_hpc_scan_total{result!="success"}[15m]) > 0)\n  )\n)\nor vector(0)',
     { w: 4, h: 4, x: 20, y: 0 },
     id=11,
   ),
@@ -137,5 +144,18 @@ g.dashboard.new('GPU Node Repairs')
     id=9,
     perPage=20,
     valueMap={ '1': { color: 'blue', text: 'Active' } },
+  ),
+  panel.table(
+    'Fault Monitor Scan Errors (last 15m)',
+    [
+      instantTable(
+        'label_replace(\n  sum by(hostname, result) (increase(gfm_scan_total{result!="success"}[15m])) > 0,\n  "input", "Health check results", "", ""\n)\nor\nlabel_replace(\n  sum by(hostname, result) (increase(gfm_hpc_scan_total{result!="success"}[15m])) > 0,\n  "input", "FMS fault file", "", ""\n)',
+        'A'
+      ),
+    ],
+    { w: 24, h: 6, x: 0, y: 34 },
+    12,
+    config=tableConfig({ Value: 'Failed Scans', hostname: 'Node', input: 'Input', result: 'Result' }, [], sortColumn='Failed Scans')
+           + { fieldConfig+: { overrides+: [{ matcher: { id: 'byName', options: 'Failed Scans' }, properties: [{ id: 'decimals', value: 0 }] }] } },
   ),
 ], setPanelIDs=false)
