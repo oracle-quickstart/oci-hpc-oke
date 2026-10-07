@@ -350,6 +350,7 @@ module "oke" {
   create_operator                    = var.create_operator
   create_vcn                         = var.create_vcn
   enable_ipv6                        = var.enable_ipv6
+  oke_ip_families                    = var.oke_ip_families
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
@@ -380,6 +381,8 @@ module "oke" {
   ssh_private_key                   = local.any_deployments_via_operator ? tls_private_key.stack_key.private_key_openssh : null
   use_defined_tags                  = false
   vcn_cidrs                         = split(",", var.vcn_cidrs)
+  vcn_enable_ipv6_gua               = var.vcn_enable_ipv6_gua
+  vcn_ipv6_ula_cidrs                = var.vcn_ipv6_ula_cidrs
   vcn_create_internet_gateway       = var.create_public_subnets ? "auto" : "never"
   vcn_create_nat_gateway            = "auto"
   vcn_create_service_gateway        = "auto"

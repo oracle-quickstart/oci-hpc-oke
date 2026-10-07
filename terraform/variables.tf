@@ -68,6 +68,11 @@ variable "create_nsgs" {
   description = "Create network security groups (NSGs) for the cluster components. Only honored when create_vcn = false; a created VCN always gets its NSGs. When disabled, no NSGs (including the FSS and Lustre NSGs) are created and the bring-your-own subnets must already permit the required traffic."
 }
 variable "enable_ipv6" { default = false }
+variable "oke_ip_families" {
+  default     = []
+  type        = list(string)
+  description = "Override the ip_families attribute for the OKE cluster. Supported values: ['IPv4'] or ['IPv4', 'IPv6'] or ['IPv6']. Defaults to ['IPv4', 'IPv6'] when enable_ipv6 is true, otherwise ['IPv4']."
+}
 
 variable "vcn_compartment_ocid" {
   default = null
@@ -79,6 +84,16 @@ variable "vcn_id" {
 }
 variable "vcn_name" { default = "oke-gpu-quickstart" }
 variable "vcn_cidrs" { default = "10.140.0.0/16" }
+variable "vcn_ipv6_ula_cidrs" {
+  default     = []
+  type        = list(string)
+  description = "IPv6 ULA CIDR blocks (fd00::/8, /64 or larger) assigned to the VCN. Subnet IPv6 CIDRs may combine one block per VCN IPv6 prefix, e.g. one GUA-derived /64 plus one ULA /64."
+}
+variable "vcn_enable_ipv6_gua" {
+  default     = true
+  type        = bool
+  description = "Whether the VCN gets an Oracle-allocated IPv6 GUA /56 prefix. Set false to rely on ULA/BYOIPv6 prefixes only."
+}
 variable "create_public_subnets" {
   type    = bool
   default = true
