@@ -321,7 +321,7 @@ module "oke" {
   allow_worker_internet_access = true
   allow_worker_ssh_access      = true
   assign_dns                   = true
-  bastion_allowed_cidrs        = flatten(tolist([var.bastion_allowed_cidrs]))
+  bastion_allowed_cidrs        = compact([for c in split(",", join(",", flatten([var.bastion_allowed_cidrs]))) : trimspace(c)]) # ORM joins array items with commas
   bastion_await_cloudinit      = false
   bastion_is_public            = var.create_public_subnets ? var.bastion_is_public : false
   bastion_image_type           = local.bastion_image_type
@@ -340,7 +340,7 @@ module "oke" {
   cluster_name                       = local.cluster_name
   cluster_type                       = "enhanced"
   cni_type                           = local.cni_type
-  control_plane_allowed_cidrs        = flatten(tolist([var.control_plane_allowed_cidrs]))
+  control_plane_allowed_cidrs        = compact([for c in split(",", join(",", flatten([var.control_plane_allowed_cidrs]))) : trimspace(c)])
   control_plane_is_public            = var.control_plane_is_public
   create_bastion                     = var.create_bastion
   create_cluster                     = true
