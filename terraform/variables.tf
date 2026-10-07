@@ -198,6 +198,21 @@ variable "bastion_user" {
     error_message = "bastion_user must be 'auto' or a valid Linux username."
   }
 }
+variable "bastion_boot_volume_backup" {
+  default     = false
+  description = "Assign an Oracle-defined backup policy to the bastion boot volume."
+  type        = bool
+}
+variable "bastion_boot_volume_backup_policy" {
+  default     = "bronze"
+  description = "Oracle-defined backup policy for the bastion boot volume: bronze, silver or gold."
+  type        = string
+
+  validation {
+    condition     = contains(["bronze", "silver", "gold"], lower(var.bastion_boot_volume_backup_policy))
+    error_message = "bastion_boot_volume_backup_policy must be bronze, silver or gold."
+  }
+}
 
 # Bastion Service
 variable "create_oci_bastion_service" {
@@ -289,6 +304,21 @@ variable "operator_user" {
   validation {
     condition     = lower(var.operator_user) == "auto" || can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.operator_user))
     error_message = "operator_user must be 'auto' or a valid Linux username."
+  }
+}
+variable "operator_boot_volume_backup" {
+  default     = false
+  description = "Assign an Oracle-defined backup policy to the operator boot volume."
+  type        = bool
+}
+variable "operator_boot_volume_backup_policy" {
+  default     = "bronze"
+  description = "Oracle-defined backup policy for the operator boot volume: bronze, silver or gold."
+  type        = string
+
+  validation {
+    condition     = contains(["bronze", "silver", "gold"], lower(var.operator_boot_volume_backup_policy))
+    error_message = "operator_boot_volume_backup_policy must be bronze, silver or gold."
   }
 }
 
