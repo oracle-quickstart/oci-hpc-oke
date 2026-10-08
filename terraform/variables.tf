@@ -930,6 +930,16 @@ variable "worker_rdma_host_group_id" {
   description = "OCID of the existing host group for the GPU with RDMA worker pool."
   type        = string
 }
+variable "worker_rdma_use_existing_compute_cluster" {
+  default     = false
+  description = "Place the GPU with RDMA worker pool in an existing compute cluster instead of creating a new one. Applies only when worker_rdma_use_cluster_network is false. Changing this on an existing stack replaces all nodes in the pool."
+  type        = bool
+}
+variable "worker_rdma_compute_cluster_id" {
+  default     = ""
+  description = "OCID of the existing compute cluster for the GPU with RDMA worker pool. It must be in the same availability domain as the pool. With create_policies, it must be in the deployment compartment or a child compartment. The user that runs Terraform needs read access to the compute cluster. Changing this on an existing stack replaces all nodes in the pool."
+  type        = string
+}
 
 # Workers - GPU Memory Cluster
 variable "worker_gmc_enabled" {

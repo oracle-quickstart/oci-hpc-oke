@@ -251,6 +251,11 @@ data "oci_core_image" "worker_rdma" {
   image_id = coalesce(var.worker_rdma_image_custom_id, var.worker_rdma_image_platform_id, "none")
 }
 
+data "oci_core_compute_cluster" "worker_rdma" {
+  count              = var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network && var.worker_rdma_use_existing_compute_cluster && var.worker_rdma_compute_cluster_id != "" ? 1 : 0
+  compute_cluster_id = var.worker_rdma_compute_cluster_id
+}
+
 resource "null_resource" "validate_bastion_networking" {
   count = local.invalid_bastion ? 1 : 0
 
@@ -303,6 +308,22 @@ resource "null_resource" "validate_worker_rdma_image" {
     precondition {
       condition     = !local.invalid_worker_rdma_image
       error_message = "GPU & RDMA worker pools only support Ubuntu images. The selected image '${one(data.oci_core_image.worker_rdma[*].display_name)}' is an Oracle Linux image. Please choose an Ubuntu-based custom image."
+    }
+  }
+}
+
+resource "null_resource" "validate_worker_rdma_compute_cluster" {
+  count = var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network && var.worker_rdma_use_existing_compute_cluster ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.worker_rdma_compute_cluster_id != ""
+      error_message = "worker_rdma_use_existing_compute_cluster=true requires worker_rdma_compute_cluster_id."
+    }
+    # The module uses only the trailing AD number of worker_rdma_ad, so compare that part.
+    precondition {
+      condition     = var.worker_rdma_compute_cluster_id == "" || try(substr(data.oci_core_compute_cluster.worker_rdma[0].availability_domain, -1, 1) == substr(var.worker_rdma_ad, -1, 1), false)
+      error_message = "The compute cluster ${var.worker_rdma_compute_cluster_id} is in ${try(data.oci_core_compute_cluster.worker_rdma[0].availability_domain, "unknown")}, but worker_rdma_ad is ${var.worker_rdma_ad}. Use the same availability domain."
     }
   }
 }

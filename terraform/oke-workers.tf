@@ -245,6 +245,7 @@ locals {
       mode                           = var.worker_rdma_use_cluster_network ? "cluster-network" : "node-pool"
       use_compute_cluster            = !var.worker_rdma_use_cluster_network
       host_group_id                  = var.worker_rdma_host_group_id
+      compute_cluster_id             = var.worker_rdma_use_existing_compute_cluster ? var.worker_rdma_compute_cluster_id : ""
       size                           = var.worker_rdma_pool_size
       shape                          = var.worker_rdma_shape
       boot_volume_size               = var.worker_rdma_boot_volume_size
