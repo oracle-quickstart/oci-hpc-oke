@@ -193,6 +193,29 @@ var validationTestCases = []validationTestCase{
 		expectedError: "Dranet (preview) supports single-stack IPv4 clusters only",
 	},
 	{
+		name: "DranetRequiresSingleStackIPv4WithIPv6Families",
+		vars: map[string]interface{}{
+			"install_dranet": true,
+			"ip_families":    "IPv6",
+		},
+		expectedError: "Dranet (preview) supports single-stack IPv4 clusters only",
+	},
+	{
+		name: "IPv6RequiresPublicSubnets",
+		vars: map[string]interface{}{
+			"ip_families":           "IPv4,IPv6",
+			"create_public_subnets": false,
+		},
+		expectedError: "Dual stack and IPv6 clusters need public subnets",
+	},
+	{
+		name: "InvalidIPFamilies",
+		vars: map[string]interface{}{
+			"ip_families": "IPv6,IPv4",
+		},
+		expectedError: "ip_families must be IPv4, IPv4,IPv6 or IPv6",
+	},
+	{
 		name: "DranetConflictsWithNetworkOperator",
 		vars: map[string]interface{}{
 			"install_dranet":                 true,

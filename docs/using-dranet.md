@@ -21,7 +21,7 @@ The setting applies to nodes created after you enable the option. Replace existi
 
 ## Requirements
 
-- A single-stack IPv4 cluster (`enable_ipv6 = false`). Dranet does not support IPv6 yet.
+- A single-stack IPv4 cluster (`ip_families = "IPv4"`). Dranet does not support IPv6 yet.
 - The exception is a GPU Memory Cluster pool with the `BM.GPU.GB200.4` shape, which uses native InfiniBand.
 - No NVIDIA Network Operator (`deploy_nvidia_network_operator = false`). Its SR-IOV VFs need exclusive RDMA network namespace mode, which the stack sets when the Network Operator is enabled.
 

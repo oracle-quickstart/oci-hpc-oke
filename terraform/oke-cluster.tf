@@ -150,6 +150,10 @@ locals {
     var.pods_sn_cidrs != null ? [for c in split(",", var.pods_sn_cidrs) : trimspace(c)] : local.pods_ipv4_cidrs_default
   )
 
+  # With IPv6, GVA also needs two IPv6 prefixes on the pods subnet, or OCI limits ip_count to 16.
+  # A subnet takes only one prefix per VCN IPv6 block, so the VCN gets a ULA block for the second.
+  pods_ipv6_ula_vcn_cidr = local.cluster_uses_ipv6 && local.use_gva && var.create_vcn ? "fd00:10:140::/56" : null
+
   subnets = merge(
     {
       bastion = merge(
@@ -221,6 +225,8 @@ locals {
         { ipv4_cidrs = local.pods_subnet_ipv4_cidrs } : {},
         !local.pods_subnet_stack_created ?
         { id = var.pods_sn_id, create = "never" } : {},
+        local.pods_ipv6_ula_vcn_cidr != null ?
+        { ipv6_cidrs = ["8, 6", cidrsubnet(local.pods_ipv6_ula_vcn_cidr, 8, 6)] } : {},
         lookup(var.subnet_advanced_attrs, "pods", {})
       )
       bastion_service = merge(
@@ -261,6 +267,10 @@ locals {
   )
 
   cni_type = contains(["npn", "VCN-Native Pod Networking"], var.cni_type) ? "npn" : "flannel"
+
+  # enable_ipv6 is the old dual stack switch.
+  ip_families       = var.enable_ipv6 && var.ip_families == "IPv4" ? ["IPv4", "IPv6"] : split(",", var.ip_families)
+  cluster_uses_ipv6 = contains(local.ip_families, "IPv6")
 
   operator_denseio_ocpus = {
     "VM.DenseIO.E4.Flex" = var.operator_shape_ocpus_denseIO_e4_flex,
@@ -304,8 +314,8 @@ data "oci_core_image" "operator_selected" {
 }
 
 module "oke" {
-  source  = "oracle-terraform-modules/oke/oci"
-  version = "5.5.1"
+  # OKE module 5.5.1 with the fix for subnets that set ipv6_cidrs, from a fork until the fix is released.
+  source = "git::https://github.com/OguzPastirmaci/terraform-oci-oke.git?ref=d830e2006faf9626f52f8fbb49f3bf31cafa28df"
 
   providers = { oci.home = oci.home }
 
@@ -349,10 +359,11 @@ module "oke" {
   create_iam_tag_namespace           = false
   create_operator                    = var.create_operator
   create_vcn                         = var.create_vcn
-  enable_ipv6                        = var.enable_ipv6
+  enable_ipv6                        = local.cluster_uses_ipv6
   kubernetes_version                 = var.kubernetes_version
   load_balancers                     = var.create_public_subnets ? "both" : "internal"
   lockdown_default_seclist           = true
+  oke_ip_families                    = local.ip_families
   operator_image_type                = local.operator_image_type
   operator_image_id                  = local.operator_image_id
   operator_image_os                  = local.operator_image_operating_system
@@ -386,6 +397,7 @@ module "oke" {
   nat_route_table_id                = var.private_subnet_route_table
   ig_route_table_id                 = var.public_subnet_route_table
   vcn_id                            = var.vcn_id
+  vcn_ipv6_ula_cidrs                = local.pods_ipv6_ula_vcn_cidr != null ? [local.pods_ipv6_ula_vcn_cidr] : []
   vcn_name                          = local.vcn_name
   worker_disable_default_cloud_init = true
   worker_is_public                  = false

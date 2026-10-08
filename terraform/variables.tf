@@ -67,7 +67,21 @@ variable "create_nsgs" {
   default     = true
   description = "Create network security groups (NSGs) for the cluster components. Only honored when create_vcn = false; a created VCN always gets its NSGs. When disabled, no NSGs (including the FSS and Lustre NSGs) are created and the bring-your-own subnets must already permit the required traffic."
 }
-variable "enable_ipv6" { default = false }
+variable "enable_ipv6" {
+  type        = bool
+  default     = false
+  description = "Deprecated. Use ip_families. When true and ip_families is IPv4, the cluster is IPv4/IPv6 dual stack."
+}
+variable "ip_families" {
+  type        = string
+  default     = "IPv4"
+  description = "IP families of the cluster. IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. IPv6 is single stack IPv6, which is in limited availability and is not available in every region. Dual stack and IPv6 make the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. Changing this value replaces the cluster."
+
+  validation {
+    condition     = contains(["IPv4", "IPv4,IPv6", "IPv6"], var.ip_families)
+    error_message = "ip_families must be IPv4, IPv4,IPv6 or IPv6."
+  }
+}
 
 variable "vcn_compartment_ocid" {
   default = null
