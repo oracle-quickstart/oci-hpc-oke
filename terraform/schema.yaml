@@ -280,6 +280,8 @@ variableGroups:
       - worker_rdma_use_cluster_network
       - worker_rdma_use_host_group
       - worker_rdma_host_group_id
+      - worker_rdma_use_existing_compute_cluster
+      - worker_rdma_compute_cluster_id
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -2240,6 +2242,28 @@ variables:
         - ${worker_rdma_advanced_options}
         - not: [worker_rdma_use_cluster_network]
         - ${worker_rdma_use_host_group}
+  worker_rdma_use_existing_compute_cluster:
+    title: Use existing compute cluster
+    description: Place the GPU with RDMA worker pool in an existing compute cluster instead of creating a new one. Changing this on an existing stack replaces all nodes in the pool.
+    type: boolean
+    default: false
+    required: false
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+  worker_rdma_compute_cluster_id:
+    title: Compute cluster OCID
+    description: OCID of the existing compute cluster for the GPU with RDMA worker pool. It must be in the same availability domain as the pool. With Create Policies, it must be in the deployment compartment or a child compartment. The user that runs the stack needs read access to the compute cluster. Changing this on an existing stack replaces all nodes in the pool.
+    type: ocid
+    required: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+        - ${worker_rdma_use_existing_compute_cluster}
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name
