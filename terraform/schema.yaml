@@ -139,6 +139,8 @@ variableGroups:
       - bastion_image_compartment
       - bastion_image_id
       - bastion_user
+      - bastion_boot_volume_backup
+      - bastion_boot_volume_backup_policy
       - create_operator
       - operator_shape_config
       - operator_shape_name
@@ -156,6 +158,8 @@ variableGroups:
       - operator_image_id
       - operator_allow_image_drift
       - operator_user
+      - operator_boot_volume_backup
+      - operator_boot_volume_backup_policy
       - create_oci_bastion_service
       - bastion_service_allowed_cidrs
       - bastion_service_max_session_ttl
@@ -1018,6 +1022,23 @@ variables:
       and:
         - ${create_bastion}
         - ${bastion_shape_config}
+  bastion_boot_volume_backup:
+    title: Enable bastion boot volume backups
+    description: Back up the bastion boot volume with an Oracle-defined backup policy.
+    type: boolean
+    default: false
+    visible: ${create_bastion}
+  bastion_boot_volume_backup_policy:
+    title: Bastion boot volume backup policy
+    description: Bronze makes monthly backups, Silver adds weekly backups, and Gold adds daily backups. Backups are kept until their retention period ends.
+    type: enum
+    enum: [Bronze, Silver, Gold]
+    default: Bronze
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_boot_volume_backup}
 
   # Bastion Service
   create_oci_bastion_service:
@@ -1257,6 +1278,23 @@ variables:
       and:
         - ${create_operator}
         - ${operator_shape_config}
+  operator_boot_volume_backup:
+    title: Enable operator boot volume backups
+    description: Back up the operator boot volume with an Oracle-defined backup policy.
+    type: boolean
+    default: false
+    visible: ${create_operator}
+  operator_boot_volume_backup_policy:
+    title: Operator boot volume backup policy
+    description: Bronze makes monthly backups, Silver adds weekly backups, and Gold adds daily backups. Backups are kept until their retention period ends.
+    type: enum
+    enum: [Bronze, Silver, Gold]
+    default: Bronze
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_boot_volume_backup}
 
   # Storage
   create_fss:
