@@ -40,8 +40,8 @@ flavor="${FLAVOR:-ubuntu26.04}"
 slurm_minor="${slurm_version%.*}" # 26.05.1 -> 26.05
 
 operator_repo="${OPERATOR_REPO:-https://github.com/SlinkyProject/slurm-operator.git}"
-operator_ref="${OPERATOR_REF:-v1.2.1}"
-operator_version="${OPERATOR_VERSION:-1.2.1}"
+operator_ref="${OPERATOR_REF:-v1.2.3}"
+operator_version="${OPERATOR_VERSION:-1.2.3}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 workdir="$(mktemp -d)"

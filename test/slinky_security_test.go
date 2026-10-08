@@ -17,7 +17,7 @@ func readRepositoryFile(t *testing.T, path ...string) string {
 	return string(contents)
 }
 
-func TestSlinkyVersionSetUses121(t *testing.T) {
+func TestSlinkyVersionSetUses123(t *testing.T) {
 	slinky := readRepositoryFile(t, "terraform", "slinky.tf")
 	buildScript := readRepositoryFile(t, "docker", "slinky", "slurm-operator", "build-control-plane-images.sh")
 
@@ -27,19 +27,19 @@ func TestSlinkyVersionSetUses121(t *testing.T) {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "operator_chart_version") {
 			operatorPins++
-			require.Contains(t, line, `"1.2.1"`)
+			require.Contains(t, line, `"1.2.3"`)
 		}
 		if strings.HasPrefix(line, "slurm_chart_version") {
 			slurmPins++
-			require.Contains(t, line, `"1.2.1"`)
+			require.Contains(t, line, `"1.2.3"`)
 		}
 	}
 
 	require.Equal(t, 3, operatorPins)
 	require.Equal(t, 3, slurmPins)
 	require.Equal(t, 2, strings.Count(slinky, `tag: "${local.slinky_operator_chart_version}"`))
-	require.Contains(t, buildScript, `operator_ref="${OPERATOR_REF:-v1.2.1}"`)
-	require.Contains(t, buildScript, `operator_version="${OPERATOR_VERSION:-1.2.1}"`)
+	require.Contains(t, buildScript, `operator_ref="${OPERATOR_REF:-v1.2.3}"`)
+	require.Contains(t, buildScript, `operator_version="${OPERATOR_VERSION:-1.2.3}"`)
 }
 
 func TestSlinkySSSDUsesReadOnlyBindAccount(t *testing.T) {
