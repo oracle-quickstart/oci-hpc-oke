@@ -2723,7 +2723,7 @@ variables:
         - ${slinky_advanced_options}
   slinky_gpus_per_node:
     title: GPUs per Slurm worker
-    description: "Defaults independently to the final numeric component of each accelerator pool's GPU shape."
+    description: "Defaults independently to the final numeric component of each accelerator pool's GPU shape. RDMA shapes without GPUs always use 0."
     type: integer
     required: false
     visible:

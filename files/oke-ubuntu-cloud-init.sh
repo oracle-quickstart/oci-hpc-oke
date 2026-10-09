@@ -93,8 +93,9 @@ SHAPE=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/
 
 # RDMA workloads pin memory through ibv_reg_mr, which fails against the
 # container runtime default of 8 MB locked memory. Start all containers on GPU
-# nodes with unlimited memlock so slurmd and other RDMA pods inherit it.
-if [[ "$SHAPE" == *GPU* ]]; then
+# and RDMA nodes with unlimited memlock so slurmd and other RDMA pods inherit it.
+# BM.HPC* and BM.Optimized* are the RDMA shapes without GPUs.
+if [[ "$SHAPE" == *GPU* || "$SHAPE" == BM.HPC* || "$SHAPE" == BM.Optimized* ]]; then
     mkdir -p /etc/crio/crio.conf.d
     cat >/etc/crio/crio.conf.d/12-memlock.conf <<'EOF'
 [crio.runtime]

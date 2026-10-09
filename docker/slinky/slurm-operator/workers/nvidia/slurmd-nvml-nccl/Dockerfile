@@ -80,8 +80,9 @@ for d in ompi ucx sharp nccl_spectrum-x_plugin nccl_rdma_sharp_plugin; do
   fi
 done
 
-# Optional diagnostic utilities from the NCCL image.
-for bin in gpu-fryer ib_write_bw ib_read_bw ib_send_bw ibv_rc_pingpong; do
+# Optional diagnostic utilities from the NCCL image. The RDMA tools come from
+# apt below so a newer NCCL image cannot shadow them in /usr/local/bin.
+for bin in gpu-fryer; do
   if [ -x "/nccl-root/usr/local/bin/${bin}" ]; then
     cp -a "/nccl-root/usr/local/bin/${bin}" /usr/local/bin/
   fi
@@ -100,6 +101,11 @@ test -f /opt/hpcx/nccl_spectrum-x_plugin/lib/libnccl-net.so
 test -f /usr/lib/${multiarch}/slurm/gpu_nvml.so
 test -f /usr/lib/${multiarch}/slurm/gres_gpu.so
 EOR
+
+# RDMA diagnostics for Slurm jobs (ib_write_bw, ibv_devinfo, ip).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends iproute2 ibverbs-utils perftest \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN cat > /opt/nccl-tests/IMAGE_NOTES.md <<EOR
 # slurmd-nvml-nccl

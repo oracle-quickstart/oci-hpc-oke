@@ -18,6 +18,16 @@ labeler:
           - matchExpressions:
               - key: amd.com/gpu
                 operator: Exists
+          # RDMA shapes without GPUs (e.g. BM.Optimized3.36) have no GPU label.
+          # Match the pools the annotator and topology generator use.
+          - matchExpressions:
+              - key: oke.oraclecloud.com/pool.name
+                operator: In
+                values:
+                  - oke-gpu
+                  - oke-rdma
+                  - oke-gmc
+                  - oke-cpu
   podAnnotations: {}
   podLabels: {}
   interval: 300

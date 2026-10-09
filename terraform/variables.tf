@@ -1185,7 +1185,7 @@ variable "slinky_worker_replicas" {
 variable "slinky_gpus_per_node" {
   default     = null
   type        = number
-  description = "GPUs per Slinky accelerator slurmd pod. Defaults independently to the final numeric component of each pool's worker shape."
+  description = "GPUs per Slinky accelerator slurmd pod. Defaults independently to the final numeric component of each pool's worker shape. RDMA shapes without GPUs (for example BM.Optimized3.36) always use 0."
 }
 
 variable "slinky_worker_rdma_resource" {

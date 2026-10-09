@@ -55,9 +55,11 @@ locals {
   slinky_system_pool_name = "oke-system"
   slinky_gpu_is_amd       = contains(local.slinky_amd_shapes, var.worker_gpu_shape)
   slinky_rdma_is_amd      = contains(local.slinky_amd_shapes, var.worker_rdma_shape)
+  # RDMA shapes without GPUs (e.g. BM.Optimized3.36) get 0 GPUs and no GPU vendor.
+  slinky_rdma_has_gpu = can(regex("GPU", coalesce(var.worker_rdma_shape, "")))
   slinky_enabled_worker_vendors = distinct(compact([
     var.worker_gpu_enabled ? (local.slinky_gpu_is_amd ? "amd" : "nvidia") : "",
-    var.worker_rdma_enabled ? (local.slinky_rdma_is_amd ? "amd" : "nvidia") : "",
+    var.worker_rdma_enabled && local.slinky_rdma_has_gpu ? (local.slinky_rdma_is_amd ? "amd" : "nvidia") : "",
     var.worker_gmc_enabled ? "nvidia" : "",
   ]))
   # gres.conf is shared by every NodeSet, so the first implementation supports
@@ -267,7 +269,7 @@ locals {
       replicas            = coalesce(var.slinky_worker_replicas, var.worker_rdma_pool_size)
       image_tag           = local.slinky_worker_image_tag
       gpu_resource        = local.slinky_rdma_is_amd ? "amd.com/gpu" : "nvidia.com/gpu"
-      gpus_per_node       = coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", var.worker_rdma_shape), length(split(".", var.worker_rdma_shape)) - 1)), 1))
+      gpus_per_node       = local.slinky_rdma_has_gpu ? coalesce(var.slinky_gpus_per_node, try(tonumber(element(split(".", var.worker_rdma_shape), length(split(".", var.worker_rdma_shape)) - 1)), 1)) : 0
       mount_infiniband    = var.slinky_worker_mount_infiniband
       host_network        = local.slinky_rdma_host_network
       sriov_enabled       = local.slinky_rdma_sriov_enabled
@@ -276,7 +278,7 @@ locals {
       rdma_networks       = local.slinky_rdma_networks_annotation
       slurmd_parameters   = local.slinky_rdma_numa_topology_enabled ? "numa_node_as_socket" : ""
       numa_topology       = local.slinky_rdma_numa_topology_enabled
-      features            = distinct(compact(concat([var.worker_rdma_shape], local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
+      features            = distinct(compact(concat([var.worker_rdma_shape], local.slinky_rdma_has_gpu ? (local.slinky_rdma_is_amd ? ["amd", "rocm"] : ["nvidia"]) : [], ["rdma"], local.slinky_rdma_host_network ? ["hostnetwork"] : [], local.slinky_rdma_sriov_enabled ? ["sriov"] : [])))
       imex_claim_template = ""
     }
   } : {}

@@ -9,7 +9,7 @@
 | [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Enabled in the chart, disabled by default in the Terraform stack | Runs shell scripts on the host via `nsenter` |
 
-The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes.
+The prepuller targets GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The labeler targets GPU nodes and the stack worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`), so RDMA shapes without GPUs (for example BM.Optimized3.36) also get topology labels. The topology annotator targets the same worker pools. Hostexec has no node selector and runs on all nodes.
 
 ## Manual Installation
 
@@ -81,7 +81,7 @@ Labels are applied periodically and kept up to date. If a data source is tempora
 
 #### RDMA Topology Labels
 
-Applied to all GPU nodes. Sourced from IMDS every 5 minutes (default).
+Applied to all nodes the labeler runs on. Sourced from IMDS every 5 minutes (default).
 
 | Label | Description | Example |
 |-------|-------------|---------|
