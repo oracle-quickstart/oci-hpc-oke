@@ -60,8 +60,8 @@ images (see "Base Images Built from Upstream Source") instead of
 | Controller with PMIx plus SSSD/NSS | `slurm-operator/controller/slurmctld-pmix-sssd-nss/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
 | Login with Pyxis, Enroot, and login tools | `slurm-operator/login/login-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:login-pyxis-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
 | NVIDIA worker base with NVML AutoDetect plugins | `slurm-operator/workers/nvidia/slurmd-nvml-core/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-core-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
-| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-07-02.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL tests and HPCX payload | `slurm-operator/workers/nvidia/slurmd-nvml-nccl/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-26.05.1-ubuntu26.04-2026-10-08.0` | `linux/amd64`, `linux/arm64` |
+| NVIDIA worker with NCCL plus Pyxis/Enroot | `slurm-operator/workers/nvidia/slurmd-nvml-nccl-pyxis/Dockerfile` | `iad.ocir.io/idxzjcdglx2s/slurm-operator:slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-10-08.0` | `linux/amd64`, `linux/arm64` |
 
 The current AMD worker Dockerfiles build from the RCCL test image
 `iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-011826.1`.

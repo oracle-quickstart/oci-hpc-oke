@@ -124,7 +124,7 @@ locals {
       sssd_image_tag              = "login-26.05.1-ubuntu26.04-2026-07-02.0"
       controller_image_tag        = "slurmctld-pmix-sssd-nss-26.05.1-ubuntu26.04-2026-07-02.0"
       login_image_tag             = "login-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
-      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-07-02.0"
+      nvidia_worker_tag           = "slurmd-nvml-nccl-pyxis-26.05.1-ubuntu26.04-2026-10-08.0"
       amd_worker_tag              = "slurmd-rocm-rccl-26.05.1-rocm7.1.1-sssd-pyxis-2026-07-02.0"
     }
   }
