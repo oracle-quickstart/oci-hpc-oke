@@ -7,7 +7,7 @@ local query(name, label, metric, labelName, datasource) =
   + var.query.queryTypes.withLabelValues(labelName, metric)
   + var.query.generalOptions.withLabel(label)
   + var.query.selectionOptions.withMulti()
-  + var.query.selectionOptions.withIncludeAll()
+  + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
   + var.query.withRefresh(1);
 
 {
