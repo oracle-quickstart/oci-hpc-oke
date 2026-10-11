@@ -12,7 +12,7 @@ local var = g.dashboard.variable;
     + var.query.queryTypes.withLabelValues('instance_shape', 'node_uname_info')
     + var.query.generalOptions.withLabel('Instance Shape')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 
   hostname:
@@ -21,7 +21,7 @@ local var = g.dashboard.variable;
     + var.query.queryTypes.withLabelValues('hostname', 'up{instance_shape=~"$instance_shape"}')
     + var.query.generalOptions.withLabel('Node')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 
   oci_name:
@@ -30,6 +30,6 @@ local var = g.dashboard.variable;
     + var.query.queryTypes.withLabelValues('oci_name', 'up{instance_shape=~"$instance_shape"}')
     + var.query.generalOptions.withLabel('Display Name')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 }
