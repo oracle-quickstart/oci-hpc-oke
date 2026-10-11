@@ -89,6 +89,14 @@ locals {
           scrapeTimeout = local.nvidia_dcgm_exporter_service_monitor_interval
           honorLabels   = local.nvidia_dcgm_exporter_service_monitor_honor_labels
           relabelings   = local.nvidia_dcgm_exporter_service_monitor_relabelings
+          # The workload labels change with every pod on a GPU and multiply the
+          # DCGM series. No dashboard or alert uses them.
+          metricRelabelings = [
+            {
+              action = "labeldrop"
+              regex  = "exported_(pod|container|namespace)"
+            }
+          ]
         }
       ]
     }

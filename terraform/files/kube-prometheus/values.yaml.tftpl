@@ -80,11 +80,18 @@ prometheus-node-exporter:
         - sourceLabels: [__name__]
           regex: node_cpu_guest_seconds_total
           action: drop
+        # Dashboards read only idle CPU time. Keep user, system and iowait for debugging.
+        - sourceLabels: [__name__, mode]
+          regex: node_cpu_seconds_total;(irq|nice|softirq|steal)
+          action: drop
   extraArgs:
     # Unused collectors with high per-node series counts on large GPU hosts.
     - --no-collector.ipvs
     - --no-collector.cpufreq
     - --no-collector.thermal_zone
+    - --no-collector.softnet
+    - --no-collector.schedstat
+    - --no-collector.hwmon
     - --collector.mountstats
     - --collector.textfile.directory=/host/root/var/lib/node_exporter/textfile_collector
     - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
@@ -131,10 +138,75 @@ kubelet:
     # steps below the datasource's 30s timeInterval, so 30s, the stack-wide
     # interval, changes no dashboard.
     cAdvisorInterval: 30s
+    # No dashboard or rule reads the probe metrics.
+    probes: false
+    # Helm replaces lists, so the drop lists below repeat the chart 92.0.0 defaults first.
+    metricRelabelings:
+      - action: drop
+        sourceLabels: [__name__, le]
+        regex: (csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\.0)?
+      # One series per feature gate per node. No dashboard or rule reads it.
+      - action: drop
+        sourceLabels: [__name__]
+        regex: kubernetes_feature_enabled
+    cAdvisorMetricRelabelings:
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_memory_(mapped_file|swap)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_(file_descriptors|tasks_state|threads_max)'
+      - sourceLabels: [__name__, scope]
+        action: drop
+        regex: 'container_memory_failures_total;hierarchy'
+      - sourceLabels: [__name__, interface]
+        action: drop
+        regex: 'container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_spec.*'
+      - sourceLabels: [id, pod]
+        action: drop
+        regex: '.+;'
+      # cAdvisor metrics that no dashboard or rule reads. Memory usage, OOM events and
+      # CPU throttling stay for debugging.
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_blkio_device_usage_total|container_network_(receive|transmit)_errors_total|container_pressure_.*'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_memory_(failures_total|failcnt|kernel_usage|max_usage_bytes|total_active_file_bytes|total_inactive_file_bytes)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_(health_state|last_seen|processes|scrape_error|sockets|start_time_seconds|threads|ulimits_soft)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_cpu_(cfs_burst_periods_total|cfs_burst_seconds_total|load_d_average_10s)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_fs_(inodes_free|inodes_total|limit_bytes|read_seconds_total|usage_bytes|write_seconds_total)'
+
+# No dashboard or rule reads the kube-proxy metrics.
+kubeProxy:
+  enabled: false
 
 kube-state-metrics:
   serviceAccount:
     create: true
+  # Per-pod metadata series that no dashboard or rule reads.
+  metricDenylist:
+    - kube_pod_tolerations
+    - kube_pod_ips
+    - kube_pod_status_qos_class
+    - kube_pod_service_account
+    - kube_pod_scheduler
+    - kube_pod_restart_policy
 %{ if gpu_health_monitoring }
   # Export the GPU Health Monitoring add-on NodeHealthReports (faults and repairs) as metrics.
   rbac:
@@ -445,48 +517,6 @@ additionalPrometheusRulesMap:
     groups:
       - name: node_health
         rules:
-          - record: node_disk_free_ok
-            expr: avg by (hostname) (node_filesystem_avail_bytes{mountpoint="/",device=~"/dev/sd.*"}) >= bool 50 * 1024 * 1024 * 1024
-          - record: node_memory_availability_ok
-            expr: avg by (hostname) (node_memory_MemAvailable_bytes) >= bool 50 * 1024 * 1024 * 1024
-          - record: node_gpu_power_violation_ok
-            expr: min by (hostname) (increase(DCGM_FI_DEV_POWER_VIOLATION[5m]) == bool 0)
-          - record: node_gpu_board_limit_violation_ok
-            expr: min by (hostname) (increase(DCGM_FI_DEV_BOARD_LIMIT_VIOLATION[5m]) == bool 0)
-          - record: node_gpu_thermal_violation_ok
-            expr: min by (hostname) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) == bool 0)
-          - record: node_gpu_sync_boost_violation_ok
-            expr: min by (hostname) (increase(DCGM_FI_DEV_SYNC_BOOST_VIOLATION[5m]) == bool 0)
-          - record: node_gpu_reliability_violation_ok
-            expr: min by (hostname) (increase(DCGM_FI_DEV_RELIABILITY_VIOLATION[5m]) == bool 0)
-          - record: node_pcie_aer_correctable_errors_ok
-            expr: min by (hostname) (increase(pcie_aer_correctable_error_count[5m]) == bool 0)
-          - record: node_pcie_aer_fatal_errors_ok
-            expr: min by (hostname) (increase(pcie_aer_fatal_error_count[5m]) == bool 0)
-          - record: node_pcie_aer_nonfatal_errors_ok
-            expr: min by(hostname) (increase(pcie_aer_nonfatal_error_count[5m]) == bool 0)
-          - record: node_pcie_bus_inaccessible_ok
-            expr: min by (hostname) (pcie_bus_inaccessible_status == bool 0)
-          - record: node_pcie_bus_linkwidth_ok
-            expr: min by (hostname) (pcie_bus_linkwidth_status == bool 0)
-          - record: node_rttcc_ok
-            expr: min by(hostname) (problem_gauge{reason="RdmaRttccHasIssues",type="RdmaRttcc"} == bool 0)
-          - record: node_oca_ver_ok
-            expr: min by(hostname) (problem_gauge{reason="OcaVersionHasIssues",type="OcaVersion"} == bool 0)
-          - record: node_rdma_device_status_ok
-            expr: min by(hostname) (rdma_device_status)
-          - record: node_check_bus_issue_count_ok
-            expr: (check_bus_issue_count == bool 0) * on (hostname) (check_bus_issue_count == bool 0)
-          - record: node_rdma_link_flapping_ok
-            expr: min by(hostname) (rdma_link_noflap)
-          - record: node_ecc_error_check_ok
-            expr: (gpu_ecc_error_check) * on (hostname) (gpu_ecc_error_check)
-          - record: node_gpu_row_remap_error_check
-            expr: (gpu_row_remap_error_check== bool 0) * on (hostname) (gpu_row_remap_error_check== bool 0)
-          - record: node_xid_error_check
-            expr: (xid_error_check) * on (hostname) (xid_error_check)
-          - record: node_up_check
-            expr: (min by (hostname) (up{instance=~".*:9100$"}))
 %{ if !npd_removed }
           # The NPD condition lists and counts come from Terraform. NPD is not deployed when the GPU Health Monitoring add-on checks every GPU shape.
           - record: node_npd_failed
