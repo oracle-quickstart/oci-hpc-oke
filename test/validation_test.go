@@ -212,6 +212,7 @@ var validationTestCases = []validationTestCase{
 		name: "MonitoringPoolSmallerThanPrometheusPods",
 		vars: map[string]interface{}{
 			"install_thanos":              true,
+			"worker_monitoring_enabled":   true,
 			"prometheus_shards":           3,
 			"worker_monitoring_pool_size": 2,
 		},

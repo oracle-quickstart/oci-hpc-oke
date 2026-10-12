@@ -1534,9 +1534,9 @@ variables:
       - install_thanos
   worker_monitoring_enabled:
     title: Dedicated monitoring pool
-    description: Run Prometheus, Thanos, Grafana and kube-state-metrics on a tainted node pool sized from the cluster, instead of the system pool.
+    description: Opt-in. Run Prometheus, Thanos, Grafana and kube-state-metrics on a tainted node pool sized from the cluster, instead of the system pool.
     type: boolean
-    default: true
+    default: false
     visible:
       and:
       - install_monitoring
