@@ -25,7 +25,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -50,7 +50,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -75,7 +75,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -92,7 +92,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -109,7 +109,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -126,7 +126,7 @@
       "cuda": "13.2",
       "name": "Canonical-Ubuntu-22.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -142,7 +142,7 @@
       "cuda": null,
       "name": "Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -158,7 +158,7 @@
       "cuda": null,
       "name": "Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
     },
     {
       "shapes": [
@@ -174,7 +174,7 @@
       "cuda": null,
       "name": "Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci",
       "release_date": "2026-07-16",
-      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/rr0d4Zw8yIc-Bwwu8cUDPJ6ooh4LQ_SVHPDBFJ5T89j2drv-hmkeMTwVv8DANpvC/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
+      "url": "https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci"
     },
     {
       "shapes": [
