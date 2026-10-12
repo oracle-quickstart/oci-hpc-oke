@@ -1,0 +1,61 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: GPU Health Monitoring
+      folder: Alerts
+      interval: 1m
+      rules:
+        - uid: oke_gpu_health_signal
+          title: GPU Health Signal
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: label_replace(max by(node, source, fault_code, action) (oke_node_health_report_signal_last_observed_timestamp_seconds{source="hpcFault"} > time() - 900 or oke_node_health_report_signal_last_observed_timestamp_seconds{source="clusterHealthCheck",action!="REBOOT"} > time() - 900), "hostname", "$1", "node", "(.*)")
+                instant: true
+                intervalMs: 300000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: OK
+          execErrState: Error
+          for: 1m
+          keep_firing_for: 30m
+          annotations:
+            description: The GPU Health Monitoring add-on reports an active FMS fault (hpcFault) or a health check signal that does not reboot the node. Node auto repair does not act on it. See the GPU Node Repairs dashboard.
+          labels: {}
+          isPaused: false
+          notification_settings:
+            receiver: ons-webhook
+            repeat_interval: 24h
