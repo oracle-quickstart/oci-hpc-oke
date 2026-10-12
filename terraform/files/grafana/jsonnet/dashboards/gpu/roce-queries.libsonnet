@@ -17,7 +17,7 @@ local devicesByShape = [
 ];
 
 local query(metric) = std.join('\nor\n', [
-  'sum by (device) (irate(%s{hostname=~"$hostname", instance_shape="%s", device=~"%s"}[1m]))' % [
+  'sum by (hostname, device) (irate(%s{hostname=~"$hostname", instance_shape="%s", device=~"%s"}[1m]))' % [
     metric,
     item.shape,
     item.devices,

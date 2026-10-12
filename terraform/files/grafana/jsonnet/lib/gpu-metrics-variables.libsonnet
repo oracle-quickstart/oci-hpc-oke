@@ -15,13 +15,14 @@ local var = g.dashboard.variable;
     + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 
+  // No All option, so the dashboard opens on the first GPU node. All GPU nodes at once are too large to render.
   hostname:
     var.query.new('hostname')
     + var.query.withDatasourceFromVariable(self.prometheus)
-    + var.query.queryTypes.withLabelValues('hostname', 'up{instance_shape=~"$instance_shape"}')
+    + var.query.queryTypes.withLabelValues('hostname', 'node_uname_info{instance_shape=~"$instance_shape", instance_shape=~"(BM|VM).GPU.*"}')
     + var.query.generalOptions.withLabel('Node')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
+    + var.query.selectionOptions.withIncludeAll(false)
     + var.query.withRefresh(1),
 
   oci_name:

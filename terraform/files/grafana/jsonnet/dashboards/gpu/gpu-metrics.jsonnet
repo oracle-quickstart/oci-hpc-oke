@@ -25,7 +25,8 @@ g.dashboard.new('GPU Metrics')
 + g.dashboard.withPanels([
   statPanel(
     'Avail GPU',
-    'count by (hostname) (sum by (hostname, gpu_id) (amd_gpu_health == 1)) or label_replace(count by (Hostname) (sum by (Hostname, gpu) (DCGM_EXP_GPU_HEALTH_STATUS == 0)), "hostname", "$1", "Hostname", "(.*)")',
+    // A GPU counts only when all its health checks pass. NVIDIA reports one series per health watch.
+    'sum by (hostname) (min by (hostname, gpu_id) (amd_gpu_health{hostname=~"$hostname", instance_shape=~"$instance_shape"} == bool 1)) or label_replace(sum by (Hostname) (min by (Hostname, gpu) (DCGM_EXP_GPU_HEALTH_STATUS{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"} == bool 0)), "hostname", "$1", "Hostname", "(.*)")',
     { w: 4, h: 4, x: 0, y: 0 },
     id=1,
     instant=false,
@@ -52,16 +53,17 @@ g.dashboard.new('GPU Metrics')
     id=4,
     legend='__auto',
   ),
+  // One tile per GPU. A GPU is healthy only when all its health checks pass.
   gpuHealthPanel(
     'GPU Health',
-    'amd_gpu_health{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_EXP_GPU_HEALTH_STATUS{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"} == bool 0, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
+    'min by (hostname, gpu_id) (amd_gpu_health{hostname=~"$hostname", instance_shape=~"$instance_shape"}) or min by (hostname, gpu_id) (label_replace(label_replace(DCGM_EXP_GPU_HEALTH_STATUS{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"} == bool 0, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)"))',
     { w: 8, h: 4, x: 16, y: 0 },
     id=5,
   ),
   timeseriesPanel(
     'GPU Temperature',
     'amd_gpu_junction_temperature{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_FI_DEV_GPU_TEMP{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'celsius',
     { w: 8, h: 8, x: 0, y: 4 },
     id=6,
@@ -69,7 +71,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Powerdraw',
     'amd_gpu_package_power{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_FI_DEV_POWER_USAGE{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'watts',
     { w: 8, h: 8, x: 8, y: 4 },
     id=7,
@@ -77,7 +79,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Utilization',
     'amd_gpu_gfx_activity{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_FI_DEV_GPU_UTIL{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'percent',
     { w: 8, h: 8, x: 16, y: 4 },
     id=8,
@@ -85,7 +87,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Memory Temperature',
     'amd_gpu_memory_temperature{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_FI_DEV_MEMORY_TEMP{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'celsius',
     { w: 8, h: 8, x: 0, y: 12 },
     id=9,
@@ -93,7 +95,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Clock (System)',
     'max by (hostname, gpu_id) (amd_gpu_clock{clock_type="system", hostname=~"$hostname", instance_shape=~"$instance_shape"}) or label_replace(label_replace(DCGM_FI_DEV_SM_CLOCK{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'MHz',
     { w: 8, h: 8, x: 8, y: 12 },
     id=10,
@@ -101,7 +103,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Memory Controller Activity (UMC)',
     'amd_gpu_umc_activity{hostname=~"$hostname", instance_shape=~"$instance_shape"} or label_replace(label_replace(DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}, "hostname", "$1", "Hostname", "(.*)"), "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'percent',
     { w: 8, h: 8, x: 16, y: 12 },
     id=11,
@@ -109,7 +111,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'GPU Fabric Rx + Tx Combined B/W',
     'sum by (hostname, gpu_id) ((rate(amd_gpu_xgmi_link_rx{hostname=~"$hostname", instance_shape=~"$instance_shape"}[5m]) + rate(amd_gpu_xgmi_link_tx{hostname=~"$hostname", instance_shape=~"$instance_shape"}[5m])) * 1024) or label_replace(sum by (hostname, gpu) (rate(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{hostname=~"$hostname", oci_name=~"$oci_name", instance_shape=~"$instance_shape"}[5m])) * 1024, "gpu_id", "$1", "gpu", "(.*)")',
-    '{{ gpu_id }}',
+    '{{ hostname }} GPU {{ gpu_id }}',
     'Bps',
     { w: 24, h: 8, x: 0, y: 20 },
     id=12,
@@ -117,7 +119,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'ROCEv2 Rx + Tx Combined B/W',
     roce.combined,
-    '{{ device }}',
+    '{{ hostname }} {{ device }}',
     'Bps',
     { w: 8, h: 10, x: 0, y: 28 },
     { calcs: ['delta'], displayMode: 'table', placement: 'right' },
@@ -126,7 +128,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'ROCEv2 Tx B/W',
     roce.transmit,
-    '{{ device }}',
+    '{{ hostname }} {{ device }}',
     'Bps',
     { w: 8, h: 10, x: 8, y: 28 },
     { calcs: ['delta'], displayMode: 'table', placement: 'right' },
@@ -135,7 +137,7 @@ g.dashboard.new('GPU Metrics')
   timeseriesPanel(
     'ROCEv2 Rx B/W',
     roce.receive,
-    '{{ device }}',
+    '{{ hostname }} {{ device }}',
     'Bps',
     { w: 8, h: 10, x: 16, y: 28 },
     { calcs: ['delta'], displayMode: 'table', placement: 'right' },

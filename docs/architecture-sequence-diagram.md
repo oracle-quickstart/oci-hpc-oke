@@ -457,8 +457,8 @@ sequenceDiagram
     Grafana->>Prom: Resolve instance_shape from node_uname_info
     Prom-->>Grafana: Available shape values
     User->>Grafana: Select instance shape
-    Grafana->>Prom: Resolve hostname and oci_name from up metrics filtered by shape
-    Prom-->>Grafana: Available node and display-name values
+    Grafana->>Prom: Resolve hostname from node_uname_info on GPU shapes, and oci_name from up metrics
+    Prom-->>Grafana: Available node and display-name values. Node has no All option and opens on the first GPU node
     User->>Grafana: Select node, display name and time range
     par Independent metrics collection
         Prom->>Exporters: Scrape configured endpoints
