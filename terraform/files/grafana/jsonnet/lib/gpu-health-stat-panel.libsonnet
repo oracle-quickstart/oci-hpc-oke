@@ -10,7 +10,7 @@ function(title, promql, gridPos, id=null)
     + { refId: 'A', range: true },
   ])
   + g.panel.stat.options.withOrientation('vertical')
-  + g.panel.stat.standardOptions.withDisplayName('${__field.labels.gpu_id}')
+  + g.panel.stat.standardOptions.withDisplayName('${__field.labels.hostname} GPU ${__field.labels.gpu_id}')
   + g.panel.stat.standardOptions.withMappings(
     g.panel.stat.standardOptions.mapping.ValueMap.withType()
     + g.panel.stat.standardOptions.mapping.ValueMap.withOptions({
