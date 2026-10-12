@@ -283,6 +283,13 @@ locals {
           }],
           local.amd_device_metrics_exporter_service_monitor_relabelings,
         )
+        # The workload labels change with every pod on a GPU and multiply the
+        # AMD series. No dashboard or alert uses them. They are pod, namespace and
+        # container with honorLabels true, and exported_* without it.
+        metricRelabelings = [{
+          action = "labeldrop"
+          regex  = "(exported_)?(pod|namespace|container)"
+        }]
       }]
     }
   })
