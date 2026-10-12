@@ -424,19 +424,19 @@ variable "prometheus_stack_chart_version" {
 }
 
 variable "prometheus_memory" {
-  default     = "8Gi"
+  default     = ""
   type        = string
-  description = "Memory request and limit of each Prometheus pod (one per shard and replica). Prometheus uses about 4 KB per active series, and a BM.GPU.B300.8 node exposes about 22k series, so 8Gi covers about 35 such nodes per shard with headroom for queries. Raise it, or shard with install_thanos, for larger clusters; the system pool must have room for it."
+  description = "Memory request and limit of each Prometheus pod (one per shard and replica). Empty: with install_thanos, sized from the worker pool sizes and prometheus_shards (see the prometheus_sizing output); without Thanos, no requests or limits are set, as before. Set it, for example to 16Gi, to override either way."
   validation {
-    condition     = can(regex("^[0-9]+(\\.[0-9]+)?(Mi|Gi)$", var.prometheus_memory))
-    error_message = "prometheus_memory must be a Kubernetes quantity in Mi or Gi, for example 8Gi."
+    condition     = can(regex("^$|^[0-9]+(\\.[0-9]+)?(Mi|Gi)$", trimspace(var.prometheus_memory)))
+    error_message = "prometheus_memory must be empty or a Kubernetes quantity in Mi or Gi, for example 16Gi."
   }
 }
 
 variable "prometheus_cpu" {
   default     = "1"
   type        = string
-  description = "CPU request of each Prometheus pod. No CPU limit is set."
+  description = "CPU request of each Prometheus pod, set whenever the memory request is (no CPU limit)."
 }
 
 variable "prometheus_retention" {

@@ -183,6 +183,16 @@ output "prom_server_port_forward" {
   value = format("kubectl port-forward -n %v svc/%v 9090:9090", var.monitoring_namespace, local.thanos_enabled ? "thanos-query" : "kube-prometheus-stack-prometheus")
 }
 
+output "prometheus_sizing" {
+  description = "Memory per Prometheus pod and the series estimate behind it (calculated when install_thanos is set and prometheus_memory is empty)."
+  value = {
+    memory_per_pod             = local.prometheus_memory == "" ? "unbounded (no requests or limits)" : local.prometheus_memory
+    shards                     = local.thanos_enabled ? var.prometheus_shards : 1
+    estimated_series           = local.prometheus_estimated_series
+    estimated_series_per_shard = local.thanos_enabled ? local.prometheus_series_per_shard : local.prometheus_estimated_series
+  }
+}
+
 output "thanos_bucket" {
   value = local.thanos_enabled ? local.thanos_bucket_name : "N/A"
 }

@@ -1445,11 +1445,11 @@ variables:
     visible: false
   prometheus_memory:
     title: Prometheus memory
-    description: Memory request and limit of each Prometheus pod. About 4 KB per active series; a BM.GPU.B300.8 node exposes about 22k series, so 8Gi covers about 35 such nodes per shard.
+    description: Memory request and limit of each Prometheus pod, for example 16Gi. Leave empty to size it from the worker pools and shards when Thanos is enabled, or to set no limit without Thanos.
     type: string
-    pattern: "^[0-9]+(\\.[0-9]+)?(Mi|Gi)$"
-    required: true
-    default: "8Gi"
+    pattern: "^$|^[0-9]+(\\.[0-9]+)?(Mi|Gi)$"
+    required: false
+    default: ""
     visible:
       and:
       - install_monitoring
@@ -1457,7 +1457,7 @@ variables:
       - install_node_problem_detector_kube_prometheus_stack
   prometheus_cpu:
     title: Prometheus CPU request
-    description: CPU request of each Prometheus pod. No CPU limit is set.
+    description: CPU request of each Prometheus pod, set whenever the memory request is. No CPU limit is set.
     type: string
     required: true
     default: "1"

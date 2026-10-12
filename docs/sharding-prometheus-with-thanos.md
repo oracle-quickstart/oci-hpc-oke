@@ -4,20 +4,44 @@ By default the stack runs a single Prometheus. Its memory grows with the number 
 
 Two settings address this:
 
-- **Prometheus resources (always on).** `prometheus_memory` (default `8Gi`) is set as both the request and the limit, and `prometheus_cpu` (default `1`) as the request. A Prometheus that outgrows its budget is OOM-killed inside its own cgroup instead of pushing the node into kubelet eviction, which can take out Kueue and other controllers on the same node.
 - **Thanos (opt-in).** `install_thanos = true` lets you split Prometheus into shards. Thanos keeps one global view for Grafana and stores history in an OCI Object Storage bucket.
+- **Prometheus memory.** `prometheus_memory` is set as both the request and the limit, and `prometheus_cpu` (default `1`) as the request. A Prometheus that outgrows its budget is OOM-killed inside its own cgroup instead of pushing the node into kubelet eviction, which can take out Kueue and other controllers on the same node. When `prometheus_memory` is empty (the default):
+  - Without Thanos, no requests or limits are set, the stack's historical behavior.
+  - With Thanos, it is calculated from the worker pools and `prometheus_shards` (see below).
+
+  Set `prometheus_memory` explicitly to override it in either case.
 
 ## Sizing
 
-Prometheus uses about 4 KB of memory per active series. Keep the working set at about 40% of the limit to leave headroom for queries and restarts:
+With Thanos and an empty `prometheus_memory`, the stack estimates active series from the worker pool sizes. The constants were measured on a 16 × BM.GPU.B300.8 + 3 × VM.Standard.E5.Flex cluster (449k series predicted, 449k observed):
 
-| Memory per shard | Active series per shard | BM.GPU.B300.8 nodes per shard |
+| Source | Active series |
+| --- | --- |
+| Each bare-metal node (`BM.*` shapes, RDMA and GMC pools) | ~23.6k (node-exporter, cAdvisor, kubelet, DCGM, and its share of kube-state-metrics and CoreDNS) |
+| Each VM node | ~12.2k |
+| Cluster-wide (API server, kube-state-metrics base, Grafana, operators) | ~35k |
+
+Memory per Prometheus pod is then calculated as follows:
+
+```
+series_per_shard = total / prometheus_shards × 1.25   (hash sharding over few targets is uneven)
+memory           = series_per_shard × 4.5 KB × 2 + 1 GiB, rounded up to whole GiB, at least 2Gi
+```
+
+The 4.5 KB is the measured working set per series. The factor of 2 leaves headroom for queries, WAL replay after restarts, head compaction, and series churn.
+
+| Cluster | Shards | Memory per pod |
 | --- | --- | --- |
-| 8Gi (default) | ~0.8M | ~35 |
-| 16Gi | ~1.5M | ~70 |
-| 32Gi | ~3M | ~140 |
+| 16 × BM GPU + 3 system | 2 | 4Gi |
+| 128 × BM GPU + 3 system | 6 | 7Gi |
+| 512 × BM GPU + 3 system | 8 | 17Gi |
+| 1024 × BM GPU + 3 system | 16 | 17Gi |
 
-Each Prometheus pod must fit on a system node. The default system pool is 3 × VM.Standard.E5.Flex with 16 GB, so for more than 8Gi per shard, increase `worker_ops_memory` or add shards.
+The `prometheus_sizing` output shows the estimate and the result.
+
+Each Prometheus pod must also fit on a system or CPU pool node, because the GPU pools are tainted. If a pod plus its sidecar would take more than about 60% of such a node, the plan shows a warning with the number of shards that would fit. The default system pool is 3 × VM.Standard.E5.Flex with 16 GB, which allows about 9Gi per pod. Add shards, or raise `worker_ops_memory`.
+
+The estimate uses the pool sizes in the stack. If nodes are added outside the stack, re-apply or set `prometheus_memory` explicitly.
 
 ## Enabling Thanos
 
@@ -25,7 +49,7 @@ Each Prometheus pod must fit on a system node. The default system pool is 3 × V
 install_thanos      = true
 prometheus_shards   = 2     # targets are split across shards by hash of their address
 prometheus_replicas = 1     # per shard; 2 adds HA and doubles Object Storage writes
-prometheus_memory   = "8Gi"
+# prometheus_memory = "16Gi"  # optional; calculated from the worker pools when empty
 ```
 
 This deploys:

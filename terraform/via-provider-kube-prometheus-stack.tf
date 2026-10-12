@@ -10,7 +10,7 @@ locals {
     setup_alerting                = var.setup_alerting
     monitoring_namespace          = var.monitoring_namespace
     prometheus_cpu                = var.prometheus_cpu
-    prometheus_memory             = var.prometheus_memory
+    prometheus_memory             = local.prometheus_memory
     prometheus_retention          = var.prometheus_retention
     install_thanos                = local.thanos_enabled
     prometheus_shards             = var.prometheus_shards

@@ -28,16 +28,19 @@ prometheus:
     enableAdminAPI: false
     retention: ${prometheus_retention}
     retentionSize: 450GB
+%{ if prometheus_memory != "" }
     # Requests equal limits for memory: a Prometheus that outgrows its budget is
     # OOM-killed in its own cgroup instead of pushing the node into kubelet
     # eviction, which can take out Kueue and other controllers on the same node.
-    # Prometheus sets GOMEMLIMIT from the limit.
+    # Prometheus sets GOMEMLIMIT from the limit. Without Thanos and without an
+    # explicit prometheus_memory, no resources are set.
     resources:
       requests:
         cpu: "${prometheus_cpu}"
         memory: "${prometheus_memory}"
       limits:
         memory: "${prometheus_memory}"
+%{ endif }
 %{ if install_thanos }
     # Operator-native sharding: targets are split by hashmod of __address__,
     # replicas are per shard. Thanos Query merges the shards.
