@@ -149,20 +149,24 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
     dashboard = load(BUILD_DIR / "gpu" / "gpu-health-status.json")
     panels = dashboard["panels"]
     ids = {panel["id"] for panel in panels}
-    if not {7, 23}.issubset(ids):
-        failures.append("gpu-health-status: source must retain panel IDs 7 and 23")
+    if not {7, 23, 25}.issubset(ids):
+        failures.append("gpu-health-status: source must retain panel IDs 7, 23 and 25")
 
-    for name, amd, nvidia, expected in (
-        ("AMD", True, False, {23}),
-        ("NVIDIA", False, True, {7}),
-        ("mixed", True, True, {7, 23}),
+    # The add-on shows panel 25.
+    for name, amd, nvidia, addon, expected in (
+        ("AMD", True, False, False, {23}),
+        ("NVIDIA", False, True, False, {7}),
+        ("mixed", True, True, False, {7, 23}),
+        ("NVIDIA add-on", False, True, True, {7, 25}),
     ):
         filtered = [
             panel
             for panel in panels
-            if (panel["id"] != 7 or nvidia) and (panel["id"] != 23 or amd)
+            if (panel["id"] != 7 or nvidia)
+            and (panel["id"] != 23 or amd)
+            and (panel["id"] != 25 or addon)
         ]
-        retained = {panel["id"] for panel in filtered} & {7, 23}
+        retained = {panel["id"] for panel in filtered} & {7, 23, 25}
         if retained != expected:
             failures.append(f"gpu-health-status: {name} vendor filtering changed")
         reflowed = []

@@ -18,9 +18,11 @@ locals {
   grafana_gpu_dashboard_sources = try(local.grafana_rendered_dashboards.gpu, {})
   grafana_oci_dashboard_sources = try(local.grafana_rendered_dashboards.oci, {})
   grafana_gpu_health_dashboard  = try(jsondecode(local.grafana_gpu_dashboard_sources["gpu-health-status.json"]), { panels = [] })
+  # Show the add-on panel 25 with the GPU Health Monitoring add-on.
   grafana_gpu_health_panels = [
     for panel in local.grafana_gpu_health_dashboard.panels : panel
-    if(panel.id != 7 || local.has_nvidia_gpu) && (panel.id != 23 || local.has_amd_gpu)
+    if(panel.id != 7 || local.has_nvidia_gpu) && (panel.id != 23 || local.has_amd_gpu) &&
+    (panel.id != 25 || local.deploy_gpu_health_monitoring_addon)
   ]
   grafana_gpu_health_panels_reflowed = [
     for index, panel in local.grafana_gpu_health_panels :
@@ -69,9 +71,12 @@ locals {
     if(!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
     (!contains(local.grafana_nvidia_alert_files, f) || local.has_nvidia_gpu) &&
     (!contains(local.grafana_gpu_health_alert_files, f) || local.deploy_gpu_health_monitoring_addon) &&
+    (f != "gpu-health-delete-alerts.yaml" || !local.deploy_gpu_health_monitoring_addon) &&
     (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
   ]
+  # Alert files outside the deployed set. The operator path deletes their ConfigMaps, because kubectl apply -k does not.
+  grafana_alert_files_excluded = sort(setsubtract(local.grafana_alert_files, local.grafana_alert_files_filtered))
   grafana_alerts = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? {
     for f in local.grafana_alert_files_filtered :
     f => file(join("/", [local.grafana_alert_dir, f]))
