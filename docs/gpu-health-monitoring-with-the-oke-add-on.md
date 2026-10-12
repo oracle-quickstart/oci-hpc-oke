@@ -3,7 +3,7 @@
 > [!NOTE]
 > Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and the cluster has GPU node pools. Terraform also sets up the metrics, dashboards, and alerts in this guide.
 
-The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. Node Problem Detector (NPD) keeps running its checks next to the add-on.
+The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. When the add-on checks every GPU pool of the cluster, Terraform does not install Node Problem Detector (NPD). For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
 
 ## Overview
 
@@ -41,7 +41,7 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
   Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
   ```
 
-  Terraform does not check that this policy exists.
+  Terraform does not check that this policy exists. It removes NPD also when the policy is missing.
 
 ## Node Conditions
 
@@ -70,6 +70,8 @@ The OCA plugin has health check rules for these shapes (Oracle Cloud Agent 1.64.
 - `BM.GPU.GB200.4`, `BM.GPU.GB200-v2.4`, `BM.GPU.GB200-v3.4`, `BM.GPU.GB300.4`
 - `BM.GPU.L40S.4`, `BM.GPU.L40S-NC.4`, `BM.GPU.RTXPRO.8`
 - `BM.GPU.MI300X.8`, `BM.GPU.MI355X.8`, `BM.GPU.MI355X-v1.8`
+
+Terraform installs NPD with all of its checks when a GPU pool uses another shape, for example `VM.GPU.A10.1`, or is self-managed (the GPU memory cluster pool or a cluster network pool). It also installs NPD when NVIDIA GPU pools run without the NVIDIA GPU Operator, because nothing then sets the `nvidia.com/gpu.present` label that the add-on needs. The shape list is the `gpu_health_check_shapes` local in `terraform/oke-addons.tf`.
 
 ## Health Checks
 
@@ -147,6 +149,7 @@ Prometheus also scrapes the fault monitor pods. The `gfm_*` metrics show the sca
 The `node_health_status` recording rule includes the add-on:
 
 - A node with `GpuHealthMonitoringFaultDetected=True` is `0` (Failed).
+- A node with an `hpcFault` signal observed in the last 15 minutes is `0` (Failed). A signal stays in the `NodeHealthReport` after its fault clears, so the rule uses the last observed time.
 - A node with `GpuHealthMonitoringUnavailable=True`, or with `GpuHealthMonitoringConfigured` not `True`, is `2` (Unknown).
 
 These dashboards show the add-on data:
@@ -160,6 +163,7 @@ These dashboards show the add-on data:
 | Alert | Fires when |
 |---|---|
 | GPU Health Fault | `GpuHealthMonitoringFaultDetected` is `True` for 1 minute. |
+| GPU Health Signal | An `hpcFault` signal, or a `clusterHealthCheck` signal with an action other than `REBOOT`, is active for 1 minute. A signal is active when it was observed in the last 15 minutes. Node auto repair does not act on these signals. |
 | GPU Health Monitoring Unavailable | The add-on does not monitor the node for 30 minutes. |
 | GPU Node Repair Failed | A node repair failed in the last hour. |
 | GPU Fault Monitor Stale or Missing | The health check files on a node are older than 15 minutes, or a configured node has no healthy fault monitor scrape, for 10 minutes. |

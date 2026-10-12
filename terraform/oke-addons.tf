@@ -324,6 +324,16 @@ locals {
       }
     })
   }
+  # NPD is not deployed when the add-on checks every GPU pool. Each pool must be a managed node pool with a supported
+  # shape. NVIDIA nodes must run the GPU Operator, which sets the nvidia.com/gpu.present label that the add-on needs.
+  npd_removed = local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
+    !var.worker_rdma_enabled || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
+    !var.worker_gpu_enabled || contains(local.gpu_health_check_shapes, var.worker_gpu_shape),
+    !var.worker_gmc_enabled,
+  ])
+  # NPD conditions per GPU vendor, for the node health recording rules.
+  npd_amd_conditions    = "CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo"
+  npd_nvidia_conditions = "CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"
 
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,

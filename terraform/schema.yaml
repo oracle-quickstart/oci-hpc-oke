@@ -1408,7 +1408,7 @@ variables:
   install_node_problem_detector_kube_prometheus_stack:
     type: boolean
     title: Install Node Problem Detector & Kube Prometheus Stack
-    description: Install Node Problem Detector with the Kubernetes Prometheus stack to run GPU & RDMA health checks and use automated alerting in Grafana.
+    description: Install Node Problem Detector with the Kubernetes Prometheus stack to run GPU & RDMA health checks and use automated alerting in Grafana. Node Problem Detector is not installed when the GPU Health Monitoring add-on covers every GPU pool shape.
     default: true
     visible:
       and:
@@ -1656,7 +1656,7 @@ variables:
   deploy_gpu_health_monitoring:
     title: Install GPU Health Monitoring add-on
     type: boolean
-    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes.
+    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. When the add-on checks every GPU pool (managed node pools with supported shapes, and the NVIDIA GPU Operator for NVIDIA pools), Node Problem Detector is not installed.
     default: true
   gpu_health_monitoring_addon_version:
     title: GPU Health Monitoring add-on version
