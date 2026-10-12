@@ -84,6 +84,12 @@ kubelet:
   serviceMonitor:
     attachMetadata:
       node: true
+    # The chart scrapes cAdvisor every 10s, but cAdvisor refreshes its stats only
+    # every ~15s and the samples carry cAdvisor's timestamps, so about a third of
+    # every scrape repeats the previous sample and is dropped. Grafana never
+    # steps below the datasource's 30s timeInterval, so 30s, the stack-wide
+    # interval, changes no dashboard.
+    cAdvisorInterval: 30s
 
 kube-state-metrics:
   serviceAccount:
