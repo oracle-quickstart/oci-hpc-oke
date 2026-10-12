@@ -12,6 +12,11 @@ The add-on has two components in the `gpu-health-monitoring` namespace:
 - The `gpu-health-monitoring-controller` Deployment enables the Oracle Cloud Agent (OCA) "Compute RDMA GPU Monitoring" plugin on each GPU node and manages the node repairs.
 - The `gpu-fault-monitor` DaemonSet reads the health check results of the OCA plugin on each GPU node every 30 seconds.
 
+The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource selects. Terraform creates one cluster-scoped config for each [supported shape](#supported-shapes) of the managed GPU node pools, for example `gpu-health-monitoring-bm-gpu-b300-8`. Each config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. A node can match only one config, because the add-on rejects configs that select the same node (`MultipleMatchingPolicies`). Without a config, the add-on deploys no fault monitor and checks no node. The add-on does not check self-managed nodes, so the GPU memory cluster pool and a cluster network pool get no config.
+
+> [!IMPORTANT]
+> If the cluster already has a `GpuHealthMonitoringConfig` that you created, delete it before you apply Terraform. Otherwise your config and the Terraform config select the same nodes, and the add-on rejects both.
+
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
 The add-on can also repair nodes. It reboots a node when a fault with the action `REBOOT` stays active for 10 minutes, and it tags and terminates a node on a user request. Repair needs a `NodeRepairConfig` resource. Terraform does not create this resource. See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
@@ -20,7 +25,13 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 
 - An enhanced OKE cluster with Kubernetes 1.32 or later
 - Managed GPU node pools
-- The IAM policy that lets the worker nodes read the instance agent plugins. Terraform creates this policy.
+- The IAM policy that lets the worker nodes read the instance agent plugins. Terraform creates this policy only when `create_policies` is `true`. Otherwise, create it before you deploy:
+
+  ```text
+  Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
+  ```
+
+  Terraform does not check that this policy exists.
 
 ## Node Conditions
 
@@ -146,6 +157,20 @@ These dashboards show the add-on data:
 The alerts are in the `GPU Health Monitoring` group of the `Alerts` folder. They use the `ons-webhook` contact point.
 
 ## Troubleshooting
+
+### No Fault Monitor Pods
+
+Make sure that a `GpuHealthMonitoringConfig` exists for each GPU shape, and read how many nodes each one selects and assigns:
+
+```bash
+kubectl get gpuhealthmonitoringconfig -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].reason,SUMMARY:.status.summary'
+```
+
+The controller runs a fault monitor only on assigned nodes. If `unassigned` is more than `0`:
+
+- Make sure that the IAM policy in [Prerequisites](#prerequisites) exists.
+
+If `READY` is `MultipleMatchingPolicies`, two configs select the same nodes. Delete the config that Terraform did not create.
 
 ### GpuHealthMonitoringConfigured Is Unknown
 
