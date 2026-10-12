@@ -475,16 +475,11 @@ variable "prometheus_target_series_per_shard" {
   }
 }
 
-variable "worker_monitoring_enabled" {
-  default     = false
-  type        = bool
-  description = "Opt-in. With install_thanos, create a dedicated, tainted node pool for Prometheus, Thanos, Grafana and kube-state-metrics, sized from the cluster. It uses the system pool's image, availability domain and node cycling settings. When false, they run on the system pool and the plan warns if they won't fit there."
-}
 
 variable "worker_monitoring_pool_size" {
   default     = 0
   type        = number
-  description = "Nodes in the monitoring pool. 0: one per Prometheus pod (shards x replicas) plus one spare."
+  description = "Nodes in the monitoring pool, which install_thanos always creates. 0: one per Prometheus pod (shards x replicas) plus one spare."
   validation {
     condition     = var.worker_monitoring_pool_size >= 0 && floor(var.worker_monitoring_pool_size) == var.worker_monitoring_pool_size
     error_message = "worker_monitoring_pool_size must be a whole number (0 for automatic)."

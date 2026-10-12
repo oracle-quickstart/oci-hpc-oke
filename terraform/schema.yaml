@@ -327,7 +327,6 @@ variableGroups:
     - prometheus_shards
     - prometheus_target_series_per_shard
     - prometheus_replicas
-    - worker_monitoring_enabled
     - worker_monitoring_pool_size
     - worker_monitoring_shape
     - worker_monitoring_ocpus
@@ -1532,19 +1531,9 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
-  worker_monitoring_enabled:
-    title: Dedicated monitoring pool
-    description: Opt-in. Run Prometheus, Thanos, Grafana and kube-state-metrics on a tainted node pool sized from the cluster, instead of the system pool.
-    type: boolean
-    default: false
-    visible:
-      and:
-      - install_monitoring
-      - monitoring_advanced_options
-      - install_thanos
   worker_monitoring_pool_size:
     title: Monitoring pool nodes
-    description: 0 sizes the pool to one node per Prometheus pod plus a spare.
+    description: The pool install_thanos creates for Prometheus, Thanos, Grafana and kube-state-metrics. 0 sizes it to one node per Prometheus pod plus a spare.
     type: integer
     required: true
     default: 0
@@ -1554,7 +1543,6 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
-      - worker_monitoring_enabled
   worker_monitoring_shape:
     title: Monitoring pool shape
     description: A Flex shape matching the system pool image's architecture.
@@ -1567,7 +1555,6 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
-      - worker_monitoring_enabled
   worker_monitoring_ocpus:
     title: Monitoring node OCPUs
     type: integer
@@ -1579,7 +1566,6 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
-      - worker_monitoring_enabled
   worker_monitoring_memory:
     title: Monitoring node memory (GB)
     description: 0 sizes each node to hold one Prometheus pod and its share of Thanos.
@@ -1592,7 +1578,6 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
-      - worker_monitoring_enabled
   thanos_bucket_name:
     title: Existing Thanos bucket
     description: Leave empty to create a bucket, which is emptied and deleted on destroy. An existing bucket is left untouched.

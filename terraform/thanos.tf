@@ -90,9 +90,10 @@ locals {
   prometheus_replicas = local.thanos_enabled ? var.prometheus_replicas : 1
   prometheus_pods     = local.prometheus_shards * local.prometheus_replicas
 
-  # One Prometheus pod per monitoring node (hard anti-affinity) plus a spare,
-  # so a shard can reschedule when a node is lost or cycled.
-  monitoring_pool_enabled = local.thanos_enabled && var.worker_monitoring_enabled
+  # With Thanos, Prometheus always runs on the monitoring pool: one pod per node
+  # (hard anti-affinity) plus a spare, so a shard can reschedule when a node is
+  # lost or cycled.
+  monitoring_pool_enabled = local.thanos_enabled
   monitoring_pool_size = !local.monitoring_pool_enabled ? 0 : (
     var.worker_monitoring_pool_size > 0 ? var.worker_monitoring_pool_size : local.prometheus_pods + 1
   )
@@ -117,14 +118,11 @@ locals {
     max(16, 8 * ceil((local.prometheus_pod_gib + local.monitoring_node_overhead_gib) / local.node_allocatable_fraction / 8))
   )
 
-  # Without the monitoring pool, Prometheus lands on the system or CPU pool
-  # (the GPU pools are tainted). Keep each pod under ~60% of such a node, and all
-  # of them plus Thanos (~7Gi) and the other system pods (~2.2Gi per node) under
-  # 85% of the pool's allocatable memory.
+  # Without Thanos, a single Prometheus stays on the system or CPU pool (the GPU
+  # pools are tainted). An explicit prometheus_memory should leave room on such
+  # a node for the other system pods.
   system_node_memory_gb      = max(var.worker_ops_memory, var.worker_cpu_enabled ? var.worker_cpu_memory : 0)
-  system_pool_nodes          = var.worker_ops_pool_size + (var.worker_cpu_enabled ? var.worker_cpu_pool_size : 0)
   prometheus_node_budget_gib = 0.6 * local.system_node_memory_gb
-  system_pool_budget_gib     = 0.85 * local.node_allocatable_fraction * local.system_node_memory_gb * local.system_pool_nodes - 2.2 * local.system_pool_nodes - (local.thanos_enabled ? 7 : 0)
 }
 
 check "prometheus_fits_monitoring_nodes" {
@@ -139,12 +137,10 @@ check "prometheus_fits_monitoring_nodes" {
 
 check "prometheus_fits_system_nodes" {
   assert {
-    condition = local.monitoring_pool_enabled || local.prometheus_memory_gib == 0 || (
-      local.prometheus_pod_gib <= local.prometheus_node_budget_gib && local.prometheus_pods * local.prometheus_pod_gib <= local.system_pool_budget_gib
-    )
+    condition = local.thanos_enabled || local.prometheus_memory_gib <= local.prometheus_node_budget_gib
     error_message = format(
-      "%d Prometheus pod(s) of %s for ~%d series each don't fit on %d system/CPU node(s) of %v GB next to Thanos and the other system pods; some shards would stay Pending. Enable worker_monitoring_enabled, or grow worker_ops_pool_size / worker_ops_memory.",
-      local.prometheus_pods, local.prometheus_memory, local.prometheus_series_per_shard, local.system_pool_nodes, local.system_node_memory_gb
+      "prometheus_memory (%s) is more than ~60%% of a %v GB system/CPU node, so Prometheus may not schedule. Lower it, raise worker_ops_memory, or set install_thanos.",
+      local.prometheus_memory, local.system_node_memory_gb
     )
   }
 }
