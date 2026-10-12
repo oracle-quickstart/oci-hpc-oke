@@ -17,6 +17,16 @@ The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource sel
 > [!IMPORTANT]
 > If the cluster already has a `GpuHealthMonitoringConfig` that you created, delete it before you apply Terraform. Otherwise your config and the Terraform config select the same nodes, and the add-on rejects both.
 
+### AMD GPU Nodes
+
+The add-on controller assigns a selected node only when the node has the label `nvidia.com/gpu.present=true` or `amd.com/gpu.present=true`. The NVIDIA GPU Operator sets the NVIDIA label. No AMD component sets the AMD label, so Terraform adds `amd.com/gpu.present=true` to the node pool labels of the AMD GPU pools. This is a workaround until OKE fixes the controller.
+
+OKE adds node pool labels only to new nodes. To monitor an AMD node that existed before this change, label it:
+
+```bash
+kubectl label node <node-name> amd.com/gpu.present=true
+```
+
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
 The add-on can also repair nodes. It reboots a node when a fault with the action `REBOOT` stays active for 10 minutes, and it tags and terminates a node on a user request. Repair needs a `NodeRepairConfig` resource. Terraform does not create this resource. See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
@@ -168,7 +178,8 @@ kubectl get gpuhealthmonitoringconfig -o custom-columns='NAME:.metadata.name,REA
 
 The controller runs a fault monitor only on assigned nodes. If `unassigned` is more than `0`:
 
-- Make sure that the IAM policy in [Prerequisites](#prerequisites) exists.
+1. On an AMD node, make sure that the node has the label `amd.com/gpu.present=true`. See [AMD GPU Nodes](#amd-gpu-nodes).
+2. Make sure that the IAM policy in [Prerequisites](#prerequisites) exists.
 
 If `READY` is `MultipleMatchingPolicies`, two configs select the same nodes. Delete the config that Terraform did not create.
 
