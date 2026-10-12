@@ -426,7 +426,7 @@ variable "prometheus_stack_chart_version" {
 variable "prometheus_memory" {
   default     = ""
   type        = string
-  description = "Memory request and limit of each Prometheus pod (one per shard and replica). Empty: with install_thanos, sized from the worker pool sizes and prometheus_shards (see the prometheus_sizing output); without Thanos, no requests or limits are set, as before. Set it, for example to 16Gi, to override either way."
+  description = "Memory request and limit of each Prometheus pod (one per shard and replica). Empty: with install_thanos, sized from the worker pool sizes and the shard count (see the prometheus_sizing output); without Thanos, no requests or limits are set, as before. Set it, for example to 16Gi, to override either way."
   validation {
     condition     = can(regex("^$|^[0-9]+(\\.[0-9]+)?(Mi|Gi)$", trimspace(var.prometheus_memory)))
     error_message = "prometheus_memory must be empty or a Kubernetes quantity in Mi or Gi, for example 16Gi."
@@ -456,19 +456,71 @@ variable "install_thanos" {
 }
 
 variable "prometheus_shards" {
-  default     = 1
+  default     = 0
   type        = number
-  description = "Number of Prometheus shards. Scrape targets are split across shards by hash; requires install_thanos when above 1."
+  description = "Number of Prometheus shards; scrape targets are split across them by hash. 0: with install_thanos, enough shards for prometheus_target_series_per_shard given the worker pools; without Thanos, 1. Above 1 requires install_thanos."
   validation {
-    condition     = var.prometheus_shards >= 1 && floor(var.prometheus_shards) == var.prometheus_shards
-    error_message = "prometheus_shards must be a whole number of at least 1."
+    condition     = var.prometheus_shards >= 0 && floor(var.prometheus_shards) == var.prometheus_shards
+    error_message = "prometheus_shards must be a whole number (0 for automatic)."
+  }
+}
+
+variable "prometheus_target_series_per_shard" {
+  default     = 3000000
+  type        = number
+  description = "Active series each Prometheus shard should hold when prometheus_shards is 0. Fewer, larger shards mean fewer sidecars and fewer Object Storage requests, but more memory per pod and a larger gap when one shard is down."
+  validation {
+    condition     = var.prometheus_target_series_per_shard >= 100000
+    error_message = "prometheus_target_series_per_shard must be at least 100000."
+  }
+}
+
+variable "worker_monitoring_enabled" {
+  default     = true
+  type        = bool
+  description = "With install_thanos, create a dedicated, tainted node pool for Prometheus, Thanos, Grafana and kube-state-metrics, sized from the cluster. It uses the system pool's image, availability domain and node cycling settings. Disable to keep them on the system pool."
+}
+
+variable "worker_monitoring_pool_size" {
+  default     = 0
+  type        = number
+  description = "Nodes in the monitoring pool. 0: one per Prometheus pod (shards x replicas) plus one spare."
+  validation {
+    condition     = var.worker_monitoring_pool_size >= 0 && floor(var.worker_monitoring_pool_size) == var.worker_monitoring_pool_size
+    error_message = "worker_monitoring_pool_size must be a whole number (0 for automatic)."
+  }
+}
+
+variable "worker_monitoring_shape" {
+  default     = "VM.Standard.E5.Flex"
+  type        = string
+  description = "Flex shape of the monitoring pool. It must match the system pool image's architecture."
+  validation {
+    condition     = strcontains(var.worker_monitoring_shape, ".Flex")
+    error_message = "worker_monitoring_shape must be a Flex shape, so its memory can be sized."
+  }
+}
+
+variable "worker_monitoring_ocpus" {
+  default     = 4
+  type        = number
+  description = "OCPUs per monitoring node."
+}
+
+variable "worker_monitoring_memory" {
+  default     = 0
+  type        = number
+  description = "Memory per monitoring node in GB. 0: sized to hold one Prometheus pod and its share of Thanos (see the prometheus_sizing output)."
+  validation {
+    condition     = var.worker_monitoring_memory >= 0
+    error_message = "worker_monitoring_memory must be 0 (automatic) or a size in GB."
   }
 }
 
 variable "prometheus_replicas" {
   default     = 1
   type        = number
-  description = "Number of Prometheus replicas per shard, for HA. Each replica uploads its own blocks, doubling Object Storage writes. Requires install_thanos when above 1."
+  description = "Number of Prometheus replicas per shard, for HA. Each replica uploads its own blocks, doubling Object Storage writes, and needs its own monitoring node. Requires install_thanos when above 1."
   validation {
     condition     = var.prometheus_replicas >= 1 && floor(var.prometheus_replicas) == var.prometheus_replicas
     error_message = "prometheus_replicas must be a whole number of at least 1."

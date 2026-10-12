@@ -40,12 +40,14 @@ locals {
   pods_required_gpu  = var.worker_gpu_enabled ? var.worker_gpu_pool_size * local.worker_gpu_pods_per_node : 0
   pods_required_rdma = var.worker_rdma_enabled ? var.worker_rdma_pool_size * local.worker_rdma_pods_per_node : 0
   pods_required_gmc  = var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size * local.worker_gmc_pods_per_node : 0
+  pods_required_mon  = local.monitoring_pool_size * local.worker_monitoring_pods_per_node
   total_pods_required = (
     local.pods_required_ops +
     local.pods_required_cpu +
     local.pods_required_gpu +
     local.pods_required_rdma +
-    local.pods_required_gmc
+    local.pods_required_gmc +
+    local.pods_required_mon
   )
 
   # User-provided pods CIDR blocks (pods_sn_cidrs, comma-separated). With the NPN CNI the
@@ -259,7 +261,7 @@ data "oci_core_compute_cluster" "worker_rdma" {
 # Without Thanos, Grafana would query one shard or replica at a time and
 # silently show partial data.
 resource "null_resource" "validate_prometheus_sharding" {
-  count = alltrue([var.prometheus_shards * var.prometheus_replicas > 1, !var.install_thanos]) ? 1 : 0
+  count = alltrue([max(var.prometheus_shards, 1) * var.prometheus_replicas > 1, !var.install_thanos]) ? 1 : 0
 
   provisioner "local-exec" {
     command = "echo 'Error: More than one Prometheus shard or replica requires Thanos' && exit 1"
@@ -267,8 +269,25 @@ resource "null_resource" "validate_prometheus_sharding" {
 
   lifecycle {
     precondition {
-      condition     = !(var.prometheus_shards * var.prometheus_replicas > 1 && !var.install_thanos)
+      condition     = !(max(var.prometheus_shards, 1) * var.prometheus_replicas > 1 && !var.install_thanos)
       error_message = "More than one Prometheus shard or replica requires Thanos for a global view. Please set `install_thanos=true` or set `prometheus_shards=1` and `prometheus_replicas=1`."
+    }
+  }
+}
+
+# The monitoring pool runs one Prometheus pod per node (hard anti-affinity), so
+# a pool smaller than shards x replicas leaves shards Pending.
+resource "null_resource" "validate_monitoring_pool_size" {
+  count = alltrue([local.monitoring_pool_enabled, local.monitoring_pool_size < local.prometheus_pods]) ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Error: The monitoring pool is smaller than the number of Prometheus pods' && exit 1"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !(local.monitoring_pool_enabled && local.monitoring_pool_size < local.prometheus_pods)
+      error_message = "The monitoring pool runs one Prometheus pod per node, so it needs at least prometheus_shards x prometheus_replicas nodes (plus one spare to reschedule). Please set `worker_monitoring_pool_size=0` for automatic sizing, or raise it."
     }
   }
 }

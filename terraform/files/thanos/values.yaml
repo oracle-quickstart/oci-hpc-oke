@@ -25,6 +25,11 @@ objstore:
 # (kube-prometheus-stack prometheus.thanosService).
 prometheusDiscoveryService: kube-prometheus-stack-thanos-discovery
 
+# Applied to Query, Store Gateway and Compactor; the stack sets them to the
+# monitoring pool's label and taint when that pool is enabled.
+nodeSelector: {}
+tolerations: []
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1001

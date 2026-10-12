@@ -1,19 +1,40 @@
 # Sharding Prometheus with Thanos
 
-By default the stack runs a single Prometheus. Its memory grows with the number of active series, and a BM.GPU.B300.8 node exposes about 22k of them (node-exporter about 13k, cAdvisor about 5k). On large clusters one Prometheus pod eventually outgrows the system node it runs on.
+By default the stack runs a single Prometheus on the system pool, with no memory requests or limits. Its memory grows with the number of active series, and a BM.GPU.B300.8 node exposes about 22k of them (node-exporter about 13k, cAdvisor about 5k). On large clusters one Prometheus outgrows the system node it runs on. It can then starve, or get controllers such as Kueue evicted, on the same node.
 
-Two settings address this:
+`install_thanos = true` addresses this:
 
-- **Thanos (opt-in).** `install_thanos = true` lets you split Prometheus into shards. Thanos keeps one global view for Grafana and stores history in an OCI Object Storage bucket.
-- **Prometheus memory.** `prometheus_memory` is set as both the request and the limit, and `prometheus_cpu` (default `1`) as the request. A Prometheus that outgrows its budget is OOM-killed inside its own cgroup instead of pushing the node into kubelet eviction, which can take out Kueue and other controllers on the same node. When `prometheus_memory` is empty (the default):
-  - Without Thanos, no requests or limits are set, the stack's historical behavior.
-  - With Thanos, it is calculated from the worker pools and `prometheus_shards` (see below).
+- **Sharding.** Scrape targets are split across Prometheus shards by hash. Thanos keeps one global view for Grafana and stores history in an OCI Object Storage bucket.
+- **Automatic sizing.** The stack estimates active series from the worker pools, then picks the number of shards, the memory per Prometheus pod (request equals limit), and the monitoring pool size.
+- **A dedicated monitoring pool.** Prometheus, Thanos, Grafana and kube-state-metrics run on a tainted node pool sized for them, isolated from the system pool.
 
-  Set `prometheus_memory` explicitly to override it in either case.
+Without Thanos nothing changes: one Prometheus, no requests or limits, unless you set `prometheus_memory`.
+
+## Layout
+
+| Component | Runs on | Notes |
+| --- | --- | --- |
+| Prometheus shards + Thanos sidecar | monitoring pool, one pod per node | uploads a TSDB block every 2 hours |
+| Thanos Query | monitoring pool, 2 replicas | Grafana's `Prometheus` datasource (uid `prometheus`) points here; dashboards and alerts are unchanged |
+| Thanos Store Gateway, Compactor | monitoring pool | serve the bucket; compact, downsample, and apply `thanos_retention_raw` / `_5m` / `_1h` (30d / 90d / 365d) |
+| Thanos Ruler | monitoring pool | evaluates the rules that need the global view (see below) |
+| Grafana, kube-state-metrics | monitoring pool | |
+| node-exporter, CSI, CNI | every node | they tolerate the monitoring taint |
+
+The monitoring pool, `oke-monitoring`, has these properties:
+
+- Its nodes carry the label `oci.oraclecloud.com/monitoring=true` and the taint `oci.oraclecloud.com/monitoring=true:NoSchedule`.
+- It has one node per Prometheus pod (shards × replicas) plus a spare, so a shard can reschedule when a node is lost or cycled.
+- It uses the system pool's image, availability domain (where the Prometheus and Grafana volumes live), and node cycling settings.
+- OKE's own node-problem-detector and observability agent don't tolerate the taint, so they don't run on these nodes.
+
+Set `worker_monitoring_enabled = false` to keep everything on the system pool instead. The plan then warns if the shards won't fit there.
+
+After installing kube-prometheus-stack, the apply waits until every shard and replica is available. If a shard can't schedule, the apply fails and shows the Pending pods, instead of silently dropping that shard's targets.
 
 ## Sizing
 
-With Thanos and an empty `prometheus_memory`, the stack estimates active series from the worker pool sizes. The constants were measured on a 16 × BM.GPU.B300.8 + 3 × VM.Standard.E5.Flex cluster (449k series predicted, 449k observed):
+The series estimate comes from the worker pool sizes. The constants were measured on a 16 × BM.GPU.B300.8 + 3 × VM.Standard.E5.Flex cluster (449k series predicted, 449k observed):
 
 | Source | Active series |
 | --- | --- |
@@ -21,55 +42,57 @@ With Thanos and an empty `prometheus_memory`, the stack estimates active series 
 | Each VM node | ~12.2k |
 | Cluster-wide (API server, kube-state-metrics base, Grafana, operators) | ~35k |
 
-Memory per Prometheus pod is then calculated as follows:
+Shards, memory and nodes are then calculated as follows:
 
 ```
-series_per_shard = total / prometheus_shards × 1.25   (hash sharding over few targets is uneven)
-memory           = series_per_shard × 4.5 KB × 2 + 1 GiB, rounded up to whole GiB, at least 2Gi
+shards       = 1 if series <= target, else ceil(series × 1.25 / prometheus_target_series_per_shard)   (target 3M)
+memory/pod   = series / shards × 1.25 × 4.5 KB × 2 + 1 GiB, whole GiB, at least 2Gi
+pool nodes   = shards × replicas + 1
+node memory  = (memory/pod + 0.5Gi sidecar + ~6.5Gi DaemonSets and Thanos) / 0.84, in 8 GB steps, at least 16 GB
 ```
 
-The 4.5 KB is the measured working set per series. The factor of 2 leaves headroom for queries, WAL replay after restarts, head compaction, and series churn.
+The constants:
 
-| Cluster | Shards | Memory per pod |
-| --- | --- | --- |
-| 16 × BM GPU + 3 system | 2 | 4Gi |
-| 128 × BM GPU + 3 system | 6 | 7Gi |
-| 512 × BM GPU + 3 system | 8 | 17Gi |
-| 1024 × BM GPU + 3 system | 16 | 17Gi |
+- The 1.25 allows for uneven hash sharding.
+- 4.5 KB is the measured working set per series.
+- The factor of 2 leaves headroom for queries, WAL replay after restarts, head compaction, and series churn.
+- 0.84 is the allocatable fraction of a node's memory.
 
-The `prometheus_sizing` output shows the estimate and the result.
+| Bare-metal GPU nodes (+3 system) | Shards | Memory per Prometheus pod | Monitoring pool |
+| --- | --- | --- | --- |
+| 16 | 1 | 5Gi | 2 × 16 GB |
+| 128 | 2 | 18Gi | 3 × 32 GB |
+| 512 | 6 | 23Gi | 7 × 40 GB |
+| 1024 | 11 | 25Gi | 12 × 40 GB |
 
-Each Prometheus pod must also fit on a system or CPU pool node, because the GPU pools are tainted. If a pod plus its sidecar would take more than about 60% of such a node, the plan shows a warning with the number of shards that would fit. The default system pool is 3 × VM.Standard.E5.Flex with 16 GB, which allows about 9Gi per pod. Add shards, or raise `worker_ops_memory`.
+The `prometheus_sizing` output shows the estimate and every derived value. Each can be set explicitly: `prometheus_shards`, `prometheus_memory`, `worker_monitoring_pool_size`, `worker_monitoring_memory`.
 
-The estimate uses the pool sizes in the stack. If nodes are added outside the stack, re-apply or set `prometheus_memory` explicitly.
+A lower `prometheus_target_series_per_shard` gives more, smaller shards: for example, 1.5M gives 21 × 14Gi at 1024 nodes. That means a smaller gap when one shard is down. The costs are more sidecars, more blocks, and more Object Storage requests, because metadata polling scales with the number of blocks.
+
+The estimate uses the pool sizes in the stack. If nodes are added outside the stack, re-apply or set the values explicitly. Changing the shard count reassigns most targets to different shards, so memory rises for a while as the new owners pick up their series. History stays in the bucket.
 
 ## Enabling Thanos
 
 ```hcl
-install_thanos      = true
-prometheus_shards   = 2     # targets are split across shards by hash of their address
-prometheus_replicas = 1     # per shard; 2 adds HA and doubles Object Storage writes
-# prometheus_memory = "16Gi"  # optional; calculated from the worker pools when empty
+install_thanos = true
+# Optional overrides; everything below is calculated when left at 0 or empty.
+# prometheus_shards           = 0
+# prometheus_replicas         = 1      # 2 adds HA, doubles Object Storage writes and Prometheus nodes
+# prometheus_memory           = ""
+# worker_monitoring_pool_size = 0
+# worker_monitoring_memory    = 0
 ```
-
-This deploys:
-
-| Component | Where | Notes |
-| --- | --- | --- |
-| Thanos sidecar | each Prometheus pod | uploads a TSDB block every 2 hours |
-| Thanos Query | `files/thanos` chart, 2 replicas | Grafana's `Prometheus` datasource (uid `prometheus`) now points here; dashboards and alerts are unchanged |
-| Store Gateway | `files/thanos` chart | serves the blocks in the bucket |
-| Compactor | `files/thanos` chart | compacts, downsamples to 5m and 1h, applies `thanos_retention_raw`, `_5m`, `_1h` (30d / 90d / 365d) |
-| Thanos Ruler | kube-prometheus-stack `thanosRuler` | evaluates the rules that need the global view (see below) |
 
 The stack also creates:
 
 - A private bucket `oke-gpu-<state_id>-thanos`. To use an existing bucket instead, set `thanos_bucket_name`.
 - An IAM policy that grants the bucket to the `thanos` and `kube-prometheus-stack-prometheus` ServiceAccounts through OKE workload identity. There are no keys or secrets with credentials. With `create_policies = false`, the `thanos_policy_statements` output lists the statements an administrator must create.
 
-Install order matters and is handled by the stack: bucket and policy, then a 5-minute wait for IAM propagation, then the `thanos` chart (which creates the objstore Secret and Thanos Query), then kube-prometheus-stack.
+Install order is handled by the stack: bucket and policy, then a 5-minute wait for IAM propagation, then the `thanos` chart (which creates the objstore Secret and Thanos Query), then kube-prometheus-stack.
 
 Use Thanos Query, not the Prometheus Service, for ad hoc queries: with shards, the `kube-prometheus-stack-prometheus` Service sends each request to one shard. The `prom_server_port_forward` output points at `thanos-query` when Thanos is enabled.
+
+The monitoring taint is applied by the node bootstrap script (`files/oke-ubuntu-cloud-init.sh`, which nodes download from `main`). Until a branch with that change is merged, nodes in the monitoring pool come up untainted. The node selectors still place the monitoring pods there, but other pods may also schedule on those nodes.
 
 ## Recording rules across shards
 
@@ -91,10 +114,10 @@ Downsampled data is kept alongside the raw data, so it only saves space when `th
 
 ## Enabling Thanos on an existing cluster
 
-Applying with `install_thanos = true` updates the running Prometheus in place. Shard 0 keeps its volume and history, and the new shards start empty. History on the existing volume stays queryable through the sidecar until it ages out of `prometheus_retention`.
+Applying with `install_thanos = true` creates the monitoring pool and moves Prometheus, Grafana and kube-state-metrics there. Shard 0 keeps its volume and history, and the new shards start empty. History on the existing volume stays queryable through the sidecar until it ages out of `prometheus_retention`.
 
 To move it into the bucket, apply once with `thanos_upload_existing_blocks = true`, then set it back to `false`. This can upload up to the full size of the Prometheus volume.
 
 ## Destroy
 
-On destroy, or when `install_thanos` is turned off, the stack empties and deletes the bucket it created. It deletes all objects and aborts any uncommitted multipart uploads, which would otherwise block the bucket deletion. A bucket passed in `thanos_bucket_name` is left untouched.
+On destroy, or when `install_thanos` is turned off, the stack empties and deletes the bucket it created. It deletes all objects and aborts any uncommitted multipart uploads, which would otherwise block the bucket deletion. A bucket passed in `thanos_bucket_name` is left untouched. The monitoring pool is removed with Thanos.

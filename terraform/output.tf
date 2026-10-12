@@ -184,12 +184,15 @@ output "prom_server_port_forward" {
 }
 
 output "prometheus_sizing" {
-  description = "Memory per Prometheus pod and the series estimate behind it (calculated when install_thanos is set and prometheus_memory is empty)."
+  description = "Prometheus shards, memory per pod and monitoring pool, and the series estimate behind them (calculated with install_thanos unless set explicitly)."
   value = {
+    shards                     = local.prometheus_shards
+    replicas                   = local.prometheus_replicas
     memory_per_pod             = local.prometheus_memory == "" ? "unbounded (no requests or limits)" : local.prometheus_memory
-    shards                     = local.thanos_enabled ? var.prometheus_shards : 1
     estimated_series           = local.prometheus_estimated_series
-    estimated_series_per_shard = local.thanos_enabled ? local.prometheus_series_per_shard : local.prometheus_estimated_series
+    estimated_series_per_shard = local.prometheus_series_per_shard
+    monitoring_pool_nodes      = local.monitoring_pool_size
+    monitoring_node_memory_gb  = local.monitoring_node_memory_gb
   }
 }
 

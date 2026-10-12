@@ -325,7 +325,13 @@ variableGroups:
     - prometheus_retention
     - install_thanos
     - prometheus_shards
+    - prometheus_target_series_per_shard
     - prometheus_replicas
+    - worker_monitoring_enabled
+    - worker_monitoring_pool_size
+    - worker_monitoring_shape
+    - worker_monitoring_ocpus
+    - worker_monitoring_memory
     - thanos_bucket_name
     - thanos_retention_raw
     - thanos_retention_5m
@@ -1490,11 +1496,11 @@ variables:
       - install_node_problem_detector_kube_prometheus_stack
   prometheus_shards:
     title: Prometheus shards
-    description: Scrape targets are split across this many Prometheus shards.
+    description: Scrape targets are split across this many Prometheus shards. 0 picks enough shards for the target series per shard, given the worker pools.
     type: integer
     required: true
-    default: 1
-    minimum: 1
+    default: 0
+    minimum: 0
     maximum: 64
     visible:
       and:
@@ -1514,6 +1520,79 @@ variables:
       - install_monitoring
       - monitoring_advanced_options
       - install_thanos
+  prometheus_target_series_per_shard:
+    title: Target series per Prometheus shard
+    description: Used when Prometheus shards is 0. Fewer, larger shards mean fewer Object Storage requests but more memory per pod.
+    type: integer
+    required: true
+    default: 3000000
+    minimum: 100000
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_enabled:
+    title: Dedicated monitoring pool
+    description: Run Prometheus, Thanos, Grafana and kube-state-metrics on a tainted node pool sized from the cluster, instead of the system pool.
+    type: boolean
+    default: true
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_pool_size:
+    title: Monitoring pool nodes
+    description: 0 sizes the pool to one node per Prometheus pod plus a spare.
+    type: integer
+    required: true
+    default: 0
+    minimum: 0
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+      - worker_monitoring_enabled
+  worker_monitoring_shape:
+    title: Monitoring pool shape
+    description: A Flex shape matching the system pool image's architecture.
+    type: string
+    pattern: "^.*\\.Flex$"
+    required: true
+    default: "VM.Standard.E5.Flex"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+      - worker_monitoring_enabled
+  worker_monitoring_ocpus:
+    title: Monitoring node OCPUs
+    type: integer
+    required: true
+    default: 4
+    minimum: 1
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+      - worker_monitoring_enabled
+  worker_monitoring_memory:
+    title: Monitoring node memory (GB)
+    description: 0 sizes each node to hold one Prometheus pod and its share of Thanos.
+    type: integer
+    required: true
+    default: 0
+    minimum: 0
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+      - worker_monitoring_enabled
   thanos_bucket_name:
     title: Existing Thanos bucket
     description: Leave empty to create a bucket, which is emptied and deleted on destroy. An existing bucket is left untouched.

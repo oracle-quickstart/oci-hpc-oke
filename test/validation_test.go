@@ -208,6 +208,15 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "More than one Prometheus shard or replica requires Thanos",
 	},
+	{
+		name: "MonitoringPoolSmallerThanPrometheusPods",
+		vars: map[string]interface{}{
+			"install_thanos":              true,
+			"prometheus_shards":           3,
+			"worker_monitoring_pool_size": 2,
+		},
+		expectedError: "The monitoring pool runs one Prometheus pod per node",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests

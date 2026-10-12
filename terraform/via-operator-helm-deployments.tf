@@ -163,7 +163,12 @@ module "kube_prometheus_stack" {
     ] : [])) : []
   ])
 
-  post_deployment_commands = []
+  # helm --wait doesn't cover the operator-created Prometheus StatefulSets: with
+  # Thanos, fail the deployment if a shard can't schedule.
+  post_deployment_commands = local.thanos_enabled ? [
+    "cat > /tmp/wait-prometheus-available.sh <<'PROMETHEUS_WAIT_EOF'\n${file("${path.module}/files/kube-prometheus/wait-prometheus-available.sh")}\nPROMETHEUS_WAIT_EOF",
+    "bash /tmp/wait-prometheus-available.sh '${var.monitoring_namespace}' kube-prometheus-stack-prometheus '${local.prometheus_pods}' 1200",
+  ] : []
 
   helm_template_values_override = local.kube_prometheus_stack_values
 

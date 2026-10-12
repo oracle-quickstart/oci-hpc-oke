@@ -46,6 +46,17 @@ prometheus:
     # replicas are per shard. Thanos Query merges the shards.
     shards: ${prometheus_shards}
     replicas: ${prometheus_replicas}
+%{ if monitoring_pool }
+    # One Prometheus pod per monitoring node; the pool has a node per pod plus a spare.
+    podAntiAffinity: hard
+    nodeSelector:
+      ${monitoring_node_key}: "true"
+    tolerations:
+      - key: ${monitoring_node_key}
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+%{ endif }
     # Each shard evaluates rules over its own targets only. Rules that join
     # series from different targets are labelled thanos-ruler: "true" and are
     # evaluated by the Thanos Ruler against the global view instead.
@@ -115,6 +126,15 @@ prometheus-node-exporter:
 grafana:
   enabled: ${install_grafana}
   defaultDashboardsEnabled: false
+%{ if monitoring_pool }
+  nodeSelector:
+    ${monitoring_node_key}: "true"
+  tolerations:
+    - key: ${monitoring_node_key}
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+%{ endif }
   persistence:
     enabled: true
     type: sts
@@ -157,6 +177,15 @@ kubelet:
 kube-state-metrics:
   serviceAccount:
     create: true
+%{ if monitoring_pool }
+  nodeSelector:
+    ${monitoring_node_key}: "true"
+  tolerations:
+    - key: ${monitoring_node_key}
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+%{ endif }
 
 %{ if install_thanos }
 # Evaluates the rules labelled thanos-ruler: "true" against Thanos Query and
@@ -180,6 +209,15 @@ thanosRuler:
       matchLabels:
         thanos-ruler: "true"
     evaluationInterval: 30s
+%{ if monitoring_pool }
+    nodeSelector:
+      ${monitoring_node_key}: "true"
+    tolerations:
+      - key: ${monitoring_node_key}
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+%{ endif }
     objectStorageConfig:
       existingSecret:
         name: thanos-objstore

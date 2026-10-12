@@ -13,8 +13,10 @@ locals {
     prometheus_memory             = local.prometheus_memory
     prometheus_retention          = var.prometheus_retention
     install_thanos                = local.thanos_enabled
-    prometheus_shards             = var.prometheus_shards
-    prometheus_replicas           = var.prometheus_replicas
+    prometheus_shards             = local.prometheus_shards
+    prometheus_replicas           = local.prometheus_replicas
+    monitoring_pool               = local.monitoring_pool_enabled
+    monitoring_node_key           = local.monitoring_node_key
     thanos_version                = var.thanos_version
     thanos_upload_existing_blocks = var.thanos_upload_existing_blocks
   })
@@ -145,4 +147,35 @@ data "kubernetes_service_v1" "grafana_internal_ip" {
     name      = try(format("%s-grafana", one(helm_release.prometheus.*.name)), "")
     namespace = one(helm_release.prometheus.*.namespace)
   }
+}
+
+# helm --wait doesn't cover the Prometheus StatefulSets, which the operator
+# creates after the release. With Thanos, fail the apply if a shard can't
+# schedule (for example the pool is too small) instead of silently dropping
+# its targets.
+resource "null_resource" "prometheus_available_via_orm" {
+  count = alltrue([local.thanos_enabled, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+
+  triggers = {
+    values        = sha256(local.kube_prometheus_stack_values)
+    chart_version = var.prometheus_stack_chart_version
+    pods          = local.prometheus_pods
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      # Stop on any error, so kubectl never falls back to ~/.kube/config.
+      set -euo pipefail
+      WORKDIR="$(mktemp -d "$${TMPDIR:-/tmp}/prometheus-wait.XXXXXX")"
+      trap 'rm -rf "$WORKDIR"' EXIT
+      printf '%s' '${base64encode(yamlencode(local.patched_kube_config))}' | base64 -d > "$WORKDIR/kubeconfig"
+      export KUBECONFIG="$WORKDIR/kubeconfig"
+      export PYTHONWARNINGS="ignore:the 'strict' parameter::urllib3.poolmanager"
+      printf '%s' '${base64encode(file("${path.module}/files/kube-prometheus/wait-prometheus-available.sh"))}' | base64 -d > "$WORKDIR/wait.sh"
+      bash "$WORKDIR/wait.sh" '${var.monitoring_namespace}' kube-prometheus-stack-prometheus '${local.prometheus_pods}' 1200
+    EOT
+  }
+
+  depends_on = [helm_release.prometheus]
 }
