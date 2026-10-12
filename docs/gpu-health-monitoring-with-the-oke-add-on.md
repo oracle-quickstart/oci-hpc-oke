@@ -73,6 +73,8 @@ The OCA plugin has health check rules for these shapes (Oracle Cloud Agent 1.64.
 
 Terraform installs NPD with all of its checks when a GPU pool uses another shape, for example `VM.GPU.A10.1`, or is self-managed (the GPU memory cluster pool or a cluster network pool). It also installs NPD when NVIDIA GPU pools run without the NVIDIA GPU Operator, because nothing then sets the `nvidia.com/gpu.present` label that the add-on needs. The shape list is the `gpu_health_check_shapes` local in `terraform/oke-addons.tf`.
 
+When NPD is not installed, Terraform also deletes the NPD alert rules from Grafana. Grafana keeps a provisioned rule after its file is removed, so a cluster that had NPD would otherwise keep the old rules. The `NPD Check Stale` rule would then fire for every check on every GPU node.
+
 ## Health Checks
 
 The OCA plugin selects the checks for the node shape. On `BM.GPU.B300.8`, it runs these checks:

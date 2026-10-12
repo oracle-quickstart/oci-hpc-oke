@@ -105,6 +105,7 @@ locals {
     (!contains(local.grafana_gpu_health_alert_files, f) || local.deploy_gpu_health_monitoring_addon) &&
     (f != "gpu-health-delete-alerts.yaml" || !local.deploy_gpu_health_monitoring_addon) &&
     (!contains(local.grafana_npd_alert_files, f) || !local.npd_removed) &&
+    (f != "npd-delete-all-alerts.yaml" || local.npd_removed) &&
     (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
   ]
