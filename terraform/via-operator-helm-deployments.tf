@@ -165,11 +165,7 @@ module "kube_prometheus_stack" {
 
   post_deployment_commands = []
 
-  helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
-    install_grafana               = var.install_grafana
-    preferred_kubernetes_services = var.preferred_kubernetes_services
-    setup_alerting                = var.setup_alerting
-  })
+  helm_template_values_override = local.kube_prometheus_stack_values
 
   helm_user_values_override = var.install_grafana ? yamlencode(
     {
@@ -190,7 +186,9 @@ module "kube_prometheus_stack" {
   # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
   # admission hook Jobs fail with "no endpoints available for service
   # kueue-webhook-service" while Kueue is still starting.
-  depends_on = [module.ingress, module.kueue]
+  # With Thanos, the thanos release must exist first (objstore Secret, Thanos
+  # Query); the purge hook must be destroyed after this release.
+  depends_on = [module.ingress, module.kueue, module.thanos, null_resource.thanos_predestroy_purge_via_operator]
 }
 
 

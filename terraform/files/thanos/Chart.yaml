@@ -1,0 +1,13 @@
+apiVersion: v2
+name: thanos
+description: Thanos Query, Store Gateway and Compactor for the sharded kube-prometheus-stack Prometheus, backed by OCI Object Storage.
+type: application
+version: 0.1.0
+appVersion: "v0.42.4"
+keywords:
+  - prometheus
+  - thanos
+  - oci
+home: https://github.com/oracle-quickstart/oci-hpc-oke
+sources:
+  - https://github.com/oracle-quickstart/oci-hpc-oke

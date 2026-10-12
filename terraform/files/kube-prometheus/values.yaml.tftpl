@@ -5,10 +5,70 @@ defaultRules:
   create: false
 
 prometheus:
+%{ if install_thanos }
+  # Headless Service with one SRV record per shard sidecar, discovered by Thanos Query.
+  thanosService:
+    enabled: true
+  thanosServiceMonitor:
+    enabled: true
+  additionalServiceMonitors:
+    - name: thanos
+      selector:
+        matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values: [thanos-query, thanos-store, thanos-compact]
+      namespaceSelector:
+        matchNames: [${monitoring_namespace}]
+      endpoints:
+        - port: http
+          interval: 30s
+%{ endif }
   prometheusSpec:
     enableAdminAPI: false
-    retention: 30d
+    retention: ${prometheus_retention}
     retentionSize: 450GB
+    # Requests equal limits for memory: a Prometheus that outgrows its budget is
+    # OOM-killed in its own cgroup instead of pushing the node into kubelet
+    # eviction, which can take out Kueue and other controllers on the same node.
+    # Prometheus sets GOMEMLIMIT from the limit.
+    resources:
+      requests:
+        cpu: "${prometheus_cpu}"
+        memory: "${prometheus_memory}"
+      limits:
+        memory: "${prometheus_memory}"
+%{ if install_thanos }
+    # Operator-native sharding: targets are split by hashmod of __address__,
+    # replicas are per shard. Thanos Query merges the shards.
+    shards: ${prometheus_shards}
+    replicas: ${prometheus_replicas}
+    # Each shard evaluates rules over its own targets only. Rules that join
+    # series from different targets are labelled thanos-ruler: "true" and are
+    # evaluated by the Thanos Ruler against the global view instead.
+    ruleSelector:
+      matchExpressions:
+        - key: thanos-ruler
+          operator: DoesNotExist
+    thanos:
+      image: quay.io/thanos/thanos:${thanos_version}
+      version: ${thanos_version}
+      objectStorageConfig:
+        existingSecret:
+          name: thanos-objstore
+          key: objstore.yml
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          memory: 512Mi
+%{ if thanos_upload_existing_blocks }
+      # One-time migration: also upload the blocks already on the PVCs.
+      additionalArgs:
+        - name: shipper.upload-compacted
+%{ endif }
+%{ endif }
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
@@ -64,6 +124,12 @@ grafana:
     finalizers:
       - kubernetes.io/pvc-protection
   sidecar:
+%{ if install_thanos }
+    datasources:
+      # Same datasource name and uid ("prometheus"), so dashboards and alerts
+      # are unchanged; only the URL moves to the global view.
+      url: http://thanos-query.${monitoring_namespace}:9090/
+%{ endif }
     alerts:
       enabled: ${setup_alerting}
     dashboards:
@@ -88,6 +154,40 @@ kubelet:
 kube-state-metrics:
   serviceAccount:
     create: true
+
+%{ if install_thanos }
+# Evaluates the rules labelled thanos-ruler: "true" against Thanos Query and
+# ships its results to the bucket. Uses the thanos ServiceAccount from the
+# files/thanos chart, which the bucket policy grants access to.
+thanosRuler:
+  enabled: true
+  serviceAccount:
+    create: false
+    name: thanos
+  thanosRulerSpec:
+    image:
+      registry: quay.io
+      repository: thanos/thanos
+      tag: ${thanos_version}
+    queryEndpoints:
+      - thanos-query.${monitoring_namespace}.svc.cluster.local:9090
+    ruleNamespaceSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector:
+      matchLabels:
+        thanos-ruler: "true"
+    evaluationInterval: 30s
+    objectStorageConfig:
+      existingSecret:
+        name: thanos-objstore
+        key: objstore.yml
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 512Mi
+%{ endif }
 
 additionalPrometheusRulesMap:
   kube-apiserver-availability-rules:
@@ -209,6 +309,13 @@ additionalPrometheusRulesMap:
               verb: write
             expr: histogram_quantile(0.99, sum by (cluster, le, resource) (rate(apiserver_request_sli_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE",subresource!~"proxy|attach|log|exec|portforward"}[5m]))) > 0
   k8s-container-resource-rules:
+%{ if install_thanos }
+    # node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate
+    # joins cAdvisor (every kubelet) with kube_pod_info (one kube-state-metrics
+    # target), which land on different shards.
+    additionalLabels:
+      thanos-ruler: "true"
+%{ endif }
     groups:
       - name: k8s.rules.container_cpu_usage_seconds_total
         rules:

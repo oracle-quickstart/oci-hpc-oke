@@ -1,27 +1,46 @@
 # Copyright (c) 2025 Oracle Corporation and/or its affiliates.
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
+# Rendered once for both the provider path (below) and the operator path
+# (module.kube_prometheus_stack), so the two can't drift.
+locals {
+  kube_prometheus_stack_values = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
+    install_grafana               = var.install_grafana
+    preferred_kubernetes_services = var.preferred_kubernetes_services
+    setup_alerting                = var.setup_alerting
+    monitoring_namespace          = var.monitoring_namespace
+    prometheus_cpu                = var.prometheus_cpu
+    prometheus_memory             = var.prometheus_memory
+    prometheus_retention          = var.prometheus_retention
+    install_thanos                = local.thanos_enabled
+    prometheus_shards             = var.prometheus_shards
+    prometheus_replicas           = var.prometheus_replicas
+    thanos_version                = var.thanos_version
+    thanos_upload_existing_blocks = var.thanos_upload_existing_blocks
+  })
+}
+
 resource "helm_release" "prometheus" {
   count = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
   # admission hook Jobs fail with "no endpoints available for service
   # kueue-webhook-service" while Kueue is still starting.
+  # With Thanos, the thanos release must exist first: it creates the objstore
+  # Secret the sidecars mount and the Thanos Query that Grafana points at.
   depends_on = [
     helm_release.ingress,
     time_sleep.wait_for_ingress_lb,
     helm_release.kueue,
     kubectl_manifest.kueue_webhook_probe,
+    helm_release.thanos,
+    null_resource.thanos_predestroy_purge_via_orm,
   ]
-  namespace  = var.monitoring_namespace
-  name       = "kube-prometheus-stack"
-  chart      = "kube-prometheus-stack"
-  repository = "https://prometheus-community.github.io/helm-charts"
-  version    = var.prometheus_stack_chart_version
-  values = [templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
-    install_grafana               = var.install_grafana
-    preferred_kubernetes_services = var.preferred_kubernetes_services
-    setup_alerting                = var.setup_alerting
-  })]
+  namespace         = var.monitoring_namespace
+  name              = "kube-prometheus-stack"
+  chart             = "kube-prometheus-stack"
+  repository        = "https://prometheus-community.github.io/helm-charts"
+  version           = var.prometheus_stack_chart_version
+  values            = [local.kube_prometheus_stack_values]
   create_namespace  = true
   recreate_pods     = false
   force_update      = true

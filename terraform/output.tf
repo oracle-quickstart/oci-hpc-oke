@@ -179,7 +179,17 @@ output "slinky_openldap_config_password" {
 }
 
 output "prom_server_port_forward" {
-  value = format("kubectl port-forward -n %v svc/kube-prometheus-stack-prometheus 9090:9090", var.monitoring_namespace)
+  # With shards, the Prometheus Service picks one shard per request; Thanos Query has the global view.
+  value = format("kubectl port-forward -n %v svc/%v 9090:9090", var.monitoring_namespace, local.thanos_enabled ? "thanos-query" : "kube-prometheus-stack-prometheus")
+}
+
+output "thanos_bucket" {
+  value = local.thanos_enabled ? local.thanos_bucket_name : "N/A"
+}
+
+output "thanos_policy_statements" {
+  description = "IAM policy statements Thanos needs. Created by the stack unless create_policies=false; then an administrator must create them."
+  value       = local.thanos_enabled && !var.create_policies ? local.thanos_policy_statements : []
 }
 
 output "grafana_port_forward" {

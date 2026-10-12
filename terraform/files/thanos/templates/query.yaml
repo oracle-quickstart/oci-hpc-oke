@@ -1,0 +1,123 @@
+# Thanos Query: the global view behind Grafana's "Prometheus" datasource.
+# Fans out to every shard's sidecar, the store gateway (bucket) and the Thanos
+# Ruler, and deduplicates on the replica labels. It needs no bucket access.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thanos-query-endpoints
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "thanos.labels" . | nindent 4 }}
+data:
+  endpoints.yaml: |
+    endpoints:
+      - address: dnssrv+_grpc._tcp.{{ .Values.prometheusDiscoveryService }}.{{ .Release.Namespace }}.svc.cluster.local
+      - address: dnssrv+_grpc._tcp.thanos-store.{{ .Release.Namespace }}.svc.cluster.local
+      - address: dnssrv+_grpc._tcp.thanos-ruler-operated.{{ .Release.Namespace }}.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-query
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: thanos-query
+    {{- include "thanos.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: thanos-query
+  ports:
+    # 9090, so anything that expects a Prometheus URL works unchanged.
+    - name: http
+      port: 9090
+      targetPort: http
+    - name: grpc
+      port: 10901
+      targetPort: grpc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thanos-query
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: thanos-query
+    {{- include "thanos.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.query.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos-query
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: thanos-query
+        {{- include "thanos.labels" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: thanos-query
+      containers:
+        - name: thanos-query
+          image: {{ include "thanos.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - query
+            - --log.level=info
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+            - --endpoint.sd-config-file=/etc/thanos/endpoints.yaml
+            {{- range .Values.query.replicaLabels }}
+            - --query.replica-label={{ . }}
+            {{- end }}
+            - --query.auto-downsampling
+            - --enable-auto-gomemlimit
+          ports:
+            - name: grpc
+              containerPort: 10901
+            - name: http
+              containerPort: 10902
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+          resources:
+            {{- toYaml .Values.query.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: endpoints
+              mountPath: /etc/thanos
+              readOnly: true
+      volumes:
+        - name: endpoints
+          configMap:
+            name: thanos-query-endpoints
+{{- if gt (int .Values.query.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: thanos-query
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "thanos.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos-query
+{{- end }}

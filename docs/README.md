@@ -50,6 +50,7 @@ Engine (OKE). For deployment and project overview, see the
 - [Running ib_write_bw Tests Between Nodes](./running-ib-write-bw-test.md): Run ib_write_bw RDMA bandwidth tests between nodes.
 - [Manual Deployment: Prometheus & Grafana Stack](./deploying-monitoring-stack-manually.md): Manually deploy the Prometheus and Grafana monitoring stack with dashboards and alerts.
 - [Operating and Developing Grafana Dashboards](./grafonnet-dashboards.md): Understand deployment-time provisioning, update dashboards in a running cluster, and develop durable Grafonnet changes.
+- [Sharding Prometheus with Thanos](./sharding-prometheus-with-thanos.md): Size Prometheus memory, shard it, and keep a global view in Grafana with Thanos and OCI Object Storage.
 
 ## Security advisories
 

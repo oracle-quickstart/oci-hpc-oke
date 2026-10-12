@@ -1,0 +1,2 @@
+# Run by the stack's destroy hooks, not part of the chart.
+predestroy-purge.sh

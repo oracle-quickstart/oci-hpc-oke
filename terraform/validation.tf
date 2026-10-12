@@ -256,6 +256,23 @@ data "oci_core_compute_cluster" "worker_rdma" {
   compute_cluster_id = var.worker_rdma_compute_cluster_id
 }
 
+# Without Thanos, Grafana would query one shard or replica at a time and
+# silently show partial data.
+resource "null_resource" "validate_prometheus_sharding" {
+  count = alltrue([var.prometheus_shards * var.prometheus_replicas > 1, !var.install_thanos]) ? 1 : 0
+
+  provisioner "local-exec" {
+    command = "echo 'Error: More than one Prometheus shard or replica requires Thanos' && exit 1"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !(var.prometheus_shards * var.prometheus_replicas > 1 && !var.install_thanos)
+      error_message = "More than one Prometheus shard or replica requires Thanos for a global view. Please set `install_thanos=true` or set `prometheus_shards=1` and `prometheus_replicas=1`."
+    }
+  }
+}
+
 resource "null_resource" "validate_bastion_networking" {
   count = local.invalid_bastion ? 1 : 0
 

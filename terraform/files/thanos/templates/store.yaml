@@ -1,0 +1,100 @@
+# Store gateway: serves the blocks in the bucket over the StoreAPI.
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: thanos-store
+    {{- include "thanos.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: thanos-store
+  ports:
+    - name: grpc
+      port: 10901
+      targetPort: grpc
+    - name: http
+      port: 10902
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: thanos-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: thanos-store
+    {{- include "thanos.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: thanos-store
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos-store
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: thanos-store
+        {{- include "thanos.labels" . | nindent 8 }}
+      annotations:
+        checksum/objstore: {{ include (print $.Template.BasePath "/serviceaccount.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: thanos-store
+          image: {{ include "thanos.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - store
+            - --log.level=info
+            - --data-dir=/var/thanos/store
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+            - --index-cache-size={{ .Values.store.indexCacheSize }}
+            - --chunk-pool-size={{ .Values.store.chunkPoolSize }}
+            - --enable-auto-gomemlimit
+          ports:
+            - name: grpc
+              containerPort: 10901
+            - name: http
+              containerPort: 10902
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            periodSeconds: 30
+            failureThreshold: 8
+          resources:
+            {{- toYaml .Values.store.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/store
+            - name: objstore
+              mountPath: /etc/thanos
+              readOnly: true
+      volumes:
+        - name: objstore
+          secret:
+            secretName: {{ .Values.objstore.secretName }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: {{ .Values.store.storage.storageClassName }}
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.store.storage.size }}

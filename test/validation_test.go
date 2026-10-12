@@ -200,6 +200,14 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "Dranet (preview) needs the shared RDMA netns mode",
 	},
+	{
+		name: "PrometheusShardsRequireThanos",
+		vars: map[string]interface{}{
+			"install_thanos":    false,
+			"prometheus_shards": 2,
+		},
+		expectedError: "More than one Prometheus shard or replica requires Thanos",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests
