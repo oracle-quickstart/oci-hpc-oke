@@ -506,7 +506,7 @@ case "${GPU_VENDOR}" in
 esac
 
 # With the add-on, skip the NPD alerts. Without it, skip the add-on alerts.
-ADDON_ALERTS="gpu-fault-monitor-stale gpu-health-fault gpu-health-signal gpu-health-unavailable gpu-node-repair-failed"
+ADDON_ALERTS="gpu-fault-monitor-stale gpu-health-fault gpu-health-signal gpu-health-unavailable gpu-node-repair-failed npd-delete-all-alerts"
 NO_ADDON_ALERTS="cpu-profile dcgm-health gpu-bad-pages gpu-bus gpu-count gpu-ecc gpu-fabric-manager gpu-health-delete-alerts gpu-imex gpu-pcie gpu-row-remap gpu-xid node-pcie npd-check-stale npd-check-unknown npd-delete-amd-alerts npd-delete-nvidia-alerts nvlink-speed oca-version rdma-gid-index rdma-link rdma-link-flapping rdma-oca-plugins rdma-ovs-mtu rdma-rttcc rdma-vf-counters rdma-vf-routes rdma-wpa-auth"
 if [ "${GPU_HEALTH_ADDON}" = "true" ]; then
   SKIP_ALERTS="${NO_ADDON_ALERTS}"
