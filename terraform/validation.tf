@@ -246,6 +246,8 @@ locals {
   invalid_dranet_with_network_operator = var.install_dranet && var.deploy_nvidia_network_operator
   # OKE needs public subnets for IPv6, and IPv6 egress goes through the internet gateway.
   invalid_ipv6_without_public_subnets = local.cluster_uses_ipv6 && var.create_vcn && !var.create_public_subnets
+  # GVA with IPv6 needs two IPv6 prefixes on the pods subnet. The stack adds the second one only in a VCN it creates.
+  invalid_ipv6_gva_existing_vcn = local.cluster_uses_ipv6 && local.use_gva && !var.create_vcn && !var.custom_subnet_ids && !local.pods_ipv6_user_set
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -661,6 +663,17 @@ resource "null_resource" "validate_ipv6_public_subnets" {
     precondition {
       condition     = !local.invalid_ipv6_without_public_subnets
       error_message = "Dual stack and IPv6 clusters need public subnets and an internet gateway. Please set `create_public_subnets=true`, or set `ip_families=IPv4` and `enable_ipv6=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_ipv6_gva_existing_vcn" {
+  count = local.invalid_ipv6_gva_existing_vcn ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_ipv6_gva_existing_vcn
+      error_message = "Dual stack and IPv6 clusters with VCN-Native Pod Networking need two IPv6 prefixes on the pods subnet, and the stack adds the second one only in a VCN that it creates. Please set `create_vcn=true`, or set `ip_families=IPv4` and `enable_ipv6=false`."
     }
   }
 }

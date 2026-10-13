@@ -209,6 +209,15 @@ var validationTestCases = []validationTestCase{
 		expectedError: "Dual stack and IPv6 clusters need public subnets",
 	},
 	{
+		// The stack adds the second pods IPv6 prefix for GVA only in a VCN it creates.
+		name: "IPv6GvaRequiresStackVcn",
+		vars: map[string]interface{}{
+			"ip_families": "IPv4,IPv6",
+			"create_vcn":  false,
+		},
+		expectedError: "clusters with VCN-Native Pod Networking need two IPv6",
+	},
+	{
 		name: "InvalidIPFamilies",
 		vars: map[string]interface{}{
 			"ip_families": "IPv6,IPv4",
