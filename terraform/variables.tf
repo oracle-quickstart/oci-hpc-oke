@@ -75,7 +75,7 @@ variable "enable_ipv6" {
 variable "ip_families" {
   type        = string
   default     = "IPv4"
-  description = "IP families of the cluster. IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. IPv6 is single stack IPv6, which is in limited availability and is not available in every region. Dual stack and IPv6 make the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. Changing this value replaces the cluster."
+  description = "IP families of the cluster. IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. IPv6 is single stack IPv6, which is in limited availability and is not available in every region. Dual stack and IPv6 make the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. With VCN-Native Pod Networking, an existing pods subnet needs two IPv6 prefixes. Changing this value replaces the cluster. A VCN that the stack created does not change from IPv4 to dual stack, so use a new stack for that change."
 
   validation {
     condition     = contains(["IPv4", "IPv4,IPv6", "IPv6"], var.ip_families)

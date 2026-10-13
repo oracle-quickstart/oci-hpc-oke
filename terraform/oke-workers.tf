@@ -134,9 +134,9 @@ locals {
       permissions = "0644"
     },
     {
-      # OCA replaces its defaults with this file, and keys left out keep OCA's default behavior.
-      # On an IPv6-only primary VNIC OCA stops with an error if the file exists and host_serial_based_rdma_ips is false.
-      # OCA uses host serial based RDMA IPs there anyway, so true changes nothing else.
+      # OCA reads only this file when it exists, so a key left out gets its zero value. Today that gives the OCA defaults.
+      # On an IPv6-only primary VNIC OCA stops with an error if host_serial_based_rdma_ips is false.
+      # With an IPv4 primary VNIC, true makes OCA take the RDMA IPs from the host serial number.
       content = jsonencode(merge(
         { ipv6_fabric_policy_based_routing_default_shapes = ["BM.GPU.RTXPRO.8", "BM.GPU.B300.8"] },
         contains(local.ip_families, "IPv4") ? {} : { host_serial_based_rdma_ips = true },
