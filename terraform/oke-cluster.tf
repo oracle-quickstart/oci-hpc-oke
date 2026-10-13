@@ -152,7 +152,9 @@ locals {
 
   # With IPv6, GVA also needs two IPv6 prefixes on the pods subnet, or OCI limits ip_count to 16.
   # A subnet takes only one prefix per VCN IPv6 block, so the VCN gets a ULA block for the second.
-  pods_ipv6_ula_vcn_cidr = local.cluster_uses_ipv6 && local.use_gva && var.create_vcn ? "fd00:10:140::/56" : null
+  # Pods IPv6 CIDRs from subnet_advanced_attrs replace this.
+  pods_ipv6_user_set     = length(setintersection(keys(lookup(var.subnet_advanced_attrs, "pods", {})), ["ipv6_cidr", "ipv6_cidrs"])) > 0
+  pods_ipv6_ula_vcn_cidr = local.cluster_uses_ipv6 && local.use_gva && var.create_vcn && !local.pods_ipv6_user_set ? "fd00:10:140::/56" : null
 
   subnets = merge(
     {
