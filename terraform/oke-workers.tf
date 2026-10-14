@@ -134,6 +134,14 @@ locals {
       permissions = "0644"
     },
     {
+      # OCA resets the NICs on the first boot, and a re-created rail starts with accept_ra=1.
+      # systemd-sysctl applies this file to each new rail.
+      content     = "net.ipv6.conf.rdma*.accept_ra = 2\n"
+      owner       = "root:root"
+      path        = "/etc/sysctl.d/90-oke-rdma-ipv6.conf"
+      permissions = "0644"
+    },
+    {
       # OCA reads only this file when it exists, so a key left out gets its zero value. Today that gives the OCA defaults.
       # On an IPv6-only primary VNIC OCA stops with an error if host_serial_based_rdma_ips is false.
       # With an IPv4 primary VNIC, true makes OCA take the RDMA IPs from the host serial number.
