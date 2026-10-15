@@ -241,9 +241,13 @@ locals {
 
   # Dranet has no IPv6 support yet, so it needs a single-stack IPv4 cluster.
   # GB200.4 uses native InfiniBand and is the exception.
-  invalid_dranet_ip_stack = var.install_dranet && var.enable_ipv6 && !(var.worker_gmc_enabled && var.worker_gmc_shape == "BM.GPU.GB200.4")
+  invalid_dranet_ip_stack = var.install_dranet && local.cluster_uses_ipv6 && !(var.worker_gmc_enabled && var.worker_gmc_shape == "BM.GPU.GB200.4")
   # Dranet needs shared RDMA netns mode and the Network Operator needs exclusive mode.
   invalid_dranet_with_network_operator = var.install_dranet && var.deploy_nvidia_network_operator
+  # OKE needs public subnets for IPv6, and IPv6 egress goes through the internet gateway.
+  invalid_ipv6_without_public_subnets = local.cluster_uses_ipv6 && var.create_vcn && !var.create_public_subnets
+  # GVA with IPv6 needs two IPv6 prefixes on the pods subnet. The stack adds the second one only in a VCN it creates.
+  invalid_ipv6_gva_existing_vcn = local.cluster_uses_ipv6 && local.use_gva && !var.create_vcn && !var.custom_subnet_ids && !local.pods_ipv6_user_set
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -668,7 +672,29 @@ resource "null_resource" "validate_dranet_ip_stack" {
   lifecycle {
     precondition {
       condition     = !local.invalid_dranet_ip_stack
-      error_message = "Dranet (preview) supports single-stack IPv4 clusters only, or a GPU Memory Cluster pool with the BM.GPU.GB200.4 shape. Please set `enable_ipv6=false` or set `install_dranet=false`."
+      error_message = "Dranet (preview) supports single-stack IPv4 clusters only, or a GPU Memory Cluster pool with the BM.GPU.GB200.4 shape. Please set `ip_families=IPv4` and `enable_ipv6=false`, or set `install_dranet=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_ipv6_public_subnets" {
+  count = local.invalid_ipv6_without_public_subnets ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_ipv6_without_public_subnets
+      error_message = "Dual stack and IPv6 clusters need public subnets and an internet gateway. Please set `create_public_subnets=true`, or set `ip_families=IPv4` and `enable_ipv6=false`."
+    }
+  }
+}
+
+resource "null_resource" "validate_ipv6_gva_existing_vcn" {
+  count = local.invalid_ipv6_gva_existing_vcn ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_ipv6_gva_existing_vcn
+      error_message = "Dual stack and IPv6 clusters with VCN-Native Pod Networking need two IPv6 prefixes on the pods subnet, and the stack adds the second one only in a VCN that it creates. Please set `create_vcn=true`, or set `ip_families=IPv4` and `enable_ipv6=false`."
     }
   }
 }
