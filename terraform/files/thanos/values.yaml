@@ -1,0 +1,92 @@
+# Installed before kube-prometheus-stack: it creates the objstore Secret the
+# Prometheus sidecars and the Thanos Ruler mount. Everything that needs the
+# Prometheus Operator CRDs (ThanosRuler, ServiceMonitors) lives in the
+# kube-prometheus-stack values instead.
+
+image:
+  repository: quay.io/thanos/thanos
+  tag: v0.42.4
+  pullPolicy: IfNotPresent
+
+# Shared by the store gateway, the compactor and the Thanos Ruler. The OCI IAM
+# policy grants bucket access to this ServiceAccount through OKE workload identity.
+serviceAccount:
+  name: thanos
+
+objstore:
+  secretName: thanos-objstore
+  bucket: ""
+  region: ""
+  # The OCI SDK default is 128 MiB parts with 5 upload goroutines (~640 MiB
+  # buffered per upload), which would OOM the 512Mi sidecars.
+  partSize: 33554432
+
+# Headless Service with one SRV record per Prometheus shard sidecar
+# (kube-prometheus-stack prometheus.thanosService).
+prometheusDiscoveryService: kube-prometheus-stack-thanos-discovery
+
+# Applied to Query, Store Gateway and Compactor; the stack sets them to the
+# monitoring pool's label and taint when that pool is enabled.
+nodeSelector: {}
+tolerations: []
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+query:
+  # Grafana's datasource and every Grafana alert go through Query, and the
+  # alerts move to Error after 1m without it: keep two replicas.
+  replicas: 2
+  replicaLabels:
+    - prometheus_replica
+    - thanos_ruler_replica
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      memory: 1Gi
+
+store:
+  indexCacheSize: 256MB
+  chunkPoolSize: 512MB
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1536Mi
+    limits:
+      memory: 1536Mi
+  storage:
+    storageClassName: oci-bv
+    size: 50Gi
+
+compact:
+  retention:
+    raw: 30d
+    fiveMinutes: 90d
+    oneHour: 365d
+  deleteDelay: 48h
+  # Refresh of the /global block viewer. It is most of the compactor's
+  # metadata polling against the bucket.
+  blockViewerSyncInterval: 1m
+  extraArgs: []
+  resources:
+    requests:
+      cpu: 500m
+      memory: 3Gi
+    limits:
+      memory: 3Gi
+  storage:
+    storageClassName: oci-bv
+    size: 50Gi

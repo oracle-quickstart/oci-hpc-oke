@@ -437,6 +437,153 @@ variable "prometheus_stack_chart_version" {
   type    = string
 }
 
+variable "prometheus_memory" {
+  default     = ""
+  type        = string
+  description = "Memory request and limit of each Prometheus pod (one per shard and replica). Empty: with install_thanos, sized from the worker pool sizes and the shard count (see the prometheus_sizing output); without Thanos, no requests or limits are set, as before. Set it, for example to 16Gi, to override either way."
+  validation {
+    condition     = can(regex("^$|^[0-9]+(\\.[0-9]+)?(Mi|Gi)$", trimspace(var.prometheus_memory)))
+    error_message = "prometheus_memory must be empty or a Kubernetes quantity in Mi or Gi, for example 16Gi."
+  }
+}
+
+variable "prometheus_cpu" {
+  default     = "1"
+  type        = string
+  description = "CPU request of each Prometheus pod, set whenever the memory request is (no CPU limit)."
+}
+
+variable "prometheus_retention" {
+  default     = "30d"
+  type        = string
+  description = "How long Prometheus keeps data on its own volume. With install_thanos, older data is still served from Object Storage, so this can be shortened (for example 7d)."
+  validation {
+    condition     = can(regex("^[0-9]+(h|d|w|y)$", var.prometheus_retention))
+    error_message = "prometheus_retention must be a duration such as 30d."
+  }
+}
+
+variable "install_thanos" {
+  default     = false
+  type        = bool
+  description = "Deploy Thanos (Query, Store Gateway, Compactor, Ruler) with an OCI Object Storage bucket, and a Thanos sidecar on Prometheus. Required for prometheus_shards or prometheus_replicas above 1; Grafana then queries Thanos for the global view."
+}
+
+variable "prometheus_shards" {
+  default     = 0
+  type        = number
+  description = "Number of Prometheus shards; scrape targets are split across them by hash. 0: with install_thanos, enough shards for prometheus_target_series_per_shard given the worker pools; without Thanos, 1. Above 1 requires install_thanos."
+  validation {
+    condition     = var.prometheus_shards >= 0 && floor(var.prometheus_shards) == var.prometheus_shards
+    error_message = "prometheus_shards must be a whole number (0 for automatic)."
+  }
+}
+
+variable "prometheus_target_series_per_shard" {
+  default     = 3000000
+  type        = number
+  description = "Active series each Prometheus shard should hold when prometheus_shards is 0. Fewer, larger shards mean fewer sidecars and fewer Object Storage requests, but more memory per pod and a larger gap when one shard is down."
+  validation {
+    condition     = var.prometheus_target_series_per_shard >= 100000
+    error_message = "prometheus_target_series_per_shard must be at least 100000."
+  }
+}
+
+
+variable "worker_monitoring_pool_size" {
+  default     = 0
+  type        = number
+  description = "Nodes in the monitoring pool, which install_thanos always creates. 0: one per Prometheus pod (shards x replicas) plus one spare."
+  validation {
+    condition     = var.worker_monitoring_pool_size >= 0 && floor(var.worker_monitoring_pool_size) == var.worker_monitoring_pool_size
+    error_message = "worker_monitoring_pool_size must be a whole number (0 for automatic)."
+  }
+}
+
+variable "worker_monitoring_shape" {
+  default     = "VM.Standard.E5.Flex"
+  type        = string
+  description = "Flex shape of the monitoring pool. It must match the system pool image's architecture."
+  validation {
+    condition     = strcontains(var.worker_monitoring_shape, ".Flex")
+    error_message = "worker_monitoring_shape must be a Flex shape, so its memory can be sized."
+  }
+}
+
+variable "worker_monitoring_ocpus" {
+  default     = 4
+  type        = number
+  description = "OCPUs per monitoring node."
+}
+
+variable "worker_monitoring_memory" {
+  default     = 0
+  type        = number
+  description = "Memory per monitoring node in GB. 0: sized to hold one Prometheus pod and its share of Thanos (see the prometheus_sizing output)."
+  validation {
+    condition     = var.worker_monitoring_memory >= 0
+    error_message = "worker_monitoring_memory must be 0 (automatic) or a size in GB."
+  }
+}
+
+variable "prometheus_replicas" {
+  default     = 1
+  type        = number
+  description = "Number of Prometheus replicas per shard, for HA. Each replica uploads its own blocks, doubling Object Storage writes, and needs its own monitoring node. Requires install_thanos when above 1."
+  validation {
+    condition     = var.prometheus_replicas >= 1 && floor(var.prometheus_replicas) == var.prometheus_replicas
+    error_message = "prometheus_replicas must be a whole number of at least 1."
+  }
+}
+
+variable "thanos_version" {
+  default     = "v0.42.4"
+  type        = string
+  description = "Thanos image tag (quay.io/thanos/thanos) for the sidecars, Query, Store Gateway, Compactor and Ruler."
+}
+
+variable "thanos_bucket_name" {
+  default     = ""
+  type        = string
+  description = "Existing Object Storage bucket for Thanos. Leave empty to create one, which is emptied and deleted on destroy; an existing bucket is left untouched."
+}
+
+variable "thanos_retention_raw" {
+  default     = "30d"
+  type        = string
+  description = "Retention of raw-resolution data in the Thanos bucket. 0d keeps it forever."
+  validation {
+    condition     = can(regex("^[0-9]+(h|d|w|y)$", var.thanos_retention_raw))
+    error_message = "thanos_retention_raw must be a duration such as 30d."
+  }
+}
+
+variable "thanos_retention_5m" {
+  default     = "90d"
+  type        = string
+  description = "Retention of 5-minute downsampled data in the Thanos bucket. 0d keeps it forever."
+  validation {
+    condition     = can(regex("^[0-9]+(h|d|w|y)$", var.thanos_retention_5m))
+    error_message = "thanos_retention_5m must be a duration such as 90d."
+  }
+}
+
+variable "thanos_retention_1h" {
+  default     = "365d"
+  type        = string
+  description = "Retention of 1-hour downsampled data in the Thanos bucket. 0d keeps it forever."
+  validation {
+    condition     = can(regex("^[0-9]+(h|d|w|y)$", var.thanos_retention_1h))
+    error_message = "thanos_retention_1h must be a duration such as 365d."
+  }
+}
+
+variable "thanos_upload_existing_blocks" {
+  default     = false
+  type        = bool
+  description = "When enabling Thanos on an existing cluster, also upload the blocks already on the Prometheus volume (up to its full size) to the bucket. Disable it again once they are uploaded."
+}
+
 variable "cert_manager_chart_version" {
   default = "v1.20.2"
   type    = string

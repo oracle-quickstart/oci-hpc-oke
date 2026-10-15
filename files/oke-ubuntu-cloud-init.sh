@@ -126,6 +126,8 @@ fi
 kubernetes_version="${1-}"
 setup_credential_provider="${2:-false}"
 hostname_override="${3:-false}"
+# Optional pool-specific kubelet flags, e.g. --register-with-taints for the monitoring pool.
+pool_kubelet_args="${4:-}"
 
 if [[ "$setup_credential_provider" == "true" ]]; then
     download_oke_credential_provider_for_ocir && credential_provider_done=0 || credential_provider_done=1
@@ -143,6 +145,9 @@ if [[ "$hostname_override" == "true" ]]; then
     else
         kubelet_extra_args="--hostname-override=$(hostname)"
     fi
+fi
+if [[ -n "$pool_kubelet_args" ]]; then
+    kubelet_extra_args="${kubelet_extra_args:+$kubelet_extra_args }$pool_kubelet_args"
 fi
 
 # Fetch and execute the OKE pre-bootstrap script from metadata

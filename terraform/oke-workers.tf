@@ -55,15 +55,26 @@ locals {
 
   # Effective pod IPs required per node from the pods subnet: the derived GVA ip_count when
   # GVA is active, otherwise the legacy max_pods_per_node value. Used for capacity validation.
-  worker_ops_pods_per_node  = local.use_gva ? local.worker_ops_gva_ip_count : local.worker_ops_max_pods_per_node
-  worker_cpu_pods_per_node  = local.use_gva ? local.worker_cpu_gva_ip_count : local.worker_cpu_max_pods_per_node
-  worker_gpu_pods_per_node  = local.use_gva ? local.worker_gpu_gva_ip_count : local.worker_gpu_max_pods_per_node
-  worker_rdma_pods_per_node = local.use_gva ? local.worker_rdma_gva_ip_count : local.worker_rdma_max_pods_per_node
-  worker_gmc_pods_per_node  = local.use_gva ? local.worker_gmc_gva_ip_count : local.worker_gmc_max_pods_per_node
+  worker_ops_pods_per_node = local.use_gva ? local.worker_ops_gva_ip_count : local.worker_ops_max_pods_per_node
+  # The monitoring pool reuses the system pool's pod settings, capped to what its own shape supports.
+  supported_worker_monitoring_max_pods_per_node = anytrue([strcontains(var.worker_monitoring_shape, "Flex"), strcontains(var.worker_monitoring_shape, "Generic")]) ? (var.worker_monitoring_ocpus <= 2 ? 31 : (var.worker_monitoring_ocpus - 1) * 31) : var.max_pods_per_node
+  worker_monitoring_max_pods_per_node           = min(local.supported_worker_monitoring_max_pods_per_node, var.worker_ops_max_pods_per_node)
+  worker_monitoring_pods_per_node               = local.use_gva ? local.worker_ops_gva_ip_count : local.worker_monitoring_max_pods_per_node
+  worker_cpu_pods_per_node                      = local.use_gva ? local.worker_cpu_gva_ip_count : local.worker_cpu_max_pods_per_node
+  worker_gpu_pods_per_node                      = local.use_gva ? local.worker_gpu_gva_ip_count : local.worker_gpu_max_pods_per_node
+  worker_rdma_pods_per_node                     = local.use_gva ? local.worker_rdma_gva_ip_count : local.worker_rdma_max_pods_per_node
+  worker_gmc_pods_per_node                      = local.use_gva ? local.worker_gmc_gva_ip_count : local.worker_gmc_max_pods_per_node
 
   runcmd_bootstrap = local.create_workers ? format(
     "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
     var.kubernetes_version, var.setup_credential_provider_for_ocir, local.hostname_override_effective
+  ) : ""
+
+  # runcmd_bootstrap plus the monitoring pool's taint, passed as the bootstrap
+  # script's optional fourth argument (extra kubelet flags).
+  runcmd_bootstrap_monitoring = local.create_workers ? format(
+    "curl -sL -o /var/run/oke-ubuntu-cloud-init.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-ubuntu-cloud-init.sh && (bash /var/run/oke-ubuntu-cloud-init.sh '%v' '%v' '%v' '%v' || echo 'Error bootstrapping OKE' >&2)",
+    var.kubernetes_version, var.setup_credential_provider_for_ocir, local.hostname_override_effective, format("--register-with-taints=%v=true:NoSchedule", local.monitoring_node_key)
   ) : ""
 
   runcmd_nvme_raid = var.nvme_raid_enabled ? format(
@@ -167,6 +178,9 @@ locals {
     ])
     write_files = local.write_files
   }
+  cloud_init_monitoring = merge(local.cloud_init, {
+    runcmd = [for cmd in local.cloud_init.runcmd : cmd == local.runcmd_bootstrap ? local.runcmd_bootstrap_monitoring : cmd]
+  })
 
   node_metadata = merge(
     var.oke_pre_bootstrap_script != "" ? { "pre_oke" : base64encode(var.oke_pre_bootstrap_script) } : {},
@@ -215,6 +229,40 @@ locals {
         local.node_metadata
       )
       cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+    }
+    # With Thanos: the Prometheus shards (one per node), Thanos, Grafana and
+    # kube-state-metrics, isolated from the system pool by a NoSchedule taint.
+    # Sized in thanos.tf. Same AD as the system pool, where the Prometheus and
+    # Grafana volumes live.
+    "oke-monitoring" = {
+      create             = local.create_workers && local.monitoring_pool_enabled
+      description        = "OKE-managed VM Node Pool for the sharded Prometheus and Thanos"
+      placement_ads      = [substr(var.worker_ops_ad, -1, 0)]
+      mode               = "node-pool"
+      size               = local.monitoring_pool_size
+      shape              = var.worker_monitoring_shape
+      ocpus              = var.worker_monitoring_ocpus
+      memory             = local.monitoring_node_memory_gb
+      boot_volume_size   = var.worker_ops_boot_volume_size
+      image_type         = local.worker_ops_image_type
+      os                 = var.worker_ops_image_os
+      os_version         = var.worker_ops_image_os_version
+      image_id           = local.worker_ops_image_id
+      kubernetes_version = coalesce(var.worker_ops_kubernetes_version, var.kubernetes_version)
+      max_pods_per_node  = local.worker_monitoring_max_pods_per_node
+      gva_secondary_vnics = local.use_gva ? {
+        pods = { ip_count = local.worker_ops_gva_ip_count }
+      } : {}
+      node_cycling_enabled         = var.worker_ops_node_cycling_enabled
+      node_cycling_max_surge       = var.worker_ops_node_cycling_max_surge
+      node_cycling_max_unavailable = var.worker_ops_node_cycling_max_unavailable
+      node_cycling_mode            = [var.worker_ops_node_cycling_mode]
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
+        local.node_metadata
+      )
+      cloud_init  = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init_monitoring) }]
+      node_labels = { (local.monitoring_node_key) = "true" }
     }
     "oke-cpu" = {
       create             = local.create_workers && var.worker_cpu_enabled

@@ -321,6 +321,23 @@ variableGroups:
     - install_node_problem_detector_kube_prometheus_stack
     - node_problem_detector_chart_version
     - prometheus_stack_chart_version
+    - prometheus_memory
+    - prometheus_cpu
+    - prometheus_retention
+    - install_thanos
+    - prometheus_shards
+    - prometheus_target_series_per_shard
+    - prometheus_replicas
+    - worker_monitoring_pool_size
+    - worker_monitoring_shape
+    - worker_monitoring_ocpus
+    - worker_monitoring_memory
+    - thanos_bucket_name
+    - thanos_retention_raw
+    - thanos_retention_5m
+    - thanos_retention_1h
+    - thanos_upload_existing_blocks
+    - thanos_version
     - ingress_chart_version
     - install_grafana
     - install_grafana_dashboards
@@ -1431,6 +1448,196 @@ variables:
     type: string
     required: true
     default: "87.2.1"
+    visible: false
+  prometheus_memory:
+    title: Prometheus memory
+    description: Memory request and limit of each Prometheus pod, for example 16Gi. Leave empty to size it from the worker pools and shards when Thanos is enabled, or to set no limit without Thanos.
+    type: string
+    pattern: "^$|^[0-9]+(\\.[0-9]+)?(Mi|Gi)$"
+    required: false
+    default: ""
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+  prometheus_cpu:
+    title: Prometheus CPU request
+    description: CPU request of each Prometheus pod, set whenever the memory request is. No CPU limit is set.
+    type: string
+    required: true
+    default: "1"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+  prometheus_retention:
+    title: Prometheus local retention
+    description: How long Prometheus keeps data on its own volume. With Thanos, older data is still served from Object Storage.
+    type: string
+    pattern: "^[0-9]+(h|d|w|y)$"
+    required: true
+    default: "30d"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+  install_thanos:
+    title: Thanos (sharded Prometheus with Object Storage)
+    description: Deploy Thanos with an Object Storage bucket and a sidecar on Prometheus, so Prometheus can be sharded and Grafana queries the global view.
+    type: boolean
+    default: false
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_node_problem_detector_kube_prometheus_stack
+  prometheus_shards:
+    title: Prometheus shards
+    description: Scrape targets are split across this many Prometheus shards. 0 picks enough shards for the target series per shard, given the worker pools.
+    type: integer
+    required: true
+    default: 0
+    minimum: 0
+    maximum: 64
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  prometheus_replicas:
+    title: Prometheus replicas per shard
+    description: More than 1 adds HA and doubles Object Storage writes.
+    type: integer
+    required: true
+    default: 1
+    minimum: 1
+    maximum: 3
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  prometheus_target_series_per_shard:
+    title: Target series per Prometheus shard
+    description: Used when Prometheus shards is 0. Fewer, larger shards mean fewer Object Storage requests but more memory per pod.
+    type: integer
+    required: true
+    default: 3000000
+    minimum: 100000
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_pool_size:
+    title: Monitoring pool nodes
+    description: The pool install_thanos creates for Prometheus, Thanos, Grafana and kube-state-metrics. 0 sizes it to one node per Prometheus pod plus a spare.
+    type: integer
+    required: true
+    default: 0
+    minimum: 0
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_shape:
+    title: Monitoring pool shape
+    description: A Flex shape matching the system pool image's architecture.
+    type: string
+    pattern: "^.*\\.Flex$"
+    required: true
+    default: "VM.Standard.E5.Flex"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_ocpus:
+    title: Monitoring node OCPUs
+    type: integer
+    required: true
+    default: 4
+    minimum: 1
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  worker_monitoring_memory:
+    title: Monitoring node memory (GB)
+    description: 0 sizes each node to hold one Prometheus pod and its share of Thanos.
+    type: integer
+    required: true
+    default: 0
+    minimum: 0
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_bucket_name:
+    title: Existing Thanos bucket
+    description: Leave empty to create a bucket, which is emptied and deleted on destroy. An existing bucket is left untouched.
+    type: string
+    required: false
+    default: ""
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_retention_raw:
+    title: Thanos raw retention
+    type: string
+    pattern: "^[0-9]+(h|d|w|y)$"
+    required: true
+    default: "30d"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_retention_5m:
+    title: Thanos 5m downsampled retention
+    type: string
+    pattern: "^[0-9]+(h|d|w|y)$"
+    required: true
+    default: "90d"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_retention_1h:
+    title: Thanos 1h downsampled retention
+    type: string
+    pattern: "^[0-9]+(h|d|w|y)$"
+    required: true
+    default: "365d"
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_upload_existing_blocks:
+    title: Upload existing Prometheus blocks
+    description: When enabling Thanos on an existing cluster, also upload the blocks already on the Prometheus volume. Disable it again afterwards.
+    type: boolean
+    default: false
+    visible:
+      and:
+      - install_monitoring
+      - monitoring_advanced_options
+      - install_thanos
+  thanos_version:
+    title: Thanos version
+    type: string
+    required: true
+    default: "v0.42.4"
     visible: false
   ingress_chart_version:
     title: Ingress Controller helm chart version
