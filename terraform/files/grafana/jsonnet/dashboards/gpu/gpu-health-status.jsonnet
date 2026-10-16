@@ -150,7 +150,7 @@ g.dashboard.new('GPU Health Status')
   ),
   statHealthPanel(
     'Disk free',
-    '0 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", hostname=~"$hostname"}[$__range])\n  )) < bool 50 * 1024 * 1024 * 1024) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu", node=~"$hostname"} > 0\n            ),\n            "hostname", "$1", "node", "(.*)"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", hostname=~"$hostname"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", hostname=~"$hostname"}[$__range])\n  )) >= bool 50 * 1024 * 1024 * 1024) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", hostname=~"$hostname"}[10m])\n      )\n    )',
+    '0 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", instance_shape=~"(BM|VM).GPU.*", hostname=~"$hostname"}[$__range])\n  )) < bool 50 * 1024 * 1024 * 1024) == 1\n    )\n    or\n    (\n      (\n        0 * (\n          label_replace(\n            max by(node) (\n              kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu", node=~"$hostname"} > 0\n            ),\n            "hostname", "$1", "node", "(.*)"\n          )\n        )\n        + 2\n      )\n      unless on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", instance_shape=~"(BM|VM).GPU.*", hostname=~"$hostname"}[10m])\n      )\n    )\n    or\n    1 * (\n  ((min by(hostname) (\n    min_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", instance_shape=~"(BM|VM).GPU.*", hostname=~"$hostname"}[$__range])\n  )) >= bool 50 * 1024 * 1024 * 1024) == 1\n      and on(hostname)\n      max by(hostname) (\n        present_over_time(node_filesystem_avail_bytes{mountpoint="/", device=~"/dev/sd.*", instance_shape=~"(BM|VM).GPU.*", hostname=~"$hostname"}[10m])\n      )\n    )',
     '{{hostname}}',
     { w: 3, h: 3, x: 9, y: 6 },
     id=19,
@@ -161,6 +161,14 @@ g.dashboard.new('GPU Health Status')
     '{{hostname}}',
     { w: 3, h: 3, x: 12, y: 6 },
     id=20,
+  ),
+  // The GPU Health Monitoring add-on condition. grafana.tf keeps this panel only when the add-on is deployed.
+  statHealthPanel(
+    'GPU Health Add-on',
+    '0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n              status="true",\n              node=~"$hostname"\n            }[$__range]\n          )\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n            status="unknown",\n            node=~"$hostname"\n          }\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n            status="false",\n            node=~"$hostname"\n          }\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )',
+    '{{hostname}}',
+    { w: 3, h: 3, x: 15, y: 6 },
+    id=25,
   ),
   stateTimelinePanel(
     'PCIE Health history',
