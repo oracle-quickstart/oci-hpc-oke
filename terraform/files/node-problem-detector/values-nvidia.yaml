@@ -38,7 +38,7 @@ settings:
           {"type": "permanent", "condition": "GpuPcie", "reason": "GpuPcieHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["gpu-pcie", "60"], "timeout": "30s"},
           {"type": "permanent", "condition": "GpuFabricMgr", "reason": "GpuFabricMgrHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["fabric-mgr", "60"], "timeout": "30s"},
           {"type": "permanent", "condition": "GpuXid", "reason": "GpuXidHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["xid-err", "60"], "timeout": "30s"},
-          {"type": "permanent", "condition": "RdmaLink", "reason": "RdmaLinkHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdmalink-stat", "60"], "timeout": "45s"},
+          {"type": "permanent", "condition": "RdmaLink", "reason": "RdmaLinkHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdmalink-stat", "60"], "timeout": "55s"},
           {"type": "permanent", "condition": "RdmaLinkFlapping", "reason": "RdmaLinkFlappingHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdmalink-flap", "60"], "timeout": "30s"},
           {"type": "permanent", "condition": "RdmaWpaAuth", "reason": "RdmaWpaAuthHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["wpa-auth", "60"], "timeout": "40s"},
           {"type": "permanent", "condition": "RdmaRttcc", "reason": "RdmaRttccHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rttcc-stat", "60"], "timeout": "30s"},
@@ -65,7 +65,10 @@ settings:
           {"type": "DcgmiHealth", "reason": "DcgmiHealthHasNoIssues", "message": "DCGMI health check passed"},
           {"type": "RdmaVfRoutes", "reason": "RdmaVfRoutesHasNoIssues", "message": "RDMA VF routes are configured"},
           {"type": "RdmaVfCounters", "reason": "RdmaVfCountersHasNoIssues", "message": "RDMA VF counters have no fatal errors"},
-          {"type": "GpuImex", "reason": "GpuImexHasNoIssues", "message": "NVIDIA IMEX is ready"}
+          {"type": "GpuImex", "reason": "GpuImexHasNoIssues", "message": "NVIDIA IMEX is ready"},
+          {"type": "RdmaOcaPlugins", "reason": "RdmaOcaPluginsHasNoIssues", "message": "Required OCA RDMA plugins are enabled"},
+          {"type": "RdmaGidIndex", "reason": "RdmaGidIndexHasNoIssues", "message": "RDMA GID index 3 is RoCE v2 on all rails"},
+          {"type": "RdmaOvsMtu", "reason": "RdmaOvsMtuHasNoIssues", "message": "RDMA OVS MTU is as expected"}
         ],
         "rules": [
           {"type": "permanent", "condition": "OcaVersion", "reason": "OcaVersionHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["oca-ver", "300"], "timeout": "30s"},
@@ -74,7 +77,10 @@ settings:
           {"type": "permanent", "condition": "DcgmiHealth", "reason": "DcgmiHealthHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["dcgmi-health", "300"], "timeout": "90s"},
           {"type": "permanent", "condition": "RdmaVfRoutes", "reason": "RdmaVfRoutesHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdma-vf-routes", "300"], "timeout": "45s"},
           {"type": "permanent", "condition": "RdmaVfCounters", "reason": "RdmaVfCountersHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdma-vf-counters", "300"], "timeout": "45s"},
-          {"type": "permanent", "condition": "GpuImex", "reason": "GpuImexHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["imex", "300"], "timeout": "45s"}
+          {"type": "permanent", "condition": "GpuImex", "reason": "GpuImexHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["imex", "300"], "timeout": "45s"},
+          {"type": "permanent", "condition": "RdmaOcaPlugins", "reason": "RdmaOcaPluginsHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["instance-rdma-plugins", "300"], "timeout": "30s"},
+          {"type": "permanent", "condition": "RdmaGidIndex", "reason": "RdmaGidIndexHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdma-gid-index", "300"], "timeout": "30s"},
+          {"type": "permanent", "condition": "RdmaOvsMtu", "reason": "RdmaOvsMtuHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdma-ovs-mtu", "300"], "timeout": "45s"}
         ]
       }
   custom_plugin_monitors:
@@ -102,6 +108,7 @@ affinity:
                 - BM.GPU.RTXPRO.8
                 - BM.GPU.B200.8
                 - BM.GPU.B300.8
+                - BM.GPU.B300.HS.8
                 - BM.GPU.GB200.4
                 - BM.GPU.GB200-v2.4
                 - BM.GPU.GB200-v3.4

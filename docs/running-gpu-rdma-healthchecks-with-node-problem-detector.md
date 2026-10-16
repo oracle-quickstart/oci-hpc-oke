@@ -48,6 +48,9 @@ Run all commands from the repository root.
 | `RdmaRttcc` | AMD and NVIDIA | Checks that RTTCC is disabled |
 | `RdmaVfRoutes` | NVIDIA B300 and GB300 | Checks multi-plane RDMA VF addresses and routes |
 | `RdmaVfCounters` | NVIDIA B300 and GB300 | Checks multi-plane RDMA VF error counters |
+| `RdmaOvsMtu` | NVIDIA B300 and GB300 | Checks the OVS RDMA MTU on multi-plane nodes |
+| `RdmaGidIndex` | AMD and NVIDIA | Checks that GID index 3 is RoCE v2 and matches each rail address |
+| `RdmaOcaPlugins` | AMD and NVIDIA | Checks that the OCA RDMA Authentication and Auto-Configuration plugins are enabled |
 | `GpuImex` | NVIDIA GB300 | Checks IMEX service readiness |
 | `IpAddress` | AMD and NVIDIA | Checks required RDMA interface addresses |
 | `OcaVersion` | AMD and NVIDIA | Checks the Oracle Cloud Agent version |
@@ -56,14 +59,14 @@ Run all commands from the repository root.
 
 Some checks return a passing result when they do not apply to the current shape. The vendor-specific monitor configuration prevents AMD-only and NVIDIA-only checks from running on the wrong vendor.
 
-The B300 and GB300 RDMA checks use OCI host metadata to identify multi-plane nodes. If the required metadata is unavailable or invalid, the check returns `Unknown`. Other GPU shapes do not depend on this metadata.
+The B300 and GB300 RDMA checks use OCI host metadata to identify multi-plane nodes. A `planes` value of `0` or `1` means a single-plane node. If the required metadata is unavailable or invalid, the check returns `Unknown`. Other GPU shapes do not depend on this metadata.
 
 ## Check Schedule
 
 Checks run in two groups:
 
 - Fast checks run every minute and cover GPU, PCIe, and common RDMA health.
-- Slow checks run every five minutes and cover CPU profile, Oracle Cloud Agent, NVLink, DCGMI, and multi-plane configuration where applicable.
+- Slow checks run every five minutes and cover CPU profile, Oracle Cloud Agent version and RDMA plugins, NVLink, DCGMI, RDMA GID index, and multi-plane configuration where applicable.
 
 NPD limits how many checks run at once to avoid overloading the node.
 

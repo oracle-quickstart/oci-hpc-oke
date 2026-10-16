@@ -13,6 +13,8 @@ deleteRules:
     - orgId: 1
       uid: oke_npd_nvlink_speed
     - orgId: 1
+      uid: oke_npd_rdma_ovs_mtu
+    - orgId: 1
       uid: oke_npd_rdma_vf_counters
     - orgId: 1
       uid: oke_npd_rdma_vf_routes

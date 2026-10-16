@@ -51,6 +51,7 @@ locals {
     "gpu-row-remap.yaml",
     "gpu-xid.yaml",
     "nvlink-speed.yaml",
+    "rdma-ovs-mtu.yaml",
     "rdma-vf-counters.yaml",
     "rdma-vf-routes.yaml",
   ]
