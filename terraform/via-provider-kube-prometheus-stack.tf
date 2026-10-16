@@ -23,6 +23,7 @@ resource "helm_release" "prometheus" {
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
     prometheus_memory_request     = local.prometheus_memory_request
+    gpu_health_monitoring         = local.deploy_gpu_health_monitoring_addon
   })]
   create_namespace  = true
   recreate_pods     = false

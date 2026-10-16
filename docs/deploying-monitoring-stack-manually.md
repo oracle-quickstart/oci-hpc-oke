@@ -310,7 +310,7 @@ kubectl get pods -n ${MONITORING_NAMESPACE} \
 
 The repository includes Grafonnet dashboards for:
 - **Common**: Kubernetes API server, CoreDNS, Kubelet, Pods, PVs, Prometheus, Scheduling
-- **GPU**: Cluster metrics, Command Center, GPU health, GPU metrics, and host metrics for AMD and NVIDIA clusters
+- **GPU**: Cluster metrics, Command Center, GPU health, GPU metrics, and host metrics for AMD and NVIDIA clusters, and GPU node repairs for clusters with the GPU Health Monitoring add-on
 
 Compile the Jsonnet sources before creating ConfigMaps. Generated JSON is
 temporary and remains under the ignored `build` directory:

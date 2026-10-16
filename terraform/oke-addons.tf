@@ -290,12 +290,47 @@ locals {
     (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
     (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
   )
+  deploy_gpu_health_monitoring_addon = var.deploy_gpu_health_monitoring && (local.has_nvidia_gpu || local.has_amd_gpu)
+
+  # GPU shapes with health check rules in the add-on (FMS rule bundle of Oracle Cloud Agent 1.64.0).
+  gpu_health_check_shapes = [
+    "BM.GPU.A100-v2.8", "BM.GPU.B200.8", "BM.GPU.B300.8", "BM.GPU.B300.HS.8", "BM.GPU.B4.8",
+    "BM.GPU.GB200-v2.4", "BM.GPU.GB200-v3.4", "BM.GPU.GB200.4", "BM.GPU.GB300.4", "BM.GPU.H100.8",
+    "BM.GPU.H100T.8", "BM.GPU.H200-LM.8", "BM.GPU.H200.8", "BM.GPU.L40S-NC.4", "BM.GPU.L40S.4",
+    "BM.GPU.MI300X.8", "BM.GPU.MI355X-v1.8", "BM.GPU.MI355X.8", "BM.GPU.RTXPRO.8", "BM.GPU4.8",
+  ]
+  # The add-on monitors only the nodes that a config selects. One config per GPU pool shape with health check
+  # rules, because the add-on rejects configs that select the same node. Self-managed pools (GPU memory cluster,
+  # cluster network) are left out, because the add-on does not check self-managed nodes.
+  gpu_health_monitoring_shapes = toset([
+    for s in [
+      var.worker_gpu_enabled ? var.worker_gpu_shape : "",
+      var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? var.worker_rdma_shape : "",
+    ] : s if contains(local.gpu_health_check_shapes, s)
+  ])
+  gpu_health_monitoring_configs = {
+    for s in local.gpu_health_monitoring_shapes : s => yamlencode({
+      apiVersion = "oci.oraclecloud.com/v1beta1"
+      kind       = "GpuHealthMonitoringConfig"
+      metadata = {
+        name   = format("gpu-health-monitoring-%s", replace(lower(s), ".", "-"))
+        labels = { "app.kubernetes.io/managed-by" = "oci-hpc-oke" }
+      }
+      spec = {
+        enabled = true
+        nodeSelector = {
+          matchLabels = { "node.kubernetes.io/instance-type" = s }
+        }
+      }
+    })
+  }
 
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
     local.deploy_amd_gpu_operator_addon,
     local.deploy_nvidia_gpu_operator_addon,
     var.deploy_nvidia_network_operator,
+    local.deploy_gpu_health_monitoring_addon,
   ])
 
   managed_addon_non_gpu_pool_ids = compact([
@@ -701,6 +736,139 @@ resource "oci_containerengine_addon" "node_feature_discovery" {
     module.oke,
     terraform_data.wait_for_non_gpu_workers,
   ]
+}
+
+# Reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes.
+resource "oci_containerengine_addon" "gpu_health_monitoring" {
+  count = local.deploy_gpu_health_monitoring_addon ? 1 : 0
+
+  addon_name = "GpuHealthMonitoring"
+  cluster_id = module.oke.cluster_id
+  version    = var.gpu_health_monitoring_addon_version
+
+  override_existing                = true
+  remove_addon_resources_on_delete = true
+
+  depends_on = [
+    module.oke,
+    terraform_data.wait_for_non_gpu_workers,
+  ]
+}
+
+# Without a GpuHealthMonitoringConfig, the add-on deploys no fault monitor and checks no node.
+resource "kubectl_manifest" "gpu_health_monitoring_config" {
+  for_each = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_local || local.deploy_from_orm]) ? local.gpu_health_monitoring_configs : {}
+
+  yaml_body = each.value
+  # On delete, wait until the add-on clears its finalizer, before the add-on itself is removed.
+  wait = true
+
+  depends_on = [oci_containerengine_addon.gpu_health_monitoring]
+}
+
+# No destroy step, so a changed config is applied in place and not deleted first.
+resource "null_resource" "gpu_health_monitoring_config_via_operator" {
+  count = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_operator, length(local.gpu_health_monitoring_configs) > 0]) ? 1 : 0
+
+  triggers = {
+    config_md5      = md5(join("---\n", values(local.gpu_health_monitoring_configs)))
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+    config_target   = "/tmp/gpu-health-monitoring-config.yaml"
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "file" {
+    content     = join("---\n", values(local.gpu_health_monitoring_configs))
+    destination = self.triggers.config_target
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "set -e",
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      # kubectl wait fails at once when the add-on has not created the CRD yet.
+      "for i in $(seq 1 30); do kubectl get crd gpuhealthmonitoringconfigs.oci.oraclecloud.com >/dev/null 2>&1 && break; sleep 10; done",
+      "kubectl wait --for condition=established --timeout=300s crd/gpuhealthmonitoringconfigs.oci.oraclecloud.com",
+      "kubectl apply -f ${self.triggers.config_target}",
+      # Delete the configs of pool shapes that are gone.
+      "kubectl get gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke -o name | grep -vxF ${join(" ", [for y in values(local.gpu_health_monitoring_configs) : "-e gpuhealthmonitoringconfig.oci.oraclecloud.com/${yamldecode(y).metadata.name}"])} | xargs -r kubectl delete --timeout=5m",
+      "rm -f ${self.triggers.config_target}",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [oci_containerengine_addon.gpu_health_monitoring]
+}
+
+# Deletes the configs when the add-on is removed. It runs before the add-on is removed, so the add-on can clear its finalizer.
+resource "null_resource" "gpu_health_monitoring_config_cleanup_via_operator" {
+  count = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_operator, length(local.gpu_health_monitoring_configs) > 0]) ? 1 : 0
+
+  triggers = {
+    bastion_host    = module.oke.bastion_public_ip
+    bastion_user    = local.bastion_user
+    ssh_private_key = tls_private_key.stack_key.private_key_openssh
+    operator_host   = module.oke.operator_private_ip
+    operator_user   = local.operator_user
+  }
+
+  connection {
+    bastion_host        = self.triggers.bastion_host
+    bastion_user        = self.triggers.bastion_user
+    bastion_private_key = self.triggers.ssh_private_key
+    host                = self.triggers.operator_host
+    user                = self.triggers.operator_user
+    private_key         = self.triggers.ssh_private_key
+    timeout             = "40m"
+    type                = "ssh"
+  }
+
+  provisioner "remote-exec" {
+    when = destroy
+    inline = [
+      "export OCI_CLI_AUTH=instance_principal",
+      "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
+      "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "kubectl delete gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke --ignore-not-found --timeout=5m",
+    ]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      triggers["bastion_host"],
+      triggers["bastion_user"],
+      triggers["ssh_private_key"],
+      triggers["operator_host"],
+      triggers["operator_user"],
+    ]
+  }
+
+  depends_on = [oci_containerengine_addon.gpu_health_monitoring]
 }
 
 resource "oci_containerengine_addon" "nvidia_gpu_operator" {
