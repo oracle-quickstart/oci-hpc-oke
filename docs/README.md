@@ -46,6 +46,7 @@ Engine (OKE). For deployment and project overview, see the
 ## Health checks, benchmarks, and monitoring
 
 - [Running Active Health Checks for GPU Nodes (Preview)](./running-active-health-checks.md): Run active health checks against GPU nodes.
+- [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md): GPU faults, node health reports, repairs, metrics, and alerts from the OKE GPU Health Monitoring add-on.
 - [Running GPU & RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md): Continuous GPU and RDMA health checks via Node Problem Detector.
 - [Running ib_write_bw Tests Between Nodes](./running-ib-write-bw-test.md): Run ib_write_bw RDMA bandwidth tests between nodes.
 - [Manual Deployment: Prometheus & Grafana Stack](./deploying-monitoring-stack-manually.md): Manually deploy the Prometheus and Grafana monitoring stack with dashboards and alerts.

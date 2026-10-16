@@ -23,6 +23,12 @@ resource "helm_release" "prometheus" {
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
     prometheus_memory_request     = local.prometheus_memory_request
+    gpu_health_monitoring         = local.deploy_gpu_health_monitoring_addon
+    npd_removed                   = local.npd_removed
+    npd_amd_conditions            = local.npd_amd_conditions
+    npd_nvidia_conditions         = local.npd_nvidia_conditions
+    npd_amd_condition_count       = length(split("|", local.npd_amd_conditions))
+    npd_nvidia_condition_count    = length(split("|", local.npd_nvidia_conditions))
   })]
   create_namespace  = true
   recreate_pods     = false

@@ -197,6 +197,8 @@ variableGroups:
       - amd_gpu_operator_addon_version
       - amd_gpu_operator_skip_nfd_dependency_check
       - amd_gpu_operator_configuration
+      - deploy_gpu_health_monitoring
+      - gpu_health_monitoring_addon_version
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kueue
@@ -1405,8 +1407,8 @@ variables:
       - monitoring_advanced_options
   install_node_problem_detector_kube_prometheus_stack:
     type: boolean
-    title: Install Node Problem Detector & Kube Prometheus Stack
-    description: Install Node Problem Detector with the Kubernetes Prometheus stack to run GPU & RDMA health checks and use automated alerting in Grafana.
+    title: Install Kube Prometheus Stack
+    description: Install the Kubernetes Prometheus stack with Grafana dashboards and automated alerting. Node Problem Detector, which runs GPU and RDMA health checks, is also installed only when the GPU Health Monitoring add-on does not check every GPU pool.
     default: true
     visible:
       and:
@@ -1651,6 +1653,21 @@ variables:
     type: map(string)
     description: Additional configuration key-value pairs for the AMD GPU Operator OKE add-on.
     visible: false
+  deploy_gpu_health_monitoring:
+    title: Install GPU Health Monitoring add-on
+    type: boolean
+    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. When the add-on checks every GPU pool (managed node pools with supported shapes, and the NVIDIA GPU Operator for NVIDIA pools), Node Problem Detector is not installed.
+    default: true
+  gpu_health_monitoring_addon_version:
+    title: GPU Health Monitoring add-on version
+    type: enum
+    description: Version of the GPU Health Monitoring OKE add-on.
+    default: "v1.1.0"
+    required: true
+    enum:
+      - "v1.1.0"
+    visible:
+      - deploy_gpu_health_monitoring
   deploy_nvidia_gpu_operator:
     title: Install NVIDIA GPU Operator add-on
     type: boolean

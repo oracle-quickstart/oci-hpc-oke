@@ -1,0 +1,13 @@
+# Deployed when the GPU Health Monitoring add-on is off. Grafana keeps provisioned rules after their file is removed, so delete the add-on alerts.
+apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: oke_gpu_fault_monitor_stale
+    - orgId: 1
+      uid: oke_gpu_health_fault
+    - orgId: 1
+      uid: oke_gpu_health_signal
+    - orgId: 1
+      uid: oke_gpu_health_unavailable
+    - orgId: 1
+      uid: oke_gpu_node_repair_failed

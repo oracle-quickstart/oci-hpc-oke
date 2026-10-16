@@ -1858,6 +1858,85 @@
       },
       "fieldConfig": {
         "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "Failed"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "OK"
+                },
+                "2": {
+                  "color": "yellow",
+                  "text": "Unknown"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 15,
+        "y": 6
+      },
+      "id": 25,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "v13.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$PROMETHEUS_DS"
+          },
+          "expr": "0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition=\"oci.oraclecloud.com/GpuHealthMonitoringFaultDetected\",\n              status=\"true\",\n              node=~\"$hostname\"\n            }[$__range]\n          )\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"oci.oraclecloud.com/GpuHealthMonitoringFaultDetected\",\n            status=\"unknown\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition=\"oci.oraclecloud.com/GpuHealthMonitoringFaultDetected\",\n            status=\"false\",\n            node=~\"$hostname\"\n          }\n        ) == 1,\n        \"hostname\", \"$1\", \"node\", \"(.*)\"\n      )\n    )",
+          "instant": true,
+          "legendFormat": "{{hostname}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "GPU Health Add-on",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "fieldConfig": {
+        "defaults": {
           "color": {
             "mode": "continuous-GrYlRd"
           },

@@ -35,6 +35,25 @@ prometheus:
           resources:
             requests:
               storage: 500Gi
+%{ if gpu_health_monitoring }
+  # The GPU Health Monitoring add-on has no Service or monitor. Scrape the scan metrics of its fault monitor.
+  additionalPodMonitors:
+    - name: gpu-fault-monitor
+      namespaceSelector:
+        matchNames:
+          - gpu-health-monitoring
+      selector:
+        matchLabels:
+          app: gpu-fault-monitor
+      podMetricsEndpoints:
+        - port: http
+          scheme: https
+          tlsConfig:
+            insecureSkipVerify: true
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_node_name]
+              targetLabel: hostname
+%{ endif }
 
 prometheus-node-exporter:
   # The chart default rolls one node at a time, which takes longer than helm --wait on large clusters.
@@ -116,6 +135,155 @@ kubelet:
 kube-state-metrics:
   serviceAccount:
     create: true
+%{ if gpu_health_monitoring }
+  # Export the GPU Health Monitoring add-on NodeHealthReports (faults and repairs) as metrics.
+  rbac:
+    extraRules:
+      - apiGroups: ["oci.oraclecloud.com"]
+        resources: ["nodehealthreports"]
+        verbs: ["list", "watch"]
+  customResourceState:
+    enabled: true
+    config:
+      kind: CustomResourceStateMetrics
+      spec:
+        resources:
+          - groupVersionKind:
+              group: oci.oraclecloud.com
+              version: v1beta1
+              kind: NodeHealthReport
+            metricNamePrefix: oke_node_health_report
+            labelsFromPath:
+              node: [spec, nodeRef, name]
+            metrics:
+              - name: repair_info
+                help: Current repair of the node.
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      action: [status, repair, repairAction]
+                      phase: [status, repair, execution, repairPhase]
+                      terminal_state: [status, repair, terminalState]
+                      dry_run: [status, repair, dryRun]
+                      admission: [status, repair, admission, state]
+              - name: repair_started_timestamp_seconds
+                help: Start time of the current repair (0 when there is none).
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, repair, startedAt]
+                    nilIsZero: true
+              - name: last_repair_info
+                help: Last repair attempt of the node.
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      action: [status, lastRepairAttempt, repairAction]
+                      result: [status, lastRepairAttempt, result]
+                      dry_run: [status, lastRepairAttempt, dryRun]
+              # A gauge path that points to an object reads every field of it, so point at the field itself.
+              - name: last_repair_completed_timestamp_seconds
+                help: Completion time of the last repair attempt (0 when there is none).
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, lastRepairAttempt, completedAt]
+                    nilIsZero: true
+              - name: signal_first_observed_timestamp_seconds
+                help: First time a fault signal was seen.
+                commonLabels:
+                  source: clusterHealthCheck
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, clusterHealthCheck]
+                    nilIsZero: true
+                    valueFrom: [firstObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+                      action: [action]
+                      description: [faultDescription]
+              - name: signal_last_observed_timestamp_seconds
+                help: Last time a fault signal was seen.
+                commonLabels:
+                  source: clusterHealthCheck
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, clusterHealthCheck]
+                    nilIsZero: true
+                    valueFrom: [lastObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+                      action: [action]
+                      description: [faultDescription]
+              - name: signal_first_observed_timestamp_seconds
+                help: First time a fault signal was seen.
+                commonLabels:
+                  source: customer
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, customer]
+                    nilIsZero: true
+                    valueFrom: [firstObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+                      action: [action]
+                      description: [faultDescription]
+              - name: signal_last_observed_timestamp_seconds
+                help: Last time a fault signal was seen.
+                commonLabels:
+                  source: customer
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, customer]
+                    nilIsZero: true
+                    valueFrom: [lastObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+                      action: [action]
+                      description: [faultDescription]
+              - name: signal_first_observed_timestamp_seconds
+                help: First time a fault signal was seen.
+                commonLabels:
+                  source: hpcFault
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, hpcFault]
+                    nilIsZero: true
+                    valueFrom: [firstObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+              - name: signal_last_observed_timestamp_seconds
+                help: Last time a fault signal was seen.
+                commonLabels:
+                  source: hpcFault
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, hpcFault]
+                    nilIsZero: true
+                    valueFrom: [lastObservedAt]
+                    labelsFromPath:
+                      fault_code: [faultCode]
+              - name: maintenance_event_last_observed_timestamp_seconds
+                help: Last time a maintenance event signal was seen.
+                each:
+                  type: Gauge
+                  gauge:
+                    path: [status, signals, maintenanceEvent]
+                    nilIsZero: true
+                    valueFrom: [lastObservedAt]
+                    labelsFromPath:
+                      action: [action]
+                      maintenance_state: [maintenanceLifecycleState]
+                      maintenance_event_id: [maintenanceEventId]
+%{ endif }
 
 additionalPrometheusRulesMap:
   kube-apiserver-availability-rules:
@@ -319,6 +487,8 @@ additionalPrometheusRulesMap:
             expr: (xid_error_check) * on (hostname) (xid_error_check)
           - record: node_up_check
             expr: (min by (hostname) (up{instance=~".*:9100$"}))
+%{ if !npd_removed }
+          # The NPD condition lists and counts come from Terraform. NPD is not deployed when the GPU Health Monitoring add-on checks every GPU shape.
           - record: node_npd_failed
             expr: |
               max by(hostname) (
@@ -326,7 +496,7 @@ additionalPrometheusRulesMap:
                   (
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="true"} == bool 1)
+                        (kube_node_status_condition{condition=~"${npd_amd_conditions}",status="true"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                       )
@@ -336,7 +506,7 @@ additionalPrometheusRulesMap:
                     or
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="true"} == bool 1)
+                        (kube_node_status_condition{condition=~"${npd_nvidia_conditions}",status="true"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                       )
@@ -354,7 +524,7 @@ additionalPrometheusRulesMap:
                   (
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo",status="unknown"} == bool 1)
+                        (kube_node_status_condition{condition=~"${npd_amd_conditions}",status="unknown"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                       )
@@ -364,7 +534,7 @@ additionalPrometheusRulesMap:
                     or
                     (
                       max by(node) (
-                        (kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth",status="unknown"} == bool 1)
+                        (kube_node_status_condition{condition=~"${npd_nvidia_conditions}",status="unknown"} == bool 1)
                         and on(node)
                         (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                       )
@@ -383,7 +553,7 @@ additionalPrometheusRulesMap:
                     (
                       count by(node) (
                         max by(node, condition) (
-                          kube_node_status_condition{condition=~"CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo"}
+                          kube_node_status_condition{condition=~"${npd_amd_conditions}"}
                           and on(node)
                           (kube_node_status_capacity{resource="amd_com_gpu"} > 0)
                         )
@@ -395,7 +565,7 @@ additionalPrometheusRulesMap:
                     (
                       count by(node) (
                         max by(node, condition) (
-                          kube_node_status_condition{condition=~"CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"}
+                          kube_node_status_condition{condition=~"${npd_nvidia_conditions}"}
                           and on(node)
                           (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0)
                         )
@@ -412,14 +582,54 @@ additionalPrometheusRulesMap:
               max by(hostname) (
                 label_replace(
                   (
-                    (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0) + 15)
+                    (0 * max by(node) (kube_node_status_capacity{resource="amd_com_gpu"} > 0) + ${npd_amd_condition_count})
                     or
-                    (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0) + 22)
+                    (0 * max by(node) (kube_node_status_capacity{resource="nvidia_com_gpu"} > 0) + ${npd_nvidia_condition_count})
                   ),
                   "hostname", "$1", "node", "(.*)"
                 )
               )
           - record: node_npd_unknown
             expr: clamp_max(node_npd_unknown_condition + (node_npd_condition_count < bool node_npd_expected_condition_count), 1)
+%{ endif }
+          # GPU Health Monitoring add-on conditions. A node without them counts as healthy.
+          - record: node_gpu_health_fault
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",status="true"},
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
+          - record: node_gpu_health_unknown
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringUnavailable",status="true"}
+                  or
+                  kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status=~"false|unknown"},
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
+          # Active FMS faults from the add-on (hpcFault signals). A signal stays after its fault clears, and lastObservedAt refreshes about every 3 minutes while the fault is active.
+          - record: node_gpu_health_hpc_fault
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  oke_node_health_report_signal_last_observed_timestamp_seconds{source="hpcFault"} > bool (time() - 900),
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
+          # 0 for every GPU node, so that a node without NPD conditions, add-on conditions or signals counts as healthy.
+          - record: node_gpu_node
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  0 * (kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"} > 0),
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
           - record: node_health_status
-            expr: (1 - node_npd_failed) * (1 + node_npd_unknown)
+            expr: |
+              (1 - clamp_max((node_npd_failed or node_gpu_node) + (node_gpu_health_fault or node_gpu_node) + (node_gpu_health_hpc_fault or node_gpu_node), 1))
+              * (1 + clamp_max((node_npd_unknown or node_gpu_node) + (node_gpu_health_unknown or node_gpu_node), 1))

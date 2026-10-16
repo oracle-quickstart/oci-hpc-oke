@@ -149,20 +149,30 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
     dashboard = load(BUILD_DIR / "gpu" / "gpu-health-status.json")
     panels = dashboard["panels"]
     ids = {panel["id"] for panel in panels}
-    if not {7, 23}.issubset(ids):
-        failures.append("gpu-health-status: source must retain panel IDs 7 and 23")
+    if not {7, 23, 25}.issubset(ids):
+        failures.append("gpu-health-status: source must retain panel IDs 7, 23 and 25")
 
-    for name, amd, nvidia, expected in (
-        ("AMD", True, False, {23}),
-        ("NVIDIA", False, True, {7}),
-        ("mixed", True, True, {7, 23}),
+    # Panels that read NPD data. Same list as grafana.tf.
+    # The add-on shows panel 25. When the add-on checks every GPU shape, NPD is not deployed and these panels are dropped.
+    npd_panels = {1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24}
+    for name, amd, nvidia, addon, npd_removed, expected in (
+        ("AMD", True, False, False, False, {23}),
+        ("NVIDIA", False, True, False, False, {7}),
+        ("mixed", True, True, False, False, {7, 23}),
+        ("AMD add-on", True, False, True, True, {25}),
+        ("NVIDIA add-on", False, True, True, True, {25}),
+        ("mixed add-on", True, True, True, True, {25}),
+        ("NVIDIA add-on with NPD", False, True, True, False, {7, 25}),
     ):
         filtered = [
             panel
             for panel in panels
-            if (panel["id"] != 7 or nvidia) and (panel["id"] != 23 or amd)
+            if (panel["id"] != 7 or nvidia)
+            and (panel["id"] != 23 or amd)
+            and (panel["id"] != 25 or addon)
+            and (panel["id"] not in npd_panels or not npd_removed)
         ]
-        retained = {panel["id"] for panel in filtered} & {7, 23}
+        retained = {panel["id"] for panel in filtered} & {7, 23, 25}
         if retained != expected:
             failures.append(f"gpu-health-status: {name} vendor filtering changed")
         reflowed = []
@@ -199,7 +209,7 @@ def main() -> int:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
         return 1
-    print("Verified 21 dashboard contracts and AMD/NVIDIA/mixed GPU variants")
+    print("Verified 22 dashboard contracts and AMD/NVIDIA/mixed GPU variants")
     return 0
 
 
