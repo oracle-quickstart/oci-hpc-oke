@@ -15,6 +15,17 @@ locals {
     var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0,
   ])
 
+  total_gpu_worker_nodes = sum([
+    var.worker_gpu_enabled ? var.worker_gpu_pool_size : 0,
+    var.worker_rdma_enabled ? var.worker_rdma_pool_size : 0,
+    var.worker_gmc_enabled ? length(local.worker_gmc_gpu_memory_fabric_ids) * var.worker_gmc_scale_target_size : 0,
+  ])
+
+  # Prometheus memory grows with the scraped series. About 107 MiB per BM.GPU.B300.8 node was
+  # measured at 208 nodes, so 128 MiB per GPU node leaves room for series churn.
+  prometheus_memory_request_mib = 2048 + 128 * local.total_gpu_worker_nodes + 32 * (local.total_worker_nodes - local.total_gpu_worker_nodes)
+  prometheus_memory_request     = format("%dMi", local.prometheus_memory_request_mib)
+
   deploy_from_operator = alltrue([var.create_bastion, var.create_operator, !var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_local    = alltrue([!local.deploy_from_operator, var.control_plane_is_public, !var.deploy_to_oke_from_orm])
   deploy_from_orm      = alltrue([var.current_user_ocid != null, var.deploy_to_oke_from_orm])

@@ -169,6 +169,7 @@ module "kube_prometheus_stack" {
     install_grafana               = var.install_grafana
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
+    prometheus_memory_request     = local.prometheus_memory_request
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(
@@ -190,7 +191,7 @@ module "kube_prometheus_stack" {
   # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
   # admission hook Jobs fail with "no endpoints available for service
   # kueue-webhook-service" while Kueue is still starting.
-  depends_on = [module.ingress, module.kueue]
+  depends_on = [module.ingress, module.kueue, terraform_data.validate_prometheus_memory_request]
 }
 
 

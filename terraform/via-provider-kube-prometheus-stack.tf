@@ -7,6 +7,7 @@ resource "helm_release" "prometheus" {
   # admission hook Jobs fail with "no endpoints available for service
   # kueue-webhook-service" while Kueue is still starting.
   depends_on = [
+    terraform_data.validate_prometheus_memory_request,
     helm_release.ingress,
     time_sleep.wait_for_ingress_lb,
     helm_release.kueue,
@@ -21,6 +22,7 @@ resource "helm_release" "prometheus" {
     install_grafana               = var.install_grafana
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
+    prometheus_memory_request     = local.prometheus_memory_request
   })]
   create_namespace  = true
   recreate_pods     = false
