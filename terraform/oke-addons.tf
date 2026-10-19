@@ -859,6 +859,8 @@ resource "null_resource" "gpu_health_monitoring_config_cleanup_via_operator" {
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
       "kubectl delete gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke --ignore-not-found --timeout=5m",
     ]
+    # The CRD is gone when the add-on was removed outside Terraform. Do not block the destroy.
+    on_failure = continue
   }
 
   lifecycle {
