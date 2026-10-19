@@ -144,6 +144,10 @@ kube-state-metrics exports the reports as `oke_node_health_report_*` metrics:
 | `oke_node_health_report_signal_last_observed_timestamp_seconds` | Last time of each signal |
 | `oke_node_health_report_maintenance_event_last_observed_timestamp_seconds` | Last time of each maintenance event, with `maintenance_event_id`, `action`, and `maintenance_state` labels |
 
+All report metrics include `report_uid`, the UID of the `NodeHealthReport`. This distinguishes reports even when nodes reuse the same name or IP address. The `oke_node_health_report_repair_completion_timestamp_seconds` recording rule captures each observed completion timestamp together with its action, result, and dry-run labels. The dashboard reads this history after a report changes or is deleted, within Prometheus retention.
+
+The completed and failed repair counts count distinct reports in the selected time range, not individual repair attempts. Repeated attempts with the same result in one report count once. The "Last Repair Attempts" table shows the latest observed completion per report in the selected range. Repairs must be scraped and recorded to appear in the history.
+
 Prometheus also scrapes the fault monitor pods. The `gfm_*` metrics show the scan results and the age of the health check files, for example `gfm_passive_result_age_seconds` and `gfm_scan_total`.
 
 The `node_health_status` recording rule includes the add-on:

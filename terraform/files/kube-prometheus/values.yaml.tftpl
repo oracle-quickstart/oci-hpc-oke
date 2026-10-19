@@ -155,6 +155,7 @@ kube-state-metrics:
             metricNamePrefix: oke_node_health_report
             labelsFromPath:
               node: [spec, nodeRef, name]
+              report_uid: [metadata, uid]
             metrics:
               - name: repair_info
                 help: Current repair of the node.
@@ -286,6 +287,19 @@ kube-state-metrics:
 %{ endif }
 
 additionalPrometheusRulesMap:
+%{ if gpu_health_monitoring }
+  gpu-repair-history:
+    groups:
+      - name: gpu-repair-history
+        interval: 30s
+        rules:
+          # Capture the result with its timestamp before the report changes or disappears.
+          - record: oke_node_health_report_repair_completion_timestamp_seconds
+            expr: |
+              oke_node_health_report_last_repair_completed_timestamp_seconds
+              * ignoring(action, result, dry_run) group_left(action, result, dry_run)
+              oke_node_health_report_last_repair_info
+%{ endif }
   kube-apiserver-availability-rules:
     groups:
       - name: kube-apiserver-availability.rules

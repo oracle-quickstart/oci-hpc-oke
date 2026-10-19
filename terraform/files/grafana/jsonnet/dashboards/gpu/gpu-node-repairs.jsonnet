@@ -19,6 +19,7 @@ local hiddenColumns = {
   job: true,
   namespace: true,
   pod: true,
+  report_uid: true,
   service: true,
 };
 
@@ -59,7 +60,7 @@ g.dashboard.new('GPU Node Repairs')
 + g.dashboard.withPanels([
   statPanel(
     'Nodes in Repair',
-    'count(count by(node) (max_over_time(oke_node_health_report_repair_info{phase!="", terminal_state=""}[$__range]))) or vector(0)',
+    'count(count by(report_uid) (max_over_time(oke_node_health_report_repair_info{phase!="", terminal_state=""}[$__range]))) or vector(0)',
     { w: 4, h: 4, x: 0, y: 0 },
     id=1,
   ),
@@ -70,14 +71,14 @@ g.dashboard.new('GPU Node Repairs')
     id=2,
   ),
   statPanel(
-    'Repairs Completed',
-    'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{dry_run="false", result="Completed"}\n)\nor vector(0)',
+    'Nodes with Completed Repairs',
+    'count(\n  max by(report_uid) (\n    max_over_time(oke_node_health_report_repair_completion_timestamp_seconds{dry_run="false", result="Completed"}[$__range])\n  ) > time() - $__range_s\n)\nor vector(0)',
     { w: 4, h: 4, x: 8, y: 0 },
     id=3,
   ),
   statPanel(
-    'Repairs Failed',
-    'count(\n  (oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s)\n  * on(node) group_left()\n  oke_node_health_report_last_repair_info{result="Failed"}\n)\nor vector(0)',
+    'Nodes with Failed Repairs',
+    'count(\n  max by(report_uid) (\n    max_over_time(oke_node_health_report_repair_completion_timestamp_seconds{result="Failed"}[$__range])\n  ) > time() - $__range_s\n)\nor vector(0)',
     { w: 4, h: 4, x: 12, y: 0 },
     id=4,
   ),
@@ -97,7 +98,7 @@ g.dashboard.new('GPU Node Repairs')
     'Repair Status',
     [
       instantTable(
-        '(oke_node_health_report_repair_started_timestamp_seconds > time() - $__range_s) * 1000\n* on(node) group_left(action, phase, terminal_state, dry_run, admission)\noke_node_health_report_repair_info',
+        '(oke_node_health_report_repair_started_timestamp_seconds > time() - $__range_s) * 1000\n* ignoring(action, phase, terminal_state, dry_run, admission) group_left(action, phase, terminal_state, dry_run, admission)\noke_node_health_report_repair_info',
         'A'
       ),
     ],
@@ -123,7 +124,7 @@ g.dashboard.new('GPU Node Repairs')
     'Last Repair Attempts',
     [
       instantTable(
-        '(oke_node_health_report_last_repair_completed_timestamp_seconds > time() - $__range_s) * 1000\n* on(node) group_left(action, result, dry_run)\noke_node_health_report_last_repair_info',
+        '(\n  (\n    max by(node, report_uid, action, result, dry_run) (\n      max_over_time(oke_node_health_report_repair_completion_timestamp_seconds[$__range])\n    ) > time() - $__range_s\n  )\n  == on(report_uid) group_left()\n  max by(report_uid) (\n    max_over_time(oke_node_health_report_repair_completion_timestamp_seconds[$__range])\n  )\n) * 1000',
         'A'
       ),
     ],
