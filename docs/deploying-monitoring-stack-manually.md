@@ -133,7 +133,7 @@ echo "Grafana admin password: ${GRAFANA_ADMIN_PASSWORD}"
 
 ### 2.2 Install kube-prometheus-stack
 
-The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, setting the Prometheus memory request, then removing the Terraform conditional markers.
+The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, setting the Prometheus memory request, and including the add-on sections only when `GPU_HEALTH_ADDON=true`.
 
 Prometheus memory grows with the number of nodes. Set `PROMETHEUS_MEMORY_REQUEST` to about 2 GiB plus 128 MiB for each GPU node. For example, use `28Gi` for 208 GPU nodes. Make sure that a system node has this much free memory.
 
@@ -150,6 +150,11 @@ NPD_RULES_FILTER='/^%{ if !npd_removed }/d'
 if [ "${GPU_HEALTH_ADDON}" = "true" ]; then
   NPD_RULES_FILTER='/^%{ if !npd_removed }/,/^%{ endif }/d'
 fi
+# Without the add-on, delete its PodMonitor and custom-resource metrics blocks.
+GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/d'
+if [ "${GPU_HEALTH_ADDON}" != "true" ]; then
+  GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/,/^%{ endif }/d'
+fi
 sed -e 's/${install_grafana}/true/' \
   -e 's/${setup_alerting}/true/' \
   -e "s/\${prometheus_memory_request}/${PROMETHEUS_MEMORY_REQUEST}/" \
@@ -158,6 +163,7 @@ sed -e 's/${install_grafana}/true/' \
   -e "s/\${npd_amd_condition_count}/${NPD_AMD_COUNT}/" \
   -e "s/\${npd_nvidia_condition_count}/${NPD_NVIDIA_COUNT}/" \
   -e "${NPD_RULES_FILTER}" \
+  -e "${GPU_HEALTH_RULES_FILTER}" \
   -e '/^%{ if /d' \
   -e '/^%{ endif }/d' \
   terraform/files/kube-prometheus/values.yaml.tftpl \

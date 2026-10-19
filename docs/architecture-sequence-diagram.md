@@ -378,7 +378,7 @@ Sources: [operator monitoring deployments](../terraform/via-operator-helm-deploy
 
 #### 8a. Grafonnet Dashboards - Source, Compilation and Deployment
 
-Grafonnet lets us build dashboards from reusable pieces of Jsonnet code. A dashboard combines shared panel and variable helpers with its own queries, titles, units, thresholds, and layout. The renderer turns those definitions into the JSON Grafana loads from ConfigMaps. There are 21 dashboards here: seven for Kubernetes, five for GPUs, and nine for OCI metrics.
+Grafonnet lets us build dashboards from reusable pieces of Jsonnet code. A dashboard combines shared panel and variable helpers with its own queries, titles, units, thresholds, and layout. The renderer turns those definitions into the JSON Grafana loads from ConfigMaps. There are 22 dashboard sources here: seven for Kubernetes, six for GPUs, and nine for OCI metrics.
 
 ```mermaid
 sequenceDiagram
@@ -403,7 +403,7 @@ sequenceDiagram
     Render->>Render: Replace rendered output directory after successful compilation
     Render-->>TF: Return JSON strings by category and source hash
     TF->>TF: Select enabled dashboard categories
-    TF->>TF: Filter and reflow GPU Health Status panels for configured GPU vendors
+    TF->>TF: Filter and reflow GPU Health Status panels for GPU vendors, add-on and NPD settings
     alt Local or ORM provider path
         TF->>API: Create or update dashboard-name ConfigMaps from generated strings
     else Operator path through bastion SSH
@@ -424,10 +424,10 @@ Turning on `install_monitoring` and `install_grafana` enables the renderer. To p
 | Source category | Dashboard count | Folder annotation | Additional selection |
 | --- | --- | --- | --- |
 | `dashboards/common` | 7 | `Kubernetes` | Shared publication conditions above |
-| `dashboards/gpu` | 5 | `GPU Nodes` | `has_amd_gpu || has_nvidia_gpu` |
+| `dashboards/gpu` | 6 | `GPU Nodes` | `has_amd_gpu || has_nvidia_gpu`; GPU Node Repairs also requires the GPU Health Monitoring add-on |
 | `dashboards/oci` | 9 | `OCI Metrics` | `setup_oci_metrics_exporter` |
 
-Terraform adjusts GPU Health Status to match the configured GPUs: panel `7` is for NVIDIA and panel `23` is for AMD. It then arranges the remaining stat panels in rows of eight. Once the dashboard is loaded, Grafana queries the live metrics as shown in diagram 8b.
+Terraform adjusts GPU Health Status to match the configured GPUs and health monitoring: panel `7` is for NVIDIA, panel `23` is for AMD, and panel `25` is included only with the GPU Health Monitoring add-on. When the add-on checks every GPU pool and NPD is removed, Terraform also removes the panels that read NPD data. It then arranges the remaining stat panels in rows of eight. Once the dashboard is loaded, Grafana queries the live metrics as shown in diagram 8b.
 
 The older JSON files under `files/grafana/dashboards` are kept as a reference for development checks. Running `make verify` checks formatting, compiles the dashboards, and compares IDs, queries, variables, layout, and GPU vendor variants against that reference. Terraform deploys the freshly generated JSON.
 
