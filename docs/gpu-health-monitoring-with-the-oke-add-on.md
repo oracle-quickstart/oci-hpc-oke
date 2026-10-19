@@ -1,7 +1,7 @@
 # GPU Health Monitoring with the OKE Add-on
 
 > [!NOTE]
-> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and the cluster has GPU node pools. Terraform also sets up the metrics, dashboards, and alerts in this guide.
+> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, or unsupported GPU shapes does not get the add-on.
 
 The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. Node Problem Detector (NPD) keeps running its checks next to the add-on.
 
@@ -35,6 +35,7 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 
 - An enhanced OKE cluster with Kubernetes 1.32 or later
 - Managed GPU node pools
+- On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. Without this label, the add-on selects the node but does not monitor it.
 - Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
 - The IAM policies that let the worker nodes manage instances and read the instance agent plugins. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create both before you deploy:
 
@@ -146,6 +147,8 @@ kube-state-metrics exports the reports as `oke_node_health_report_*` metrics:
 
 All report metrics include `report_uid`, the UID of the `NodeHealthReport`. This distinguishes reports even when nodes reuse the same name or IP address. The `oke_node_health_report_repair_completion_timestamp_seconds` recording rule captures each observed completion timestamp together with its action, result, and dry-run labels. The dashboard reads this history after a report changes or is deleted, within Prometheus retention.
 
+The failed repair counts and the "GPU Node Repair Failed" alert do not include dry-run repairs. A dry run does not change the node.
+
 The completed and failed repair counts count distinct reports in the selected time range, not individual repair attempts. Repeated attempts with the same result in one report count once. The "Last Repair Attempts" table shows the latest observed completion per report in the selected range. Repairs must be scraped and recorded to appear in the history.
 
 Prometheus also scrapes the fault monitor pods. The `gfm_*` metrics show the scan results and the age of the health check files, for example `gfm_passive_result_age_seconds` and `gfm_scan_total`.
@@ -167,7 +170,7 @@ These dashboards show the add-on data:
 |---|---|
 | GPU Health Fault | `GpuHealthMonitoringFaultDetected` is `True` for 1 minute. |
 | GPU Health Monitoring Unavailable | The add-on does not monitor the node for 30 minutes. |
-| GPU Node Repair Failed | A node repair failed in the last hour. |
+| GPU Node Repair Failed | A node repair (not a dry run) failed in the last hour. |
 | GPU Fault Monitor Stale or Missing | The health check files on a node are older than 15 minutes, or a configured node has no healthy fault monitor scrape, for 10 minutes. |
 
 The alerts are in the `GPU Health Monitoring` group of the `Alerts` folder. They use the `ons-webhook` contact point.
