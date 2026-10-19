@@ -290,7 +290,8 @@ locals {
     (var.worker_gpu_enabled && can(regex("GPU", coalesce(var.worker_gpu_shape, ""))) && !contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape)) ||
     (var.worker_gmc_enabled && can(regex("GPU", coalesce(var.worker_gmc_shape, ""))))
   )
-  deploy_gpu_health_monitoring_addon = var.deploy_gpu_health_monitoring && (local.has_nvidia_gpu || local.has_amd_gpu)
+  # Only when at least one pool gets a config. Without a config, the add-on checks no node and its alerts stay in NoData.
+  deploy_gpu_health_monitoring_addon = var.deploy_gpu_health_monitoring && length(local.gpu_health_monitoring_configs) > 0
 
   # GPU shapes with health check rules in the add-on (FMS rule bundle of Oracle Cloud Agent 1.64.0).
   gpu_health_check_shapes = [
