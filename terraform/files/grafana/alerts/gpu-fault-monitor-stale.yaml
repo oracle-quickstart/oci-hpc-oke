@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900) or (node_gpu_health_expected unless on(hostname) max by(hostname) (up{job=~".+/gpu-fault-monitor"} == 1))
+                expr: max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900) or ((node_gpu_health_expected unless on(hostname) node_gpu_health_unconfigured) unless on(hostname) max by(hostname) (up{job=~".+/gpu-fault-monitor"} == 1))
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
@@ -53,7 +53,7 @@ groups:
           for: 10m
           keep_firing_for: 30m
           annotations:
-            description: The GPU fault monitor reads health results that are older than 15 minutes, or a node selected for monitoring has no healthy fault monitor scrape.
+            description: The GPU fault monitor reads health results that are older than 15 minutes, or a configured node has no healthy fault monitor scrape. The unavailable alert covers nodes that are not configured.
           labels: {}
           isPaused: false
           notification_settings:
