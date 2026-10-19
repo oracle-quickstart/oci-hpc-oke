@@ -78,7 +78,7 @@ g.dashboard.new('GPU Node Repairs')
   ),
   statPanel(
     'Nodes with Failed Repairs',
-    'count(\n  max by(report_uid) (\n    max_over_time(oke_node_health_report_repair_completion_timestamp_seconds{result="Failed"}[$__range])\n  ) > time() - $__range_s\n)\nor vector(0)',
+    'count(\n  max by(report_uid) (\n    max_over_time(oke_node_health_report_repair_completion_timestamp_seconds{dry_run="false", result="Failed"}[$__range])\n  ) > time() - $__range_s\n)\nor vector(0)',
     { w: 4, h: 4, x: 12, y: 0 },
     id=4,
   ),

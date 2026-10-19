@@ -88,11 +88,21 @@ export PROMETHEUS_STACK_CHART_VERSION="92.0.0"
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"
 
+# Enable only when the GPU Health Monitoring add-on is installed and configured
+export GPU_HEALTH_MONITORING="false"
+
 case "${GPU_VENDOR}" in
   amd|nvidia|mixed) ;;
   *) echo "GPU_VENDOR must be amd, nvidia, or mixed" >&2; exit 1 ;;
 esac
+
+case "${GPU_HEALTH_MONITORING}" in
+  true|false) ;;
+  *) echo "GPU_HEALTH_MONITORING must be true or false" >&2; exit 1 ;;
+esac
 ```
+
+Set `GPU_HEALTH_MONITORING=true` only after following [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md). This setting controls the add-on metrics, repair recording rule, dashboards, and alerts; it does not install the add-on.
 
 ### 1.4 Add Helm Repositories
 
@@ -123,18 +133,22 @@ echo "Grafana admin password: ${GRAFANA_ADMIN_PASSWORD}"
 
 ### 2.2 Install kube-prometheus-stack
 
-The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, setting the Prometheus memory request, then removing the Terraform conditional markers.
+The repository stores the kube-prometheus values as a Terraform template. Render a manual values file by enabling Grafana and alerting, setting the Prometheus memory request, and including the add-on sections only when `GPU_HEALTH_MONITORING=true`.
 
 Prometheus memory grows with the number of nodes. Set `PROMETHEUS_MEMORY_REQUEST` to about 2 GiB plus 128 MiB for each GPU node. For example, use `28Gi` for 208 GPU nodes. Make sure that a system node has this much free memory.
 
 ```bash
 PROMETHEUS_MEMORY_REQUEST=4Gi
+awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" '
+  BEGIN { include = 1 }
+  /^%\{ if gpu_health_monitoring \}/ { include = (gpu_health_monitoring == "true"); next }
+  /^%\{ endif \}/ { include = 1; next }
+  /^%\{ if / { next }
+  include
+' terraform/files/kube-prometheus/values.yaml.tftpl | \
 sed -e 's/${install_grafana}/true/' \
   -e 's/${setup_alerting}/true/' \
   -e "s/\${prometheus_memory_request}/${PROMETHEUS_MEMORY_REQUEST}/" \
-  -e '/^%{ if /d' \
-  -e '/^%{ endif }/d' \
-  terraform/files/kube-prometheus/values.yaml.tftpl \
   > /tmp/kube-prometheus-values.yaml
 ```
 
@@ -340,7 +354,7 @@ done
 
 ### 5.2 Deploy GPU Dashboards (if applicable)
 
-The source GPU Health dashboard contains both vendor-specific panels. Render it for the `GPU_VENDOR` selected in Step 1.3 before creating its ConfigMap. This uses the same panel filtering and stat-panel layout as Terraform.
+The source GPU Health dashboard contains both vendor-specific panels and an add-on panel. Render it for the `GPU_VENDOR` and `GPU_HEALTH_MONITORING` settings selected in Step 1.3 before creating its ConfigMap. This uses the same panel filtering and stat-panel layout as Terraform. The GPU Node Repairs dashboard is deployed only when the add-on setting is enabled.
 
 ```bash
 # Render the vendor-specific GPU Health dashboard
@@ -350,11 +364,12 @@ cleanup_rendered_dashboards() {
 }
 trap cleanup_rendered_dashboards EXIT
 
-if ! jq -e --arg vendor "${GPU_VENDOR}" '
+if ! jq -e --arg vendor "${GPU_VENDOR}" --argjson addon "${GPU_HEALTH_MONITORING}" '
   .panels |= map(
     select(
       (.id != 7 or $vendor != "amd") and
-      (.id != 23 or $vendor != "nvidia")
+      (.id != 23 or $vendor != "nvidia") and
+      (.id != 25 or $addon)
     )
   )
   | .panels = (
@@ -377,8 +392,16 @@ if ! jq -e --arg vendor "${GPU_VENDOR}" '
   exit 1
 fi
 
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
+  kubectl delete configmap dashboard-gpu-node-repairs \
+    --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
+
 # Deploy each GPU dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
+  if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
+    continue
+  fi
   dashboard_file="${dashboard}"
   if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
     dashboard_file="${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"
@@ -407,10 +430,10 @@ kubectl get configmaps -n ${MONITORING_NAMESPACE} -l grafana_dashboard=1
 kubectl get configmap dashboard-gpu-health-status \
   -n "${MONITORING_NAMESPACE}" -o json | \
 jq '.data["gpu-health-status.json"] | fromjson |
-  [.panels[] | select(.id == 7 or .id == 23) | {id, title}]'
+  [.panels[] | select(.id == 7 or .id == 23 or .id == 25) | {id, title}]'
 ```
 
-The result must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster.
+The vendor panels must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster. Panel 25 must be present only when `GPU_HEALTH_MONITORING=true`.
 
 ## Step 6: Deploy Grafana Alert Rules
 
@@ -467,8 +490,23 @@ case "${GPU_VENDOR}" in
     ;;
 esac
 
+if [ "${GPU_HEALTH_MONITORING}" = "true" ]; then
+  kubectl delete configmap alert-gpu-health-delete-alerts \
+    --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+else
+  kubectl delete configmap alert-gpu-fault-monitor-stale alert-gpu-health-fault \
+    alert-gpu-health-unavailable alert-gpu-node-repair-failed \
+    --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
+
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
+
+  case "${GPU_HEALTH_MONITORING}:${alert_name}" in
+    true:gpu-health-delete-alerts.yaml|false:gpu-fault-monitor-stale.yaml|false:gpu-health-fault.yaml|false:gpu-health-unavailable.yaml|false:gpu-node-repair-failed.yaml)
+      continue
+      ;;
+  esac
 
   case "${GPU_VENDOR}:${alert_name}" in
     amd:dcgm-health.yaml|amd:gpu-fabric-manager.yaml|amd:gpu-imex.yaml|amd:gpu-row-remap.yaml|amd:gpu-xid.yaml|amd:nvlink-speed.yaml|amd:rdma-ovs-mtu.yaml|amd:rdma-vf-counters.yaml|amd:rdma-vf-routes.yaml|amd:npd-delete-amd-alerts.yaml)
@@ -492,6 +530,8 @@ done
 ```
 
 The single-vendor cleanup files remove stale file-provisioned rules left by an older generic deployment. Mixed-vendor clusters skip both cleanup files and retain both vendors' rules.
+
+When `GPU_HEALTH_MONITORING=false`, the add-on cleanup file deletes previously provisioned add-on alerts. When it is `true`, only the add-on alert definitions are deployed. The commands remove the excluded ConfigMaps before applying the selected files.
 
 ### 6.2 Verify Alert Rules
 

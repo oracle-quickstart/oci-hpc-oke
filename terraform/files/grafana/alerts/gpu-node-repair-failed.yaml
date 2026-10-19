@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: label_replace(max by(node, action) (oke_node_health_report_last_repair_info{result="Failed"}) and on(node) (time() - oke_node_health_report_last_repair_completed_timestamp_seconds < 3600), "hostname", "$1", "node", "(.*)")
+                expr: label_replace(max by(node, action) (oke_node_health_report_last_repair_info{dry_run="false",result="Failed"}) and on(node) (time() - oke_node_health_report_last_repair_completed_timestamp_seconds < 3600), "hostname", "$1", "node", "(.*)")
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto

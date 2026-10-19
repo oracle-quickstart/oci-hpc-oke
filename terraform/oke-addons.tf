@@ -771,6 +771,7 @@ resource "null_resource" "gpu_health_monitoring_config_via_operator" {
   count = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_operator, length(local.gpu_health_monitoring_configs) > 0]) ? 1 : 0
 
   triggers = {
+    cluster_id      = module.oke.cluster_id
     config_md5      = md5(join("---\n", values(local.gpu_health_monitoring_configs)))
     bastion_host    = module.oke.bastion_public_ip
     bastion_user    = local.bastion_user
@@ -830,6 +831,7 @@ resource "null_resource" "gpu_health_monitoring_config_cleanup_via_operator" {
   count = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_operator, length(local.gpu_health_monitoring_configs) > 0]) ? 1 : 0
 
   triggers = {
+    cluster_id      = module.oke.cluster_id
     bastion_host    = module.oke.bastion_public_ip
     bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
