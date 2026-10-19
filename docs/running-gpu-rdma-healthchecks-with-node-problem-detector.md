@@ -1,7 +1,7 @@
 # Running GPU and RDMA Health Checks with Node Problem Detector
 
 > [!NOTE]
-> If you deployed the monitoring stack using Terraform, Node Problem Detector is already installed and configured. Do not install a second copy manually. Terraform does not install Node Problem Detector when the GPU Health Monitoring add-on checks every GPU pool shape.
+> If you deployed the monitoring stack using Terraform, Node Problem Detector is already installed and configured. Do not install a second copy manually. Terraform removes Node Problem Detector only after full add-on coverage is verified and `gpu_health_monitoring_remove_npd=true` is set.
 
 Node Problem Detector (NPD) monitors node health and reports problems as Kubernetes node conditions and events. This guide explains the OKE-specific GPU and RDMA checks, their three-state result contract, and how to deploy the vendor-specific NPD releases manually.
 
@@ -79,7 +79,7 @@ The exact monitor definitions are in:
 
 The OKE GPU Health Monitoring add-on is the main GPU health source when `deploy_gpu_health_monitoring` is `true` (the default). For the add-on, see [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md).
 
-When the add-on checks every enabled GPU pool, Terraform does not install NPD. The add-on checks a managed node pool with a supported shape. NVIDIA pools also need the NVIDIA GPU Operator. Otherwise NPD runs all of its checks. For the shape list, see [Supported Shapes](./gpu-health-monitoring-with-the-oke-add-on.md#supported-shapes).
+After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. The add-on checks a managed node pool with a supported shape. NVIDIA pools also need the NVIDIA GPU Operator. Otherwise NPD runs all of its checks. For the shape list, see [Supported Shapes](./gpu-health-monitoring-with-the-oke-add-on.md#supported-shapes).
 
 Without NPD, two sources report GPU and RDMA faults:
 
@@ -118,7 +118,7 @@ These NPD checks have no replacement:
 | Kernel monitor (`KernelDeadlock`, `XfsShutdown`, `CperHardwareErrorFatal`, OOM kill, hung task, kernel oops, ext4 and I/O error events) | AMD and NVIDIA | No check. |
 | Read-only file system monitor (`ReadonlyFilesystem`) | AMD and NVIDIA | No check. |
 
-Without NPD, Terraform does not deploy the NPD alerts and the NPD panels of the GPU Health Status dashboard. The `node_health_status` rule uses only the add-on conditions and the active `hpcFault` signals.
+After verifying full add-on coverage and setting `gpu_health_monitoring_remove_npd=true`, Terraform does not deploy the NPD alerts and the NPD panels of the GPU Health Status dashboard. The `node_health_status` rule uses only the add-on conditions and the active `hpcFault` signals.
 
 ## Result Contract
 
@@ -197,7 +197,7 @@ kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f 
 
 Install the release that matches the cluster's GPU vendor. Install both releases for a mixed-vendor cluster.
 
-If the GPU Health Monitoring add-on checks every GPU node pool, do not install NPD.
+Skip NPD installation only after verifying complete add-on coverage and opting out of NPD.
 
 ### AMD
 

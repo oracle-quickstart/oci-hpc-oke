@@ -136,6 +136,8 @@ kube-state-metrics:
   serviceAccount:
     create: true
 %{ if gpu_health_monitoring }
+  metricLabelsAllowlist:
+    - nodes=[node.kubernetes.io/instance-type,oci.oraclecloud.com/node.info.managed]
   # Export the GPU Health Monitoring add-on NodeHealthReports (faults and repairs) as metrics.
   rbac:
     extraRules:
@@ -203,6 +205,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [firstObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
                       action: [action]
                       description: [faultDescription]
@@ -217,6 +220,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [lastObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
                       action: [action]
                       description: [faultDescription]
@@ -231,6 +235,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [firstObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
                       action: [action]
                       description: [faultDescription]
@@ -245,6 +250,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [lastObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
                       action: [action]
                       description: [faultDescription]
@@ -259,6 +265,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [firstObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
               - name: signal_last_observed_timestamp_seconds
                 help: Last time a fault signal was seen.
@@ -271,6 +278,7 @@ kube-state-metrics:
                     nilIsZero: true
                     valueFrom: [lastObservedAt]
                     labelsFromPath:
+                      signal_id: [id]
                       fault_code: [faultCode]
               - name: maintenance_event_last_observed_timestamp_seconds
                 help: Last time a maintenance event signal was seen.
@@ -606,7 +614,28 @@ additionalPrometheusRulesMap:
           - record: node_npd_unknown
             expr: clamp_max(node_npd_unknown_condition + (node_npd_condition_count < bool node_npd_expected_condition_count), 1)
 %{ endif }
-          # GPU Health Monitoring add-on conditions. A node without them counts as healthy.
+%{ if gpu_health_monitoring }
+          # Match the managed nodes selected by the add-on configs, even before assignment.
+          - record: node_gpu_health_expected
+            expr: |
+              max by(hostname) (
+                label_replace(
+                  kube_node_labels{label_node_kubernetes_io_instance_type=~"${gpu_health_monitoring_shape_regex}",label_oci_oraclecloud_com_node_info_managed="true"},
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
+          - record: node_gpu_health_unconfigured
+            expr: |
+              node_gpu_health_expected
+              unless on(hostname)
+              max by(hostname) (
+                label_replace(
+                  kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status="true"} == 1,
+                  "hostname", "$1", "node", "(.*)"
+                )
+              )
+%{ endif }
+          # Missing add-on configuration is unknown for nodes that its configs select.
           - record: node_gpu_health_fault
             expr: |
               max by(hostname) (
@@ -624,6 +653,9 @@ additionalPrometheusRulesMap:
                   kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status=~"false|unknown"},
                   "hostname", "$1", "node", "(.*)"
                 )
+%{ if gpu_health_monitoring }
+                or node_gpu_health_unconfigured
+%{ endif }
               )
           # Active FMS faults from the add-on (hpcFault signals). A signal stays after its fault clears, and lastObservedAt refreshes about every 3 minutes while the fault is active.
           - record: node_gpu_health_hpc_fault
@@ -634,7 +666,7 @@ additionalPrometheusRulesMap:
                   "hostname", "$1", "node", "(.*)"
                 )
               )
-          # 0 for every GPU node, so that a node without NPD conditions, add-on conditions or signals counts as healthy.
+          # Baseline for GPU nodes. Expected add-on nodes without configuration are marked unknown above.
           - record: node_gpu_node
             expr: |
               max by(hostname) (
@@ -642,6 +674,9 @@ additionalPrometheusRulesMap:
                   0 * (kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"} > 0),
                   "hostname", "$1", "node", "(.*)"
                 )
+%{ if gpu_health_monitoring }
+                or 0 * node_gpu_health_expected
+%{ endif }
               )
           - record: node_health_status
             expr: |

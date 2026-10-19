@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: label_replace(max by(node) (kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringUnavailable",status="true"} or kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status=~"false|unknown"}), "hostname", "$1", "node", "(.*)")
+                expr: node_gpu_health_unknown
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
@@ -53,7 +53,7 @@ groups:
           for: 30m
           keep_firing_for: 30m
           annotations:
-            description: The GPU Health Monitoring add-on does not monitor this node. It is not configured, or its health check files are missing.
+            description: The GPU Health Monitoring add-on does not monitor this node. It is selected for monitoring but not configured, or its health check files are missing.
           labels: {}
           isPaused: false
           notification_settings:

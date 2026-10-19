@@ -3,7 +3,7 @@
 > [!NOTE]
 > Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, or unsupported GPU shapes does not get the add-on.
 
-The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. When the add-on checks every GPU pool of the cluster, Terraform does not install Node Problem Detector (NPD). For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
+The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. Terraform keeps Node Problem Detector (NPD) by default. After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. Terraform also requires supported managed GPU pools and the NVIDIA GPU Operator for NVIDIA pools. For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
 
 ## Overview
 
@@ -44,7 +44,28 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
   Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
   ```
 
-  Terraform does not check that these policies exist. It removes NPD also when the policies are missing.
+  Terraform does not check that these policies exist. Keep NPD until the coverage checks below succeed.
+
+## Verify Coverage Before Removing NPD
+
+Apply once with `gpu_health_monitoring_remove_npd=false` (the default). Label existing AMD nodes as described above and resolve any IAM or configuration errors. Wait for the config assignments and node conditions to converge:
+
+```bash
+kubectl get gpuhealthmonitoringconfigs -o yaml
+kubectl get nodes -o json | jq -e '
+  [.items[] | select(
+    (.metadata.labels["node.kubernetes.io/instance-type"] // "") |
+    test("^(BM|VM)\\.GPU"))] |
+  length > 0 and all(.[];
+    any(.status.conditions[];
+      .type == "oci.oraclecloud.com/GpuHealthMonitoringConfigured" and .status == "True") and
+    any(.status.conditions[];
+      .type == "oci.oraclecloud.com/GpuHealthMonitoringUnavailable" and .status == "False"))'
+```
+
+Every expected GPU node must be present, each config must report current successful assignments, and the command must return `true`. An empty or zero-unassigned summary alone does not prove that existing nodes were selected. Only then set `gpu_health_monitoring_remove_npd=true` and apply again. Leave it false for partial coverage, unsupported shapes, or self-managed pools.
+
+Prometheus marks managed nodes selected by the configured pool shapes as Unknown when `GpuHealthMonitoringConfigured=True` is missing, and the unavailable alert reports them. This remains active after NPD is removed.
 
 ## Node Conditions
 
@@ -54,13 +75,14 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 | `oci.oraclecloud.com/GpuHealthMonitoringUnavailable` | `False` | The health check result files are present on the node. |
 | `oci.oraclecloud.com/GpuHealthMonitoringFaultDetected` | `False` | The passive health checks found no active critical GPU fault. |
 
-To list the nodes with an add-on problem:
+To list GPU nodes without successful add-on configuration (including expected fallback pools):
 
 ```bash
-kubectl get nodes -o json | jq -r '.items[] | .metadata.name as $n |
-  .status.conditions[] | select(.type | startswith("oci.oraclecloud.com/GpuHealthMonitoring")) |
-  select(((.type | endswith("Configured")) and .status != "True") or ((.type | endswith("Configured") | not) and .status != "False")) |
-  [$n, .type, .status, .reason] | @tsv'
+kubectl get nodes -o json | jq -r '.items[] |
+  select((.metadata.labels["node.kubernetes.io/instance-type"] // "") | test("^(BM|VM)\\.GPU")) |
+  select(any(.status.conditions[];
+    .type == "oci.oraclecloud.com/GpuHealthMonitoringConfigured" and .status == "True") | not) |
+  [.metadata.name, "Missing successful add-on configuration"] | @tsv'
 ```
 
 ## Supported Shapes
@@ -99,8 +121,8 @@ The add-on creates a cluster-scoped `NodeHealthReport` for a node when it has a 
 
 | Signal | Source | Fields |
 |---|---|---|
-| `clusterHealthCheck` | Passive health checks | `faultCode`, `faultDescription`, `action`, `firstObservedAt`, `lastObservedAt` |
-| `hpcFault` | OCI Fault Management Service | `faultCode`, `firstObservedAt`, `lastObservedAt` |
+| `clusterHealthCheck` | Passive health checks | `id`, `faultCode`, `faultDescription`, `action`, `firstObservedAt`, `lastObservedAt` |
+| `hpcFault` | OCI Fault Management Service | `id`, `faultCode`, `firstObservedAt`, `lastObservedAt` |
 | `customer` | User-initiated repair label | `action`, `firstObservedAt`, `lastObservedAt` |
 | `maintenanceEvent` | OCI maintenance events | `faultCodes`, `action`, `maintenanceLifecycleState` |
 

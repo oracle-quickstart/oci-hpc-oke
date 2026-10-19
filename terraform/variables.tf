@@ -687,6 +687,12 @@ variable "gpu_health_monitoring_addon_version" {
   description = "Version of the GpuHealthMonitoring OKE addon."
 }
 
+variable "gpu_health_monitoring_remove_npd" {
+  type        = bool
+  default     = false
+  description = "Remove Node Problem Detector after verifying that every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Requires add-on coverage for every GPU pool."
+}
+
 variable "deploy_nvidia_network_operator" {
   type        = bool
   default     = false

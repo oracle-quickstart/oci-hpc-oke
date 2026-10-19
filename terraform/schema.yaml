@@ -199,6 +199,7 @@ variableGroups:
       - amd_gpu_operator_configuration
       - deploy_gpu_health_monitoring
       - gpu_health_monitoring_addon_version
+      - gpu_health_monitoring_remove_npd
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kueue
@@ -1656,7 +1657,7 @@ variables:
   deploy_gpu_health_monitoring:
     title: Install GPU Health Monitoring add-on
     type: boolean
-    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. When the add-on checks every GPU pool (managed node pools with supported shapes, and the NVIDIA GPU Operator for NVIDIA pools), Node Problem Detector is not installed.
+    description: Install the GPU Health Monitoring OKE add-on for supported managed GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. Keep Node Problem Detector until live add-on coverage has been verified.
     default: true
   gpu_health_monitoring_addon_version:
     title: GPU Health Monitoring add-on version
@@ -1666,6 +1667,13 @@ variables:
     required: true
     enum:
       - "v1.1.0"
+    visible:
+      - deploy_gpu_health_monitoring
+  gpu_health_monitoring_remove_npd:
+    title: Remove NPD after verifying GPU health coverage
+    type: boolean
+    description: Enable only after every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Every GPU pool must support the add-on.
+    default: false
     visible:
       - deploy_gpu_health_monitoring
   deploy_nvidia_gpu_operator:

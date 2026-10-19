@@ -309,6 +309,7 @@ locals {
       var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? var.worker_rdma_shape : "",
     ] : s if contains(local.gpu_health_check_shapes, s)
   ])
+  gpu_health_monitoring_shape_regex = replace(join("|", sort(tolist(local.gpu_health_monitoring_shapes))), ".", "[.]")
   gpu_health_monitoring_configs = {
     for s in local.gpu_health_monitoring_shapes : s => yamlencode({
       apiVersion = "oci.oraclecloud.com/v1beta1"
@@ -325,9 +326,9 @@ locals {
       }
     })
   }
-  # NPD is not deployed when the add-on checks every GPU pool. Each pool must be a managed node pool with a supported
+  # Remove NPD only after the user verifies live coverage and opts in. Each pool must be a managed node pool with a supported
   # shape. NVIDIA nodes must run the GPU Operator, which sets the nvidia.com/gpu.present label that the add-on needs.
-  npd_removed = local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
+  npd_removed = var.gpu_health_monitoring_remove_npd && local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
     !var.worker_rdma_enabled || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
     !var.worker_gpu_enabled || contains(local.gpu_health_check_shapes, var.worker_gpu_shape),
     !var.worker_gmc_enabled,
