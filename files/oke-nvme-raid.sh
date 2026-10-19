@@ -109,10 +109,11 @@ EOF
     systemctl enable "${mount_unit_name}" --now
 done
 
-# Cleanup stale Kubernetes certs if they exist because the node was set to do Quick Recycle
-if [[ -d /var/lib/kubelet/pki ]]; then
-  echo "Clearing stale kubelet certs from reused NVMe RAID" >&2
-  rm -rf /var/lib/kubelet/pki
+# Clear stale kubelet state (certs, CPU manager checkpoint) if the node was set to do Quick Recycle.
+# /var/lib/kubelet is a bind mount here, so remove its contents and keep the directory.
+if [[ -n "$(ls -A /var/lib/kubelet)" ]]; then
+  echo "Clearing stale kubelet state from reused NVMe RAID" >&2
+  rm -rf /var/lib/kubelet/*
 fi
 
 case "$ID" in
