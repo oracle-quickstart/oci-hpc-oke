@@ -35,13 +35,15 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 
 - An enhanced OKE cluster with Kubernetes 1.32 or later
 - Managed GPU node pools
-- The IAM policy that lets the worker nodes read the instance agent plugins. Terraform creates this policy only when `create_policies` is `true`. Otherwise, create it before you deploy:
+- Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
+- The IAM policies that let the worker nodes manage instances and read the instance agent plugins. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create both before you deploy:
 
   ```text
+  Allow dynamic-group <dynamic group of the cluster nodes> to manage instance-family in compartment id <compartment OCID>
   Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
   ```
 
-  Terraform does not check that this policy exists.
+  Terraform does not check that these policies exist.
 
 ## Node Conditions
 
