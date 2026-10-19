@@ -248,6 +248,8 @@ locals {
   invalid_ipv6_without_public_subnets = local.cluster_uses_ipv6 && var.create_vcn && !var.create_public_subnets
   # GVA with IPv6 needs two IPv6 prefixes on the pods subnet. The stack adds the second one only in a VCN it creates.
   invalid_ipv6_gva_existing_vcn = local.cluster_uses_ipv6 && local.use_gva && !var.create_vcn && !var.custom_subnet_ids && !local.pods_ipv6_user_set
+  # Fail instead of keeping NPD silently when the user asks to remove it but the add-on cannot check every GPU pool.
+  invalid_gpu_health_npd_removal = var.deploy_gpu_health_monitoring && var.gpu_health_monitoring_remove_npd && !local.npd_removed
 }
 
 data "oci_core_image" "worker_rdma" {
@@ -728,6 +730,17 @@ resource "null_resource" "validate_amd_gpu_operator_kubernetes_version" {
     precondition {
       condition     = !local.invalid_amd_gpu_operator_kubernetes_version
       error_message = "AMD GPU Operator addon requires Kubernetes 1.34 or later. Please upgrade `kubernetes_version` or set `deploy_amd_gpu_operator=false` to keep the AmdGpuPlugin addon."
+    }
+  }
+}
+
+resource "null_resource" "validate_gpu_health_npd_removal" {
+  count = local.invalid_gpu_health_npd_removal ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = !local.invalid_gpu_health_npd_removal
+      error_message = "Removing Node Problem Detector needs the GPU Health Monitoring add-on on every GPU pool: managed node pools with supported shapes (no cluster network pool and no GPU memory cluster pool), and the NVIDIA GPU Operator for NVIDIA pools. Please set `gpu_health_monitoring_remove_npd=false` or change the GPU pools."
     }
   }
 }
