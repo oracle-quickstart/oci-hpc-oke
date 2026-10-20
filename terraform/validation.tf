@@ -249,7 +249,10 @@ locals {
   # GVA with IPv6 needs two IPv6 prefixes on the pods subnet. The stack adds the second one only in a VCN it creates.
   invalid_ipv6_gva_existing_vcn = local.cluster_uses_ipv6 && local.use_gva && !var.create_vcn && !var.custom_subnet_ids && !local.pods_ipv6_user_set
   # Fail instead of keeping NPD silently when the user asks to remove it but the add-on cannot check every GPU pool.
-  invalid_gpu_health_npd_removal = var.deploy_gpu_health_monitoring && var.gpu_health_monitoring_remove_npd && !local.npd_removed
+  invalid_gpu_health_npd_removal = alltrue([
+    var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu || local.has_amd_gpu,
+    var.deploy_gpu_health_monitoring, var.gpu_health_monitoring_remove_npd, !local.npd_removed,
+  ])
 }
 
 data "oci_core_image" "worker_rdma" {
