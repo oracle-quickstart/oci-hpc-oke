@@ -36,9 +36,11 @@ locals {
   ]
   grafana_gpu_dashboards = (var.install_monitoring && var.install_grafana && var.install_grafana_dashboards) ? {
     for f, content in local.grafana_gpu_dashboard_sources :
+    # NPD does not clear its node conditions when it is removed. Without NPD, the Command Center node issues history
+    # shows only the add-on condition.
     f => f == "gpu-health-status.json" ? jsonencode(merge(local.grafana_gpu_health_dashboard, {
       panels = local.grafana_gpu_health_panels_reflowed
-    })) : content
+    })) : f == "command-center.json" && local.npd_removed ? replace(content, "/CpuProfile[|][A-Za-z|]*Rocminfo[|]/", "") : content
     # The node repairs dashboard reads NodeHealthReports, which exist only with the GPU Health Monitoring add-on.
     if f != "gpu-node-repairs.json" || local.deploy_gpu_health_monitoring_addon
   } : {}

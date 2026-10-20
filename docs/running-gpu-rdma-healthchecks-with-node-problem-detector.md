@@ -118,7 +118,20 @@ These NPD checks have no replacement:
 | Kernel monitor (`KernelDeadlock`, `XfsShutdown`, `CperHardwareErrorFatal`, OOM kill, hung task, kernel oops, ext4 and I/O error events) | AMD and NVIDIA | No check. |
 | Read-only file system monitor (`ReadonlyFilesystem`) | AMD and NVIDIA | No check. |
 
-After verifying full add-on coverage and setting `gpu_health_monitoring_remove_npd=true`, Terraform does not deploy the NPD alerts and the NPD panels of the GPU Health Status dashboard. The `node_health_status` rule uses only the add-on conditions and the active `hpcFault` signals.
+After verifying full add-on coverage and setting `gpu_health_monitoring_remove_npd=true`, Terraform does not deploy the NPD alerts and the NPD panels of the GPU Health Status dashboard. The `node_health_status` rule uses only the add-on conditions and the active `hpcFault` signals. The Command Center node issues history shows only the add-on condition.
+
+NPD does not clear its node conditions when it is removed. The last NPD values stay on the nodes, and `kubectl describe node` still shows them. To remove them after NPD is gone, run:
+
+```bash
+NPD_CONDITIONS="CpuProfile DcgmiHealth GpuBadPages GpuBus GpuCount GpuEcc GpuFabricMgr GpuImex GpuPcie GpuRowRemap GpuXid IpAddress NodeHasPcieErrors NvlinkSpeed OcaVersion RdmaGidIndex RdmaLink RdmaLinkFlapping RdmaOcaPlugins RdmaOvsMtu RdmaRttcc RdmaVfCounters RdmaVfRoutes RdmaWpaAuth Rocminfo"
+PATCH=$(for c in ${NPD_CONDITIONS}; do printf '{"type":"%s","$patch":"delete"},' "${c}"; done)
+for node in $(kubectl get nodes -o name); do
+  kubectl patch "${node}" --subresource=status --type=strategic \
+    -p "{\"status\":{\"conditions\":[${PATCH%,}]}}"
+done
+```
+
+Run it only after NPD is removed. A running NPD adds its conditions again.
 
 ## Result Contract
 

@@ -398,7 +398,7 @@ done
 
 ### 5.2 Deploy GPU Dashboards (if applicable)
 
-The source GPU Health dashboard contains both vendor-specific panels and the GPU Health Monitoring add-on panel (ID 25). Render it for the `GPU_VENDOR` and `GPU_HEALTH_MONITORING` selected in Step 1.3 before creating its ConfigMap. With `NPD_REMOVED=true`, the render step removes the panels that read NPD data (IDs 1 to 7, 14 to 16, 18, and 21 to 24). This uses the same panel filtering and stat-panel layout as Terraform.
+The source GPU Health dashboard contains both vendor-specific panels and the GPU Health Monitoring add-on panel (ID 25). Render it for the `GPU_VENDOR` and `GPU_HEALTH_MONITORING` selected in Step 1.3 before creating its ConfigMap. With `NPD_REMOVED=true`, the render step removes the panels that read NPD data (IDs 1 to 7, 14 to 16, 18, and 21 to 24), and the Command Center node issues history shows only the add-on condition. This uses the same panel filtering and stat-panel layout as Terraform.
 
 ```bash
 # Render the vendor-specific GPU Health dashboard
@@ -451,6 +451,11 @@ for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
   fi
   if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
     dashboard_file="${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"
+  fi
+  # Without NPD, the Command Center node issues history shows only the add-on condition.
+  if [ "$(basename "${dashboard}")" = "command-center.json" ] && [ "${NPD_REMOVED}" = "true" ]; then
+    sed -E 's/CpuProfile[|][A-Za-z|]*Rocminfo[|]//g' "${dashboard}" > "${RENDERED_DASHBOARD_DIR}/command-center.json"
+    dashboard_file="${RENDERED_DASHBOARD_DIR}/command-center.json"
   fi
 
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
