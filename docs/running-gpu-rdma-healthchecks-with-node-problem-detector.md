@@ -375,4 +375,4 @@ helm uninstall gpu-rdma-node-problem-detector-amd -n monitoring
 helm uninstall gpu-rdma-node-problem-detector-nvidia -n monitoring
 ```
 
-Node conditions written by NPD can remain after uninstalling the release. They are removed when another writer updates the node status or when the node is replaced. Do not assume that Kubernetes automatically removes custom conditions when NPD is deleted.
+Node conditions written by NPD remain after you uninstall the release. Kubernetes does not remove custom conditions when NPD is deleted. They go away only when the node is replaced, or when you delete them with the command in [Running with the GPU Health Monitoring Add-on](#running-with-the-gpu-health-monitoring-add-on).

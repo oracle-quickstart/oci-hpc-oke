@@ -986,11 +986,11 @@ kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometh
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'amd_gpu_junction_temperature'
 
-# Query for node problem detector metrics (only without the GPU Health Monitoring add-on)
+# Query for node problem detector metrics (only with NPD_REMOVED=false)
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'problem_gauge'
 
-# Query NPD wrapper status and freshness metrics (only without the GPU Health Monitoring add-on)
+# Query NPD wrapper status and freshness metrics (only with NPD_REMOVED=false)
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'oke_npd_check_status_code'
 
