@@ -510,7 +510,7 @@ additionalPrometheusRulesMap:
           - record: node_up_check
             expr: (min by (hostname) (up{instance=~".*:9100$"}))
 %{ if !npd_removed }
-          # The NPD condition lists and counts come from Terraform. NPD is not deployed when the GPU Health Monitoring add-on checks every GPU shape.
+          # The NPD condition lists and counts come from Terraform. NPD is removed only with gpu_health_monitoring_remove_npd=true and full add-on coverage.
           - record: node_npd_failed
             expr: |
               max by(hostname) (

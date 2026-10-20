@@ -153,7 +153,7 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
         failures.append("gpu-health-status: source must retain panel IDs 7, 23 and 25")
 
     # Panels that read NPD data. Same list as grafana.tf.
-    # The add-on shows panel 25. When the add-on checks every GPU shape, NPD is not deployed and these panels are dropped.
+    # The add-on shows panel 25. When NPD is removed (opt-in, with full add-on coverage), these panels are dropped.
     npd_panels = {1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24}
     for name, amd, nvidia, addon, npd_removed, expected in (
         ("AMD", True, False, False, False, {23}),

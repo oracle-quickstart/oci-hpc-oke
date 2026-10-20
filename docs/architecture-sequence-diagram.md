@@ -427,7 +427,7 @@ Turning on `install_monitoring` and `install_grafana` enables the renderer. To p
 | `dashboards/gpu` | 6 | `GPU Nodes` | `has_amd_gpu || has_nvidia_gpu`; GPU Node Repairs also requires the GPU Health Monitoring add-on |
 | `dashboards/oci` | 9 | `OCI Metrics` | `setup_oci_metrics_exporter` |
 
-Terraform adjusts GPU Health Status to match the configured GPUs and health monitoring: panel `7` is for NVIDIA, panel `23` is for AMD, and panel `25` is included only with the GPU Health Monitoring add-on. When the add-on checks every GPU pool and NPD is removed, Terraform also removes the panels that read NPD data. It then arranges the remaining stat panels in rows of eight. Once the dashboard is loaded, Grafana queries the live metrics as shown in diagram 8b.
+Terraform adjusts GPU Health Status to match the configured GPUs and health monitoring: panel `7` is for NVIDIA, panel `23` is for AMD, and panel `25` is included only with the GPU Health Monitoring add-on. When NPD is removed (`gpu_health_monitoring_remove_npd=true` with full add-on coverage), Terraform also removes the panels that read NPD data. It then arranges the remaining stat panels in rows of eight. Once the dashboard is loaded, Grafana queries the live metrics as shown in diagram 8b.
 
 The older JSON files under `files/grafana/dashboards` are kept as a reference for development checks. Running `make verify` checks formatting, compiles the dashboards, and compares IDs, queries, variables, layout, and GPU vendor variants against that reference. Terraform deploys the freshly generated JSON.
 

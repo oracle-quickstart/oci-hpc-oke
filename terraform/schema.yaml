@@ -1386,7 +1386,7 @@ variables:
   install_monitoring:
     type: boolean
     title: Install Monitoring Stack
-    description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector, and AMD device metrics exporter.
+    description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector (unless removed for the GPU Health Monitoring add-on), and AMD device metrics exporter.
     default: true
     visible: true
   monitoring_advanced_options:
