@@ -1,0 +1,61 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: GPU Health Monitoring
+      folder: Alerts
+      interval: 1m
+      rules:
+        - uid: oke_gpu_fault_monitor_stale
+          title: GPU Fault Monitor Stale or Missing
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900) or ((node_gpu_health_expected unless on(hostname) node_gpu_health_unconfigured) unless on(hostname) max by(hostname) (up{job=~".+/gpu-fault-monitor"} == 1))
+                instant: true
+                intervalMs: 300000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: OK
+          execErrState: Error
+          for: 10m
+          keep_firing_for: 30m
+          annotations:
+            description: The GPU fault monitor reads health results that are older than 15 minutes, or a configured node has no healthy fault monitor scrape. The unavailable alert covers nodes that are not configured.
+          labels: {}
+          isPaused: false
+          notification_settings:
+            receiver: ons-webhook
+            repeat_interval: 24h
