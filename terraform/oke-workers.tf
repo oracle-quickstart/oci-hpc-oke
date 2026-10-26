@@ -266,6 +266,8 @@ locals {
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gpu_hostname_prefix } : {},
+        # The GPU health add-on assigns only nodes with a *.gpu.present label, and no AMD component sets one. Remove when OKE fixes this.
+        local.deploy_gpu_health_monitoring_addon && contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape) ? { "amd.com/gpu.present" = "true" } : {},
       )
       node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
@@ -305,6 +307,8 @@ locals {
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_rdma_hostname_prefix } : {},
+        # The GPU health add-on assigns only nodes with a *.gpu.present label, and no AMD component sets one. Remove when OKE fixes this.
+        local.deploy_gpu_health_monitoring_addon && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape) ? { "amd.com/gpu.present" = "true" } : {},
       )
       agent_config = {
         are_all_plugins_disabled = false

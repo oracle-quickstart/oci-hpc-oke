@@ -27,7 +27,7 @@ package-test:
 	cp -R $(PACKAGE_DIR)/dashboards $(PACKAGE_DIR)/lib "$$package_dir"; \
 	cp $(PACKAGE_DIR)/jsonnetfile.json $(PACKAGE_DIR)/jsonnetfile.lock.json $(PACKAGE_DIR)/render_dashboards.py "$$package_dir"; \
 	$(PYTHON) "$$package_dir/render_dashboards.py" --cache-dir "$$package_dir/.cache" --output-dir "$$package_dir/build"; \
-	test "$$(find "$$package_dir/build" -type f -name '*.json' | wc -l | tr -d ' ')" = 21
+	test "$$(find "$$package_dir/build" -type f -name '*.json' | wc -l | tr -d ' ')" = 22
 
 clean:
 	rm -rf $(PACKAGE_DIR)/build $(PACKAGE_DIR)/.cache
