@@ -14,17 +14,19 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
+- [GPU driver 580.178.04 LTS & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-2026.09.18-0-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.19-0.oci)
 
-#### 6.14 Kernel
+#### 6.17 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
+- [GPU driver 580.178.04 LTS & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-2026.09.18-0-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.19-0.oci)
 
 ## BM.GPU.GB200.4, BM.GPU.GB200-v3.4, BM.GPU.GB300.4
 
@@ -32,17 +34,18 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 580.178.04 LTS & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.19-0.oci)
 
-#### 6.14 Kernel
+#### 6.17 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.14-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.17-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-aarch64-2026.02.28-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.3.0-GPU-595-OPEN-CUDA-13.2-2026.07.16-0.oci)
+- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
+- [GPU driver 580.178.04 LTS & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.19-0.oci)
 
 ## BM.GPU.MI300X.8, BM.GPU.MI355X-v1.8
 
@@ -50,22 +53,22 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [ROCm 7.2.4](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci)
+- [ROCm 10.0](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.19-0.oci)
 
-#### 6.14 Kernel
+#### 6.17 Kernel
 
-- [ROCm 7.2.4](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-24.04-2026.02.28-0-KERNEL-ORACLE-6.14-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci)
+- [ROCm 10.0](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.19-0.oci)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [ROCm 7.2.4](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/2026.07.16/Canonical-Ubuntu-22.04-2026.02.28-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.3.0-AMD-ROCM-724-2026.07.16-0.oci)
+- [ROCm 10.0](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.19-0.oci)
 
 ## BM.GPU.MI355X.8
 
-### Ubuntu 24.04
+### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [ROCm 7.2.1](https://objectstorage.ap-kulai-1.oraclecloud.com/p/udreDKcRQs-iAJ-lM7US8-4fRdLigS6GAyQAXzpJj5Px-asvDxTJcR5Pf7z_VLt0/n/hpctraininglab/b/Sudhir-Bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-kernel-6.8.0-106-ainic-a-77-host-sw-MOFED-2410_1140-AMD-ROCM-721-oca-plugin-157-10-2967-ipv4-2026.07.01-0)
+- [ROCm 7.2.4 & Pollara 1.117.5-a-77](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-POLLARA-1.117.5-a-77-AMD-ROCM-7.2.4-2026.10.19-0.oci)
