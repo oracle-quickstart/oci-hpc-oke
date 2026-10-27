@@ -411,13 +411,13 @@ cleanup_rendered_dashboards() {
 }
 trap cleanup_rendered_dashboards EXIT
 
-if ! jq -e --arg vendor "${GPU_VENDOR}" --arg addon "${GPU_HEALTH_MONITORING}" --arg removed "${NPD_REMOVED}" '
+if ! jq -e --arg vendor "${GPU_VENDOR}" --argjson addon "${GPU_HEALTH_MONITORING}" --argjson removed "${NPD_REMOVED}" '
   .panels |= map(
     select(
       (.id != 7 or $vendor != "amd") and
       (.id != 23 or $vendor != "nvidia") and
-      (.id != 25 or $addon == "true") and
-      ((.id | IN(1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24)) and $removed == "true" | not)
+      (.id != 25 or $addon) and
+      ((.id | IN(1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24)) and $removed | not)
     )
   )
   | .panels = (
