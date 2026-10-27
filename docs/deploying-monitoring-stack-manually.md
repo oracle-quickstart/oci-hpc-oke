@@ -107,7 +107,7 @@ case "${NPD_REMOVED}" in
   true|false) ;;
   *) echo "NPD_REMOVED must be true or false" >&2; exit 1 ;;
 esac
-if [ "${NPD_REMOVED}" = "true" ] && [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${NPD_REMOVED}" = "true" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   echo "NPD removal requires the GPU Health Monitoring add-on" >&2
   exit 1
 fi
@@ -164,8 +164,11 @@ The node health rules use the NPD conditions on each GPU node. NPD runs 15 check
 
 ```bash
 PROMETHEUS_MEMORY_REQUEST=4Gi
-NPD_AMD_CONDITIONS="CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo"
-NPD_NVIDIA_CONDITIONS="CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"
+SHARED_CONDITIONS="CpuProfile|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth"
+NPD_AMD_ONLY_CONDITIONS="GpuBadPages|Rocminfo"
+NPD_NVIDIA_ONLY_CONDITIONS="DcgmiHealth|GpuFabricMgr|GpuImex|GpuRowRemap|GpuXid|NvlinkSpeed|RdmaOvsMtu|RdmaVfCounters|RdmaVfRoutes"
+NPD_AMD_CONDITIONS="${SHARED_CONDITIONS}|${NPD_AMD_ONLY_CONDITIONS}"
+NPD_NVIDIA_CONDITIONS="${SHARED_CONDITIONS}|${NPD_NVIDIA_ONLY_CONDITIONS}"
 NPD_AMD_COUNT=$(echo "${NPD_AMD_CONDITIONS}" | awk -F'|' '{print NF}')
 NPD_NVIDIA_COUNT=$(echo "${NPD_NVIDIA_CONDITIONS}" | awk -F'|' '{print NF}')
 # Delete the NPD rules block only after opting out of NPD.
@@ -175,7 +178,7 @@ if [ "${NPD_REMOVED}" = "true" ]; then
 fi
 # Without the add-on, delete its PodMonitor and custom-resource metrics blocks.
 GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/d'
-if [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/,/^%{ endif }/d'
 fi
 sed -e 's/${install_grafana}/true/' \
@@ -437,7 +440,7 @@ if ! jq -e --arg vendor "${GPU_VENDOR}" --arg addon "${GPU_HEALTH_MONITORING}" -
   exit 1
 fi
 
-if [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   kubectl delete configmap dashboard-gpu-node-repairs \
     --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
 fi
@@ -446,7 +449,7 @@ fi
 for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
   dashboard_file="${dashboard}"
   # The node repairs dashboard reads NodeHealthReports, which exist only with the add-on.
-  if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+  if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
     continue
   fi
   if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
