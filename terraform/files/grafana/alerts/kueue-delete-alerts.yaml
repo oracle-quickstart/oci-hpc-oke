@@ -1,0 +1,6 @@
+apiVersion: 1
+deleteRules:
+  - orgId: 1
+    uid: oke_kueue_controller_unavailable
+  - orgId: 1
+    uid: oke_kueue_metrics_unavailable

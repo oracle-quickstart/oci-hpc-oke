@@ -45,6 +45,8 @@ Engine (OKE). For deployment and project overview, see the
 
 ## Health checks, benchmarks, and monitoring
 
+- [Monitoring Kueue Workloads](./monitoring-kueue-workloads.md): Queue and admission metrics, workload-to-host resource views, and links to GPU and host dashboards.
+
 - [Running Active Health Checks for GPU Nodes (Preview)](./running-active-health-checks.md): Run active health checks against GPU nodes.
 - [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md): GPU faults, node health reports, repairs, metrics, and alerts from the OKE GPU Health Monitoring add-on.
 - [Running GPU & RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md): Continuous GPU and RDMA health checks via Node Problem Detector.

@@ -71,6 +71,8 @@ locals {
     if(!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
     (!contains(local.grafana_nvidia_alert_files, f) || local.has_nvidia_gpu) &&
     (!contains(local.grafana_gpu_health_alert_files, f) || local.deploy_gpu_health_monitoring_addon) &&
+    (f != "kueue-health.yaml" || var.install_kueue) &&
+    (f != "kueue-delete-alerts.yaml" || !var.install_kueue) &&
     (f != "gpu-health-delete-alerts.yaml" || !local.deploy_gpu_health_monitoring_addon) &&
     (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
@@ -90,8 +92,9 @@ data "external" "grafana_dashboards" {
 
   program = ["python3", "${local.grafana_jsonnet_dir}/render_dashboards.py", "--external"]
   query = {
-    cache_dir  = local.grafana_jsonnet_cache_dir
-    output_dir = local.grafana_jsonnet_build_dir
+    cache_dir     = local.grafana_jsonnet_cache_dir
+    output_dir    = local.grafana_jsonnet_build_dir
+    install_kueue = tostring(var.install_kueue && var.install_grafana_dashboards)
   }
 }
 

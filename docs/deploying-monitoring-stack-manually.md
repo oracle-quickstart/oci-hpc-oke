@@ -139,12 +139,20 @@ Prometheus memory grows with the number of nodes. Set `PROMETHEUS_MEMORY_REQUEST
 
 ```bash
 PROMETHEUS_MEMORY_REQUEST=4Gi
-awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" '
-  BEGIN { include = 1 }
-  /^%\{ if gpu_health_monitoring \}/ { include = (gpu_health_monitoring == "true"); next }
-  /^%\{ endif \}/ { include = 1; next }
-  /^%\{ if / { next }
-  include
+# Set true only when Kueue is installed; enables scraping and workload metadata.
+KUEUE_MONITORING=false
+awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" -v install_kueue="${KUEUE_MONITORING}" '
+  BEGIN { depth = 0; active[0] = 1 }
+  /^%\{ if / {
+    condition = 0
+    if ($0 ~ /gpu_health_monitoring \|\| install_kueue/) condition = (gpu_health_monitoring == "true" || install_kueue == "true")
+    else if ($0 ~ /gpu_health_monitoring/) condition = (gpu_health_monitoring == "true")
+    else if ($0 ~ /install_kueue/) condition = (install_kueue == "true")
+    # The public-ingress-only grafana.ini block is omitted for this manual setup.
+    depth++; active[depth] = active[depth-1] && condition; next
+  }
+  /^%\{ endif \}/ { depth--; next }
+  active[depth]
 ' terraform/files/kube-prometheus/values.yaml.tftpl | \
 sed -e 's/${install_grafana}/true/' \
   -e 's/${setup_alerting}/true/' \
@@ -331,6 +339,8 @@ temporary and remains under the ignored `build` directory:
 
 ```bash
 make -C terraform/files/grafana/jsonnet verify
+# verify builds every source for validation; compile the selected deployment set.
+make -C terraform/files/grafana/jsonnet compile INCLUDE_KUEUE="${KUEUE_MONITORING:-false}"
 DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
 ```
 
@@ -340,6 +350,9 @@ repository for comparison only. Do not create ConfigMaps from it.
 ### 5.1 Deploy Kubernetes Dashboards
 
 ```bash
+if [ "${KUEUE_MONITORING:-false}" = "false" ]; then
+  kubectl delete configmap dashboard-kueue --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
 # Deploy each common dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
@@ -499,8 +512,18 @@ else
     --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
 fi
 
+if [ "${KUEUE_MONITORING:-false}" = "true" ]; then
+  kubectl delete configmap alert-kueue-delete-alerts --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+else
+  kubectl delete configmap alert-kueue-health --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
+
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
+
+  case "${KUEUE_MONITORING:-false}:${alert_name}" in
+    true:kueue-delete-alerts.yaml|false:kueue-health.yaml) continue ;;
+  esac
 
   case "${GPU_HEALTH_MONITORING}:${alert_name}" in
     true:gpu-health-delete-alerts.yaml|false:gpu-fault-monitor-stale.yaml|false:gpu-health-fault.yaml|false:gpu-health-unavailable.yaml|false:gpu-node-repair-failed.yaml)
@@ -1071,6 +1094,8 @@ the Jsonnet source and rerun the `kubectl apply` loops to update them in place:
 ```bash
 # Update common dashboards
 make -C terraform/files/grafana/jsonnet verify
+# verify builds every source for validation; compile the selected deployment set.
+make -C terraform/files/grafana/jsonnet compile INCLUDE_KUEUE="${KUEUE_MONITORING:-false}"
 DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
 
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
