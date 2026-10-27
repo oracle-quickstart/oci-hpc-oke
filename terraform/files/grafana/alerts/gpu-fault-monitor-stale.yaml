@@ -54,6 +54,7 @@ groups:
           keep_firing_for: 30m
           annotations:
             description: The GPU fault monitor reads health results that are older than 15 minutes, or a configured node has no healthy fault monitor scrape. The unavailable alert covers nodes that are not configured.
+            summary: Health check results are older than 15 minutes, or the fault monitor has no healthy scrape.
           labels: {}
           isPaused: false
           notification_settings:

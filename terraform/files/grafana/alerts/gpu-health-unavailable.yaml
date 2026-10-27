@@ -54,6 +54,7 @@ groups:
           keep_firing_for: 30m
           annotations:
             description: The GPU Health Monitoring add-on does not monitor this node. It is selected for monitoring but not configured, or its health check files are missing.
+            summary: The add-on does not monitor this node. The node is not configured, or its health check files are missing.
           labels: {}
           isPaused: false
           notification_settings:
