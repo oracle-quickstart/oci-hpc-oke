@@ -107,7 +107,7 @@ case "${NPD_REMOVED}" in
   true|false) ;;
   *) echo "NPD_REMOVED must be true or false" >&2; exit 1 ;;
 esac
-if [ "${NPD_REMOVED}" = "true" ] && [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${NPD_REMOVED}" = "true" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   echo "NPD removal requires the GPU Health Monitoring add-on" >&2
   exit 1
 fi
@@ -178,7 +178,7 @@ if [ "${NPD_REMOVED}" = "true" ]; then
 fi
 # Without the add-on, delete its PodMonitor and custom-resource metrics blocks.
 GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/d'
-if [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/,/^%{ endif }/d'
 fi
 sed -e 's/${install_grafana}/true/' \
@@ -440,7 +440,7 @@ if ! jq -e --arg vendor "${GPU_VENDOR}" --arg addon "${GPU_HEALTH_MONITORING}" -
   exit 1
 fi
 
-if [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
   kubectl delete configmap dashboard-gpu-node-repairs \
     --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
 fi
@@ -449,7 +449,7 @@ fi
 for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
   dashboard_file="${dashboard}"
   # The node repairs dashboard reads NodeHealthReports, which exist only with the add-on.
-  if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" != "true" ]; then
+  if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
     continue
   fi
   if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
