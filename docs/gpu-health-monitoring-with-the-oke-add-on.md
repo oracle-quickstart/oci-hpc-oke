@@ -29,7 +29,27 @@ kubectl label node <node-name> amd.com/gpu.present=true
 
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
-The add-on can also repair nodes. It reboots a node when a fault with the action `REBOOT` stays active for 10 minutes, and it tags and terminates a node on a user request. Repair needs a `NodeRepairConfig` resource. Terraform does not create this resource. See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. With these configs, the add-on does these repairs:
+
+- It cordons, drains, and reboots a node when a fault with the action `REBOOT` stays active for 10 minutes.
+- It drains a node and then stops or terminates it when a fault of the node matches a Compute maintenance event. The action of the maintenance event (`STOP` or `TERMINATE`) sets the repair action.
+
+The repair configs run one repair at a time (`maximumParallelNodeRepairs: 1`). They use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause. To see the proposed repairs without node changes, set `gpu_health_monitoring_node_repair_dry_run=true`. A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node.
+
+The add-on can also tag and terminate a node on a user request. This repair needs these items, and Terraform does not set them up:
+
+- A support request that enables the repair for the tenancy
+- The `ComputeInstanceHostActions` tag namespace with the `CustomerReportedHostStatus` tag key
+- A ClusterRoleBinding to the `oke-customer-node-repair-trigger` ClusterRole
+- This IAM policy statement:
+
+  ```text
+  Allow any-user to use tag-namespace in tenancy where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>', target.tag-namespace.name = 'ComputeInstanceHostActions'}
+  ```
+ See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+
+> [!IMPORTANT]
+> If the cluster already has a `NodeRepairConfig` that you created for GPU nodes, delete it before you apply Terraform. A node that more than one repair config selects gets no repair. Its report shows `AdmissionRejected`.
 
 ## Prerequisites
 
@@ -37,11 +57,12 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 - Managed GPU node pools
 - On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. Without this label, the add-on selects the node but does not monitor it.
 - Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
-- The IAM policies that let the worker nodes manage instances and read the instance agent plugins. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create both before you deploy:
+- The IAM policies that let the worker nodes manage instances and read the instance agent plugins, and that let the cluster use the maintenance events of its nodes. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create all three before you deploy:
 
   ```text
   Allow dynamic-group <dynamic group of the cluster nodes> to manage instance-family in compartment id <compartment OCID>
   Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
+  Allow any-user to use instance-maintenance-events in compartment id <compartment OCID> where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>'}
   ```
 
   Terraform does not check that these policies exist. Keep NPD until the coverage checks below succeed.
@@ -196,7 +217,7 @@ These dashboards show the add-on data:
 | Alert | Fires when |
 |---|---|
 | GPU Health Fault | `GpuHealthMonitoringFaultDetected` is `True` for 1 minute. |
-| GPU Health Signal | An `hpcFault` signal, or a `clusterHealthCheck` signal with an action other than `REBOOT`, is active for 1 minute. A signal is active when it was observed in the last 15 minutes. Node auto repair does not act on these signals. |
+| GPU Health Signal | An `hpcFault` signal, or a `clusterHealthCheck` signal with an action other than `REBOOT`, is active for 1 minute. A signal is active when it was observed in the last 15 minutes. Node auto repair does not reboot the node for these signals. It can stop or terminate the node when a Compute maintenance event matches the fault. |
 | GPU Health Monitoring Unavailable | The add-on does not monitor the node for 30 minutes. |
 | GPU Node Repair Failed | A node repair (not a dry run) failed in the last hour. |
 | GPU Fault Monitor Stale or Missing | The health check files on a node are older than 15 minutes, or a configured node has no healthy fault monitor scrape, for 10 minutes. |

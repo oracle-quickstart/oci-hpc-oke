@@ -200,6 +200,7 @@ variableGroups:
       - deploy_gpu_health_monitoring
       - gpu_health_monitoring_addon_version
       - gpu_health_monitoring_remove_npd
+      - gpu_health_monitoring_node_repair_dry_run
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kueue
@@ -1673,6 +1674,13 @@ variables:
     title: Remove NPD after verifying GPU health coverage
     type: boolean
     description: Enable only after every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Every GPU pool must support the add-on.
+    default: false
+    visible:
+      - deploy_gpu_health_monitoring
+  gpu_health_monitoring_node_repair_dry_run:
+    title: Dry run GPU node repairs
+    type: boolean
+    description: Show the proposed repairs in the NodeHealthReports, but do not reboot, stop or terminate GPU nodes. When not set, the add-on repairs faulty GPU nodes one at a time.
     default: false
     visible:
       - deploy_gpu_health_monitoring

@@ -53,8 +53,8 @@ groups:
           for: 1m
           keep_firing_for: 30m
           annotations:
-            description: The GPU Health Monitoring add-on reports an active FMS fault (hpcFault) or a health check signal that does not reboot the node. Node auto repair does not act on it. See the GPU Node Repairs dashboard.
-            summary: 'Source {{ $labels.source }}, fault code {{ or $labels.fault_code "N/A" }}, action {{ or $labels.action "N/A" }}. Node auto repair does not act on it.'
+            description: The GPU Health Monitoring add-on reports an active FMS fault (hpcFault) or a health check signal that does not reboot the node. Node auto repair does not reboot the node for it, but can stop or terminate the node when a Compute maintenance event matches the fault. See the GPU Node Repairs dashboard.
+            summary: 'Source {{ $labels.source }}, fault code {{ or $labels.fault_code "N/A" }}, action {{ or $labels.action "N/A" }}. No reboot; a matching maintenance event can stop or terminate the node.'
           labels: {}
           isPaused: false
           notification_settings:

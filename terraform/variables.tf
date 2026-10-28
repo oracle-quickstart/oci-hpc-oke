@@ -693,6 +693,12 @@ variable "gpu_health_monitoring_remove_npd" {
   description = "Remove Node Problem Detector after verifying that every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Requires add-on coverage for every GPU pool."
 }
 
+variable "gpu_health_monitoring_node_repair_dry_run" {
+  type        = bool
+  default     = false
+  description = "Run the GPU node repairs of the GpuHealthMonitoring addon as a dry run. A dry run shows the proposed repair in the NodeHealthReport, and does not cordon, drain, reboot, stop or terminate the node."
+}
+
 variable "deploy_nvidia_network_operator" {
   type        = bool
   default     = false

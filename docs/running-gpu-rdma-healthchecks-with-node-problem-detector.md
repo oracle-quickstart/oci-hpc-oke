@@ -84,7 +84,7 @@ After verifying that the add-on checks every GPU node, set `gpu_health_monitorin
 Without NPD, two sources report GPU and RDMA faults:
 
 - The DR-HPC passive checks of the Oracle Cloud Agent (OCA) Compute RDMA GPU Monitoring plugin. They run every 5 minutes. The add-on reports a result with action `REBOOT` as a fault. With a `NodeRepairConfig`, node auto repair then reboots the node.
-- The OCA hardware events of the OCI Fault Management Service (FMS). The add-on shows an active FMS fault as an `hpcFault` signal in the `NodeHealthReport`. These signals do not start a repair. The `GPU Health Signal` alert reports them.
+- The OCA hardware events of the OCI Fault Management Service (FMS). The add-on shows an active FMS fault as an `hpcFault` signal in the `NodeHealthReport`. These signals do not start a reboot. When a Compute maintenance event matches the fault, node auto repair can stop or terminate the node. The `GPU Health Signal` alert reports them.
 
 | NPD condition | Replacement |
 |---|---|
