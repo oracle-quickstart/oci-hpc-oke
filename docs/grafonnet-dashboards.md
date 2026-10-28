@@ -94,6 +94,13 @@ Folder annotations remain:
 | `dashboards/gpu` | `GPU Nodes` |
 | `dashboards/oci` | `OCI Metrics` |
 
+Kueue's `common/kueue.jsonnet` source is compiled only when Terraform passes
+`install_kueue=true`. It uses the same Kubernetes folder and provisioning path.
+For local development, pass `INCLUDE_KUEUE=true` to `make compile`; `make verify`
+includes it automatically. Disabling Kueue also removes its operator ConfigMap.
+See [Monitoring Kueue Workloads](./monitoring-kueue-workloads.md) for job-to-host
+navigation and metric semantics.
+
 OCI dashboards are deployed only when the OCI metrics exporter is enabled. GPU
 dashboards are deployed only when the cluster contains an AMD or NVIDIA GPU.
 

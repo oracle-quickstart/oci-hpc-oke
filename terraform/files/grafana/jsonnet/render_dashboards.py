@@ -181,7 +181,8 @@ def source_hash(package_dir: Path) -> str:
 
 
 def compile_dashboards(
-    package_dir: Path, output_dir: Path, jsonnet_path: Path, vendor_dir: Path
+    package_dir: Path, output_dir: Path, jsonnet_path: Path, vendor_dir: Path,
+    include_kueue: bool = False,
 ) -> dict[str, dict[str, str]]:
     dashboard_dir = package_dir / "dashboards"
     sources = sorted(dashboard_dir.glob("*/*.jsonnet"))
@@ -193,6 +194,8 @@ def compile_dashboards(
     seen_names: set[str] = set()
     try:
         for source in sources:
+            if source.name == "kueue.jsonnet" and not include_kueue:
+                continue
             category = source.parent.name
             filename = source.with_suffix(".json").name
             if filename in seen_names:
@@ -219,6 +222,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--external", action="store_true")
     parser.add_argument("--bootstrap-only", action="store_true")
+    parser.add_argument("--include-kueue", action="store_true")
     parser.add_argument("--cache-dir", type=Path)
     parser.add_argument("--output-dir", type=Path)
     return parser.parse_args()
@@ -239,7 +243,8 @@ def main() -> int:
     if args.bootstrap_only:
         print(f"Prepared Jsonnet {JSONNET_VERSION} and jb {JB_VERSION}")
         return 0
-    dashboards = compile_dashboards(package_dir, output_dir, jsonnet_path, vendor_dir)
+    include_kueue = args.include_kueue or query.get("install_kueue") == "true"
+    dashboards = compile_dashboards(package_dir, output_dir, jsonnet_path, vendor_dir, include_kueue)
     rendered_count = sum(len(category) for category in dashboards.values())
     log(f"Compiled {rendered_count} dashboards into {output_dir}")
 
@@ -248,7 +253,7 @@ def main() -> int:
             {
                 "build_dir": str(output_dir),
                 "dashboards": json.dumps(dashboards, separators=(",", ":")),
-                "source_hash": source_hash(package_dir),
+                "source_hash": hashlib.sha256(f"{source_hash(package_dir)}:kueue={include_kueue}".encode()).hexdigest(),
                 "tool_versions": f"jsonnet={JSONNET_VERSION},jb={JB_VERSION}",
             },
             sys.stdout,

@@ -1,0 +1,147 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "Kueue",
+      "folder": "Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "oke_kueue_controller_unavailable",
+          "title": "Kueue controller unavailable",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "prometheus",
+              "model": {
+                "expr": "max(kube_deployment_status_replicas_available{namespace=\"kueue-system\",deployment=\"kueue-controller-manager\"}) or vector(0)",
+                "instant": true,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        1
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "5m",
+          "annotations": {
+            "summary": "Kueue has no available controller replicas; new workloads cannot be admitted."
+          },
+          "labels": {
+            "severity": "critical"
+          },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "ons-webhook",
+            "repeat_interval": "12h"
+          }
+        },
+        {
+          "uid": "oke_kueue_metrics_unavailable",
+          "title": "Kueue metrics unavailable",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "prometheus",
+              "model": {
+                "expr": "max(up{namespace=\"kueue-system\",service=\"kueue-controller-manager-metrics-service\"}) or vector(0)",
+                "instant": true,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "params": [
+                        1
+                      ],
+                      "type": "lt"
+                    },
+                    "operator": {
+                      "type": "and"
+                    },
+                    "query": {
+                      "params": [
+                        "C"
+                      ]
+                    },
+                    "reducer": {
+                      "params": [],
+                      "type": "last"
+                    },
+                    "type": "query"
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Error",
+          "for": "5m",
+          "annotations": {
+            "summary": "Prometheus cannot scrape Kueue metrics. Check ServiceMonitor discovery, endpoint health, TLS and RBAC."
+          },
+          "labels": {
+            "severity": "critical"
+          },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "ons-webhook",
+            "repeat_interval": "12h"
+          }
+        }
+      ]
+    }
+  ]
+}
