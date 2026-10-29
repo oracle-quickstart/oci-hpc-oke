@@ -687,6 +687,18 @@ variable "gpu_health_monitoring_addon_version" {
   description = "Version of the GpuHealthMonitoring OKE addon."
 }
 
+variable "gpu_health_monitoring_remove_npd" {
+  type        = bool
+  default     = false
+  description = "Remove Node Problem Detector after verifying that every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Requires add-on coverage for every GPU pool."
+}
+
+variable "gpu_health_monitoring_node_repair_dry_run" {
+  type        = bool
+  default     = false
+  description = "Run the GPU node repairs of the GpuHealthMonitoring addon as a dry run. A dry run shows the proposed repair in the NodeHealthReport, and does not cordon, drain, reboot, stop or terminate the node."
+}
+
 variable "deploy_nvidia_network_operator" {
   type        = bool
   default     = false
@@ -761,7 +773,7 @@ variable "worker_ops_pool_size" { default = 3 }
 variable "worker_ops_shape" { default = "VM.Standard.E5.Flex" }
 variable "worker_ops_ocpus" { default = 4 }
 variable "worker_ops_memory" { default = 16 }
-variable "worker_ops_boot_volume_size" { default = 128 }
+variable "worker_ops_boot_volume_size" { default = 256 }
 variable "worker_ops_image_type" { default = "Custom" }
 variable "worker_ops_image_custom_id" { default = "" }
 variable "worker_ops_image_custom_uri" { default = "" }

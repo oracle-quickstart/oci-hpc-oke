@@ -199,6 +199,8 @@ variableGroups:
       - amd_gpu_operator_configuration
       - deploy_gpu_health_monitoring
       - gpu_health_monitoring_addon_version
+      - gpu_health_monitoring_remove_npd
+      - gpu_health_monitoring_node_repair_dry_run
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kueue
@@ -1385,7 +1387,7 @@ variables:
   install_monitoring:
     type: boolean
     title: Install Monitoring Stack
-    description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector, and AMD device metrics exporter.
+    description: Install the Prometheus stack with Grafana, NVIDIA DCGM Exporter, Node Problem Detector (unless removed for the GPU Health Monitoring add-on), and AMD device metrics exporter.
     default: true
     visible: true
   monitoring_advanced_options:
@@ -1407,8 +1409,8 @@ variables:
       - monitoring_advanced_options
   install_node_problem_detector_kube_prometheus_stack:
     type: boolean
-    title: Install Node Problem Detector & Kube Prometheus Stack
-    description: Install Node Problem Detector with the Kubernetes Prometheus stack to run GPU & RDMA health checks and use automated alerting in Grafana.
+    title: Install Kube Prometheus Stack
+    description: Install the Kubernetes Prometheus stack with Grafana dashboards and automated alerting. Node Problem Detector, which runs GPU and RDMA health checks, is also installed. It is removed only with `gpu_health_monitoring_remove_npd=true` after the GPU Health Monitoring add-on covers every GPU pool.
     default: true
     visible:
       and:
@@ -1656,7 +1658,7 @@ variables:
   deploy_gpu_health_monitoring:
     title: Install GPU Health Monitoring add-on
     type: boolean
-    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes.
+    description: Install the GPU Health Monitoring OKE add-on for supported managed GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. Keep Node Problem Detector until live add-on coverage has been verified.
     default: true
   gpu_health_monitoring_addon_version:
     title: GPU Health Monitoring add-on version
@@ -1666,6 +1668,20 @@ variables:
     required: true
     enum:
       - "v1.1.0"
+    visible:
+      - deploy_gpu_health_monitoring
+  gpu_health_monitoring_remove_npd:
+    title: Remove NPD after verifying GPU health coverage
+    type: boolean
+    description: Enable only after every GPU node reports GpuHealthMonitoringConfigured=True and GpuHealthMonitoringUnavailable=False. Every GPU pool must support the add-on.
+    default: false
+    visible:
+      - deploy_gpu_health_monitoring
+  gpu_health_monitoring_node_repair_dry_run:
+    title: Dry run GPU node repairs
+    type: boolean
+    description: Show the proposed repairs in the NodeHealthReports, but do not reboot, stop or terminate GPU nodes. When not set, the add-on repairs faulty GPU nodes one at a time.
+    default: false
     visible:
       - deploy_gpu_health_monitoring
   deploy_nvidia_gpu_operator:

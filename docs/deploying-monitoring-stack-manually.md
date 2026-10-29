@@ -88,21 +88,44 @@ export PROMETHEUS_STACK_CHART_VERSION="92.0.0"
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"
 
-# Enable only when the GPU Health Monitoring add-on is installed and configured
-export GPU_HEALTH_MONITORING="false"
-
 case "${GPU_VENDOR}" in
   amd|nvidia|mixed) ;;
   *) echo "GPU_VENDOR must be amd, nvidia, or mixed" >&2; exit 1 ;;
 esac
 
+# Set true when shape-specific configs monitor at least one supported managed GPU pool.
+export GPU_HEALTH_MONITORING="false"
+# Keep false until every GPU pool is supported and every GPU node passes the
+# coverage verification in the add-on guide. Partial coverage requires NPD.
+export NPD_REMOVED="false"
+
 case "${GPU_HEALTH_MONITORING}" in
   true|false) ;;
   *) echo "GPU_HEALTH_MONITORING must be true or false" >&2; exit 1 ;;
 esac
+case "${NPD_REMOVED}" in
+  true|false) ;;
+  *) echo "NPD_REMOVED must be true or false" >&2; exit 1 ;;
+esac
+if [ "${NPD_REMOVED}" = "true" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
+  echo "NPD removal requires the GPU Health Monitoring add-on" >&2
+  exit 1
+fi
+# Match the shape selectors of the enabled configs, including nodes not yet assigned.
+GPU_HEALTH_SHAPE_REGEX=""
+if [ "${GPU_HEALTH_MONITORING}" = "true" ]; then
+  GPU_HEALTH_SHAPE_REGEX=$(kubectl get gpuhealthmonitoringconfigs -o json | jq -r '
+    [.items[] | select(.spec.enabled == true) |
+      .spec.nodeSelector.matchLabels["node.kubernetes.io/instance-type"] // empty] |
+    unique | map(split(".") | join("[.]")) | join("|")')
+  if [ -z "${GPU_HEALTH_SHAPE_REGEX}" ]; then
+    echo "Enable a shape-specific GPU health config before deploying add-on monitoring" >&2
+    exit 1
+  fi
+fi
 ```
 
-Set `GPU_HEALTH_MONITORING=true` only after following [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md). This setting controls the add-on metrics, repair recording rule, dashboards, and alerts; it does not install the add-on.
+Set `GPU_HEALTH_MONITORING=true` only after following [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md). This setting controls the add-on metrics, repair recording rule, dashboards, and alerts. It does not install the add-on. Set `NPD_REMOVED=true` only after the coverage checks in that guide succeed.
 
 ### 1.4 Add Helm Repositories
 
@@ -137,18 +160,40 @@ The repository stores the kube-prometheus values as a Terraform template. Render
 
 Prometheus memory grows with the number of nodes. Set `PROMETHEUS_MEMORY_REQUEST` to about 2 GiB plus 128 MiB for each GPU node. For example, use `28Gi` for 208 GPU nodes. Make sure that a system node has this much free memory.
 
+The node health rules use the NPD conditions on each GPU node. NPD runs 15 checks on AMD nodes and 22 checks on NVIDIA nodes. `GPU_HEALTH_MONITORING` controls the add-on metrics. Only `NPD_REMOVED=true` removes the NPD rules. Leave it false for partial coverage or before you verify the node assignment.
+
 ```bash
 PROMETHEUS_MEMORY_REQUEST=4Gi
-awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" '
-  BEGIN { include = 1 }
-  /^%\{ if gpu_health_monitoring \}/ { include = (gpu_health_monitoring == "true"); next }
-  /^%\{ endif \}/ { include = 1; next }
-  /^%\{ if / { next }
-  include
-' terraform/files/kube-prometheus/values.yaml.tftpl | \
+SHARED_CONDITIONS="CpuProfile|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth"
+NPD_AMD_ONLY_CONDITIONS="GpuBadPages|Rocminfo"
+NPD_NVIDIA_ONLY_CONDITIONS="DcgmiHealth|GpuFabricMgr|GpuImex|GpuRowRemap|GpuXid|NvlinkSpeed|RdmaOvsMtu|RdmaVfCounters|RdmaVfRoutes"
+NPD_AMD_CONDITIONS="${SHARED_CONDITIONS}|${NPD_AMD_ONLY_CONDITIONS}"
+NPD_NVIDIA_CONDITIONS="${SHARED_CONDITIONS}|${NPD_NVIDIA_ONLY_CONDITIONS}"
+NPD_AMD_COUNT=$(echo "${NPD_AMD_CONDITIONS}" | awk -F'|' '{print NF}')
+NPD_NVIDIA_COUNT=$(echo "${NPD_NVIDIA_CONDITIONS}" | awk -F'|' '{print NF}')
+# Delete the NPD rules block only after opting out of NPD.
+NPD_RULES_FILTER='/^%{ if !npd_removed }/d'
+if [ "${NPD_REMOVED}" = "true" ]; then
+  NPD_RULES_FILTER='/^%{ if !npd_removed }/,/^%{ endif }/d'
+fi
+# Without the add-on, delete its PodMonitor and custom-resource metrics blocks.
+GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/d'
+if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
+  GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/,/^%{ endif }/d'
+fi
 sed -e 's/${install_grafana}/true/' \
   -e 's/${setup_alerting}/true/' \
   -e "s/\${prometheus_memory_request}/${PROMETHEUS_MEMORY_REQUEST}/" \
+  -e "s/\${npd_amd_conditions}/${NPD_AMD_CONDITIONS}/" \
+  -e "s/\${npd_nvidia_conditions}/${NPD_NVIDIA_CONDITIONS}/" \
+  -e "s/\${npd_amd_condition_count}/${NPD_AMD_COUNT}/" \
+  -e "s/\${npd_nvidia_condition_count}/${NPD_NVIDIA_COUNT}/" \
+  -e "s/\${gpu_health_monitoring_shape_regex}/${GPU_HEALTH_SHAPE_REGEX}/" \
+  -e "${NPD_RULES_FILTER}" \
+  -e "${GPU_HEALTH_RULES_FILTER}" \
+  -e '/^%{ if /d' \
+  -e '/^%{ endif }/d' \
+  terraform/files/kube-prometheus/values.yaml.tftpl \
   > /tmp/kube-prometheus-values.yaml
 ```
 
@@ -274,6 +319,8 @@ kubectl get pods -n kube-amd-gpu -l app.kubernetes.io/name=metrics-exporter
 
 ### 4.1 Install Node Problem Detector
 
+Skip this step only when `NPD_REMOVED` is `true`, after verifying complete add-on coverage.
+
 NPD uses separate AMD and NVIDIA releases. Run the AMD command when `GPU_VENDOR` is `amd` or `mixed`. Run the NVIDIA command when `GPU_VENDOR` is `nvidia` or `mixed`.
 
 AMD:
@@ -354,7 +401,7 @@ done
 
 ### 5.2 Deploy GPU Dashboards (if applicable)
 
-The source GPU Health dashboard contains both vendor-specific panels and an add-on panel. Render it for the `GPU_VENDOR` and `GPU_HEALTH_MONITORING` settings selected in Step 1.3 before creating its ConfigMap. This uses the same panel filtering and stat-panel layout as Terraform. The GPU Node Repairs dashboard is deployed only when the add-on setting is enabled.
+The source GPU Health dashboard contains both vendor-specific panels and the GPU Health Monitoring add-on panel (ID 25). Render it for the `GPU_VENDOR` and `GPU_HEALTH_MONITORING` selected in Step 1.3 before creating its ConfigMap. With `NPD_REMOVED=true`, the render step removes the panels that read NPD data (IDs 1 to 7, 14 to 16, 18, and 21 to 24), and the Command Center node issues history shows only the add-on condition. This uses the same panel filtering and stat-panel layout as Terraform.
 
 ```bash
 # Render the vendor-specific GPU Health dashboard
@@ -364,12 +411,13 @@ cleanup_rendered_dashboards() {
 }
 trap cleanup_rendered_dashboards EXIT
 
-if ! jq -e --arg vendor "${GPU_VENDOR}" --argjson addon "${GPU_HEALTH_MONITORING}" '
+if ! jq -e --arg vendor "${GPU_VENDOR}" --argjson addon "${GPU_HEALTH_MONITORING}" --argjson removed "${NPD_REMOVED}" '
   .panels |= map(
     select(
       (.id != 7 or $vendor != "amd") and
       (.id != 23 or $vendor != "nvidia") and
-      (.id != 25 or $addon)
+      (.id != 25 or $addon) and
+      ((.id | IN(1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24)) and $removed | not)
     )
   )
   | .panels = (
@@ -399,12 +447,18 @@ fi
 
 # Deploy each GPU dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/gpu/*.json; do
+  dashboard_file="${dashboard}"
+  # The node repairs dashboard reads NodeHealthReports, which exist only with the add-on.
   if [ "$(basename "${dashboard}")" = "gpu-node-repairs.json" ] && [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
     continue
   fi
-  dashboard_file="${dashboard}"
   if [ "$(basename "${dashboard}")" = "gpu-health-status.json" ]; then
     dashboard_file="${RENDERED_DASHBOARD_DIR}/gpu-health-status.json"
+  fi
+  # Without NPD, the Command Center node issues history shows only the add-on condition.
+  if [ "$(basename "${dashboard}")" = "command-center.json" ] && [ "${NPD_REMOVED}" = "true" ]; then
+    sed -E 's/CpuProfile[|][A-Za-z|]*Rocminfo[|]//g' "${dashboard}" > "${RENDERED_DASHBOARD_DIR}/command-center.json"
+    dashboard_file="${RENDERED_DASHBOARD_DIR}/command-center.json"
   fi
 
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
@@ -433,7 +487,7 @@ jq '.data["gpu-health-status.json"] | fromjson |
   [.panels[] | select(.id == 7 or .id == 23 or .id == 25) | {id, title}]'
 ```
 
-The vendor panels must contain only panel 23 for AMD, only panel 7 for NVIDIA, or both panels for a mixed-vendor cluster. Panel 25 must be present only when `GPU_HEALTH_MONITORING=true`.
+With NPD, the result must contain panel 23 for AMD, panel 7 for NVIDIA, or both panels for a mixed-vendor cluster. With `NPD_REMOVED=true`, panels 7 and 23 are not present. Panel 25 must be present only when `GPU_HEALTH_MONITORING=true`.
 
 ## Step 6: Deploy Grafana Alert Rules
 
@@ -462,6 +516,10 @@ The repository includes alert rules for:
 - CPU profile issues
 - NPD checks that return Unknown
 - NPD checks that stop updating
+- GPU Health Monitoring add-on faults and signals (only with the add-on)
+- Nodes that the add-on does not monitor, failed node repairs, and stale fault monitor results (only with the add-on)
+
+With `NPD_REMOVED=true`, the NPD alerts are not deployed. With partial add-on coverage, keep both alert sets. Without the add-on, `gpu-health-delete-alerts.yaml` removes the add-on rules of an earlier deployment.
 
 ### 6.1 Deploy Alert Rules
 
@@ -490,22 +548,29 @@ case "${GPU_VENDOR}" in
     ;;
 esac
 
+# Select add-on and NPD alerts independently for partial coverage.
+ADDON_ALERTS="gpu-fault-monitor-stale gpu-health-fault gpu-health-signal gpu-health-unavailable gpu-node-repair-failed"
+NPD_ALERTS="cpu-profile dcgm-health gpu-bad-pages gpu-bus gpu-count gpu-ecc gpu-fabric-manager gpu-imex gpu-pcie gpu-row-remap gpu-xid node-pcie npd-check-stale npd-check-unknown npd-delete-amd-alerts npd-delete-nvidia-alerts nvlink-speed oca-version rdma-gid-index rdma-link rdma-link-flapping rdma-oca-plugins rdma-ovs-mtu rdma-rttcc rdma-vf-counters rdma-vf-routes rdma-wpa-auth"
+SKIP_ALERTS=""
 if [ "${GPU_HEALTH_MONITORING}" = "true" ]; then
-  kubectl delete configmap alert-gpu-health-delete-alerts \
-    --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+  SKIP_ALERTS="gpu-health-delete-alerts"
 else
-  kubectl delete configmap alert-gpu-fault-monitor-stale alert-gpu-health-fault \
-    alert-gpu-health-unavailable alert-gpu-node-repair-failed \
-    --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+  SKIP_ALERTS="${ADDON_ALERTS}"
 fi
+if [ "${NPD_REMOVED}" = "true" ]; then
+  SKIP_ALERTS="${SKIP_ALERTS} ${NPD_ALERTS}"
+else
+  SKIP_ALERTS="${SKIP_ALERTS} npd-delete-all-alerts"
+fi
+for alert in ${SKIP_ALERTS}; do
+  kubectl delete configmap -n ${MONITORING_NAMESPACE} "alert-${alert}" --ignore-not-found
+done
 
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
 
-  case "${GPU_HEALTH_MONITORING}:${alert_name}" in
-    true:gpu-health-delete-alerts.yaml|false:gpu-fault-monitor-stale.yaml|false:gpu-health-fault.yaml|false:gpu-health-unavailable.yaml|false:gpu-node-repair-failed.yaml)
-      continue
-      ;;
+  case " ${SKIP_ALERTS} " in
+    *" ${alert_name%.yaml} "*) continue ;;
   esac
 
   case "${GPU_VENDOR}:${alert_name}" in
@@ -530,8 +595,6 @@ done
 ```
 
 The single-vendor cleanup files remove stale file-provisioned rules left by an older generic deployment. Mixed-vendor clusters skip both cleanup files and retain both vendors' rules.
-
-When `GPU_HEALTH_MONITORING=false`, the add-on cleanup file deletes previously provisioned add-on alerts. When it is `true`, only the add-on alert definitions are deployed. The commands remove the excluded ConfigMaps before applying the selected files.
 
 ### 6.2 Verify Alert Rules
 
@@ -926,11 +989,11 @@ kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometh
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'amd_gpu_junction_temperature'
 
-# Query for node problem detector metrics
+# Query for node problem detector metrics (only with NPD_REMOVED=false)
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'problem_gauge'
 
-# Query NPD wrapper status and freshness metrics
+# Query NPD wrapper status and freshness metrics (only with NPD_REMOVED=false)
 kubectl exec -n ${MONITORING_NAMESPACE} prometheus-kube-prometheus-stack-prometheus-0 \
   -- promtool query instant http://localhost:9090 'oke_npd_check_status_code'
 
@@ -1022,7 +1085,7 @@ kubectl apply -f terraform/files/amd-device-metrics-exporter/service-monitor.yam
 
 ### Update Node Problem Detector
 
-Upgrade each release present in the cluster.
+Upgrade each release present in the cluster. Skip this step when `NPD_REMOVED` is `true`.
 
 AMD:
 

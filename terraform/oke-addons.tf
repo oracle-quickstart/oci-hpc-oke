@@ -89,6 +89,15 @@ locals {
           scrapeTimeout = local.nvidia_dcgm_exporter_service_monitor_interval
           honorLabels   = local.nvidia_dcgm_exporter_service_monitor_honor_labels
           relabelings   = local.nvidia_dcgm_exporter_service_monitor_relabelings
+          # The workload labels change with every pod on a GPU and multiply the
+          # DCGM series. No dashboard or alert uses them. They arrive as exported_*
+          # only while honorLabels is false.
+          metricRelabelings = [
+            {
+              action = "labeldrop"
+              regex  = "exported_(pod|container|namespace)"
+            }
+          ]
         }
       ]
     }
@@ -274,6 +283,13 @@ locals {
           }],
           local.amd_device_metrics_exporter_service_monitor_relabelings,
         )
+        # The workload labels change with every pod on a GPU and multiply the
+        # AMD series. No dashboard or alert uses them. They are pod, namespace and
+        # container with honorLabels true, and exported_* without it.
+        metricRelabelings = [{
+          action = "labeldrop"
+          regex  = "(exported_)?(pod|namespace|container)"
+        }]
       }]
     }
   })
@@ -309,6 +325,7 @@ locals {
       var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? var.worker_rdma_shape : "",
     ] : s if contains(local.gpu_health_check_shapes, s)
   ])
+  gpu_health_monitoring_shape_regex = replace(join("|", sort(tolist(local.gpu_health_monitoring_shapes))), ".", "[.]")
   gpu_health_monitoring_configs = {
     for s in local.gpu_health_monitoring_shapes : s => yamlencode({
       apiVersion = "oci.oraclecloud.com/v1beta1"
@@ -325,6 +342,40 @@ locals {
       }
     })
   }
+  # The add-on repairs a node only when exactly one NodeRepairConfig selects it, so one config per monitored shape.
+  gpu_node_repair_configs = {
+    for s in local.gpu_health_monitoring_shapes : s => yamlencode({
+      apiVersion = "oci.oraclecloud.com/v1beta1"
+      kind       = "NodeRepairConfig"
+      metadata = {
+        name   = format("gpu-node-repair-%s", replace(lower(s), ".", "-"))
+        labels = { "app.kubernetes.io/managed-by" = "oci-hpc-oke" }
+      }
+      spec = {
+        nodeSelector = {
+          matchLabels = { "node.kubernetes.io/instance-type" = s }
+        }
+        policy = {
+          dryRun                      = var.gpu_health_monitoring_node_repair_dry_run
+          evictionGracePeriodMinutes  = 60
+          forceActionAfterGracePeriod = false
+          maxUnhealthyNodeThreshold   = "10%"
+          maximumParallelNodeRepairs  = 1
+          pauseBeforeRepair           = false
+        }
+      }
+    })
+  }
+  # Remove NPD only after the user verifies live coverage and opts in. Each pool must be a managed node pool with a supported
+  # shape. NVIDIA nodes must run the GPU Operator, which sets the nvidia.com/gpu.present label that the add-on needs.
+  npd_removed = var.gpu_health_monitoring_remove_npd && local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
+    !var.worker_rdma_enabled || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
+    !var.worker_gpu_enabled || contains(local.gpu_health_check_shapes, var.worker_gpu_shape),
+    !var.worker_gmc_enabled,
+  ])
+  # NPD conditions per GPU vendor, for the node health recording rules.
+  npd_amd_conditions    = "CpuProfile|GpuBadPages|GpuBus|GpuCount|GpuEcc|GpuPcie|IpAddress|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaRttcc|RdmaWpaAuth|Rocminfo"
+  npd_nvidia_conditions = "CpuProfile|DcgmiHealth|GpuBus|GpuCount|GpuEcc|GpuFabricMgr|GpuImex|GpuPcie|GpuRowRemap|GpuXid|IpAddress|NvlinkSpeed|OcaVersion|RdmaGidIndex|RdmaLink|RdmaLinkFlapping|RdmaOcaPlugins|RdmaOvsMtu|RdmaRttcc|RdmaVfCounters|RdmaVfRoutes|RdmaWpaAuth"
 
   managed_addon_gate_enabled = anytrue([
     var.deploy_node_feature_discovery,
@@ -767,13 +818,23 @@ resource "kubectl_manifest" "gpu_health_monitoring_config" {
   depends_on = [oci_containerengine_addon.gpu_health_monitoring]
 }
 
+# Lets the add-on reboot, stop or terminate a faulty node. OKE creates the CRD with the enhanced cluster.
+resource "kubectl_manifest" "gpu_node_repair_config" {
+  for_each = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_local || local.deploy_from_orm]) ? local.gpu_node_repair_configs : {}
+
+  yaml_body = each.value
+  wait      = true
+
+  depends_on = [oci_containerengine_addon.gpu_health_monitoring]
+}
+
 # No destroy step, so a changed config is applied in place and not deleted first.
 resource "null_resource" "gpu_health_monitoring_config_via_operator" {
   count = alltrue([local.deploy_gpu_health_monitoring_addon, local.deploy_from_operator, length(local.gpu_health_monitoring_configs) > 0]) ? 1 : 0
 
   triggers = {
     cluster_id      = module.oke.cluster_id
-    config_md5      = md5(join("---\n", values(local.gpu_health_monitoring_configs)))
+    config_md5      = md5(join("---\n", concat(values(local.gpu_health_monitoring_configs), values(local.gpu_node_repair_configs))))
     bastion_host    = module.oke.bastion_public_ip
     bastion_user    = local.bastion_user
     ssh_private_key = tls_private_key.stack_key.private_key_openssh
@@ -794,7 +855,7 @@ resource "null_resource" "gpu_health_monitoring_config_via_operator" {
   }
 
   provisioner "file" {
-    content     = join("---\n", values(local.gpu_health_monitoring_configs))
+    content     = join("---\n", concat(values(local.gpu_health_monitoring_configs), values(local.gpu_node_repair_configs)))
     destination = self.triggers.config_target
   }
 
@@ -810,6 +871,7 @@ resource "null_resource" "gpu_health_monitoring_config_via_operator" {
       "kubectl apply -f ${self.triggers.config_target}",
       # Delete the configs of pool shapes that are gone.
       "kubectl get gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke -o name | grep -vxF ${join(" ", [for y in values(local.gpu_health_monitoring_configs) : "-e gpuhealthmonitoringconfig.oci.oraclecloud.com/${yamldecode(y).metadata.name}"])} | xargs -r kubectl delete --timeout=5m",
+      "kubectl get noderepairconfig -l app.kubernetes.io/managed-by=oci-hpc-oke -o name | grep -vxF ${join(" ", [for y in values(local.gpu_node_repair_configs) : "-e noderepairconfig.oci.oraclecloud.com/${yamldecode(y).metadata.name}"])} | xargs -r kubectl delete --timeout=5m",
       "rm -f ${self.triggers.config_target}",
     ]
   }
@@ -857,6 +919,7 @@ resource "null_resource" "gpu_health_monitoring_config_cleanup_via_operator" {
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "export PATH=$PATH:/usr/local/bin:/home/${self.triggers.operator_user}/bin",
+      "kubectl delete noderepairconfig -l app.kubernetes.io/managed-by=oci-hpc-oke --ignore-not-found --timeout=5m",
       "kubectl delete gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke --ignore-not-found --timeout=5m",
     ]
     # The CRD is gone when the add-on was removed outside Terraform. Do not block the destroy.

@@ -11,7 +11,7 @@ g.dashboard.new('Kubernetes / Kubelet')
 + g.dashboard.withVariables([
   variable.datasource('datasource', 'prometheus', { current: { text: 'default', value: 'default' }, label: 'Data source', options: [], refresh: 1, regex: '' }),
   variable.query('cluster', { type: 'prometheus', uid: '${datasource}' }, 'label_values(up{job="kubelet", metrics_path="/metrics"}, cluster)', { allValue: '.*', current: { text: '', value: '' }, hide: 2, label: 'cluster', options: [], refresh: 2, sort: 1 }),
-  variable.query('instance', { type: 'prometheus', uid: '${datasource}' }, 'label_values(up{job="kubelet", metrics_path="/metrics",cluster="$cluster"}, instance)', { current: { text: 'All', value: '$__all' }, includeAll: true, label: 'instance', options: [], refresh: 2 }),
+  variable.query('instance', { type: 'prometheus', uid: '${datasource}' }, 'label_values(up{job="kubelet", metrics_path="/metrics",cluster="$cluster"}, instance)', { current: { text: 'All', value: '$__all' }, allValue: '.*', includeAll: true, label: 'instance', options: [], refresh: 2 }),
 ])
 + { annotations: { list: [{ builtIn: 1, datasource: { type: 'grafana', uid: '-- Grafana --' }, enable: true, hide: true, iconColor: 'rgba(0, 211, 255, 1)', name: 'Annotations & Alerts', type: 'dashboard' }] }, links: [{ asDropdown: true, includeVars: true, keepTime: true, tags: ['kubernetes-mixin'], targetBlank: false, title: 'Kubernetes', type: 'dashboards' }], tags: ['kubernetes-mixin'] }
 + g.dashboard.withPanels([

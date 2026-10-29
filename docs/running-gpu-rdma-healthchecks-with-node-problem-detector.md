@@ -1,7 +1,7 @@
 # Running GPU and RDMA Health Checks with Node Problem Detector
 
 > [!NOTE]
-> If you deployed the monitoring stack using Terraform, Node Problem Detector is already installed and configured. Do not install a second copy manually.
+> If you deployed the monitoring stack using Terraform, Node Problem Detector is already installed and configured. Do not install a second copy manually. Terraform removes Node Problem Detector only after full add-on coverage is verified and `gpu_health_monitoring_remove_npd=true` is set.
 
 Node Problem Detector (NPD) monitors node health and reports problems as Kubernetes node conditions and events. This guide explains the OKE-specific GPU and RDMA checks, their three-state result contract, and how to deploy the vendor-specific NPD releases manually.
 
@@ -74,6 +74,64 @@ The exact monitor definitions are in:
 
 - `terraform/files/node-problem-detector/values-amd.yaml`
 - `terraform/files/node-problem-detector/values-nvidia.yaml`
+
+## Running with the GPU Health Monitoring Add-on
+
+The OKE GPU Health Monitoring add-on is the main GPU health source when `deploy_gpu_health_monitoring` is `true` (the default). For the add-on, see [GPU Health Monitoring with the OKE Add-on](./gpu-health-monitoring-with-the-oke-add-on.md).
+
+After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. The add-on checks a managed node pool with a supported shape. NVIDIA pools also need the NVIDIA GPU Operator. Otherwise NPD runs all of its checks. For the shape list, see [Supported Shapes](./gpu-health-monitoring-with-the-oke-add-on.md#supported-shapes).
+
+Without NPD, two sources report GPU and RDMA faults:
+
+- The DR-HPC passive checks of the Oracle Cloud Agent (OCA) Compute RDMA GPU Monitoring plugin. They run every 5 minutes. The add-on reports a result with action `REBOOT` as a fault. With a `NodeRepairConfig`, node auto repair then reboots the node.
+- The OCA hardware events of the OCI Fault Management Service (FMS). The add-on shows an active FMS fault as an `hpcFault` signal in the `NodeHealthReport`. These signals do not start a reboot. When a Compute maintenance event matches the fault, node auto repair can stop or terminate the node. The `GPU Health Signal` alert reports them.
+
+| NPD condition | Replacement |
+|---|---|
+| `GpuCount`, `Rocminfo` | `gpu_count` |
+| `GpuBus` | `gpu_count`, `gpu_xid` |
+| `GpuEcc` | `dram`, `sram`, `retired_pages` |
+| `GpuRowRemap` | `remap` |
+| `GpuXid` | `gpu_xid` |
+| `GpuFabricMgr` | `fabricmanager`, `fabric` |
+| `NvlinkSpeed` | `nvlink` |
+| `GpuPcie` | `walk_pcie`, `pcie` |
+| `RdmaLink` | `link`, `rdma_count` |
+| `RdmaWpaAuth` | `auth` |
+| `DcgmiHealth` | `dram`, `sram`, `nvlink_err` |
+| `GpuBadPages` | `bad_page` |
+| `RdmaLinkFlapping` | Partly. The FMS fault `FMSRDMA-0002-04` reports link flaps as an `hpcFault` signal. The DR-HPC check `rdma_link_flap` counts RDMA authentication failures, not link flaps. |
+| `RdmaGidIndex` | Partly. `gid_index` accepts GID indexes 0 to 7. NPD checks that GID index 3 is RoCE v2 and matches the rail address. |
+| `RdmaOcaPlugins` | Partly. `auth`, `link` and `gid_index` fail when the RDMA plugins do not work. |
+| `OcaVersion` | Partly. An OCA that cannot run the health checks makes the add-on report `GpuHealthMonitoringUnavailable`. |
+
+These NPD checks have no replacement:
+
+| NPD check | Vendor | Notes |
+|---|---|---|
+| `RdmaRttcc` | AMD and NVIDIA | DR-HPC has `rttcc_status`, but it does not run on B300, and its action is `REBOOT`. |
+| `IpAddress` | AMD and NVIDIA | FMS checks only the global IPv6 address of RDMA VFs, and only as a preview fault. |
+| `CpuProfile` | AMD and NVIDIA | No check. |
+| `RdmaVfRoutes`, `RdmaVfCounters`, `RdmaOvsMtu` | NVIDIA B300 and GB300 | No check. These checks apply only to multi-plane nodes. |
+| `GpuImex` | NVIDIA GB300 | No check. |
+| `NodeHasPcieErrors` | AMD and NVIDIA | The FMS PCIe AER faults are preview faults. DR-HPC `pcie_error` does not run on B300. |
+| Kernel monitor (`KernelDeadlock`, `XfsShutdown`, `CperHardwareErrorFatal`, OOM kill, hung task, kernel oops, ext4 and I/O error events) | AMD and NVIDIA | No check. |
+| Read-only file system monitor (`ReadonlyFilesystem`) | AMD and NVIDIA | No check. |
+
+After verifying full add-on coverage and setting `gpu_health_monitoring_remove_npd=true`, Terraform does not deploy the NPD alerts and the NPD panels of the GPU Health Status dashboard. The `node_health_status` rule uses only the add-on conditions and the active `hpcFault` signals. The Command Center node issues history shows only the add-on condition.
+
+NPD does not clear its node conditions when it is removed. The last NPD values stay on the nodes, and `kubectl describe node` still shows them. To remove them after NPD is gone, run:
+
+```bash
+NPD_CONDITIONS="CpuProfile DcgmiHealth GpuBadPages GpuBus GpuCount GpuEcc GpuFabricMgr GpuImex GpuPcie GpuRowRemap GpuXid IpAddress NodeHasPcieErrors NvlinkSpeed OcaVersion RdmaGidIndex RdmaLink RdmaLinkFlapping RdmaOcaPlugins RdmaOvsMtu RdmaRttcc RdmaVfCounters RdmaVfRoutes RdmaWpaAuth Rocminfo"
+PATCH=$(for c in ${NPD_CONDITIONS}; do printf '{"type":"%s","$patch":"delete"},' "${c}"; done)
+for node in $(kubectl get nodes -o name); do
+  kubectl patch "${node}" --subresource=status --type=strategic \
+    -p "{\"status\":{\"conditions\":[${PATCH%,}]}}"
+done
+```
+
+Run it only after NPD is removed. A running NPD adds its conditions again.
 
 ## Result Contract
 
@@ -151,6 +209,8 @@ kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f 
 ```
 
 Install the release that matches the cluster's GPU vendor. Install both releases for a mixed-vendor cluster.
+
+Skip NPD installation only after verifying complete add-on coverage and opting out of NPD.
 
 ### AMD
 
@@ -315,4 +375,4 @@ helm uninstall gpu-rdma-node-problem-detector-amd -n monitoring
 helm uninstall gpu-rdma-node-problem-detector-nvidia -n monitoring
 ```
 
-Node conditions written by NPD can remain after uninstalling the release. They are removed when another writer updates the node status or when the node is replaced. Do not assume that Kubernetes automatically removes custom conditions when NPD is deleted.
+Node conditions written by NPD remain after you uninstall the release. Kubernetes does not remove custom conditions when NPD is deleted. They go away only when the node is replaced, or when you delete them with the command in [Running with the GPU Health Monitoring Add-on](#running-with-the-gpu-health-monitoring-add-on).

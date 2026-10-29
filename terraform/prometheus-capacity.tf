@@ -26,6 +26,19 @@ locals {
     local.system_node_overhead_mib +
     local.system_node_pods_memory_mib
   )
+
+  # Smallest usable memory per oke-system node that fits, with the same model. Used in the error message.
+  system_node_min_memory_gib = try(min([
+    for m in range(1, 1025) : m
+    if m * 1024 >= local.prometheus_memory_request_mib + local.system_node_pods_memory_mib + 100 + 100 + 512 + 1024 + ceil(1024 * (
+      m <= 4 ? 0.25 * m :
+      m <= 8 ? 1 + 0.20 * (m - 4) :
+      m <= 16 ? 1.8 + 0.10 * (m - 8) :
+      m <= 128 ? 2.6 + 0.06 * (m - 16) :
+      9.32 + 0.02 * (m - 128)
+    ))
+  ]...), 1025)
+  system_node_memory_too_small = local.system_node_memory_gib * 1024 < local.prometheus_required_node_memory_mib
 }
 
 resource "terraform_data" "validate_prometheus_memory_request" {
@@ -38,17 +51,22 @@ resource "terraform_data" "validate_prometheus_memory_request" {
 
   lifecycle {
     precondition {
-      condition = (
-        var.worker_ops_pool_size > 0 &&
-        local.system_node_memory_gib * 1024 >= local.prometheus_required_node_memory_mib
-      )
-      error_message = format(
-        "Prometheus cannot fit in the configured system pool: its request is %d MiB and estimated per-node overhead is %d MiB, including other system pods. Configure at least one system node and increase the system node RAM/OCPUs (effective memory is currently %g GiB, capped at 64 GiB per OCPU). The current estimate requires %.2f GiB per node; reservations also grow with node memory.",
-        local.prometheus_memory_request_mib,
-        local.system_node_overhead_mib + local.system_node_pods_memory_mib,
-        local.system_node_memory_gib,
-        local.prometheus_required_node_memory_mib / 1024,
-      )
+      condition = var.worker_ops_pool_size > 0 && !local.system_node_memory_too_small
+      error_message = join(" ", compact([
+        var.worker_ops_pool_size > 0 ? "" : "Prometheus runs on the oke-system pool, but the pool has no nodes. Set Number of system worker nodes (worker_ops_pool_size) in Worker Pool: System to at least 1.",
+        !local.system_node_memory_too_small ? "" : format(
+          "The oke-system nodes do not have enough memory for Prometheus. With %d worker nodes (%d GPU nodes), Prometheus requests %d MiB. Each oke-system node has %g GB of usable memory. Set Memory (GB) in Worker Pool: System (worker_ops_memory) to at least %d to fit Prometheus, reserved memory and other system pods.",
+          local.total_worker_nodes,
+          local.total_gpu_worker_nodes,
+          local.prometheus_memory_request_mib,
+          local.system_node_memory_gib,
+          local.system_node_min_memory_gib,
+        ),
+        !local.system_node_memory_too_small || var.worker_ops_ocpus * 64 >= local.system_node_min_memory_gib ? "" : format(
+          "Also set OCPUs (worker_ops_ocpus) to at least %d, because each OCPU supports up to 64 GB.",
+          ceil(local.system_node_min_memory_gib / 64),
+        ),
+      ]))
     }
   }
 }

@@ -825,7 +825,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "rate(node_network_receive_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
+          "expr": "rate(node_network_receive_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*|oci.*|veth.*\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -922,7 +922,7 @@
             "type": "prometheus",
             "uid": "$PROMETHEUS_DS"
           },
-          "expr": "rate(node_network_transmit_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*\"}[5m])",
+          "expr": "rate(node_network_transmit_bytes_total{hostname=~\"$hostname\",oci_name=~\"$oci_name\",instance_shape=~\"$instance_shape\",device=~\"$device\",device!~\"lo|docker.*|rdma.*|oci.*|veth.*\"}[5m])",
           "legendFormat": "{{ device }}",
           "refId": "A"
         }
@@ -975,17 +975,12 @@
         "type": "query"
       },
       {
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
           "uid": "${PROMETHEUS_DS}"
         },
-        "includeAll": true,
+        "includeAll": false,
         "label": "Node",
         "multi": true,
         "name": "hostname",
@@ -1037,24 +1032,6 @@
       {
         "current": {
           "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${PROMETHEUS_DS}"
-        },
-        "includeAll": true,
-        "label": "Interface",
-        "multi": true,
-        "name": "interface",
-        "options": [],
-        "query": "label_values(rdma_np_ecn_marked_roce_packets, interface)",
-        "refresh": 1,
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1068,7 +1045,7 @@
         "multi": true,
         "name": "device",
         "options": [],
-        "query": "label_values(node_network_receive_bytes_total, device)",
+        "query": "label_values(node_network_receive_bytes_total{hostname=~\"$hostname\",device!~\"lo|docker.*|rdma.*|oci.*|veth.*\"}, device)",
         "refresh": 1,
         "type": "query"
       },
