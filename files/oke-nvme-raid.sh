@@ -56,6 +56,7 @@ if [[ $level == 6 ]]; then eff_count=$((count-2)); fi
 stripe=$((eff_count*stride)) # number of data disks * stride
 
 # A new RAID 10 array skips its mirror sync. The sync runs for hours and blocks soft reboots.
+# A later md check can count mismatches in blocks that were never written. This does not affect data.
 assume_clean=""
 if [[ $level == 10 ]]; then assume_clean="--assume-clean"; fi
 
@@ -70,8 +71,10 @@ else
 fi
 
 # OCI soft reboots press the ACPI power key, and udisksd blocks it during an md sync.
-# md saves the sync progress on a clean stop, so the power key can ignore the lock.
-if [[ $level != 0 ]]; then
+# md saves the sync progress on a clean stop. The power key then ignores all shutdown block locks, not only this one.
+# Use the level of the array in use, because a reused array can have a different level than requested.
+md_level=$(mdadm --detail "$md_device" | awk '/Raid Level/ {print $4}')
+if [[ $md_level != raid0 ]]; then
   mkdir -p /etc/systemd/logind.conf.d
   printf '[Login]\nPowerKeyIgnoreInhibited=yes\n' > /etc/systemd/logind.conf.d/90-oke-power-key.conf
   systemctl kill -s HUP systemd-logind || echo "Could not reload systemd-logind" >&2
