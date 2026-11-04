@@ -405,7 +405,7 @@ variable "install_nvidia_dra_driver" {
 }
 
 variable "nvidia_dra_driver_chart_version" {
-  default     = "0.4.0"
+  default     = "0.5.1"
   type        = string
   description = "NVIDIA DRA driver Helm chart version."
 }
