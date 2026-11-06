@@ -171,6 +171,7 @@ module "kube_prometheus_stack" {
     setup_alerting                = var.setup_alerting
     prometheus_memory_request     = local.prometheus_memory_request
     gpu_health_monitoring         = local.deploy_gpu_health_monitoring_addon
+    install_kueue                 = var.install_kueue
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(

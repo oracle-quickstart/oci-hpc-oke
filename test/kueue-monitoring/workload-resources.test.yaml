@@ -1,0 +1,68 @@
+# Run against rules extracted from the rendered kube-prometheus values.
+rule_files:
+  - rules.json
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'oke_kueue_workload_owner_info{namespace="training",workload="mpi-nccl-uid",local_queue="gpu",cluster_queue="gpu",owner_kind="MPIJob",owner_name="nccl",owner_controller="true"}'
+        values: '1+0x5'
+      - series: 'oke_kueue_workload_owner_info{namespace="training",workload="job-solo-uid",local_queue="gpu",cluster_queue="gpu",owner_kind="Job",owner_name="solo",owner_controller="true"}'
+        values: '1+0x5'
+      - series: 'oke_kueue_workload_owner_info{namespace="training",workload="queued-uid",local_queue="gpu",owner_kind="Job",owner_name="queued",owner_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="worker-0",node="host-a",instance="ksm-1"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="worker-0",node="host-a",instance="ksm-2"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="worker-1",node="host-b"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="launcher",node="host-c"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="solo-0",node="host-d"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="other",pod="worker-foreign",node="host-foreign"}'
+        values: '1+0x5'
+      - series: 'kube_pod_info{namespace="training",pod="queued-0",node=""}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="training",pod="worker-0",owner_kind="MPIJob",owner_name="nccl",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="training",pod="worker-1",owner_kind="MPIJob",owner_name="nccl",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="training",pod="launcher",owner_kind="Job",owner_name="nccl-launcher",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_job_owner{namespace="training",job_name="nccl-launcher",owner_kind="MPIJob",owner_name="nccl",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="training",pod="solo-0",owner_kind="Job",owner_name="solo",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="other",pod="worker-foreign",owner_kind="MPIJob",owner_name="nccl",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_owner{namespace="training",pod="queued-0",owner_kind="Job",owner_name="queued",owner_is_controller="true"}'
+        values: '1+0x5'
+      - series: 'kube_pod_container_resource_requests{namespace="training",pod="worker-0",container="worker",resource="nvidia_com_gpu"}'
+        values: '8+0x5'
+      - series: 'kube_pod_container_resource_requests{namespace="training",pod="worker-1",container="worker",resource="nvidia_com_gpu"}'
+        values: '8+0x5'
+    promql_expr_test:
+      - expr: 'count by(namespace,workload) (max by(namespace,workload,hostname) (oke:kueue_workload_pod:info))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{namespace="training",workload="mpi-nccl-uid"}'
+            value: 3
+          - labels: '{namespace="training",workload="job-solo-uid"}'
+            value: 1
+      - expr: 'count(oke:kueue_workload_pod:info{namespace="other"}) or vector(0)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: 'count(oke:kueue_workload_pod:info{workload="queued-uid"}) or vector(0)'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: 'sum by(workload) (kube_pod_container_resource_requests{resource="nvidia_com_gpu"} * on(namespace,pod) group_left(workload) max by(namespace,pod,workload) (oke:kueue_workload_pod:info))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{workload="mpi-nccl-uid"}'
+            value: 16

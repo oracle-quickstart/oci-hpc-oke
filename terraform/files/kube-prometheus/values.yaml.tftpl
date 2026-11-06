@@ -10,6 +10,28 @@ defaultRules:
   create: false
 
 prometheus:
+%{ if install_kueue }
+  # Reuse the chart's existing HTTPS metrics Service. The Prometheus service
+  # account already has discovery and GET /metrics permissions cluster-wide.
+  additionalServiceMonitors:
+    - name: kueue
+      namespaceSelector:
+        matchNames: [kueue-system]
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: kueue
+          app.kubernetes.io/instance: kueue
+          app.kubernetes.io/component: metrics-service
+      endpoints:
+        - port: https
+          scheme: https
+          path: /metrics
+          interval: 30s
+          bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+          tlsConfig:
+            # Kueue's internal certificate management uses a self-signed cert.
+            insecureSkipVerify: true
+%{ endif }
   prometheusSpec:
     enableAdminAPI: false
     retention: 30d
@@ -135,19 +157,61 @@ kubelet:
 kube-state-metrics:
   serviceAccount:
     create: true
-%{ if gpu_health_monitoring }
-  # Export the GPU Health Monitoring add-on NodeHealthReports (faults and repairs) as metrics.
+%{ if gpu_health_monitoring || install_kueue }
   rbac:
     extraRules:
+%{ if install_kueue }
+      - apiGroups: ["kueue.x-k8s.io"]
+        resources: ["workloads"]
+        verbs: ["list", "watch"]
+%{ endif }
+%{ if gpu_health_monitoring }
       - apiGroups: ["oci.oraclecloud.com"]
         resources: ["nodehealthreports"]
         verbs: ["list", "watch"]
+%{ endif }
   customResourceState:
     enabled: true
     config:
       kind: CustomResourceStateMetrics
       spec:
         resources:
+%{ if install_kueue }
+          # These metadata series connect Kueue Workloads to Kubernetes pods.
+          - groupVersionKind:
+              group: kueue.x-k8s.io
+              version: v1beta2
+              kind: Workload
+            metricNamePrefix: oke_kueue_workload
+            labelsFromPath:
+              namespace: [metadata, namespace]
+              workload: [metadata, name]
+              local_queue: [spec, queueName]
+              cluster_queue: [status, admission, clusterQueue]
+            metrics:
+              - name: owner_info
+                help: Controller owner of a Kueue Workload.
+                each:
+                  type: Info
+                  info:
+                    path: [metadata, ownerReferences]
+                    labelsFromPath:
+                      owner_name: [name]
+                      owner_kind: [kind]
+                      owner_controller: [controller]
+              - name: condition
+                help: Kueue Workload admission and execution conditions.
+                each:
+                  type: StateSet
+                  stateSet:
+                    path: [status, conditions]
+                    valueFrom: [status]
+                    labelName: status
+                    list: ["True", "False", "Unknown"]
+                    labelsFromPath:
+                      condition: [type]
+%{ endif }
+%{ if gpu_health_monitoring }
           - groupVersionKind:
               group: oci.oraclecloud.com
               version: v1beta1
@@ -285,8 +349,47 @@ kube-state-metrics:
                       maintenance_state: [maintenanceLifecycleState]
                       maintenance_event_id: [maintenanceEventId]
 %{ endif }
+%{ endif }
 
 additionalPrometheusRulesMap:
+%{ if install_kueue }
+  kueue-workload-resources:
+    groups:
+      - name: kueue-workload-resources
+        rules:
+          # Resolve direct controller owners (Job, MPIJob, PyTorchJob, etc.).
+          # max removes scrape-replica labels before the ownership joins.
+          - record: oke:kueue_workload_pod:info
+            expr: |
+              label_replace(
+                (
+                  max by(namespace, pod, node) (kube_pod_info{node!=""})
+                  * on(namespace, pod) group_left(owner_name, owner_kind)
+                    max by(namespace, pod, owner_name, owner_kind) (kube_pod_owner{owner_is_controller="true"})
+                )
+                * on(namespace, owner_name, owner_kind) group_left(workload, local_queue, cluster_queue)
+                  max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
+                    (oke_kueue_workload_owner_info{owner_controller="true"}),
+                "hostname", "$1", "node", "(.+)"
+              )
+              or
+              label_replace(
+                (
+                  max by(namespace, pod, node) (kube_pod_info{node!=""})
+                  * on(namespace, pod) group_left(job_name)
+                    max by(namespace, pod, job_name)
+                      (label_replace(kube_pod_owner{owner_kind="Job",owner_is_controller="true"}, "job_name", "$1", "owner_name", "(.+)"))
+                )
+                * on(namespace, job_name) group_left(workload, local_queue, cluster_queue, owner_name, owner_kind)
+                (
+                  max by(namespace, job_name, owner_name, owner_kind) (kube_job_owner{owner_is_controller="true"})
+                  * on(namespace, owner_name, owner_kind) group_left(workload, local_queue, cluster_queue)
+                    max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
+                      (oke_kueue_workload_owner_info{owner_controller="true"})
+                ),
+                "hostname", "$1", "node", "(.+)"
+              )
+%{ endif }
 %{ if gpu_health_monitoring }
   gpu-repair-history:
     groups:
