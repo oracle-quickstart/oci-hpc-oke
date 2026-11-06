@@ -1451,7 +1451,7 @@ variable "slinky_cpu_worker_image_tag" {
 variable "install_oci_hpc_oke_utils" {
   default     = true
   type        = bool
-  description = "Install the OCI HPC OKE Utils Helm chart (includes the RDMA/GMC node labeler and image prepuller)."
+  description = "Install the OCI HPC OKE Utils Helm chart (includes the RDMA/GMC node labeler, Slurm topology, and hostexec)."
 }
 
 # RDMA topology labeler
@@ -1465,7 +1465,7 @@ variable "install_rdma_labeler" {
 variable "install_image_prepuller" {
   default     = false
   type        = bool
-  description = "Deploy the image prepuller DaemonSet to pre-pull container images on GPU worker nodes."
+  description = "Deprecated alias for install_kube_fledged. Enables kube-fledged instead of the former image prepuller DaemonSets."
 }
 
 # hostexec

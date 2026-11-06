@@ -1,0 +1,19 @@
+# Upstream kube-fledged v0.11.0 controller settings shared by both deployment paths.
+controllerReplicaCount: 1
+# The upstream template reads replicaCount for the webhook server.
+replicaCount: 1
+image:
+  pullPolicy: IfNotPresent
+args:
+  controllerImagePullPolicy: IfNotPresent
+  # Large GPU images can take longer than upstream's five-minute default.
+  controllerImagePullDeadlineDuration: 30m
+  controllerImageCacheRefreshFrequency: 15m
+  controllerJobPriorityClassName: system-node-critical
+  controllerJobRetentionPolicy: delete
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

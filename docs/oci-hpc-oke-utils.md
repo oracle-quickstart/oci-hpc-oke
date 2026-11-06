@@ -1,15 +1,14 @@
 # oci-hpc-oke-utils
 
-`oci-hpc-oke-utils` is a Helm chart that deploys node labeling, Slurm topology, image prepulling, and host execution components. It has four components:
+`oci-hpc-oke-utils` is a Helm chart that deploys node labeling, Slurm topology, and host execution components:
 
 | Component | Default | Description |
 |-----------|---------|-------------|
 | [Labeler](#labeler) | Enabled | Applies RDMA topology, compute host, firmware, maintenance, and custom labels to nodes |
 | [Topology](#topology) | Enabled with Slinky | Annotates nodes with their Slurm topology unit and generates `topology.yaml` for Slurm scheduling |
-| [Prepuller](#prepuller) | Disabled | Pre-pulls container images on GPU nodes |
 | [Hostexec](#hostexec) | Enabled in the chart, disabled by default in the Terraform stack | Runs shell scripts on the host via `nsenter` |
 
-The labeler and prepuller target GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes.
+The labeler targets GPU nodes by default (nodes with `nvidia.com/gpu` or `amd.com/gpu` labels). The topology annotator targets the Slurm worker pools (`oke-gpu`, `oke-rdma`, `oke-gmc`, `oke-cpu`). Hostexec has no node selector and runs on all nodes.
 
 ## Manual Installation
 
@@ -25,7 +24,6 @@ To customize values:
 ```bash
 helm install oci-hpc-oke-utils ./terraform/files/oci-hpc-oke-utils \
   --namespace kube-system \
-  --set prepuller.enabled=true \
   --set hostexec.enabled=true
 ```
 
@@ -426,63 +424,11 @@ Nodes in different pools that share a subnet have unique host bits, so names nev
 
 ---
 
-## Prepuller
+## Image caching migration
 
-The prepuller is a DaemonSet that pre-pulls container images on GPU nodes so they are cached locally before workloads need them. This avoids long image pull times when large GPU container images (often 10+ GB) are first scheduled.
+The in-house prepuller DaemonSets have been replaced by [kube-fledged](./image-caching.md), deployed separately from this utilities chart. Enable `install_kube_fledged` in Terraform. The old `install_image_prepuller` Terraform flag remains a deprecated alias.
 
-### Configuration
-
-| Value | Default | Description |
-|-------|---------|-------------|
-| `prepuller.enabled` | `false` | Enable/disable the prepuller |
-| `prepuller.pauseImage` | `registry.k8s.io/pause:3.10` | Pause container that keeps the pod alive after pulls complete |
-| `prepuller.groups` | See below | Image groups with per-group node selectors |
-
-#### Image Groups
-
-Images are organized into groups, each with its own node selector. This allows pulling NVIDIA images only on NVIDIA nodes and AMD images only on AMD nodes.
-
-Default groups:
-
-```yaml
-prepuller:
-  groups:
-    nvidia:
-      nodeSelector:
-        nvidia.com/gpu: "true"
-      images:
-        - iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
-    amd:
-      nodeSelector:
-        amd.com/gpu: "true"
-      images:
-        - iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1
-```
-
-Each group creates a separate DaemonSet. You can add custom groups for your own workload images:
-
-```yaml
-prepuller:
-  enabled: true
-  groups:
-    nvidia:
-      nodeSelector:
-        nvidia.com/gpu: "true"
-      images:
-        - my-registry/my-training-image:latest
-        - my-registry/my-inference-image:latest
-```
-
-### How It Works
-
-For each image group, the prepuller creates a DaemonSet with:
-
-1. **Init containers** -- one per image, each runs `echo Image cached` and exits. The image pull happens as part of container startup, caching the image on the node.
-2. **Pause container** -- a minimal container that keeps the pod alive after all init containers complete, ensuring the DaemonSet stays running.
-
-The init containers run with `readOnlyRootFilesystem: true` and drop all capabilities. The pod uses `system-node-critical` priority to ensure it is not evicted.
-
-If an image pull fails, the pod restarts (via `restartPolicy: Always`) and retries the pull.
+For manual Helm installations, move `prepuller.groups` to the separate `oci-hpc-imagecaches` chart's `groups` and registry secret references to its `imagePullSecrets`. Install kube-fledged first, then the image-cache chart, and remove `prepuller.enabled` from utilities values. The utilities chart rejects the removed flag so existing values cannot silently disable caching. See the [migration and validation instructions](./image-caching.md).
 
 ---
 
