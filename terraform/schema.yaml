@@ -145,6 +145,8 @@ variableGroups:
       - bastion_image_compartment
       - bastion_image_id
       - bastion_user
+      - bastion_boot_volume_backup
+      - bastion_boot_volume_backup_policy
       - create_operator
       - operator_shape_config
       - operator_shape_name
@@ -162,6 +164,8 @@ variableGroups:
       - operator_image_id
       - operator_allow_image_drift
       - operator_user
+      - operator_boot_volume_backup
+      - operator_boot_volume_backup_policy
       - create_oci_bastion_service
       - bastion_service_allowed_cidrs
       - bastion_service_max_session_ttl
@@ -173,6 +177,7 @@ variableGroups:
       - cluster_name
       - kubernetes_version
       - cni_type
+      - ip_families
       - services_cidr
       - control_plane_is_public
       - control_plane_allowed_cidrs
@@ -198,6 +203,8 @@ variableGroups:
       - amd_gpu_operator_addon_version
       - amd_gpu_operator_skip_nfd_dependency_check
       - amd_gpu_operator_configuration
+      - deploy_gpu_health_monitoring
+      - gpu_health_monitoring_addon_version
       - setup_credential_provider_for_ocir
       - install_oci_hpc_oke_utils
       - install_kube_fledged
@@ -283,6 +290,8 @@ variableGroups:
       - worker_rdma_use_cluster_network
       - worker_rdma_use_host_group
       - worker_rdma_host_group_id
+      - worker_rdma_use_existing_compute_cluster
+      - worker_rdma_compute_cluster_id
 
   - title: "Workers: GPU Memory Cluster"
     variables:
@@ -870,7 +879,7 @@ variables:
     type: array
     items:
       type: string
-      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9]|3[0-2])$"
     unique_items: true
     minItems: 0
     visible:
@@ -1025,6 +1034,23 @@ variables:
       and:
         - ${create_bastion}
         - ${bastion_shape_config}
+  bastion_boot_volume_backup:
+    title: Enable bastion boot volume backups
+    description: Back up the bastion boot volume with an Oracle-defined backup policy.
+    type: boolean
+    default: false
+    visible: ${create_bastion}
+  bastion_boot_volume_backup_policy:
+    title: Bastion boot volume backup policy
+    description: Bronze makes monthly backups, Silver adds weekly backups, and Gold adds daily backups. Backups are kept until their retention period ends.
+    type: enum
+    enum: [Bronze, Silver, Gold]
+    default: Bronze
+    required: true
+    visible:
+      and:
+        - ${create_bastion}
+        - ${bastion_boot_volume_backup}
 
   # Bastion Service
   create_oci_bastion_service:
@@ -1039,7 +1065,7 @@ variables:
     type: array
     items:
       type: string
-      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9]|3[0-2])$"
     unique_items: true
     minItems: 1
     default: ["0.0.0.0/0"]
@@ -1264,6 +1290,23 @@ variables:
       and:
         - ${create_operator}
         - ${operator_shape_config}
+  operator_boot_volume_backup:
+    title: Enable operator boot volume backups
+    description: Back up the operator boot volume with an Oracle-defined backup policy.
+    type: boolean
+    default: false
+    visible: ${create_operator}
+  operator_boot_volume_backup_policy:
+    title: Operator boot volume backup policy
+    description: Bronze makes monthly backups, Silver adds weekly backups, and Gold adds daily backups. Backups are kept until their retention period ends.
+    type: enum
+    enum: [Bronze, Silver, Gold]
+    default: Bronze
+    required: true
+    visible:
+      and:
+        - ${create_operator}
+        - ${operator_boot_volume_backup}
 
   # Storage
   create_fss:
@@ -1396,7 +1439,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "87.2.1"
+    default: "92.0.0"
     visible: false
   ingress_chart_version:
     title: Ingress Controller helm chart version
@@ -1512,7 +1555,7 @@ variables:
     type: array
     items:
       type: string
-      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9])|(?:3[0-2])$"
+      pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/(?:[0-2]?[0-9]|3[0-2])$"
     unique_items: true
     minItems: 0
   cni_type:
@@ -1524,6 +1567,15 @@ variables:
     - VCN-Native Pod Networking
     - Flannel
     default: VCN-Native Pod Networking
+  ip_families:
+    title: IP families
+    description: IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. Dual stack makes the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. With VCN-Native Pod Networking, an existing pods subnet needs two IPv6 prefixes. Changing this value replaces the cluster. A VCN that the stack created does not change from IPv4 to dual stack, so use a new stack for that change.
+    required: true
+    type: enum
+    enum:
+    - IPv4
+    - IPv4,IPv6
+    default: IPv4
   control_plane_is_public:
     title: Create the Kubernetes control plane endpoint in a public subnet and assign it a public IP address
     type: boolean
@@ -1608,6 +1660,21 @@ variables:
     type: map(string)
     description: Additional configuration key-value pairs for the AMD GPU Operator OKE add-on.
     visible: false
+  deploy_gpu_health_monitoring:
+    title: Install GPU Health Monitoring add-on
+    type: boolean
+    description: Install the GPU Health Monitoring OKE add-on for enabled GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes.
+    default: true
+  gpu_health_monitoring_addon_version:
+    title: GPU Health Monitoring add-on version
+    type: enum
+    description: Version of the GPU Health Monitoring OKE add-on.
+    default: "v1.1.0"
+    required: true
+    enum:
+      - "v1.1.0"
+    visible:
+      - deploy_gpu_health_monitoring
   deploy_nvidia_gpu_operator:
     title: Install NVIDIA GPU Operator add-on
     type: boolean
@@ -2209,6 +2276,28 @@ variables:
         - ${worker_rdma_advanced_options}
         - not: [worker_rdma_use_cluster_network]
         - ${worker_rdma_use_host_group}
+  worker_rdma_use_existing_compute_cluster:
+    title: Use existing compute cluster
+    description: Place the GPU with RDMA worker pool in an existing compute cluster instead of creating a new one. Changing this on an existing stack replaces all nodes in the pool.
+    type: boolean
+    default: false
+    required: false
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+  worker_rdma_compute_cluster_id:
+    title: Compute cluster OCID
+    description: OCID of the existing compute cluster for the GPU with RDMA worker pool. It must be in the same availability domain as the pool. With Create Policies, it must be in the deployment compartment or a child compartment. The user that runs the stack needs read access to the compute cluster. Changing this on an existing stack replaces all nodes in the pool.
+    type: ocid
+    required: true
+    visible:
+      and:
+        - ${worker_rdma_enabled}
+        - ${worker_rdma_advanced_options}
+        - not: [worker_rdma_use_cluster_network]
+        - ${worker_rdma_use_existing_compute_cluster}
   worker_rdma_ad:
     title: Availability domain
     type: oci:identity:availabilitydomain:name

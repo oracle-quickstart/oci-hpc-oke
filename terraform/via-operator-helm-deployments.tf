@@ -150,7 +150,7 @@ module "kube_prometheus_stack" {
       "--set grafana.ingress.tls[0].hosts[0]=grafana.$${INGRESS_IP}.${var.wildcard_dns_domain}",
       "--set grafana.ingress.tls[0].secretName=grafana-tls"
       ] :
-      [
+      concat([
         "--set grafana.service.type=LoadBalancer",
         "--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/load-balancer-type'=lb",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-internal'=true",
@@ -158,10 +158,9 @@ module "kube_prometheus_stack" {
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-min'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-shape-flex-max'=100",
         "--set-string grafana.service.annotations.'service\\.beta\\.kubernetes\\.io\\/oci-load-balancer-security-list-management-mode'=None",
-        local.create_nsgs_effective ? [
-          format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", local.lb_nsg_id_int)
-        ] : []
-    ]) : []
+        ], local.create_nsgs_effective ? [
+        format("--set-string grafana.service.annotations.'oci\\.oraclecloud\\.com\\/oci-network-security-groups'=%s", local.lb_nsg_id_int)
+    ] : [])) : []
   ])
 
   post_deployment_commands = []
@@ -170,6 +169,8 @@ module "kube_prometheus_stack" {
     install_grafana               = var.install_grafana
     preferred_kubernetes_services = var.preferred_kubernetes_services
     setup_alerting                = var.setup_alerting
+    prometheus_memory_request     = local.prometheus_memory_request
+    gpu_health_monitoring         = local.deploy_gpu_health_monitoring_addon
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(
@@ -191,7 +192,7 @@ module "kube_prometheus_stack" {
   # Kueue's mutating webhook intercepts Job creates cluster-wide; the chart's
   # admission hook Jobs fail with "no endpoints available for service
   # kueue-webhook-service" while Kueue is still starting.
-  depends_on = [module.ingress, module.kueue]
+  depends_on = [module.ingress, module.kueue, terraform_data.validate_prometheus_memory_request]
 }
 
 

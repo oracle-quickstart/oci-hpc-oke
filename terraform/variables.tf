@@ -67,7 +67,21 @@ variable "create_nsgs" {
   default     = true
   description = "Create network security groups (NSGs) for the cluster components. Only honored when create_vcn = false; a created VCN always gets its NSGs. When disabled, no NSGs (including the FSS and Lustre NSGs) are created and the bring-your-own subnets must already permit the required traffic."
 }
-variable "enable_ipv6" { default = false }
+variable "enable_ipv6" {
+  type        = bool
+  default     = false
+  description = "Deprecated. Use ip_families. When true and ip_families is IPv4, the cluster is IPv4/IPv6 dual stack."
+}
+variable "ip_families" {
+  type        = string
+  default     = "IPv4"
+  description = "IP families of the cluster. IPv4 is single stack IPv4. IPv4,IPv6 is dual stack. IPv6 is single stack IPv6, which is in limited availability and is not available in every region. Dual stack and IPv6 make the control plane, worker and pod subnets public. Existing subnets must be public and dual stack. With VCN-Native Pod Networking, an existing pods subnet needs two IPv6 prefixes. Changing this value replaces the cluster. A VCN that the stack created does not change from IPv4 to dual stack, so use a new stack for that change."
+
+  validation {
+    condition     = contains(["IPv4", "IPv4,IPv6", "IPv6"], var.ip_families)
+    error_message = "ip_families must be IPv4, IPv4,IPv6 or IPv6."
+  }
+}
 
 variable "vcn_compartment_ocid" {
   default = null
@@ -198,6 +212,21 @@ variable "bastion_user" {
     error_message = "bastion_user must be 'auto' or a valid Linux username."
   }
 }
+variable "bastion_boot_volume_backup" {
+  default     = false
+  description = "Assign an Oracle-defined backup policy to the bastion boot volume."
+  type        = bool
+}
+variable "bastion_boot_volume_backup_policy" {
+  default     = "bronze"
+  description = "Oracle-defined backup policy for the bastion boot volume: bronze, silver or gold."
+  type        = string
+
+  validation {
+    condition     = contains(["bronze", "silver", "gold"], lower(var.bastion_boot_volume_backup_policy))
+    error_message = "bastion_boot_volume_backup_policy must be bronze, silver or gold."
+  }
+}
 
 # Bastion Service
 variable "create_oci_bastion_service" {
@@ -289,6 +318,21 @@ variable "operator_user" {
   validation {
     condition     = lower(var.operator_user) == "auto" || can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.operator_user))
     error_message = "operator_user must be 'auto' or a valid Linux username."
+  }
+}
+variable "operator_boot_volume_backup" {
+  default     = false
+  description = "Assign an Oracle-defined backup policy to the operator boot volume."
+  type        = bool
+}
+variable "operator_boot_volume_backup_policy" {
+  default     = "bronze"
+  description = "Oracle-defined backup policy for the operator boot volume: bronze, silver or gold."
+  type        = string
+
+  validation {
+    condition     = contains(["bronze", "silver", "gold"], lower(var.operator_boot_volume_backup_policy))
+    error_message = "operator_boot_volume_backup_policy must be bronze, silver or gold."
   }
 }
 
@@ -389,7 +433,7 @@ variable "node_problem_detector_chart_version" {
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "87.2.1"
+  default = "92.0.0"
   type    = string
 }
 
@@ -631,6 +675,18 @@ variable "amd_gpu_operator_configuration" {
   }
 }
 
+variable "deploy_gpu_health_monitoring" {
+  type        = bool
+  default     = true
+  description = "Deploy the GpuHealthMonitoring OKE addon for enabled GPU worker pools."
+}
+
+variable "gpu_health_monitoring_addon_version" {
+  type        = string
+  default     = "v1.1.0"
+  description = "Version of the GpuHealthMonitoring OKE addon."
+}
+
 variable "deploy_nvidia_network_operator" {
   type        = bool
   default     = false
@@ -734,7 +790,7 @@ variable "worker_ops_kubernetes_version" {
   type        = string
 }
 variable "worker_ops_node_cycling_enabled" {
-  default     = false
+  default     = true
   description = "Enable node cycling for the system worker pool."
   type        = bool
 }
@@ -804,7 +860,7 @@ variable "worker_cpu_kubernetes_version" {
   type        = string
 }
 variable "worker_cpu_node_cycling_enabled" {
-  default     = false
+  default     = true
   description = "Enable node cycling for the CPU worker pool."
   type        = bool
 }
@@ -928,6 +984,16 @@ variable "worker_rdma_use_cluster_network" { default = false }
 variable "worker_rdma_host_group_id" {
   default     = ""
   description = "OCID of the existing host group for the GPU with RDMA worker pool."
+  type        = string
+}
+variable "worker_rdma_use_existing_compute_cluster" {
+  default     = false
+  description = "Place the GPU with RDMA worker pool in an existing compute cluster instead of creating a new one. Applies only when worker_rdma_use_cluster_network is false. Changing this on an existing stack replaces all nodes in the pool."
+  type        = bool
+}
+variable "worker_rdma_compute_cluster_id" {
+  default     = ""
+  description = "OCID of the existing compute cluster for the GPU with RDMA worker pool. It must be in the same availability domain as the pool. With create_policies, it must be in the deployment compartment or a child compartment. The user that runs Terraform needs read access to the compute cluster. Changing this on an existing stack replaces all nodes in the pool."
   type        = string
 }
 

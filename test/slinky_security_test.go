@@ -184,7 +184,9 @@ func TestSlinkyLoginHonorsPreferredKubernetesServices(t *testing.T) {
 	okeCluster := readRepositoryFile(t, "terraform", "oke-cluster.tf")
 
 	require.Contains(t, viaOperator, `login_load_balancer_internal = var.preferred_kubernetes_services == "internal"`)
-	require.Contains(t, viaOperator, `login_load_balancer_nsg_id   = var.preferred_kubernetes_services == "public" ? module.oke.pub_lb_nsg_id : module.oke.int_lb_nsg_id`)
+	require.Contains(t, viaOperator, `login_load_balancer_nsg_id   = local.lb_nsg_id_preferred`)
+	require.Contains(t, okeCluster, `lb_nsg_id_preferred = var.preferred_kubernetes_services == "public" ? local.lb_nsg_id_pub : local.lb_nsg_id_int`)
+	require.Contains(t, slurmValues, `%{ if login_load_balancer_nsg_id != "" ~}`)
 	require.Contains(t, slurmValues, `%{ if login_load_balancer_internal ~}`)
 	require.Contains(t, slurmValues, `oci-network-load-balancer.oraclecloud.com/internal: "true"`)
 	require.Contains(t, slurmValues, `%{ if !login_load_balancer_internal ~}`)

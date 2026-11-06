@@ -6,6 +6,19 @@ PREFIX="${2:-}"
 
 GRAFANA_URL=$(jq -r ".${PREFIX}grafana_url.value" "$STATE_FILE")
 GRAFANA_PASS=$(jq -r ".${PREFIX}grafana_admin_password.value" "$STATE_FILE")
+
+# Status 000 means no HTTP answer. Show the ingress, certificate and DNS state to tell why.
+dump_grafana_ingress() {
+  echo "Diagnostics: Grafana ingress, certificates and endpoint"
+  kubectl get ingress -A -o wide || true
+  kubectl get certificate,certificaterequest,order,challenge -A -o wide || true
+  kubectl describe challenge -A 2>&1 | tail -40 || true
+  kubectl get svc,pods -n projectcontour -o wide || true
+  kubectl logs -n cert-manager deploy/cert-manager --tail=60 || true
+  getent hosts "$(echo "${GRAFANA_URL}" | sed -E -e 's#^https?://##' -e 's#/.*##')" || echo "DNS lookup failed"
+  curl -sv --insecure --max-time 10 -o /dev/null "${GRAFANA_URL}/api/health" 2>&1 | tail -25 || true
+}
+
 for i in $(seq 1 60); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/org" --insecure || true)
   if [ "$STATUS" = "200" ]; then
@@ -15,7 +28,7 @@ for i in $(seq 1 60); do
   echo "  attempt $i: status=$STATUS, retrying in 10s..."
   sleep 10
 done
-[ "$STATUS" = "200" ] || { echo "FAIL: Grafana API did not respond 200 after 60 attempts"; exit 1; }
+[ "$STATUS" = "200" ] || { dump_grafana_ingress; echo "FAIL: Grafana API did not respond 200 after 60 attempts"; exit 1; }
 
 echo "Health check: Grafana dashboards"
 DASH_COUNT=$(curl -s --insecure -u "admin:${GRAFANA_PASS}" "${GRAFANA_URL}/api/search?type=dash-db" | jq 'length')

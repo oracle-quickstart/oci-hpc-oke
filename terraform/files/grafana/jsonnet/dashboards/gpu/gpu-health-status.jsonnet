@@ -162,6 +162,14 @@ g.dashboard.new('GPU Health Status')
     { w: 3, h: 3, x: 12, y: 6 },
     id=20,
   ),
+  // The GPU Health Monitoring add-on condition. grafana.tf keeps this panel only when the add-on is deployed.
+  statHealthPanel(
+    'GPU Health Add-on',
+    '0 * (\n  label_replace(\n        max by(node) (\n          max_over_time(\n            kube_node_status_condition{\n              condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n              status="true",\n              node=~"$hostname"\n            }[$__range]\n          )\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )\n    or\n    2 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n            status="unknown",\n            node=~"$hostname"\n          }\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )\n    or\n    1 * (\n  label_replace(\n        max by(node) (\n          kube_node_status_condition{\n            condition="oci.oraclecloud.com/GpuHealthMonitoringFaultDetected",\n            status="false",\n            node=~"$hostname"\n          }\n        ) == 1,\n        "hostname", "$1", "node", "(.*)"\n      )\n    )',
+    '{{hostname}}',
+    { w: 3, h: 3, x: 15, y: 6 },
+    id=25,
+  ),
   stateTimelinePanel(
     'PCIE Health history',
     '0 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=~"GpuPcie|NodeHasPcieErrors", status="true", node=~"$hostname"} == 1\n  ),\n  "hostname", "$1", "node", "(.*)"\n)\nor\n2 * label_replace(\n  max by(node) (\n    kube_node_status_condition{condition=~"GpuPcie|NodeHasPcieErrors", status="unknown", node=~"$hostname"} == 1\n  ),\n  "hostname", "$1", "node", "(.*)"\n)\nor\n1 * label_replace(\n  min by(node) (\n    kube_node_status_condition{condition=~"GpuPcie|NodeHasPcieErrors", status="false", node=~"$hostname"}\n  ) == 1,\n  "hostname", "$1", "node", "(.*)"\n)',

@@ -146,6 +146,8 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
       "export OCI_CLI_AUTH=instance_principal",
       "export PYTHONWARNINGS=\"ignore:the 'strict' parameter::urllib3.poolmanager\"",
       "kubectl delete configmap dashboard-gpu dashboard-job dashboard-node dashboard-overview --namespace ${var.monitoring_namespace} --ignore-not-found",
+      !local.deploy_gpu_health_monitoring_addon ? "kubectl delete configmap dashboard-gpu-node-repairs --namespace ${var.monitoring_namespace} --ignore-not-found" : "",
+      length(local.grafana_alert_files_excluded) > 0 ? "kubectl delete configmap ${join(" ", [for f in local.grafana_alert_files_excluded : "alert-${trimsuffix(f, ".yaml")}"])} --namespace ${var.monitoring_namespace} --ignore-not-found" : "",
       "cd /home/${self.triggers.operator_user}/grafana/",
       "kubectl apply -k .",
     ]))

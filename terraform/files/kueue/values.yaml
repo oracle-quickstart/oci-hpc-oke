@@ -1,5 +1,12 @@
-# The Kueue chart v0.20.0 default manager config, plus the DRA deviceClassMappings.
+# The Kueue chart v0.20.0 default manager config, plus the DRA deviceClassMappings
+# and the controller's priority class.
 # Compare it with the chart default when you change kueue_chart_version.
+controllerManager:
+  manager:
+    # Kueue admits every queued workload, so losing it stalls the cluster. Without
+    # a priority class it runs at priority 0, and the kubelet can pick it for
+    # eviction when another pod on the same node (e.g. Prometheus) uses up memory.
+    priorityClassName: system-cluster-critical
 managerConfig:
   controllerManagerConfigYaml: |-
     apiVersion: config.kueue.x-k8s.io/v1beta2

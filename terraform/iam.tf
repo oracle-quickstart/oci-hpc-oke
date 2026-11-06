@@ -94,6 +94,9 @@ locals {
     var.worker_gmc_enabled ? [
       "Allow dynamic-group %v to manage compute-clusters in compartment id %v",
       "Allow dynamic-group %v to manage compute-gpu-memory-clusters in compartment id %v"
+    ] : [],
+    local.deploy_gpu_health_monitoring_addon ? [
+      "Allow dynamic-group %v to read instance-agent-plugins in compartment id %v"
     ] : []
   ))
 

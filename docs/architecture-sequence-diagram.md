@@ -23,7 +23,7 @@ The [worker pool definitions](../terraform/oke-workers.tf) pass these modes to `
 | `oke-system` | Managed `node-pool`; creation enabled, size from `worker_ops_pool_size` |
 | `oke-cpu` | Managed `node-pool` when `worker_cpu_enabled` |
 | `oke-gpu` | Managed `node-pool` when `worker_gpu_enabled` |
-| `oke-rdma` | When enabled and the image is valid: `cluster-network` if `worker_rdma_use_cluster_network`, otherwise `node-pool` with `use_compute_cluster = true` |
+| `oke-rdma` | When enabled and the image is valid: `cluster-network` if `worker_rdma_use_cluster_network`, otherwise `node-pool` with `use_compute_cluster = true`. With `worker_rdma_use_existing_compute_cluster`, the pool uses `worker_rdma_compute_cluster_id` instead of a new compute cluster |
 | `oke-gmc` | Self-managed `gpu-memory-cluster` when `worker_gmc_enabled`; fabric IDs and scale configuration are passed to the module |
 
 ## Sequence Diagrams

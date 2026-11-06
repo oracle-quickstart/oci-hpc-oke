@@ -1,0 +1,61 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: GPU Health Monitoring
+      folder: Alerts
+      interval: 1m
+      rules:
+        - uid: oke_gpu_health_unavailable
+          title: GPU Health Monitoring Unavailable
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: label_replace(max by(node) (kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringUnavailable",status="true"} or kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status=~"false|unknown"}), "hostname", "$1", "node", "(.*)")
+                instant: true
+                intervalMs: 300000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 30m
+          keep_firing_for: 30m
+          annotations:
+            description: The GPU Health Monitoring add-on does not monitor this node. It is not configured, or its health check files are missing.
+          labels: {}
+          isPaused: false
+          notification_settings:
+            receiver: ons-webhook
+            repeat_interval: 24h

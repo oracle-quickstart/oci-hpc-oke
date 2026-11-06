@@ -58,11 +58,15 @@ settings:
         "metricsReporting": true,
         "conditions": [
           {"type": "OcaVersion", "reason": "OcaVersionHasNoIssues", "message": "OCA version is up to date"},
-          {"type": "CpuProfile", "reason": "CpuProfileHasNoIssues", "message": "CPU profile is set to performance"}
+          {"type": "CpuProfile", "reason": "CpuProfileHasNoIssues", "message": "CPU profile is set to performance"},
+          {"type": "RdmaOcaPlugins", "reason": "RdmaOcaPluginsHasNoIssues", "message": "Required OCA RDMA plugins are enabled"},
+          {"type": "RdmaGidIndex", "reason": "RdmaGidIndexHasNoIssues", "message": "RDMA GID index 3 is RoCE v2 on all rails"}
         ],
         "rules": [
           {"type": "permanent", "condition": "OcaVersion", "reason": "OcaVersionHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["oca-ver", "300"], "timeout": "30s"},
-          {"type": "permanent", "condition": "CpuProfile", "reason": "CpuProfileHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["cpu-profile", "300"], "timeout": "45s"}
+          {"type": "permanent", "condition": "CpuProfile", "reason": "CpuProfileHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["cpu-profile", "300"], "timeout": "45s"},
+          {"type": "permanent", "condition": "RdmaOcaPlugins", "reason": "RdmaOcaPluginsHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["instance-rdma-plugins", "300"], "timeout": "30s"},
+          {"type": "permanent", "condition": "RdmaGidIndex", "reason": "RdmaGidIndexHasIssues", "path": "./custom-config/oke_healthcheck.sh", "args": ["rdma-gid-index", "300"], "timeout": "30s"}
         ]
       }
   custom_plugin_monitors:

@@ -81,6 +81,11 @@ locals {
   rdma_netns_mode   = var.install_dranet ? "shared" : (var.deploy_nvidia_network_operator ? "exclusive" : "")
   runcmd_rdma_netns = local.rdma_netns_mode != "" ? "bash /var/run/oke-rdma-netns.sh ${local.rdma_netns_mode} || echo 'Error setting the RDMA netns mode' >&2" : ""
 
+  # IPv6 setup for the RDMA rails (see files/rdma/rdma-ipv6.sh). OCA loads its override file, which turns on
+  # IPv6 policy routing for B300, before runcmd, so the file ships in write_files. A unit reruns the script on reboots.
+  rdma_ipv6_setup  = local.cni_type == "npn" && local.cluster_uses_ipv6
+  runcmd_rdma_ipv6 = local.rdma_ipv6_setup ? "systemctl enable oke-rdma-ipv6.service; bash /usr/local/sbin/oke-rdma-ipv6.sh || echo 'Error setting up IPv6 on the RDMA rails' >&2" : ""
+
   runcmd_lustre_mount = var.create_lustre && local.lustre_mount_ip != "" ? format(
     "curl -sL -o /var/run/oke-lustre-mount.sh https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/files/oke-lustre-mount.sh && (bash /var/run/oke-lustre-mount.sh '%v' '%v' '%v' || echo 'Error mounting Lustre' >&2)",
     local.lustre_mount_ip, var.lustre_file_system_name, var.lustre_mount_path
@@ -115,10 +120,44 @@ locals {
       path        = "/var/run/oke-rdma-netns.sh"
       permissions = "0755"
     }
+    ] : [], local.rdma_ipv6_setup ? [
+    {
+      content     = file("${path.module}/files/rdma/rdma-ipv6.sh")
+      owner       = "root:root"
+      path        = "/usr/local/sbin/oke-rdma-ipv6.sh"
+      permissions = "0755"
+    },
+    {
+      content     = file("${path.module}/files/rdma/oke-rdma-ipv6.service")
+      owner       = "root:root"
+      path        = "/etc/systemd/system/oke-rdma-ipv6.service"
+      permissions = "0644"
+    },
+    {
+      # OCA resets the NICs on the first boot, and a re-created rail starts with accept_ra=1.
+      # systemd-sysctl applies this file to each new rail.
+      content     = "net.ipv6.conf.rdma*.accept_ra = 2\n"
+      owner       = "root:root"
+      path        = "/etc/sysctl.d/90-oke-rdma-ipv6.conf"
+      permissions = "0644"
+    },
+    {
+      # OCA reads only this file when it exists, so a key left out gets its zero value. Today that gives the OCA defaults.
+      # On an IPv6-only primary VNIC OCA stops with an error if host_serial_based_rdma_ips is false.
+      # With an IPv4 primary VNIC, true makes OCA take the RDMA IPs from the host serial number.
+      content = jsonencode(merge(
+        { ipv6_fabric_policy_based_routing_default_shapes = ["BM.GPU.RTXPRO.8", "BM.GPU.B300.8"] },
+        contains(local.ip_families, "IPv4") ? {} : { host_serial_based_rdma_ips = true },
+      ))
+      owner       = "root:root"
+      path        = "/etc/oracle-cloud-agent/plugins/oci-hpc/oci-hpc-configure/rdma_features_enable.json"
+      permissions = "0644"
+    }
   ] : [])
   cloud_init = {
     ssh_authorized_keys = local.ssh_authorized_keys
     runcmd = compact([
+      local.runcmd_rdma_ipv6,
       local.runcmd_nvme_raid,
       local.runcmd_rdma_netns,
       local.runcmd_bootstrap,
@@ -227,6 +266,8 @@ locals {
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_gpu_hostname_prefix } : {},
+        # The GPU health add-on assigns only nodes with a *.gpu.present label, and no AMD component sets one. Remove when OKE fixes this.
+        local.deploy_gpu_health_monitoring_addon && contains(local.amd_gpu_plugin_shapes, var.worker_gpu_shape) ? { "amd.com/gpu.present" = "true" } : {},
       )
       node_cycling_enabled         = var.worker_gpu_node_cycling_enabled
       node_cycling_max_surge       = var.worker_gpu_node_cycling_max_surge
@@ -245,6 +286,7 @@ locals {
       mode                           = var.worker_rdma_use_cluster_network ? "cluster-network" : "node-pool"
       use_compute_cluster            = !var.worker_rdma_use_cluster_network
       host_group_id                  = var.worker_rdma_host_group_id
+      compute_cluster_id             = var.worker_rdma_use_existing_compute_cluster ? var.worker_rdma_compute_cluster_id : ""
       size                           = var.worker_rdma_pool_size
       shape                          = var.worker_rdma_shape
       boot_volume_size               = var.worker_rdma_boot_volume_size
@@ -257,11 +299,16 @@ locals {
       gva_secondary_vnics = local.use_gva ? {
         pods = { ip_count = local.worker_rdma_gva_ip_count }
       } : {}
-      cloud_init    = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
-      node_metadata = local.node_metadata
+      cloud_init = [{ content_type = "text/cloud-config", content = yamlencode(local.cloud_init) }]
+      node_metadata = merge(
+        { "areLegacyImdsEndpointsDisabled" : var.legacy_imds_endpoints_disabled },
+        local.node_metadata
+      )
       node_labels = merge(
         { "oci.oraclecloud.com/disable-gpu-device-plugin" = var.disable_gpu_device_plugin ? "true" : "false" },
         var.install_slinky && !var.slinky_hostname_prefix_disabled ? { "oci.oraclecloud.com/slinky-hostname-prefix" = local.slinky_rdma_hostname_prefix } : {},
+        # The GPU health add-on assigns only nodes with a *.gpu.present label, and no AMD component sets one. Remove when OKE fixes this.
+        local.deploy_gpu_health_monitoring_addon && contains(local.amd_gpu_plugin_shapes, var.worker_rdma_shape) ? { "amd.com/gpu.present" = "true" } : {},
       )
       agent_config = {
         are_all_plugins_disabled = false

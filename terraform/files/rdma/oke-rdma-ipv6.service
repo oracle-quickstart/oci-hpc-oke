@@ -1,0 +1,12 @@
+[Unit]
+Description=IPv6 setup for the RDMA rails before Oracle Cloud Agent
+Wants=network-online.target
+After=network-online.target
+Before=snap.oracle-cloud-agent.oracle-cloud-agent.service oracle-cloud-agent.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/oke-rdma-ipv6.sh
+
+[Install]
+WantedBy=multi-user.target
