@@ -152,12 +152,17 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
     if not {7, 23, 25}.issubset(ids):
         failures.append("gpu-health-status: source must retain panel IDs 7, 23 and 25")
 
-    # The add-on shows panel 25.
-    for name, amd, nvidia, addon, expected in (
-        ("AMD", True, False, False, {23}),
-        ("NVIDIA", False, True, False, {7}),
-        ("mixed", True, True, False, {7, 23}),
-        ("NVIDIA add-on", False, True, True, {7, 25}),
+    # Panels that read NPD data. Same list as grafana.tf.
+    # The add-on shows panel 25. When NPD is removed (opt-in, with full add-on coverage), these panels are dropped.
+    npd_panels = {1, 2, 3, 4, 5, 6, 7, 14, 15, 16, 18, 21, 22, 23, 24}
+    for name, amd, nvidia, addon, npd_removed, expected in (
+        ("AMD", True, False, False, False, {23}),
+        ("NVIDIA", False, True, False, False, {7}),
+        ("mixed", True, True, False, False, {7, 23}),
+        ("AMD add-on", True, False, True, True, {25}),
+        ("NVIDIA add-on", False, True, True, True, {25}),
+        ("mixed add-on", True, True, True, True, {25}),
+        ("NVIDIA add-on with NPD", False, True, True, False, {7, 25}),
     ):
         filtered = [
             panel
@@ -165,6 +170,7 @@ def verify_gpu_vendor_contract(failures: list[str]) -> None:
             if (panel["id"] != 7 or nvidia)
             and (panel["id"] != 23 or amd)
             and (panel["id"] != 25 or addon)
+            and (panel["id"] not in npd_panels or not npd_removed)
         ]
         retained = {panel["id"] for panel in filtered} & {7, 23, 25}
         if retained != expected:

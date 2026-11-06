@@ -12,6 +12,6 @@ local var = g.dashboard.variable;
     + var.query.queryTypes.withLabelValues('node', 'kube_node_status_capacity{resource=~"(amd|nvidia)_com_gpu"}')
     + var.query.generalOptions.withLabel('Node')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 }

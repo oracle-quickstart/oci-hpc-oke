@@ -40,3 +40,9 @@ spec:
           sourceLabels:
             - __meta_kubernetes_node_label_node_kubernetes_io_instance_type
           targetLabel: instance_shape
+      # The workload labels change with every pod on a GPU and multiply the
+      # AMD series. No dashboard or alert uses them. They are pod, namespace and
+      # container with honorLabels true, and exported_* without it.
+      metricRelabelings:
+        - action: labeldrop
+          regex: (exported_)?(pod|namespace|container)

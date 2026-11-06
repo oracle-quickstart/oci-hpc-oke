@@ -125,6 +125,12 @@ resource "null_resource" "deploy_grafana_dashboards_and_alerts_from_operator" {
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu/gpu-health-status.json"
   }
 
+  # Without NPD, Terraform removes the NPD conditions from the Command Center node issues history.
+  provisioner "file" {
+    content     = lookup(local.grafana_gpu_dashboards, "command-center.json", "{}")
+    destination = "/home/${self.triggers.operator_user}/grafana/dashboards/gpu/command-center.json"
+  }
+
   provisioner "file" {
     source      = "${local.grafana_jsonnet_build_dir}/oci/"
     destination = "/home/${self.triggers.operator_user}/grafana/dashboards/oci"

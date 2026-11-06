@@ -54,6 +54,7 @@ groups:
           keep_firing_for: 30m
           annotations:
             description: The GPU Health Monitoring add-on reports a critical GPU fault. See the GPU Node Repairs dashboard for the fault code.
+            summary: Critical GPU fault. See the GPU Node Repairs dashboard for the fault code.
           labels: {}
           isPaused: false
           notification_settings:
