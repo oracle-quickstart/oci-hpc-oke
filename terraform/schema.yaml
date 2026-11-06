@@ -2555,7 +2555,7 @@ variables:
   nvidia_dra_driver_chart_version:
     title: NVIDIA DRA Driver Helm chart version
     type: string
-    default: "0.4.0"
+    default: "0.5.1"
     visible: false
 
   # Dranet
