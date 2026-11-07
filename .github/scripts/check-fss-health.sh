@@ -128,7 +128,50 @@ spec:
       path: ${FSS_MOUNT_PATH}
       type: Directory
 EOF
-kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-hostpath-reader --timeout=120s
+if ! kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-hostpath-reader --timeout=120s; then
+  echo "FAIL: timed out waiting for pod/fss-hostpath-reader to reach Succeeded"
+  kubectl get pod fss-hostpath-reader -o wide || true
+  kubectl describe pod fss-hostpath-reader || true
+  kubectl logs fss-hostpath-reader || true
+  # The reader cannot show why the OS-level mount is missing, so read the node's mounts and cloud-init log.
+  kubectl apply -f - <<EOF || true
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fss-node-debug
+spec:
+  restartPolicy: Never
+  nodeName: ${FSS_WRITER_NODE}
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+  - key: amd.com/gpu
+    operator: Exists
+  containers:
+  - name: debug
+    image: busybox
+    command: ["sh", "-c"]
+    args:
+    - |
+      echo "--- NFS mounts on the node"
+      grep nfs /host/proc/1/mounts || echo "none"
+      echo "--- ${FSS_MOUNT_PATH} on the node"
+      ls -la "/host${FSS_MOUNT_PATH}" 2>&1
+      echo "--- FSS, NFS and apt error lines in cloud-init-output.log"
+      grep -n -i -E 'fss|nfs|^E: |^Err:' /host/var/log/cloud-init-output.log | tail -40
+    volumeMounts:
+    - name: host
+      mountPath: /host
+      readOnly: true
+  volumes:
+  - name: host
+    hostPath:
+      path: /
+EOF
+  kubectl wait --for='jsonpath={.status.phase}=Succeeded' pod/fss-node-debug --timeout=60s || true
+  kubectl logs fss-node-debug || true
+  exit 1
+fi
 HOST_CONTENT=$(kubectl logs fss-hostpath-reader)
 if [[ "$HOST_CONTENT" != *"fss-test-content"* ]]; then
   echo "FAIL: FSS hostPath reader output does not contain expected content: $HOST_CONTENT"
