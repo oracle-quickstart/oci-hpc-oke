@@ -366,10 +366,11 @@ locals {
       }
     })
   }
-  # Remove NPD only after the user verifies live coverage and opts in. Each pool must be a managed node pool with a supported
+  # Remove NPD only after the user verifies live coverage and opts in. Each GPU pool must be a managed node pool with a supported
   # shape. NVIDIA nodes must run the GPU Operator, which sets the nvidia.com/gpu.present label that the add-on needs.
+  # A CPU RDMA pool does not run NPD, so it is not checked.
   npd_removed = var.gpu_health_monitoring_remove_npd && local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
-    !var.worker_rdma_enabled || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
+    !var.worker_rdma_enabled || !can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
     !var.worker_gpu_enabled || contains(local.gpu_health_check_shapes, var.worker_gpu_shape),
     !var.worker_gmc_enabled,
   ])
