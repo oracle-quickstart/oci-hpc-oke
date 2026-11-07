@@ -23,6 +23,9 @@ For example, if the cluster is currently running version 1.32.2 and the desired 
 This section covers upgrading clusters managed using Terraform or Oracle Resource Manager (ORM).
 In case there is a drift between the Terraform state and the actual cluster state, you may need to reconcile the two.
 
+> [!NOTE]
+> The default boot volume of the system node pool (`oke-system`) changed from 128 GB to 256 GB. If your stack does not set `worker_ops_boot_volume_size`, the next apply updates the system node pool. With node cycling enabled (`worker_ops_node_cycling_enabled`, the default), OKE cordons, drains, and replaces the system nodes. To keep the old size, set `worker_ops_boot_volume_size` to `128`.
+
 #### Upgrade the OKE control plane and worker configuration
 
 1. Identify what are the versions available to upgrade the OKE control plane:
