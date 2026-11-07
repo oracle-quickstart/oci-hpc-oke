@@ -1425,7 +1425,7 @@ variables:
     title: Node Problem Detector chart version
     type: string
     required: true
-    default: "2.4.1"
+    default: "2.4.2"
     visible: false
       # and:
       # - monitoring_advanced_options

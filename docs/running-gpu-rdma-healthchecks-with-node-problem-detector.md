@@ -217,7 +217,7 @@ Skip NPD installation only after verifying complete add-on coverage and opting o
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace monitoring \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -229,7 +229,7 @@ helm upgrade --install gpu-rdma-node-problem-detector-amd \
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace monitoring \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \
@@ -351,7 +351,7 @@ Install and verify the vendor-specific release before removing the old release. 
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace monitoring \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \

@@ -328,7 +328,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -340,7 +340,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \
@@ -1092,7 +1092,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -1104,7 +1104,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \

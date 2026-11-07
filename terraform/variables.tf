@@ -428,7 +428,7 @@ variable "monitoring_namespace" {
 }
 
 variable "node_problem_detector_chart_version" {
-  default = "2.4.1"
+  default = "2.4.2"
   type    = string
 }
 
