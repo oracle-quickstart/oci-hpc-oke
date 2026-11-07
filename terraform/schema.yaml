@@ -1440,7 +1440,7 @@ variables:
     title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "0.6.0"
+    default: "0.9.0"
     visible: false
   install_grafana:
     title: Grafana

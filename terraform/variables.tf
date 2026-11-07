@@ -443,7 +443,7 @@ variable "cert_manager_chart_version" {
 }
 
 variable "ingress_chart_version" {
-  default = "0.6.0"
+  default = "0.9.0"
   type    = string
 }
 
