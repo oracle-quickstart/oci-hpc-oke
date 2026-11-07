@@ -103,7 +103,8 @@ module "ingress" {
   )
   helm_user_values_override = ""
 
-  depends_on = [module.oke, module.certmanager]
+  # Kueue registers a cluster-wide Deployment webhook. Without this order, it rejects the contour Deployment.
+  depends_on = [module.oke, module.certmanager, module.kueue]
 }
 
 
