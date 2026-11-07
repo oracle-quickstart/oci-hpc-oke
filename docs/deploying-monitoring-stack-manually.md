@@ -255,6 +255,8 @@ kubectl get daemonset -n ${MONITORING_NAMESPACE} \
 
 **Note**: This step is only required if you have NVIDIA GPU nodes in your cluster with the NvidiaGpuOperator OKE addon enabled. The NVIDIA GPU Operator addon deploys the DCGM exporter DaemonSet automatically in the `gpu-operator` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
 
+The ServiceMonitor drops the GPU workload labels (`exported_pod`, `exported_container`, and `exported_namespace`) from the DCGM metrics. These labels change with every workload pod and multiply the series. The Terraform stack drops the same labels. Queries that group the DCGM metrics by workload pod or namespace do not work.
+
 ### 3.1 Locate the ServiceMonitor Manifest
 
 The ServiceMonitor manifest is available at `terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml`.
@@ -278,6 +280,8 @@ kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ## Step 3b: Deploy AMD Device Metrics Exporter ServiceMonitor
 
 **Note**: This step is only required if you have AMD MI300X or MI355X nodes in your cluster with the AmdGpuOperator OKE addon enabled. The AMD GPU Operator addon deploys the device metrics exporter DaemonSet automatically in the `kube-amd-gpu` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
+
+The ServiceMonitor drops the GPU workload labels (`pod`, `container`, and `namespace`, and their `exported_` versions) from the AMD exporter metrics. These labels change with every workload pod and multiply the series. The Terraform stack drops the same labels. Queries that group the AMD GPU metrics by workload pod or namespace do not work.
 
 ### 3b.1 Configure the Metric Prefix
 

@@ -123,7 +123,7 @@ After verifying full add-on coverage and setting `gpu_health_monitoring_remove_n
 NPD does not clear its node conditions when it is removed. The last NPD values stay on the nodes, and `kubectl describe node` still shows them. To remove them after NPD is gone, run:
 
 ```bash
-NPD_CONDITIONS="CpuProfile DcgmiHealth GpuBadPages GpuBus GpuCount GpuEcc GpuFabricMgr GpuImex GpuPcie GpuRowRemap GpuXid IpAddress NodeHasPcieErrors NvlinkSpeed OcaVersion RdmaGidIndex RdmaLink RdmaLinkFlapping RdmaOcaPlugins RdmaOvsMtu RdmaRttcc RdmaVfCounters RdmaVfRoutes RdmaWpaAuth Rocminfo"
+NPD_CONDITIONS="CorruptDockerOverlay2 CperHardwareErrorFatal CpuProfile DcgmiHealth GpuBadPages GpuBus GpuCount GpuEcc GpuFabricMgr GpuImex GpuPcie GpuRowRemap GpuXid IpAddress KernelDeadlock NodeHasPcieErrors NvlinkSpeed OcaVersion RdmaGidIndex RdmaLink RdmaLinkFlapping RdmaOcaPlugins RdmaOvsMtu RdmaRttcc RdmaVfCounters RdmaVfRoutes RdmaWpaAuth ReadonlyFilesystem Rocminfo XfsShutdown"
 PATCH=$(for c in ${NPD_CONDITIONS}; do printf '{"type":"%s","$patch":"delete"},' "${c}"; done)
 for node in $(kubectl get nodes -o name); do
   kubectl patch "${node}" --subresource=status --type=strategic \
@@ -132,6 +132,8 @@ done
 ```
 
 Run it only after NPD is removed. A running NPD adds its conditions again.
+
+NPD also writes the `oke_npd_*.prom` files to `/var/lib/node_exporter/textfile_collector` on each GPU node. Terraform does not delete these files, so node-exporter keeps exporting the last `oke_npd_*` metrics. To remove these metrics, delete the files on each GPU node.
 
 ## Result Contract
 

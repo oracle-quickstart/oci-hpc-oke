@@ -48,7 +48,8 @@ The add-on can also tag and terminate a node on a user request. This repair need
   ```text
   Allow any-user to use tag-namespace in tenancy where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>', target.tag-namespace.name = 'ComputeInstanceHostActions'}
   ```
- See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+
+See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
 
 > [!IMPORTANT]
 > If the cluster already has a `NodeRepairConfig` that you created for GPU nodes, delete it before you apply Terraform. A node that more than one repair config selects gets no repair. Its report shows `AdmissionRejected`.
