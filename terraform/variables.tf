@@ -554,7 +554,7 @@ variable "nvidia_gpu_operator_advanced_options" {
 
 variable "nvidia_gpu_operator_addon_version" {
   type        = string
-  default     = "v25.10.1"
+  default     = "v26.3.3"
   description = "Version of the NvidiaGpuOperator OKE addon."
 }
 

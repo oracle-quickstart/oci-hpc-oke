@@ -1703,9 +1703,10 @@ variables:
     title: NVIDIA GPU Operator add-on version
     type: enum
     description: Version of the NVIDIA GPU Operator OKE add-on.
-    default: "v25.10.1"
+    default: "v26.3.3"
     required: true
     enum:
+      - "v26.3.3"
       - "v25.10.1"
       - "v25.3.4"
     visible:
