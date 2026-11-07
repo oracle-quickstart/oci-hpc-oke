@@ -1099,7 +1099,7 @@ variable "install_kueue" {
 }
 
 variable "kueue_chart_version" {
-  default = "0.20.0"
+  default = "0.20.5"
   type    = string
 }
 
