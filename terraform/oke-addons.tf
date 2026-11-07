@@ -870,6 +870,8 @@ resource "null_resource" "gpu_health_monitoring_config_via_operator" {
       # kubectl wait fails at once when the add-on has not created the CRD yet.
       "for i in $(seq 1 30); do kubectl get crd gpuhealthmonitoringconfigs.oci.oraclecloud.com >/dev/null 2>&1 && break; sleep 10; done",
       "kubectl wait --for condition=established --timeout=300s crd/gpuhealthmonitoringconfigs.oci.oraclecloud.com",
+      "for i in $(seq 1 30); do kubectl get crd noderepairconfigs.oci.oraclecloud.com >/dev/null 2>&1 && break; sleep 10; done",
+      "kubectl wait --for condition=established --timeout=300s crd/noderepairconfigs.oci.oraclecloud.com",
       "kubectl apply -f ${self.triggers.config_target}",
       # Delete the configs of pool shapes that are gone.
       "kubectl get gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke -o name | grep -vxF ${join(" ", [for y in values(local.gpu_health_monitoring_configs) : "-e gpuhealthmonitoringconfig.oci.oraclecloud.com/${yamldecode(y).metadata.name}"])} | xargs -r kubectl delete --timeout=5m",
