@@ -663,7 +663,6 @@ additionalPrometheusRulesMap:
                 )
               )
 %{ endif }
-          # Missing add-on configuration is unknown for nodes that its configs select.
           - record: node_gpu_health_fault
             expr: |
               max by(hostname) (
@@ -672,6 +671,7 @@ additionalPrometheusRulesMap:
                   "hostname", "$1", "node", "(.*)"
                 )
               )
+          # Missing add-on configuration is unknown for nodes that its configs select.
           - record: node_gpu_health_unknown
             expr: |
               max by(hostname) (
