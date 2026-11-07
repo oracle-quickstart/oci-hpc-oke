@@ -1680,8 +1680,8 @@ variables:
   gpu_health_monitoring_node_repair_dry_run:
     title: Dry run GPU node repairs
     type: boolean
-    description: Show the proposed repairs in the NodeHealthReports, but do not reboot, stop or terminate GPU nodes. When not set, the add-on repairs faulty GPU nodes one at a time.
-    default: false
+    description: Show the proposed repairs in the NodeHealthReports, but do not cordon, drain, reboot, stop or terminate GPU nodes. Clear this option to let the add-on repair faulty GPU nodes.
+    default: true
     visible:
       - deploy_gpu_health_monitoring
   deploy_nvidia_gpu_operator:

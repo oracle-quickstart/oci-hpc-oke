@@ -29,12 +29,14 @@ kubectl label node <node-name> amd.com/gpu.present=true
 
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
-The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. With these configs, the add-on does these repairs:
+The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. When the repairs are not a dry run, the add-on does these repairs:
 
 - It cordons, drains, and reboots a node when a fault with the action `REBOOT` stays active for 10 minutes.
 - It drains a node and then stops or terminates it when a fault of the node matches a Compute maintenance event. The action of the maintenance event (`STOP` or `TERMINATE`) sets the repair action.
 
-The repair configs run one repair at a time (`maximumParallelNodeRepairs: 1`). They use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause. To see the proposed repairs without node changes, set `gpu_health_monitoring_node_repair_dry_run=true`. A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node.
+By default, the repair configs are a dry run (`gpu_health_monitoring_node_repair_dry_run=true`). A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node. To let the add-on repair nodes, set `gpu_health_monitoring_node_repair_dry_run=false`.
+
+Each repair config sets `maximumParallelNodeRepairs: 1`. The repair configs use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause.
 
 The add-on can also tag and terminate a node on a user request. This repair needs these items, and Terraform does not set them up:
 
