@@ -1434,7 +1434,7 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "92.0.0"
+    default: "93.0.0"
     visible: false
   ingress_chart_version:
     title: Ingress Controller helm chart version

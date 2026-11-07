@@ -138,7 +138,7 @@ kubelet:
     cAdvisorInterval: 30s
     # No dashboard or rule reads the probe metrics.
     probes: false
-    # Helm replaces lists, so the drop lists below repeat the chart 92.0.0 defaults first.
+    # Helm replaces lists, so the drop lists below repeat the chart 93.0.0 defaults first.
     metricRelabelings:
       - action: drop
         sourceLabels: [__name__, le]
@@ -154,6 +154,7 @@ kubelet:
       - sourceLabels: [__name__]
         action: drop
         regex: 'container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)'
+      # Chart 93.0.0 keeps container_memory_swap. Keep dropping it, as chart 92.0.0 did.
       - sourceLabels: [__name__]
         action: drop
         regex: 'container_memory_(mapped_file|swap)'
