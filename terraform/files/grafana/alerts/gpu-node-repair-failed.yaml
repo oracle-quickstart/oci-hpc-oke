@@ -54,6 +54,7 @@ groups:
           keep_firing_for: 30m
           annotations:
             description: A GPU node repair failed in the last hour. See the GPU Node Repairs dashboard.
+            summary: 'Node repair with action {{ or $labels.action "N/A" }} failed in the last hour.'
           labels: {}
           isPaused: false
           notification_settings:

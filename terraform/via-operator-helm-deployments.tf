@@ -166,11 +166,17 @@ module "kube_prometheus_stack" {
   post_deployment_commands = []
 
   helm_template_values_override = templatefile("${path.module}/files/kube-prometheus/values.yaml.tftpl", {
-    install_grafana               = var.install_grafana
-    preferred_kubernetes_services = var.preferred_kubernetes_services
-    setup_alerting                = var.setup_alerting
-    prometheus_memory_request     = local.prometheus_memory_request
-    gpu_health_monitoring         = local.deploy_gpu_health_monitoring_addon
+    install_grafana                   = var.install_grafana
+    preferred_kubernetes_services     = var.preferred_kubernetes_services
+    setup_alerting                    = var.setup_alerting
+    prometheus_memory_request         = local.prometheus_memory_request
+    gpu_health_monitoring             = local.deploy_gpu_health_monitoring_addon
+    gpu_health_monitoring_shape_regex = local.gpu_health_monitoring_shape_regex
+    npd_removed                       = local.npd_removed
+    npd_amd_conditions                = local.npd_amd_conditions
+    npd_nvidia_conditions             = local.npd_nvidia_conditions
+    npd_amd_condition_count           = length(split("|", local.npd_amd_conditions))
+    npd_nvidia_condition_count        = length(split("|", local.npd_nvidia_conditions))
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(
@@ -197,7 +203,7 @@ module "kube_prometheus_stack" {
 
 
 module "node_problem_detector_amd" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_amd_gpu]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_amd_gpu, !local.npd_removed]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip
@@ -226,7 +232,7 @@ module "node_problem_detector_amd" {
 }
 
 module "node_problem_detector_nvidia" {
-  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu]) ? 1 : 0
+  count  = alltrue([var.install_monitoring, local.deploy_from_operator, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu, !local.npd_removed]) ? 1 : 0
   source = "./helm-module"
 
   bastion_host    = module.oke.bastion_public_ip

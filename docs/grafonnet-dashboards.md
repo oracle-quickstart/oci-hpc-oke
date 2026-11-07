@@ -369,9 +369,10 @@ terraform/files/grafana/jsonnet/
 6. Reuse a shared helper when behavior is common across dashboards.
 7. Do not add generated JSON. Static JSON is not required for a new dashboard.
 
-`gpu-health-status` must retain panel IDs `7` and `23`. Terraform uses those IDs
-to select NVIDIA and AMD panels respectively and then reflows the remaining stat
-panels.
+`gpu-health-status` must retain panel IDs `7`, `23`, and `25`. Terraform uses those
+IDs to select the NVIDIA, AMD, and GPU Health Monitoring add-on panels respectively.
+When NPD is removed, Terraform also removes the panels that read NPD data. It then
+reflows the remaining stat panels.
 
 ### Format, compile, and verify
 

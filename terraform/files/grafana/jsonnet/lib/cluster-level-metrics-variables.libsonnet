@@ -11,6 +11,6 @@ local var = g.dashboard.variable;
     + var.query.queryTypes.withLabelValues('instance_shape', 'node_uname_info')
     + var.query.generalOptions.withLabel('Instance Shape')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 }
