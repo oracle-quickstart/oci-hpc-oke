@@ -438,7 +438,7 @@ variable "prometheus_stack_chart_version" {
 }
 
 variable "cert_manager_chart_version" {
-  default = "v1.20.2"
+  default = "v1.21.3"
   type    = string
 }
 
