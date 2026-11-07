@@ -16,7 +16,7 @@ groups:
               datasourceUid: prometheus
               model:
                 editorMode: code
-                expr: max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900) or ((node_gpu_health_expected unless on(hostname) node_gpu_health_unconfigured) unless on(hostname) max by(hostname) (up{job=~".+/gpu-fault-monitor"} == 1))
+                expr: max by(hostname) (gfm_passive_result_age_seconds > 900 or gfm_hpc_fault_file_age_seconds > 900) or (max by(hostname) (label_replace(kube_node_status_condition{condition="oci.oraclecloud.com/GpuHealthMonitoringConfigured",status="true"} == 1 and on(node) kube_node_labels{label_oci_oraclecloud_com_node_info_managed="true"}, "hostname", "$1", "node", "(.*)")) unless on(hostname) max by(hostname) (up{job=~".+/gpu-fault-monitor"} == 1))
                 instant: true
                 intervalMs: 300000
                 legendFormat: __auto
