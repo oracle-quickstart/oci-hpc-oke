@@ -232,6 +232,29 @@ var validationTestCases = []validationTestCase{
 		},
 		expectedError: "Dranet (preview) needs the shared RDMA netns mode",
 	},
+	{
+		name: "NpdRemovalRequiresSupportedGpuShape",
+		vars: map[string]interface{}{
+			"install_monitoring": true,
+			"install_node_problem_detector_kube_prometheus_stack": true,
+			"worker_gpu_enabled":               true,
+			"worker_gpu_shape":                 "VM.GPU.A10.1",
+			"gpu_health_monitoring_remove_npd": true,
+		},
+		expectedError: "Removing Node Problem Detector needs the GPU Health Monitoring add-on",
+	},
+	{
+		name: "NpdRemovalRequiresNvidiaGpuOperator",
+		vars: map[string]interface{}{
+			"install_monitoring": true,
+			"install_node_problem_detector_kube_prometheus_stack": true,
+			"worker_gpu_enabled":               true,
+			"worker_gpu_shape":                 "BM.GPU.H100.8",
+			"deploy_nvidia_gpu_operator":       false,
+			"gpu_health_monitoring_remove_npd": true,
+		},
+		expectedError: "Removing Node Problem Detector needs the GPU Health Monitoring add-on",
+	},
 }
 
 // TestValidation runs all validation test cases in parallel using table-driven tests
