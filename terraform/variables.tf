@@ -683,8 +683,8 @@ variable "deploy_gpu_health_monitoring" {
 
 variable "gpu_health_monitoring_addon_version" {
   type        = string
-  default     = "v1.1.0"
-  description = "Version of the GpuHealthMonitoring OKE addon."
+  default     = "automatic"
+  description = "Version of the GpuHealthMonitoring OKE addon. Set to \"automatic\" to let OKE update the addon, or set a version (for example v1.1.0) to pin it."
 }
 
 variable "gpu_health_monitoring_remove_npd" {

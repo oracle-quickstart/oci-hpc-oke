@@ -32,6 +32,8 @@ variableGroups:
       - oke_ons_webhook_chart_version
       - oci_metrics_exporter_chart_version
       - cert_manager_chart_version
+      # GPU Health Monitoring add-on (ORM always uses automatic updates)
+      - gpu_health_monitoring_addon_version
       # Kueue
       - kueue_chart_version
       - kueue_local_queue_default_namespace
@@ -198,7 +200,6 @@ variableGroups:
       - amd_gpu_operator_skip_nfd_dependency_check
       - amd_gpu_operator_configuration
       - deploy_gpu_health_monitoring
-      - gpu_health_monitoring_addon_version
       - gpu_health_monitoring_remove_npd
       - gpu_health_monitoring_node_repair_dry_run
       - setup_credential_provider_for_ocir
@@ -1660,16 +1661,6 @@ variables:
     type: boolean
     description: Install the GPU Health Monitoring OKE add-on for supported managed GPU pools. It reports GPU faults as node conditions and enables the Compute RDMA GPU Monitoring plugin on GPU nodes. Keep Node Problem Detector until live add-on coverage has been verified.
     default: true
-  gpu_health_monitoring_addon_version:
-    title: GPU Health Monitoring add-on version
-    type: enum
-    description: Version of the GPU Health Monitoring OKE add-on.
-    default: "v1.1.0"
-    required: true
-    enum:
-      - "v1.1.0"
-    visible:
-      - deploy_gpu_health_monitoring
   gpu_health_monitoring_remove_npd:
     title: Remove NPD after verifying GPU health coverage
     type: boolean

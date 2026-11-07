@@ -798,7 +798,8 @@ resource "oci_containerengine_addon" "gpu_health_monitoring" {
 
   addon_name = "GpuHealthMonitoring"
   cluster_id = module.oke.cluster_id
-  version    = var.gpu_health_monitoring_addon_version
+  # No version means OKE updates the add-on automatically.
+  version = var.gpu_health_monitoring_addon_version == "automatic" ? null : var.gpu_health_monitoring_addon_version
 
   override_existing                = true
   remove_addon_resources_on_delete = true
