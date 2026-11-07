@@ -1,7 +1,7 @@
 # GPU Health Monitoring with the OKE Add-on
 
 > [!NOTE]
-> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, or unsupported GPU shapes does not get the add-on.
+> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, unsupported GPU shapes, or NVIDIA pools without the NVIDIA GPU Operator does not get the add-on.
 
 The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. Terraform keeps Node Problem Detector (NPD) by default. After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. Terraform also requires supported managed GPU pools and the NVIDIA GPU Operator for NVIDIA pools. For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
 
@@ -12,7 +12,7 @@ The add-on has two components in the `gpu-health-monitoring` namespace:
 - The `gpu-health-monitoring-controller` Deployment enables the Oracle Cloud Agent (OCA) "Compute RDMA GPU Monitoring" plugin on each GPU node and manages the node repairs.
 - The `gpu-fault-monitor` DaemonSet reads the health check results of the OCA plugin on each GPU node every 30 seconds.
 
-The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource selects. Terraform creates one cluster-scoped config for each [supported shape](#supported-shapes) of the managed GPU node pools, for example `gpu-health-monitoring-bm-gpu-b300-8`. Each config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. A node can match only one config, because the add-on rejects configs that select the same node (`MultipleMatchingPolicies`). Without a config, the add-on deploys no fault monitor and checks no node. The add-on does not check self-managed nodes, so the GPU memory cluster pool and a cluster network pool get no config.
+The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource selects. Terraform creates one cluster-scoped config for each [supported shape](#supported-shapes) of the managed GPU node pools, for example `gpu-health-monitoring-bm-gpu-b300-8`. Each config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. A node can match only one config, because the add-on rejects configs that select the same node (`MultipleMatchingPolicies`). Without a config, the add-on deploys no fault monitor and checks no node. The add-on does not check self-managed nodes, so the GPU memory cluster pool and a cluster network pool get no config. An NVIDIA pool gets a config only when `deploy_nvidia_gpu_operator` is `true`.
 
 > [!IMPORTANT]
 > If the cluster already has a `GpuHealthMonitoringConfig` that you created, delete it before you apply Terraform. Otherwise your config and the Terraform config select the same nodes, and the add-on rejects both.
@@ -57,7 +57,7 @@ The add-on can also tag and terminate a node on a user request. This repair need
 
 - An enhanced OKE cluster with Kubernetes 1.32 or later
 - Managed GPU node pools
-- On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. Without this label, the add-on selects the node but does not monitor it.
+- On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. The add-on does not monitor a node without this label, so Terraform creates no config for the NVIDIA pools without the GPU Operator.
 - Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
 - The IAM policies that let the worker nodes manage instances and read the instance agent plugins, and that let the cluster use the maintenance events of its nodes. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create all three before you deploy:
 

@@ -318,12 +318,13 @@ locals {
   ]
   # The add-on monitors only the nodes that a config selects. One config per GPU pool shape with health check
   # rules, because the add-on rejects configs that select the same node. Self-managed pools (GPU memory cluster,
-  # cluster network) are left out, because the add-on does not check self-managed nodes.
+  # cluster network) are left out, because the add-on does not check self-managed nodes. NVIDIA pools need the GPU
+  # Operator, because the add-on does not monitor nodes without the nvidia.com/gpu.present label.
   gpu_health_monitoring_shapes = toset([
     for s in [
       var.worker_gpu_enabled ? var.worker_gpu_shape : "",
       var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? var.worker_rdma_shape : "",
-    ] : s if contains(local.gpu_health_check_shapes, s)
+    ] : s if contains(local.gpu_health_check_shapes, s) && (contains(local.amd_gpu_plugin_shapes, s) || local.deploy_nvidia_gpu_operator_addon)
   ])
   gpu_health_monitoring_shape_regex = replace(join("|", sort(tolist(local.gpu_health_monitoring_shapes))), ".", "[.]")
   gpu_health_monitoring_configs = {
