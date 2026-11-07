@@ -16,9 +16,20 @@ if [ -z "$EXPORT_PATH" ] || [ -z "$MOUNT_POINT" ] || [ -z "$MOUNT_TARGET_IP" ]; 
   exit 1
 fi
 
+# The script runs once at boot, so a transient package or NFS error would leave the node without the mount.
+retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    "$@" && return 0
+    echo "Attempt $attempt of 5 failed: $*" >&2
+    sleep 15
+  done
+  return 1
+}
+
 # Install NFS utils on yum or apt-get systems
 if command -v yum >/dev/null 2>&1; then
-  yum install -y nfs-utils
+  retry yum install -y nfs-utils
   echo "Installed nfs-utils via yum"
 elif command -v apt-get >/dev/null 2>&1; then
   # Wait for apt lock and install the package
@@ -26,8 +37,9 @@ elif command -v apt-get >/dev/null 2>&1; then
     echo "Waiting for dpkg/apt lock"
     sleep 1
   done
-  apt-get update
-  apt-get install -y nfs-common
+  # One broken apt source must not stop the mount; the install below still fails if nfs-common is unavailable.
+  apt-get update || echo "apt-get update reported errors, continuing with the lists it fetched" >&2
+  retry apt-get install -y nfs-common
   echo "Installed nfs-common via apt-get"
 fi
 
@@ -35,8 +47,7 @@ fi
 mkdir -p "$MOUNT_POINT"
 
 # Mount the NFS share
-mount -t nfs -o vers=3,nconnect=16 "$MOUNT_TARGET_IP:$EXPORT_PATH" "$MOUNT_POINT"
-if [ $? -eq 0 ]; then
+if retry mount -t nfs -o vers=3,nconnect=16 "$MOUNT_TARGET_IP:$EXPORT_PATH" "$MOUNT_POINT"; then
   echo "Successfully mounted $MOUNT_TARGET_IP:$EXPORT_PATH at $MOUNT_POINT"
 else
   echo 'Error mounting NFS volume' >&2
