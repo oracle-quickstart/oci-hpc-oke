@@ -47,7 +47,8 @@ fi
 mkdir -p "$MOUNT_POINT"
 
 # Mount the NFS share
-if retry mount -t nfs -o vers=3,nconnect=16 "$MOUNT_TARGET_IP:$EXPORT_PATH" "$MOUNT_POINT"; then
+# retry=1 caps each attempt at about a minute instead of the 2 minute default, so the loop does not multiply it.
+if retry mount -t nfs -o vers=3,nconnect=16,retry=1 "$MOUNT_TARGET_IP:$EXPORT_PATH" "$MOUNT_POINT"; then
   echo "Successfully mounted $MOUNT_TARGET_IP:$EXPORT_PATH at $MOUNT_POINT"
 else
   echo 'Error mounting NFS volume' >&2
