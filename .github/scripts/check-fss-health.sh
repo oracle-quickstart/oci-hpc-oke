@@ -155,10 +155,11 @@ spec:
     - |
       echo "--- NFS mounts on the node"
       grep nfs /host/proc/1/mounts || echo "none"
-      echo "--- ${FSS_MOUNT_PATH} on the node"
-      ls -la "/host${FSS_MOUNT_PATH}" 2>&1
       echo "--- FSS, NFS and apt error lines in cloud-init-output.log"
       grep -n -i -E 'fss|nfs|^E: |^Err:' /host/var/log/cloud-init-output.log | tail -40
+      # Last, because ls blocks on a hung hard NFS mount.
+      echo "--- ${FSS_MOUNT_PATH} on the node"
+      ls -la "/host${FSS_MOUNT_PATH}" 2>&1 || true
     volumeMounts:
     - name: host
       mountPath: /host
