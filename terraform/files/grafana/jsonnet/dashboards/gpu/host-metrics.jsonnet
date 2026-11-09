@@ -16,7 +16,6 @@ g.dashboard.new('Host Metrics')
   variables.hostname,
   variables.oci_name,
   variables.fstype,
-  variables.interface,
   variables.device,
   variables.mountpoint,
 ])
@@ -98,7 +97,7 @@ g.dashboard.new('Host Metrics')
   ),
   timeseriesPanel(
     'Network Traffic Received',
-    'rate(node_network_receive_bytes_total{hostname=~"$hostname",oci_name=~"$oci_name",instance_shape=~"$instance_shape",device=~"$device",device!~"lo|docker.*|rdma.*"}[5m])',
+    'rate(node_network_receive_bytes_total{hostname=~"$hostname",oci_name=~"$oci_name",instance_shape=~"$instance_shape",device=~"$device",device!~"lo|docker.*|rdma.*|oci.*|veth.*"}[5m])',
     '{{ device }}',
     'Bps',
     { w: 12, h: 8, x: 0, y: 20 },
@@ -107,7 +106,7 @@ g.dashboard.new('Host Metrics')
   ),
   timeseriesPanel(
     'Network Traffic Transmitted',
-    'rate(node_network_transmit_bytes_total{hostname=~"$hostname",oci_name=~"$oci_name",instance_shape=~"$instance_shape",device=~"$device",device!~"lo|docker.*|rdma.*"}[5m])',
+    'rate(node_network_transmit_bytes_total{hostname=~"$hostname",oci_name=~"$oci_name",instance_shape=~"$instance_shape",device=~"$device",device!~"lo|docker.*|rdma.*|oci.*|veth.*"}[5m])',
     '{{ device }}',
     'Bps',
     { w: 12, h: 8, x: 12, y: 20 },

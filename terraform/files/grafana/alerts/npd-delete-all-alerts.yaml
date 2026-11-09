@@ -1,0 +1,58 @@
+# Deployed when NPD is not deployed. Grafana keeps provisioned rules after their file is removed, so delete the NPD alerts.
+# The _gaps rules come from an earlier version that kept NPD for the checks the add-on does not cover.
+apiVersion: 1
+deleteRules:
+    - orgId: 1
+      uid: oke_npd_check_stale
+    - orgId: 1
+      uid: oke_npd_check_stale_gaps
+    - orgId: 1
+      uid: oke_npd_check_unknown
+    - orgId: 1
+      uid: oke_npd_check_unknown_gaps
+    - orgId: 1
+      uid: oke_npd_cpu_profile
+    - orgId: 1
+      uid: oke_npd_dcgm_health
+    - orgId: 1
+      uid: oke_npd_gpu_bad_pages
+    - orgId: 1
+      uid: oke_npd_gpu_bus
+    - orgId: 1
+      uid: oke_npd_gpu_count
+    - orgId: 1
+      uid: oke_npd_gpu_ecc
+    - orgId: 1
+      uid: oke_npd_gpu_fabric_mgr
+    - orgId: 1
+      uid: oke_npd_gpu_imex
+    - orgId: 1
+      uid: oke_npd_gpu_pcie
+    - orgId: 1
+      uid: oke_npd_gpu_row_remap
+    - orgId: 1
+      uid: oke_npd_gpu_xid
+    - orgId: 1
+      uid: oke_npd_node_pcie
+    - orgId: 1
+      uid: oke_npd_nvlink_speed
+    - orgId: 1
+      uid: oke_npd_oca_version
+    - orgId: 1
+      uid: oke_npd_rdma_gid_index
+    - orgId: 1
+      uid: oke_npd_rdma_link
+    - orgId: 1
+      uid: oke_npd_rdma_link_flapping
+    - orgId: 1
+      uid: oke_npd_rdma_oca_plugins
+    - orgId: 1
+      uid: oke_npd_rdma_ovs_mtu
+    - orgId: 1
+      uid: oke_npd_rdma_rttcc
+    - orgId: 1
+      uid: oke_npd_rdma_vf_counters
+    - orgId: 1
+      uid: oke_npd_rdma_vf_routes
+    - orgId: 1
+      uid: oke_npd_rdma_wpa_auth

@@ -6,6 +6,8 @@ deleteRules:
     - orgId: 1
       uid: oke_gpu_health_fault
     - orgId: 1
+      uid: oke_gpu_health_signal
+    - orgId: 1
       uid: oke_gpu_health_unavailable
     - orgId: 1
       uid: oke_gpu_node_repair_failed

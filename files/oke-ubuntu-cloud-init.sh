@@ -175,7 +175,7 @@ case "$ID" in
             oke_package_name="oci-oke-node-all-$oke_package_version"
 
             LOCAL_REPO_PATH="/opt/oke-node-client-packages/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
-            REMOTE_REPO_URL="https://objectstorage.us-sanjose-1.oraclecloud.com/p/_Zaa2khW3lPESEbqZ2JB3FijAd0HeKmiP-KA2eOMuWwro85dcG2WAqua2o_a-PlZ/n/odx-oke/b/okn-repositories-private/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
+            REMOTE_REPO_URL="https://objectstorage.us-sanjose-1.oraclecloud.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version https://odx-oke.objectstorage.us-sanjose-1.oci.customer-oci.com/n/odx-oke/b/okn-repositories/o/prod/ubuntu-$VERSION_CODENAME/kubernetes-$oke_package_repo_version"
 
             write_oke_apt_source() {
                 tee /etc/apt/sources.list.d/oke-node-client.sources > /dev/null <<EOF
