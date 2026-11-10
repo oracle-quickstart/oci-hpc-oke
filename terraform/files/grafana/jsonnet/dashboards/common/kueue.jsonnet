@@ -77,12 +77,12 @@ g.dashboard.new('Kueue Workloads')
   v('namespace', 'label_values(oke_kueue_workload_owner_info, namespace)', 'Namespace'),
   v('local_queue', 'label_values(oke_kueue_workload_owner_info{namespace=~"$namespace"}, local_queue)', 'LocalQueue'),
   v('workload', 'label_values(oke_kueue_workload_owner_info{namespace=~"$namespace",local_queue=~"$local_queue"}, workload)', 'Workload'),
-  // No custom allValue: Grafana expands All to the actual host list for links.
+  // No custom allValue: customqueryparam expands All to the actual host list for links.
   v('hostname', 'query_result(max by(hostname) (oke:kueue_workload_pod:info{' + scope + '}))', 'Host', '/hostname="([^"]+)"/'),
 ])
 + g.dashboard.withLinks([
-  nodeLink('gpu-metrics-single', 'GPU metrics — selected hosts', '${hostname:queryparam}') + { type: 'link' },
-  nodeLink('host-metrics-single', 'Host metrics — selected hosts', '${hostname:queryparam}') + { type: 'link' },
+  nodeLink('gpu-metrics-single', 'GPU metrics — selected hosts', '${hostname:customqueryparam:var-hostname}') + { type: 'link' },
+  nodeLink('host-metrics-single', 'Host metrics — selected hosts', '${hostname:customqueryparam:var-hostname}') + { type: 'link' },
 ])
 + g.dashboard.withPanels([
   stat('Kueue metrics endpoint up', 'max(up{namespace="kueue-system",service="kueue-controller-manager-metrics-service"}) or vector(0)', 0, 1, health=true),

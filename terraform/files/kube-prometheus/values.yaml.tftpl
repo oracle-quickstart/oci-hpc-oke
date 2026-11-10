@@ -438,6 +438,19 @@ additionalPrometheusRulesMap:
     groups:
       - name: kueue-workload-resources
         rules:
+          # Exclude ambiguous owners rather than assigning pods to an arbitrary
+          # Workload during Job replacement. Other owners remain joinable.
+          - record: oke:kueue_workload_owner:info
+            expr: |
+              max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
+                (oke_kueue_workload_owner_info{owner_controller="true"})
+              unless on(namespace, owner_name, owner_kind)
+              (
+                count by(namespace, owner_name, owner_kind) (
+                  max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
+                    (oke_kueue_workload_owner_info{owner_controller="true"})
+                ) > 1
+              )
           # Resolve direct controller owners (Job, MPIJob, PyTorchJob, etc.).
           # max removes scrape-replica labels before the ownership joins.
           - record: oke:kueue_workload_pod:info
@@ -449,8 +462,7 @@ additionalPrometheusRulesMap:
                     max by(namespace, pod, owner_name, owner_kind) (kube_pod_owner{owner_is_controller="true"})
                 )
                 * on(namespace, owner_name, owner_kind) group_left(workload, local_queue, cluster_queue)
-                  max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
-                    (oke_kueue_workload_owner_info{owner_controller="true"}),
+                  oke:kueue_workload_owner:info,
                 "hostname", "$1", "node", "(.+)"
               )
               or
@@ -465,8 +477,7 @@ additionalPrometheusRulesMap:
                 (
                   max by(namespace, job_name, owner_name, owner_kind) (kube_job_owner{owner_is_controller="true"})
                   * on(namespace, owner_name, owner_kind) group_left(workload, local_queue, cluster_queue)
-                    max by(namespace, owner_name, owner_kind, workload, local_queue, cluster_queue)
-                      (oke_kueue_workload_owner_info{owner_controller="true"})
+                    oke:kueue_workload_owner:info
                 ),
                 "hostname", "$1", "node", "(.+)"
               )

@@ -51,6 +51,13 @@ batch Job whose owner is the Workload's owner. Other ownership hierarchies,
 such as some Ray or JobSet layouts, need additional mappings. No job-name
 prefix guessing or pod-label wildcard allowlist is used.
 
+If multiple Workloads claim the same controller name and kind in one namespace
+(for example, while an old Workload is terminating after a Job is recreated),
+the resource map temporarily excludes that owner. Other workloads remain
+visible. Mapping resumes when only one Workload claims the owner. This avoids
+both ambiguous joins and attributing resources to an arbitrary Workload;
+the workload identity and condition tables still show the overlapping Workloads.
+
 Pending workloads without scheduled pods have no host resource mapping. Once
 pods are deleted, the live map disappears; historical recording-rule data
 remains in Prometheus retention, but current dropdowns are intended for live
@@ -105,7 +112,8 @@ skips it unless `INCLUDE_KUEUE=true` is passed. Terraform supplies
 
 The Prometheus fixture in `test/kueue-monitoring/workload-resources.test.yaml`
 tests single-host and multi-host mapping, child batch Jobs, namespace isolation,
-unscheduled pods, duplicate scrapes, and GPU requests. To run it, extract the
+unscheduled pods, duplicate scrapes, GPU requests, duplicate owners and recovery
+after their removal. To run it, extract the
 `kueue-workload-resources` group from the rendered monitoring values into
 `rules.json` beside a temporary copy of the fixture, then run
 `promtool test rules workload-resources.test.yaml` there.

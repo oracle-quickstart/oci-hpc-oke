@@ -52,7 +52,7 @@ class KueueRendering(unittest.TestCase):
             self.assertIn(uid, destinations)
             names = {v['name'] for v in destinations[uid]['templating']['list']}
             self.assertTrue({'hostname', 'instance_shape', 'oci_name'} <= names)
-            self.assertIn('${hostname:queryparam}', link['url'])
+            self.assertIn('${hostname:customqueryparam:var-hostname}', link['url'])
             self.assertIn('from=${__from}&to=${__to}', link['url'])
         host = next(v for v in dashboard['templating']['list'] if v['name'] == 'hostname')
         self.assertTrue(host['multi'])
