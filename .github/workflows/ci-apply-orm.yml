@@ -383,7 +383,7 @@ jobs:
       - name: Verify test resources deleted
         run: |
           for i in $(seq 1 24); do
-            REMAINING=$(kubectl get pods net-server net-client dns-checker fss-writer fss-reader fss-hostpath-reader lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            REMAINING=$(kubectl get pods net-server net-client dns-checker fss-writer fss-reader fss-hostpath-reader fss-node-debug lustre-writer lustre-reader lustre-hostpath-reader --ignore-not-found --no-headers 2>/dev/null | wc -l | tr -d ' ')
             PVC_REMAINING=$(kubectl get pvc fss-test-pvc lustre-test-pvc --ignore-not-found --no-headers 2>/dev/null | wc -l | tr -d ' ')
             if [ "$REMAINING" -eq 0 ] && [ "$PVC_REMAINING" -eq 0 ]; then
               echo "All test resources verified deleted"

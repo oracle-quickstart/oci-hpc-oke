@@ -22,7 +22,9 @@ retry() {
   for attempt in 1 2 3 4 5; do
     "$@" && return 0
     echo "Attempt $attempt of 5 failed: $*" >&2
-    sleep 15
+    if [ "$attempt" -lt 5 ]; then
+      sleep 15
+    fi
   done
   return 1
 }
@@ -38,8 +40,11 @@ elif command -v apt-get >/dev/null 2>&1; then
     sleep 1
   done
   # One broken apt source must not stop the mount; the install below still fails if nfs-common is unavailable.
-  apt-get update || echo "apt-get update reported errors, continuing with the lists it fetched" >&2
-  retry apt-get install -y nfs-common
+  install_nfs_common() {
+    apt-get update || echo "apt-get update reported errors, continuing with the lists it fetched" >&2
+    apt-get install -y nfs-common
+  }
+  retry install_nfs_common
   echo "Installed nfs-common via apt-get"
 fi
 
