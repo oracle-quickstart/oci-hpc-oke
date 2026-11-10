@@ -83,7 +83,7 @@ kubectl create namespace monitoring
 
 ```bash
 export MONITORING_NAMESPACE="monitoring"
-export PROMETHEUS_STACK_CHART_VERSION="92.0.0"
+export PROMETHEUS_STACK_CHART_VERSION="93.0.0"
 
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"
@@ -329,7 +329,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -341,7 +341,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \
@@ -1108,7 +1108,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -1120,7 +1120,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \

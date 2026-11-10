@@ -76,7 +76,7 @@ This is the recommended approach because:
 ### Step 1: Install Kueue
 
 ```sh
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.0" --create-namespace --namespace=kueue-system \
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.5" --create-namespace --namespace=kueue-system \
   -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/terraform/files/kueue/values.yaml
 ```
 
