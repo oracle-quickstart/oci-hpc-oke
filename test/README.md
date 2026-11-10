@@ -186,3 +186,8 @@ All test pods include `nvidia.com/gpu` and `amd.com/gpu` tolerations.
 - For instance principal runs, set `OCI_CLI_AUTH=instance_principal` when using monitoring tests so the `oci` CLI can authenticate.
 - Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`) are required to run those tests; missing flags will skip the test.
 - Private topologies use OCI Bastion Service for CI health checks. The CI runner generates an ephemeral SSH keypair, creates a bastion port-forwarding session, and tunnels kubectl through it. No stored SSH keys are needed.
+
+## Kueue monitoring checks
+
+Dashboard build-gating tests and Prometheus ownership-join fixtures are in
+`test/kueue-monitoring`. See [Monitoring Kueue Workloads](../docs/monitoring-kueue-workloads.md#development-validation) for local checks.
