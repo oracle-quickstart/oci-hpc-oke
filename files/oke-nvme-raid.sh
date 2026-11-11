@@ -55,14 +55,32 @@ if [[ $level == 5 ]]; then eff_count=$((count-1)); fi
 if [[ $level == 6 ]]; then eff_count=$((count-2)); fi
 stripe=$((eff_count*stride)) # number of data disks * stride
 
+# A new RAID 10 array skips its mirror sync. The sync runs for hours and blocks soft reboots.
+# A later md check can count mismatches in blocks that were never written. This does not affect data.
+assume_clean=""
+if [[ $level == 10 ]]; then assume_clean="--assume-clean"; fi
+
 echo -e "Creating RAID${level} filesystem mounted under ${mount_primary} with $count devices:\n  ${devices[*]}" >&2
 echo -e "Filesystem options:\n  eff_count=$eff_count; chunk=${chunk}K; bs=${bs}K; stride=$stride; stripe-width=${stripe}" >&2
 shopt -u nullglob; seen_arrays=(/dev/md/*); device=${seen_arrays[0]}
 if [ ! -e "$md_device" ]; then
-  echo "y" | mdadm --create "$md_device" --level="$level" --chunk=$chunk --force --raid-devices="$count" "${devices[@]}"
+  echo "y" | mdadm --create "$md_device" --level="$level" --chunk=$chunk --force $assume_clean --raid-devices="$count" "${devices[@]}"
   dd if=/dev/zero of="$md_device" bs=${bs}K count=128
 else
   echo "$md_device already initialized" >&2
+fi
+
+# OCI soft reboots press the ACPI power key, and udisksd blocks it during an md sync.
+# md saves the sync progress on a clean stop. The power key then ignores all shutdown block locks, not only this one.
+# Use the level of the array in use, because a reused array can have a different level than requested.
+if ! md_level=$(mdadm --detail "$md_device" | awk '/Raid Level/ {print $4}'); then
+  echo "Could not determine RAID level for $md_device; using the conservative power-key setting" >&2
+  md_level=""
+fi
+if [[ $md_level != raid0 ]]; then
+  mkdir -p /etc/systemd/logind.conf.d
+  printf '[Login]\nPowerKeyIgnoreInhibited=yes\n' > /etc/systemd/logind.conf.d/90-oke-power-key.conf
+  systemctl kill -s HUP systemd-logind || echo "Could not reload systemd-logind" >&2
 fi
 
 if ! tune2fs -l "$md_device" &>/dev/null; then

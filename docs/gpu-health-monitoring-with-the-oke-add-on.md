@@ -3,7 +3,7 @@
 > [!NOTE]
 > Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, or unsupported GPU shapes does not get the add-on.
 
-The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. Node Problem Detector (NPD) keeps running its checks next to the add-on.
+The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. Terraform keeps Node Problem Detector (NPD) by default. After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. Terraform also requires supported managed GPU pools and the NVIDIA GPU Operator for NVIDIA pools. For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
 
 ## Overview
 
@@ -29,7 +29,27 @@ kubectl label node <node-name> amd.com/gpu.present=true
 
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
-The add-on can also repair nodes. It reboots a node when a fault with the action `REBOOT` stays active for 10 minutes, and it tags and terminates a node on a user request. Repair needs a `NodeRepairConfig` resource. Terraform does not create this resource. See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. With these configs, the add-on does these repairs:
+
+- It cordons, drains, and reboots a node when a fault with the action `REBOOT` stays active for 10 minutes.
+- It drains a node and then stops or terminates it when a fault of the node matches a Compute maintenance event. The action of the maintenance event (`STOP` or `TERMINATE`) sets the repair action.
+
+The repair configs run one repair at a time (`maximumParallelNodeRepairs: 1`). They use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause. To see the proposed repairs without node changes, set `gpu_health_monitoring_node_repair_dry_run=true`. A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node.
+
+The add-on can also tag and terminate a node on a user request. This repair needs these items, and Terraform does not set them up:
+
+- A support request that enables the repair for the tenancy
+- The `ComputeInstanceHostActions` tag namespace with the `CustomerReportedHostStatus` tag key
+- A ClusterRoleBinding to the `oke-customer-node-repair-trigger` ClusterRole
+- This IAM policy statement:
+
+  ```text
+  Allow any-user to use tag-namespace in tenancy where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>', target.tag-namespace.name = 'ComputeInstanceHostActions'}
+  ```
+ See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+
+> [!IMPORTANT]
+> If the cluster already has a `NodeRepairConfig` that you created for GPU nodes, delete it before you apply Terraform. A node that more than one repair config selects gets no repair. Its report shows `AdmissionRejected`.
 
 ## Prerequisites
 
@@ -37,14 +57,36 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 - Managed GPU node pools
 - On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. Without this label, the add-on selects the node but does not monitor it.
 - Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
-- The IAM policies that let the worker nodes manage instances and read the instance agent plugins. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create both before you deploy:
+- The IAM policies that let the worker nodes manage instances and read the instance agent plugins, and that let the cluster use the maintenance events of its nodes. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create all three before you deploy:
 
   ```text
   Allow dynamic-group <dynamic group of the cluster nodes> to manage instance-family in compartment id <compartment OCID>
   Allow dynamic-group <dynamic group of the cluster nodes> to read instance-agent-plugins in compartment id <compartment OCID>
+  Allow any-user to use instance-maintenance-events in compartment id <compartment OCID> where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>'}
   ```
 
-  Terraform does not check that these policies exist.
+  Terraform does not check that these policies exist. Keep NPD until the coverage checks below succeed.
+
+## Verify Coverage Before Removing NPD
+
+Apply once with `gpu_health_monitoring_remove_npd=false` (the default). Label existing AMD nodes as described above and resolve any IAM or configuration errors. Wait for the config assignments and node conditions to converge:
+
+```bash
+kubectl get gpuhealthmonitoringconfigs -o yaml
+kubectl get nodes -o json | jq -e '
+  [.items[] | select(
+    (.metadata.labels["node.kubernetes.io/instance-type"] // "") |
+    test("^(BM|VM)\\.GPU"))] |
+  length > 0 and all(.[];
+    any(.status.conditions[];
+      .type == "oci.oraclecloud.com/GpuHealthMonitoringConfigured" and .status == "True") and
+    any(.status.conditions[];
+      .type == "oci.oraclecloud.com/GpuHealthMonitoringUnavailable" and .status == "False"))'
+```
+
+Every expected GPU node must be present, each config must report current successful assignments, and the command must return `true`. An empty or zero-unassigned summary alone does not prove that existing nodes were selected. Only then set `gpu_health_monitoring_remove_npd=true` and apply again. Leave it false for partial coverage, unsupported shapes, or self-managed pools.
+
+Prometheus marks managed nodes selected by the configured pool shapes as Unknown when `GpuHealthMonitoringConfigured=True` is missing, and the unavailable alert reports them. This remains active after NPD is removed.
 
 ## Node Conditions
 
@@ -54,13 +96,14 @@ The add-on can also repair nodes. It reboots a node when a fault with the action
 | `oci.oraclecloud.com/GpuHealthMonitoringUnavailable` | `False` | The health check result files are present on the node. |
 | `oci.oraclecloud.com/GpuHealthMonitoringFaultDetected` | `False` | The passive health checks found no active critical GPU fault. |
 
-To list the nodes with an add-on problem:
+To list GPU nodes without successful add-on configuration (including expected fallback pools):
 
 ```bash
-kubectl get nodes -o json | jq -r '.items[] | .metadata.name as $n |
-  .status.conditions[] | select(.type | startswith("oci.oraclecloud.com/GpuHealthMonitoring")) |
-  select(((.type | endswith("Configured")) and .status != "True") or ((.type | endswith("Configured") | not) and .status != "False")) |
-  [$n, .type, .status, .reason] | @tsv'
+kubectl get nodes -o json | jq -r '.items[] |
+  select((.metadata.labels["node.kubernetes.io/instance-type"] // "") | test("^(BM|VM)\\.GPU")) |
+  select(any(.status.conditions[];
+    .type == "oci.oraclecloud.com/GpuHealthMonitoringConfigured" and .status == "True") | not) |
+  [.metadata.name, "Missing successful add-on configuration"] | @tsv'
 ```
 
 ## Supported Shapes
@@ -73,6 +116,10 @@ The OCA plugin has health check rules for these shapes (Oracle Cloud Agent 1.64.
 - `BM.GPU.GB200.4`, `BM.GPU.GB200-v2.4`, `BM.GPU.GB200-v3.4`, `BM.GPU.GB300.4`
 - `BM.GPU.L40S.4`, `BM.GPU.L40S-NC.4`, `BM.GPU.RTXPRO.8`
 - `BM.GPU.MI300X.8`, `BM.GPU.MI355X.8`, `BM.GPU.MI355X-v1.8`
+
+Terraform keeps NPD with all of its checks by default. Terraform rejects `gpu_health_monitoring_remove_npd=true` when a GPU pool uses another shape, for example `VM.GPU.A10.1`, or is self-managed (the GPU memory cluster pool or a cluster network pool). It also rejects it when NVIDIA GPU pools run without the NVIDIA GPU Operator, because nothing then sets the `nvidia.com/gpu.present` label that the add-on needs. The shape list is the `gpu_health_check_shapes` local in `terraform/oke-addons.tf`.
+
+When NPD is removed, Terraform also deletes the NPD alert rules from Grafana. Grafana keeps a provisioned rule after its file is removed, so a cluster that had NPD would otherwise keep the old rules. The `NPD Check Stale` rule would then fire for every check on every GPU node.
 
 ## Health Checks
 
@@ -95,8 +142,8 @@ The add-on creates a cluster-scoped `NodeHealthReport` for a node when it has a 
 
 | Signal | Source | Fields |
 |---|---|---|
-| `clusterHealthCheck` | Passive health checks | `faultCode`, `faultDescription`, `action`, `firstObservedAt`, `lastObservedAt` |
-| `hpcFault` | OCI Fault Management Service | `faultCode`, `firstObservedAt`, `lastObservedAt` |
+| `clusterHealthCheck` | Passive health checks | `id`, `faultCode`, `faultDescription`, `action`, `firstObservedAt`, `lastObservedAt` |
+| `hpcFault` | OCI Fault Management Service | `id`, `faultCode`, `firstObservedAt`, `lastObservedAt` |
 | `customer` | User-initiated repair label | `action`, `firstObservedAt`, `lastObservedAt` |
 | `maintenanceEvent` | OCI maintenance events | `faultCodes`, `action`, `maintenanceLifecycleState` |
 
@@ -156,6 +203,7 @@ Prometheus also scrapes the fault monitor pods. The `gfm_*` metrics show the sca
 The `node_health_status` recording rule includes the add-on:
 
 - A node with `GpuHealthMonitoringFaultDetected=True` is `0` (Failed).
+- A node with an `hpcFault` signal observed in the last 15 minutes is `0` (Failed). A signal stays in the `NodeHealthReport` after its fault clears, so the rule uses the last observed time.
 - A node with `GpuHealthMonitoringUnavailable=True`, or with `GpuHealthMonitoringConfigured` not `True`, is `2` (Unknown).
 
 These dashboards show the add-on data:
@@ -169,6 +217,7 @@ These dashboards show the add-on data:
 | Alert | Fires when |
 |---|---|
 | GPU Health Fault | `GpuHealthMonitoringFaultDetected` is `True` for 1 minute. |
+| GPU Health Signal | An `hpcFault` signal, or a `clusterHealthCheck` signal with an action other than `REBOOT`, is active for 1 minute. A signal is active when it was observed in the last 15 minutes. Node auto repair does not reboot the node for these signals. It can stop or terminate the node when a Compute maintenance event matches the fault. |
 | GPU Health Monitoring Unavailable | The add-on does not monitor the node for 30 minutes. |
 | GPU Node Repair Failed | A node repair (not a dry run) failed in the last hour. |
 | GPU Fault Monitor Stale or Missing | The health check files on a node are older than 15 minutes, or a configured node has no healthy fault monitor scrape, for 10 minutes. |

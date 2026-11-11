@@ -11,7 +11,7 @@ local var = g.dashboard.variable;
     + var.query.withDatasourceFromVariable(self.prometheus)
     + var.query.queryTypes.withLabelValues('cluster_name', 'up')
     + var.query.selectionOptions.withMulti()
-    + var.query.selectionOptions.withIncludeAll()
+    + var.query.selectionOptions.withIncludeAll(customAllValue='.*')
     + var.query.withRefresh(1),
 
 }

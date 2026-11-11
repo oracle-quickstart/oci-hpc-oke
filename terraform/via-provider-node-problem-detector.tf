@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl
 
 resource "helm_release" "node_problem_detector_amd" {
-  count      = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.has_amd_gpu, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count      = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.has_amd_gpu, !local.npd_removed, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [helm_release.prometheus]
   namespace  = var.monitoring_namespace
   name       = "gpu-rdma-node-problem-detector-amd"
@@ -22,7 +22,7 @@ resource "helm_release" "node_problem_detector_amd" {
 }
 
 resource "helm_release" "node_problem_detector_nvidia" {
-  count      = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
+  count      = alltrue([var.install_monitoring, var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu, !local.npd_removed, local.deploy_from_local || local.deploy_from_orm]) ? 1 : 0
   depends_on = [helm_release.prometheus]
   namespace  = var.monitoring_namespace
   name       = "gpu-rdma-node-problem-detector-nvidia"

@@ -111,7 +111,7 @@ Kueue v0.18 and later reject pods with Dranet claims unless Kueue maps the `dra.
 - Install or upgrade Kueue with the stack values file, which maps the DeviceClass to the `dra.net/nic` resource. Kueue v0.20 no longer serves the `v1beta1` API. If Kueue is already installed, do the stored version check in [Deploy MPI Operator and Kueue](running-nccl-rccl-tests.md#deploy-mpi-operator-and-kueue) before you upgrade.
 
   ```sh
-  helm upgrade --install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.0" \
+  helm upgrade --install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.5" \
     --create-namespace --namespace=kueue-system \
     -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/terraform/files/kueue/values.yaml
   ```
