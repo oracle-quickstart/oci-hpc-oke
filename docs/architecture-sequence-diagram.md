@@ -374,7 +374,7 @@ sequenceDiagram
 
 The webhook queues incoming alerts in memory and returns HTTP 200 once they're queued. Background workers track alert state in SQLite, apply debounce and reminder rules, and send eligible notifications to ONS. They skip `DatasourceNoData` alerts and log any publishing errors.
 
-Sources: [operator monitoring deployments](../terraform/via-operator-helm-deployments.tf), [provider Prometheus deployment](../terraform/via-provider-kube-prometheus-stack.tf), [monitoring chart values](../terraform/files/kube-prometheus/values.yaml.tftpl), [provider Grafana ConfigMaps](../terraform/via-provider-grafana.tf), [operator Grafana ConfigMaps](../terraform/via-operator-grafana.tf), [Grafana notification policy](../terraform/files/grafana/alerts/alert-rules.yaml), [webhook implementation](../terraform/files/oke-ons-webhook/templates/configmap.yaml), [ONS topic](../terraform/topic.tf).
+Sources: [operator monitoring deployments](../terraform/via-operator-helm-deployments.tf), [provider Prometheus deployment](../terraform/via-provider-kube-prometheus-stack.tf), [monitoring chart values](../terraform/files/kube-prometheus/values.yaml.tftpl), [provider Grafana ConfigMaps](../terraform/via-provider-grafana.tf), [operator Grafana ConfigMaps](../terraform/via-operator-grafana.tf), [Grafana notification policy](../terraform/files/grafana/alerts/contact-points.yaml), [webhook implementation](../terraform/files/oke-ons-webhook/templates/configmap.yaml), [ONS topic](../terraform/topic.tf).
 
 #### 8a. Grafonnet Dashboards - Source, Compilation and Deployment
 

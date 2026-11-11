@@ -193,7 +193,16 @@ sed -e 's/${install_grafana}/true/' \
   -e "${GPU_HEALTH_RULES_FILTER}" \
   -e '/^%{ if /d' \
   -e '/^%{ endif }/d' \
-  terraform/files/kube-prometheus/values.yaml.tftpl \
+  terraform/files/kube-prometheus/values.yaml.tftpl | \
+awk '
+  index($0, "${jsonencode(grafana_alerting_config)}") {
+    print "    contact-points.yaml:"
+    while ((getline line < "terraform/files/grafana/alerts/contact-points.yaml") > 0) print "      " line
+    close("terraform/files/grafana/alerts/contact-points.yaml")
+    next
+  }
+  { print }
+' \
   > /tmp/kube-prometheus-values.yaml
 ```
 
@@ -531,6 +540,9 @@ With `NPD_REMOVED=true`, the NPD alerts are not deployed. With partial add-on co
 # Set the path to the alerts directory (adjust if needed)
 ALERTS_PATH="terraform/files/grafana/alerts"
 
+# The contact point is provisioned by Helm, not the alert sidecar. Remove the ConfigMap left by earlier versions.
+kubectl delete configmap -n "${MONITORING_NAMESPACE}" alert-alert-rules --ignore-not-found
+
 # Deploy only the common and vendor-applicable alert files
 case "${GPU_VENDOR}" in
   amd)
@@ -572,6 +584,9 @@ done
 
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
+
+  # The Helm values already provision the contact point and notification policy.
+  [ "${alert_name}" = "contact-points.yaml" ] && continue
 
   case " ${SKIP_ALERTS} " in
     *" ${alert_name%.yaml} "*) continue ;;
@@ -703,7 +718,7 @@ The alert rules deployed in Step 6 already reference the `ons-webhook` contact p
    - **URL**: `http://oke-ons-webhook/grafana-webhook`
    - **HTTP Method**: POST
 
-If it doesn't exist, it should be created automatically from the alert rules ConfigMap (`alert-rules.yaml`).
+The Helm values in Step 2 provision this contact point and notification policy from `contact-points.yaml`.
 
 ### 7.6 Configure ONS Subscriptions
 
@@ -1051,7 +1066,7 @@ diff <(helm get values kube-prometheus-stack -n monitoring) /tmp/kube-prometheus
 
 ### Update kube-prometheus-stack
 
-Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingress configuration) while applying changes from the values file:
+Regenerate `/tmp/kube-prometheus-values.yaml` using Step 2.2 before updating. Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingress configuration) while applying changes from the values file:
 
 ```bash
 helm repo update

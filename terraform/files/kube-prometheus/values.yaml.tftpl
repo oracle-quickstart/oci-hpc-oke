@@ -100,6 +100,10 @@ prometheus-node-exporter:
 grafana:
   enabled: ${install_grafana}
   defaultDashboardsEnabled: false
+%{ if setup_alerting }
+  alerting:
+    contact-points.yaml: ${jsonencode(grafana_alerting_config)}
+%{ endif }
   persistence:
     enabled: true
     type: sts
