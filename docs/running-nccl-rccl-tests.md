@@ -12,7 +12,7 @@ The `kueue/` manifests use topology-aware scheduling (TAS) with the `oci-rdma` T
 ```sh
 kubectl apply --server-side -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/refs/heads/main/manifests/mpi-operator/mpi-operator.yaml
 
-helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.0" --create-namespace --namespace=kueue-system \
+helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.5" --create-namespace --namespace=kueue-system \
   -f https://raw.githubusercontent.com/oracle-quickstart/oci-hpc-oke/main/terraform/files/kueue/values.yaml
 ```
 
@@ -23,7 +23,7 @@ helm install kueue oci://registry.k8s.io/kueue/charts/kueue --version="0.20.0" -
 > kubectl get crd -o custom-columns=NAME:.metadata.name,STORED:.status.storedVersions | grep kueue.x-k8s.io
 > ```
 >
-> If a CRD lists `v1beta1`, run the Kueue [migration script](https://raw.githubusercontent.com/kubernetes-sigs/kueue/v0.20.0/hack/migrate-to-v1beta2.sh) before you upgrade.
+> If a CRD lists `v1beta1`, run the Kueue [migration script](https://raw.githubusercontent.com/kubernetes-sigs/kueue/v0.20.5/hack/migrate-to-v1beta2.sh) before you upgrade.
 
 ## Run the NCCL/RCCL Tests
 

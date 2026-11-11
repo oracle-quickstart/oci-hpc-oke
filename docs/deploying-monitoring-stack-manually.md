@@ -83,7 +83,7 @@ kubectl create namespace monitoring
 
 ```bash
 export MONITORING_NAMESPACE="monitoring"
-export PROMETHEUS_STACK_CHART_VERSION="92.0.0"
+export PROMETHEUS_STACK_CHART_VERSION="93.0.0"
 
 # Set amd, nvidia, or mixed to control vendor-specific NPD and alert deployment
 export GPU_VENDOR="amd"
@@ -171,16 +171,23 @@ NPD_AMD_CONDITIONS="${SHARED_CONDITIONS}|${NPD_AMD_ONLY_CONDITIONS}"
 NPD_NVIDIA_CONDITIONS="${SHARED_CONDITIONS}|${NPD_NVIDIA_ONLY_CONDITIONS}"
 NPD_AMD_COUNT=$(echo "${NPD_AMD_CONDITIONS}" | awk -F'|' '{print NF}')
 NPD_NVIDIA_COUNT=$(echo "${NPD_NVIDIA_CONDITIONS}" | awk -F'|' '{print NF}')
-# Delete the NPD rules block only after opting out of NPD.
-NPD_RULES_FILTER='/^%{ if !npd_removed }/d'
-if [ "${NPD_REMOVED}" = "true" ]; then
-  NPD_RULES_FILTER='/^%{ if !npd_removed }/,/^%{ endif }/d'
-fi
-# Without the add-on, delete its PodMonitor and custom-resource metrics blocks.
-GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/d'
-if [ "${GPU_HEALTH_MONITORING}" = "false" ]; then
-  GPU_HEALTH_RULES_FILTER='/^%{ if gpu_health_monitoring }/,/^%{ endif }/d'
-fi
+# Set true only when Kueue is installed; enables scraping and workload metadata.
+KUEUE_MONITORING=false
+awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" -v install_kueue="${KUEUE_MONITORING}" -v npd_removed="${NPD_REMOVED}" '
+  BEGIN { depth = 0; active[0] = 1 }
+  /^%\{ if / {
+    condition = 0
+    if ($0 ~ /gpu_health_monitoring \|\| install_kueue/) condition = (gpu_health_monitoring == "true" || install_kueue == "true")
+    else if ($0 ~ /gpu_health_monitoring/) condition = (gpu_health_monitoring == "true")
+    else if ($0 ~ /!npd_removed/) condition = (npd_removed != "true")
+    else if ($0 ~ /install_kueue/) condition = (install_kueue == "true")
+    else if ($0 ~ /setup_alerting/) condition = 1
+    # The public-ingress-only grafana.ini block is omitted for this manual setup.
+    depth++; active[depth] = active[depth-1] && condition; next
+  }
+  /^%\{ endif \}/ { depth--; next }
+  active[depth]
+' terraform/files/kube-prometheus/values.yaml.tftpl | \
 sed -e 's/${install_grafana}/true/' \
   -e 's/${setup_alerting}/true/' \
   -e "s/\${prometheus_memory_request}/${PROMETHEUS_MEMORY_REQUEST}/" \
@@ -188,12 +195,7 @@ sed -e 's/${install_grafana}/true/' \
   -e "s/\${npd_nvidia_conditions}/${NPD_NVIDIA_CONDITIONS}/" \
   -e "s/\${npd_amd_condition_count}/${NPD_AMD_COUNT}/" \
   -e "s/\${npd_nvidia_condition_count}/${NPD_NVIDIA_COUNT}/" \
-  -e "s/\${gpu_health_monitoring_shape_regex}/${GPU_HEALTH_SHAPE_REGEX}/" \
-  -e "${NPD_RULES_FILTER}" \
-  -e "${GPU_HEALTH_RULES_FILTER}" \
-  -e '/^%{ if /d' \
-  -e '/^%{ endif }/d' \
-  terraform/files/kube-prometheus/values.yaml.tftpl | \
+  -e "s/\${gpu_health_monitoring_shape_regex}/${GPU_HEALTH_SHAPE_REGEX}/" | \
 awk '
   index($0, "${jsonencode(grafana_alerting_config)}") {
     print "    contact-points.yaml:"
@@ -341,7 +343,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -353,7 +355,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \
@@ -391,6 +393,8 @@ temporary and remains under the ignored `build` directory:
 
 ```bash
 make -C terraform/files/grafana/jsonnet verify
+# verify builds every source for validation; compile the selected deployment set.
+make -C terraform/files/grafana/jsonnet compile INCLUDE_KUEUE="${KUEUE_MONITORING:-false}"
 DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
 ```
 
@@ -400,6 +404,9 @@ repository for comparison only. Do not create ConfigMaps from it.
 ### 5.1 Deploy Kubernetes Dashboards
 
 ```bash
+if [ "${KUEUE_MONITORING:-false}" = "false" ]; then
+  kubectl delete configmap dashboard-kueue --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
 # Deploy each common dashboard as a ConfigMap
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do
   kubectl create configmap "dashboard-$(basename "$dashboard" .json)" \
@@ -582,11 +589,20 @@ for alert in ${SKIP_ALERTS}; do
   kubectl delete configmap -n ${MONITORING_NAMESPACE} "alert-${alert}" --ignore-not-found
 done
 
+if [ "${KUEUE_MONITORING:-false}" = "true" ]; then
+  kubectl delete configmap alert-kueue-delete-alerts --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+else
+  kubectl delete configmap alert-kueue-health --namespace "${MONITORING_NAMESPACE}" --ignore-not-found
+fi
+
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
 
   # The Helm values already provision the contact point and notification policy.
   [ "${alert_name}" = "contact-points.yaml" ] && continue
+  case "${KUEUE_MONITORING:-false}:${alert_name}" in
+    true:kueue-delete-alerts.yaml|false:kueue-health.yaml) continue ;;
+  esac
 
   case " ${SKIP_ALERTS} " in
     *" ${alert_name%.yaml} "*) continue ;;
@@ -1111,7 +1127,7 @@ AMD:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-amd \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-amd.yaml \
@@ -1123,7 +1139,7 @@ NVIDIA:
 ```bash
 helm upgrade --install gpu-rdma-node-problem-detector-nvidia \
   oci://ghcr.io/deliveryhero/helm-charts/node-problem-detector \
-  --version 2.4.1 \
+  --version 2.4.2 \
   --namespace ${MONITORING_NAMESPACE} \
   --values terraform/files/node-problem-detector/values.yaml \
   --values terraform/files/node-problem-detector/values-nvidia.yaml \
@@ -1153,6 +1169,8 @@ the Jsonnet source and rerun the `kubectl apply` loops to update them in place:
 ```bash
 # Update common dashboards
 make -C terraform/files/grafana/jsonnet verify
+# verify builds every source for validation; compile the selected deployment set.
+make -C terraform/files/grafana/jsonnet compile INCLUDE_KUEUE="${KUEUE_MONITORING:-false}"
 DASHBOARD_PATH="terraform/files/grafana/jsonnet/build"
 
 for dashboard in "${DASHBOARD_PATH}"/common/*.json; do

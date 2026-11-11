@@ -428,22 +428,22 @@ variable "monitoring_namespace" {
 }
 
 variable "node_problem_detector_chart_version" {
-  default = "2.4.1"
+  default = "2.4.2"
   type    = string
 }
 
 variable "prometheus_stack_chart_version" {
-  default = "92.0.0"
+  default = "93.0.0"
   type    = string
 }
 
 variable "cert_manager_chart_version" {
-  default = "v1.20.2"
+  default = "v1.21.3"
   type    = string
 }
 
 variable "ingress_chart_version" {
-  default = "0.6.0"
+  default = "0.9.0"
   type    = string
 }
 
@@ -554,7 +554,7 @@ variable "nvidia_gpu_operator_advanced_options" {
 
 variable "nvidia_gpu_operator_addon_version" {
   type        = string
-  default     = "v25.10.1"
+  default     = "v26.3.3"
   description = "Version of the NvidiaGpuOperator OKE addon."
 }
 
@@ -1099,7 +1099,7 @@ variable "install_kueue" {
 }
 
 variable "kueue_chart_version" {
-  default = "0.20.0"
+  default = "0.20.5"
   type    = string
 }
 

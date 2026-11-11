@@ -1426,7 +1426,7 @@ variables:
     title: Node Problem Detector chart version
     type: string
     required: true
-    default: "2.4.1"
+    default: "2.4.2"
     visible: false
       # and:
       # - monitoring_advanced_options
@@ -1435,13 +1435,13 @@ variables:
     title: Prometheus stack chart version
     type: string
     required: true
-    default: "92.0.0"
+    default: "93.0.0"
     visible: false
   ingress_chart_version:
     title: Ingress Controller helm chart version
     type: string
     required: true
-    default: "0.6.0"
+    default: "0.9.0"
     visible: false
   install_grafana:
     title: Grafana
@@ -1694,9 +1694,10 @@ variables:
     title: NVIDIA GPU Operator add-on version
     type: enum
     description: Version of the NVIDIA GPU Operator OKE add-on.
-    default: "v25.10.1"
+    default: "v26.3.3"
     required: true
     enum:
+      - "v26.3.3"
       - "v25.10.1"
       - "v25.3.4"
     visible:
@@ -2523,7 +2524,7 @@ variables:
   kueue_chart_version:
     title: Kueue Helm chart version
     type: string
-    default: "0.20.0"
+    default: "0.20.5"
     required: true
     visible: false
   kueue_local_queue_default_namespace:

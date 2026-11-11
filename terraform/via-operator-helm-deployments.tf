@@ -103,7 +103,8 @@ module "ingress" {
   )
   helm_user_values_override = ""
 
-  depends_on = [module.oke, module.certmanager]
+  # Kueue registers a cluster-wide Deployment webhook. Without this order, it rejects the contour Deployment.
+  depends_on = [module.oke, module.certmanager, module.kueue]
 }
 
 
@@ -178,6 +179,7 @@ module "kube_prometheus_stack" {
     npd_nvidia_conditions             = local.npd_nvidia_conditions
     npd_amd_condition_count           = length(split("|", local.npd_amd_conditions))
     npd_nvidia_condition_count        = length(split("|", local.npd_nvidia_conditions))
+    install_kueue                     = var.install_kueue
   })
 
   helm_user_values_override = var.install_grafana ? yamlencode(
