@@ -22,6 +22,7 @@ resource "helm_release" "prometheus" {
     install_grafana                   = var.install_grafana
     preferred_kubernetes_services     = var.preferred_kubernetes_services
     setup_alerting                    = var.setup_alerting
+    grafana_alerting_config           = var.setup_alerting ? yamldecode(file("${local.grafana_alert_dir}/${local.grafana_alerting_file}")) : null
     prometheus_memory_request         = local.prometheus_memory_request
     gpu_health_monitoring             = local.deploy_gpu_health_monitoring_addon
     gpu_health_monitoring_shape_regex = local.gpu_health_monitoring_shape_regex

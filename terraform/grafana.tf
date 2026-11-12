@@ -48,6 +48,8 @@ locals {
 
   grafana_alert_dir   = "${path.module}/files/grafana/alerts"
   grafana_alert_files = fileset(local.grafana_alert_dir, "*.yaml")
+  # Contact points and notification policy. The Helm values provision this file, not the alert sidecar.
+  grafana_alerting_file = "contact-points.yaml"
   grafana_amd_alert_files = [
     "gpu-bad-pages.yaml",
   ]
@@ -100,21 +102,26 @@ locals {
     "rdma-vf-routes.yaml",
     "rdma-wpa-auth.yaml",
   ]
+  # Same conditions as the NPD releases. NPD runs only on GPU pools.
+  npd_deployed = alltrue([var.install_node_problem_detector_kube_prometheus_stack, local.has_nvidia_gpu || local.has_amd_gpu, !local.npd_removed])
   grafana_alert_files_filtered = [
     for f in local.grafana_alert_files : f
-    if(!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
+    if f != local.grafana_alerting_file &&
+    (!contains(local.grafana_amd_alert_files, f) || local.has_amd_gpu) &&
     (!contains(local.grafana_nvidia_alert_files, f) || local.has_nvidia_gpu) &&
     (!contains(local.grafana_gpu_health_alert_files, f) || local.deploy_gpu_health_monitoring_addon) &&
     (f != "kueue-health.yaml" || var.install_kueue) &&
     (f != "kueue-delete-alerts.yaml" || !var.install_kueue) &&
     (f != "gpu-health-delete-alerts.yaml" || !local.deploy_gpu_health_monitoring_addon) &&
-    (!contains(local.grafana_npd_alert_files, f) || !local.npd_removed) &&
-    (f != "npd-delete-all-alerts.yaml" || local.npd_removed) &&
+    (!contains(local.grafana_npd_alert_files, f) || local.npd_deployed) &&
+    (f != "npd-delete-all-alerts.yaml" || !local.npd_deployed) &&
     (f != "npd-delete-nvidia-alerts.yaml" || (local.has_amd_gpu && !local.has_nvidia_gpu)) &&
     (f != "npd-delete-amd-alerts.yaml" || (local.has_nvidia_gpu && !local.has_amd_gpu))
   ]
   # Alert files outside the deployed set. The operator path deletes their ConfigMaps, because kubectl apply -k does not.
   grafana_alert_files_excluded = sort(setsubtract(local.grafana_alert_files, local.grafana_alert_files_filtered))
+  # The contact point file used to be a sidecar ConfigMap. Upgrades must delete it, or it duplicates the Helm-provisioned file.
+  grafana_legacy_alert_configmaps = ["alert-alert-rules"]
   grafana_alerts = (var.install_monitoring && var.install_grafana && var.setup_alerting) ? {
     for f in local.grafana_alert_files_filtered :
     f => file(join("/", [local.grafana_alert_dir, f]))

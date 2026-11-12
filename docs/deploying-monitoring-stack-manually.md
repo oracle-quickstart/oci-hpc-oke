@@ -181,6 +181,7 @@ awk -v gpu_health_monitoring="${GPU_HEALTH_MONITORING}" -v install_kueue="${KUEU
     else if ($0 ~ /gpu_health_monitoring/) condition = (gpu_health_monitoring == "true")
     else if ($0 ~ /!npd_removed/) condition = (npd_removed != "true")
     else if ($0 ~ /install_kueue/) condition = (install_kueue == "true")
+    else if ($0 ~ /setup_alerting/) condition = 1
     # The public-ingress-only grafana.ini block is omitted for this manual setup.
     depth++; active[depth] = active[depth-1] && condition; next
   }
@@ -194,7 +195,16 @@ sed -e 's/${install_grafana}/true/' \
   -e "s/\${npd_nvidia_conditions}/${NPD_NVIDIA_CONDITIONS}/" \
   -e "s/\${npd_amd_condition_count}/${NPD_AMD_COUNT}/" \
   -e "s/\${npd_nvidia_condition_count}/${NPD_NVIDIA_COUNT}/" \
-  -e "s/\${gpu_health_monitoring_shape_regex}/${GPU_HEALTH_SHAPE_REGEX}/" \
+  -e "s/\${gpu_health_monitoring_shape_regex}/${GPU_HEALTH_SHAPE_REGEX}/" | \
+awk '
+  index($0, "${jsonencode(grafana_alerting_config)}") {
+    print "    contact-points.yaml:"
+    while ((getline line < "terraform/files/grafana/alerts/contact-points.yaml") > 0) print "      " line
+    close("terraform/files/grafana/alerts/contact-points.yaml")
+    next
+  }
+  { print }
+' \
   > /tmp/kube-prometheus-values.yaml
 ```
 
@@ -256,6 +266,8 @@ kubectl get daemonset -n ${MONITORING_NAMESPACE} \
 
 **Note**: This step is only required if you have NVIDIA GPU nodes in your cluster with the NvidiaGpuOperator OKE addon enabled. The NVIDIA GPU Operator addon deploys the DCGM exporter DaemonSet automatically in the `gpu-operator` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
 
+The ServiceMonitor drops the GPU workload labels (`exported_pod`, `exported_container`, and `exported_namespace`) from the DCGM metrics. These labels change with every workload pod and multiply the series. The Terraform stack drops the same labels. Queries that group the DCGM metrics by workload pod or namespace do not work.
+
 ### 3.1 Locate the ServiceMonitor Manifest
 
 The ServiceMonitor manifest is available at `terraform/files/nvidia-dcgm-exporter-service-monitor/service-monitor.yaml`.
@@ -279,6 +291,8 @@ kubectl get pods -n gpu-operator -l app=nvidia-dcgm-exporter
 ## Step 3b: Deploy AMD Device Metrics Exporter ServiceMonitor
 
 **Note**: This step is only required if you have AMD MI300X or MI355X nodes in your cluster with the AmdGpuOperator OKE addon enabled. The AMD GPU Operator addon deploys the device metrics exporter DaemonSet automatically in the `kube-amd-gpu` namespace. This step adds a ServiceMonitor so Prometheus can scrape its metrics.
+
+The ServiceMonitor drops the GPU workload labels (`pod`, `container`, and `namespace`, and their `exported_` versions) from the AMD exporter metrics. These labels change with every workload pod and multiply the series. The Terraform stack drops the same labels. Queries that group the AMD GPU metrics by workload pod or namespace do not work.
 
 ### 3b.1 Configure the Metric Prefix
 
@@ -533,6 +547,9 @@ With `NPD_REMOVED=true`, the NPD alerts are not deployed. With partial add-on co
 # Set the path to the alerts directory (adjust if needed)
 ALERTS_PATH="terraform/files/grafana/alerts"
 
+# The contact point is provisioned by Helm, not the alert sidecar. Remove the ConfigMap left by earlier versions.
+kubectl delete configmap -n "${MONITORING_NAMESPACE}" alert-alert-rules --ignore-not-found
+
 # Deploy only the common and vendor-applicable alert files
 case "${GPU_VENDOR}" in
   amd)
@@ -581,6 +598,8 @@ fi
 for alert in "${ALERTS_PATH}"/*.yaml; do
   alert_name=$(basename "${alert}")
 
+  # The Helm values already provision the contact point and notification policy.
+  [ "${alert_name}" = "contact-points.yaml" ] && continue
   case "${KUEUE_MONITORING:-false}:${alert_name}" in
     true:kueue-delete-alerts.yaml|false:kueue-health.yaml) continue ;;
   esac
@@ -715,7 +734,7 @@ The alert rules deployed in Step 6 already reference the `ons-webhook` contact p
    - **URL**: `http://oke-ons-webhook/grafana-webhook`
    - **HTTP Method**: POST
 
-If it doesn't exist, it should be created automatically from the alert rules ConfigMap (`alert-rules.yaml`).
+The Helm values in Step 2 provision this contact point and notification policy from `contact-points.yaml`.
 
 ### 7.6 Configure ONS Subscriptions
 
@@ -1063,7 +1082,7 @@ diff <(helm get values kube-prometheus-stack -n monitoring) /tmp/kube-prometheus
 
 ### Update kube-prometheus-stack
 
-Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingress configuration) while applying changes from the values file:
+Regenerate `/tmp/kube-prometheus-values.yaml` using Step 2.2 before updating. Use `--reuse-values` to preserve existing settings (e.g., Grafana password, ingress configuration) while applying changes from the values file:
 
 ```bash
 helm repo update

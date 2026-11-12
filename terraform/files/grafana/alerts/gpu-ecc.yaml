@@ -51,7 +51,7 @@ groups:
           noDataState: NoData
           execErrState: Error
           for: 1m
-          keep_firing_for: 30m
+          keepFiringFor: 30m
           annotations: {}
           labels: {}
           isPaused: false

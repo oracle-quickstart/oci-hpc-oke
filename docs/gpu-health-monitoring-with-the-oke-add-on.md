@@ -1,7 +1,7 @@
 # GPU Health Monitoring with the OKE Add-on
 
 > [!NOTE]
-> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, or unsupported GPU shapes does not get the add-on.
+> Terraform installs the add-on when `deploy_gpu_health_monitoring` is `true` (the default) and at least one managed GPU node pool has a [supported shape](#supported-shapes). Terraform also sets up the metrics, dashboards, and alerts in this guide. A cluster with only a GPU memory cluster pool, a cluster network pool, unsupported GPU shapes, or NVIDIA pools without the NVIDIA GPU Operator does not get the add-on.
 
 The OKE GPU Health Monitoring add-on reports GPU node faults as node conditions and `NodeHealthReport` objects. OKE manages the add-on. The add-on is the main GPU health source of this stack. Terraform keeps Node Problem Detector (NPD) by default. After verifying that the add-on checks every GPU node, set `gpu_health_monitoring_remove_npd=true` to remove NPD. Terraform also requires supported managed GPU pools and the NVIDIA GPU Operator for NVIDIA pools. For the NPD checks that have no replacement, see [Running GPU and RDMA Health Checks with Node Problem Detector](./running-gpu-rdma-healthchecks-with-node-problem-detector.md#running-with-the-gpu-health-monitoring-add-on).
 
@@ -12,7 +12,7 @@ The add-on has two components in the `gpu-health-monitoring` namespace:
 - The `gpu-health-monitoring-controller` Deployment enables the Oracle Cloud Agent (OCA) "Compute RDMA GPU Monitoring" plugin on each GPU node and manages the node repairs.
 - The `gpu-fault-monitor` DaemonSet reads the health check results of the OCA plugin on each GPU node every 30 seconds.
 
-The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource selects. Terraform creates one cluster-scoped config for each [supported shape](#supported-shapes) of the managed GPU node pools, for example `gpu-health-monitoring-bm-gpu-b300-8`. Each config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. A node can match only one config, because the add-on rejects configs that select the same node (`MultipleMatchingPolicies`). Without a config, the add-on deploys no fault monitor and checks no node. The add-on does not check self-managed nodes, so the GPU memory cluster pool and a cluster network pool get no config.
+The add-on checks only the nodes that a `GpuHealthMonitoringConfig` resource selects. Terraform creates one cluster-scoped config for each [supported shape](#supported-shapes) of the managed GPU node pools, for example `gpu-health-monitoring-bm-gpu-b300-8`. Each config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. A node can match only one config, because the add-on rejects configs that select the same node (`MultipleMatchingPolicies`). Without a config, the add-on deploys no fault monitor and checks no node. The add-on does not check self-managed nodes, so the GPU memory cluster pool and a cluster network pool get no config. An NVIDIA pool gets a config only when `deploy_nvidia_gpu_operator` is `true`.
 
 > [!IMPORTANT]
 > If the cluster already has a `GpuHealthMonitoringConfig` that you created, delete it before you apply Terraform. Otherwise your config and the Terraform config select the same nodes, and the add-on rejects both.
@@ -29,12 +29,14 @@ kubectl label node <node-name> amd.com/gpu.present=true
 
 The OCA plugin runs passive health checks every five minutes. It also reads the active faults of the node from the OCI Fault Management Service (FMS). The fault monitor publishes the critical results as node conditions and `NodeHealthReport` objects.
 
-The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. With these configs, the add-on does these repairs:
+The add-on can also repair nodes. A repair needs a `NodeRepairConfig` resource that selects the node. Terraform creates one cluster-scoped repair config for each shape that has a `GpuHealthMonitoringConfig`, for example `gpu-node-repair-bm-gpu-b300-8`. Each repair config selects its shape by the `node.kubernetes.io/instance-type` label and has the label `app.kubernetes.io/managed-by=oci-hpc-oke`. When the repairs are not a dry run, the add-on does these repairs:
 
 - It cordons, drains, and reboots a node when a fault with the action `REBOOT` stays active for 10 minutes.
 - It drains a node and then stops or terminates it when a fault of the node matches a Compute maintenance event. The action of the maintenance event (`STOP` or `TERMINATE`) sets the repair action.
 
-The repair configs run one repair at a time (`maximumParallelNodeRepairs: 1`). They use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause. To see the proposed repairs without node changes, set `gpu_health_monitoring_node_repair_dry_run=true`. A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node.
+By default, the repair configs are a dry run (`gpu_health_monitoring_node_repair_dry_run=true`). A dry run shows the proposed repair in the `NodeHealthReport`. It does not cordon, drain, reboot, stop, or terminate the node. To let the add-on repair nodes, set `gpu_health_monitoring_node_repair_dry_run=false`.
+
+Each repair config sets `maximumParallelNodeRepairs: 1`. The repair configs use an unhealthy node threshold of 10% (`maxUnhealthyNodeThreshold`), a drain grace period of 60 minutes, and no forced action after the grace period. Repairs start without a pause.
 
 The add-on can also tag and terminate a node on a user request. This repair needs these items, and Terraform does not set them up:
 
@@ -46,7 +48,8 @@ The add-on can also tag and terminate a node on a user request. This repair need
   ```text
   Allow any-user to use tag-namespace in tenancy where all {request.principal.type = 'cluster', request.principal.id = '<cluster OCID>', target.tag-namespace.name = 'ComputeInstanceHostActions'}
   ```
- See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
+
+See [Repairing GPU Hosts](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengautorepairgpuworkernodes.htm).
 
 > [!IMPORTANT]
 > If the cluster already has a `NodeRepairConfig` that you created for GPU nodes, delete it before you apply Terraform. A node that more than one repair config selects gets no repair. Its report shows `AdmissionRejected`.
@@ -55,7 +58,7 @@ The add-on can also tag and terminate a node on a user request. This repair need
 
 - An enhanced OKE cluster with Kubernetes 1.32 or later
 - Managed GPU node pools
-- On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. Without this label, the add-on selects the node but does not monitor it.
+- On NVIDIA GPU nodes, the NVIDIA GPU Operator (`deploy_nvidia_gpu_operator`). It sets the `nvidia.com/gpu.present=true` label. The add-on does not monitor a node without this label, so Terraform creates no config for the NVIDIA pools without the GPU Operator.
 - Oracle Cloud Agent (OCA) 1.64.0 or later installed on the selected GPU worker nodes
 - The IAM policies that let the worker nodes manage instances and read the instance agent plugins, and that let the cluster use the maintenance events of its nodes. Terraform creates these policies only when `create_policies` is `true`. Otherwise, create all three before you deploy:
 

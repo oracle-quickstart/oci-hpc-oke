@@ -318,12 +318,13 @@ locals {
   ]
   # The add-on monitors only the nodes that a config selects. One config per GPU pool shape with health check
   # rules, because the add-on rejects configs that select the same node. Self-managed pools (GPU memory cluster,
-  # cluster network) are left out, because the add-on does not check self-managed nodes.
+  # cluster network) are left out, because the add-on does not check self-managed nodes. NVIDIA pools need the GPU
+  # Operator, because the add-on does not monitor nodes without the nvidia.com/gpu.present label.
   gpu_health_monitoring_shapes = toset([
     for s in [
       var.worker_gpu_enabled ? var.worker_gpu_shape : "",
       var.worker_rdma_enabled && !var.worker_rdma_use_cluster_network ? var.worker_rdma_shape : "",
-    ] : s if contains(local.gpu_health_check_shapes, s)
+    ] : s if contains(local.gpu_health_check_shapes, s) && (contains(local.amd_gpu_plugin_shapes, s) || local.deploy_nvidia_gpu_operator_addon)
   ])
   gpu_health_monitoring_shape_regex = replace(join("|", sort(tolist(local.gpu_health_monitoring_shapes))), ".", "[.]")
   gpu_health_monitoring_configs = {
@@ -366,10 +367,11 @@ locals {
       }
     })
   }
-  # Remove NPD only after the user verifies live coverage and opts in. Each pool must be a managed node pool with a supported
+  # Remove NPD only after the user verifies live coverage and opts in. Each GPU pool must be a managed node pool with a supported
   # shape. NVIDIA nodes must run the GPU Operator, which sets the nvidia.com/gpu.present label that the add-on needs.
+  # A CPU RDMA pool does not run NPD, so it is not checked.
   npd_removed = var.gpu_health_monitoring_remove_npd && local.deploy_gpu_health_monitoring_addon && (!local.has_nvidia_gpu || local.deploy_nvidia_gpu_operator_addon) && alltrue([
-    !var.worker_rdma_enabled || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
+    !var.worker_rdma_enabled || !can(regex("GPU", coalesce(var.worker_rdma_shape, ""))) || (!var.worker_rdma_use_cluster_network && contains(local.gpu_health_check_shapes, var.worker_rdma_shape)),
     !var.worker_gpu_enabled || contains(local.gpu_health_check_shapes, var.worker_gpu_shape),
     !var.worker_gmc_enabled,
   ])
@@ -796,7 +798,8 @@ resource "oci_containerengine_addon" "gpu_health_monitoring" {
 
   addon_name = "GpuHealthMonitoring"
   cluster_id = module.oke.cluster_id
-  version    = var.gpu_health_monitoring_addon_version
+  # No version means OKE updates the add-on automatically.
+  version = var.gpu_health_monitoring_addon_version == "automatic" ? null : var.gpu_health_monitoring_addon_version
 
   override_existing                = true
   remove_addon_resources_on_delete = true
@@ -868,6 +871,8 @@ resource "null_resource" "gpu_health_monitoring_config_via_operator" {
       # kubectl wait fails at once when the add-on has not created the CRD yet.
       "for i in $(seq 1 30); do kubectl get crd gpuhealthmonitoringconfigs.oci.oraclecloud.com >/dev/null 2>&1 && break; sleep 10; done",
       "kubectl wait --for condition=established --timeout=300s crd/gpuhealthmonitoringconfigs.oci.oraclecloud.com",
+      "for i in $(seq 1 30); do kubectl get crd noderepairconfigs.oci.oraclecloud.com >/dev/null 2>&1 && break; sleep 10; done",
+      "kubectl wait --for condition=established --timeout=300s crd/noderepairconfigs.oci.oraclecloud.com",
       "kubectl apply -f ${self.triggers.config_target}",
       # Delete the configs of pool shapes that are gone.
       "kubectl get gpuhealthmonitoringconfig -l app.kubernetes.io/managed-by=oci-hpc-oke -o name | grep -vxF ${join(" ", [for y in values(local.gpu_health_monitoring_configs) : "-e gpuhealthmonitoringconfig.oci.oraclecloud.com/${yamldecode(y).metadata.name}"])} | xargs -r kubectl delete --timeout=5m",

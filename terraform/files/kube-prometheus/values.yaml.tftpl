@@ -122,6 +122,10 @@ prometheus-node-exporter:
 grafana:
   enabled: ${install_grafana}
   defaultDashboardsEnabled: false
+%{ if setup_alerting }
+  alerting:
+    contact-points.yaml: ${jsonencode(grafana_alerting_config)}
+%{ endif }
   persistence:
     enabled: true
     type: sts
@@ -781,7 +785,6 @@ additionalPrometheusRulesMap:
                 )
               )
 %{ endif }
-          # Missing add-on configuration is unknown for nodes that its configs select.
           - record: node_gpu_health_fault
             expr: |
               max by(hostname) (
@@ -790,6 +793,7 @@ additionalPrometheusRulesMap:
                   "hostname", "$1", "node", "(.*)"
                 )
               )
+          # Missing add-on configuration is unknown for nodes that its configs select.
           - record: node_gpu_health_unknown
             expr: |
               max by(hostname) (
