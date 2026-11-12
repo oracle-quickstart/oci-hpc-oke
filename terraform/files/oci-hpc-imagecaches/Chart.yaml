@@ -1,0 +1,5 @@
+apiVersion: v2
+name: oci-hpc-imagecaches
+description: GPU workload ImageCache resources managed by upstream kube-fledged
+version: 0.1.0
+type: application

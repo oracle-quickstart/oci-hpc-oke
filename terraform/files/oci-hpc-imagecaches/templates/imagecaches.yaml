@@ -1,0 +1,35 @@
+{{- range $name, $group := .Values.groups }}
+{{- if $group.images }}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name) }}
+{{- fail (printf "Image cache group %q must be a DNS label" $name) }}
+{{- end }}
+{{- if gt (len (printf "%s-%s" $.Release.Name $name)) 63 }}
+{{- fail "Image cache release and group name together must not exceed 63 characters" }}
+{{- end }}
+{{- if not $group.nodeSelector }}
+{{- fail (printf "Image cache group %q must have an explicit nodeSelector" $name) }}
+{{- end }}
+---
+apiVersion: kubefledged.io/v1alpha2
+kind: ImageCache
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: oci-hpc-imagecaches
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  cacheSpec:
+    - images:
+        {{- range $image := $group.images }}
+        - {{ required "Cache image references must not be empty" $image | quote }}
+        {{- end }}
+      nodeSelector:
+        {{- toYaml $group.nodeSelector | nindent 8 }}
+  {{- with $.Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

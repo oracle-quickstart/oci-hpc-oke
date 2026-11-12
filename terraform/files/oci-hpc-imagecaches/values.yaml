@@ -1,0 +1,3 @@
+# Groups are supplied by Terraform or a values file.
+imagePullSecrets: []
+groups: {}
