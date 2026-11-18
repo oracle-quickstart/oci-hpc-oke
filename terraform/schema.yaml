@@ -3216,7 +3216,7 @@ variables:
 
   install_kube_fledged:
     title: Install kube-fledged image caching
-    description: Pre-pull NVIDIA NCCL and AMD RCCL images on GPU nodes using kube-fledged. Independent of OCI HPC OKE Utils.
+    description: Pre-pull NVIDIA NCCL or AMD RCCL images for vendors in enabled GPU worker pools using kube-fledged. Independent of OCI HPC OKE Utils.
     type: boolean
     default: false
   install_image_prepuller:

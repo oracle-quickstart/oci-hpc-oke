@@ -253,6 +253,18 @@ jobs:
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
         run: .github/scripts/build-variables-orm.sh
 
+      - name: Configure optional image cache checks
+        run: |
+          ENABLED=$(jq -r '[.install_kube_fledged, .install_image_prepuller] | any(. == true or . == "true")' variables.json)
+          echo "RUN_IMAGE_CACHE_HEALTH_CHECKS=$ENABLED" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        if: env.RUN_IMAGE_CACHE_HEALTH_CHECKS == 'true'
+        with:
+          go-version-file: test/go.mod
+          cache: true
+          cache-dependency-path: test/go.sum
+
       - name: Zip Terraform directory
         run: |
           cd terraform
@@ -365,6 +377,11 @@ jobs:
       - name: GPU resource health checks
         run: .github/scripts/check-gpu-health.sh state.json "outputs."
 
+      - name: Image cache health checks
+        if: env.RUN_IMAGE_CACHE_HEALTH_CHECKS == 'true'
+        working-directory: test
+        run: go test -v -count=1 -run '^TestImageCacheHealth$' -timeout 50m ./...
+
       - name: FSS health checks
         if: contains(env.TOPOLOGY, 'fss')
         run: .github/scripts/check-fss-health.sh state.json "outputs."
@@ -408,6 +425,11 @@ jobs:
 
       - name: GPU resource health checks (post-reboot)
         run: .github/scripts/check-gpu-health.sh state.json "outputs."
+
+      - name: Image cache health checks (post-reboot)
+        if: env.RUN_IMAGE_CACHE_HEALTH_CHECKS == 'true'
+        working-directory: test
+        run: go test -v -count=1 -run '^TestImageCacheHealth$' -timeout 50m ./...
 
       - name: FSS health checks (post-reboot)
         if: contains(env.TOPOLOGY, 'fss')

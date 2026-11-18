@@ -15,7 +15,9 @@ resource "helm_release" "kube_fledged" {
   timeout          = 600
   max_history      = 1
 
-  depends_on = [module.oke, data.oci_resourcemanager_private_endpoint_reachable_ip.oke]
+  # Kueue's Deployment webhook also admits the kube-fledged deployments.
+  # Wait for Kueue's webhook readiness before creating these deployments.
+  depends_on = [module.oke, data.oci_resourcemanager_private_endpoint_reachable_ip.oke, helm_release.kueue, kubectl_manifest.kueue_webhook_probe]
 }
 
 # A separate release installs the CRD/controller before CR creation and

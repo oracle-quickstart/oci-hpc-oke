@@ -26,7 +26,8 @@ module "kube_fledged" {
   post_deployment_commands  = []
   helm_user_values_override = ""
 
-  depends_on = [module.oke]
+  # The Kueue module probes webhook readiness before completing.
+  depends_on = [module.oke, module.kueue]
 }
 
 module "imagecaches" {

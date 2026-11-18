@@ -110,9 +110,35 @@ Monitoring:
 RUN_MONITORING_TESTS=1 go test -count=1 ./... -run TestMonitoring -timeout 3h
 ```
 
+Image caching:
+
+```sh
+RUN_IMAGE_CACHE_TESTS=1 TFVARS_FILE=./tfvars/tf/public-base-tf.tfvars go test -count=1 ./... -run '^TestImageCaching$' -timeout 3h
+```
+
+Like the other optional suites, this test applies Terraform, checks the deployed resources, and destroys the test infrastructure afterward. GPU worker pools exercise the default cache groups; deployments without GPU pools validate the controller and intentionally empty cache release. Public clusters also run the Kubernetes cache health checks; private clusters are checked through the existing CI bastion tunnel instead.
+
+To opt into the CI apply checks, set `{"install_kube_fledged":true}` in the workflow `overrides` input, or use `key=value` overrides in a PR comment:
+
+```text
+/ok-to-run-apply-tf public-base-tf install_kube_fledged=true
+/ok-to-run-apply-tf public-bastion-operator-tf install_kube_fledged=true
+/ok-to-run-apply-orm public-base-orm install_kube_fledged=true
+```
+
+The feature remains disabled in default tests. When enabled, Terraform and ORM apply CI run cache health checks before and after reboot. Offline cache-status regression tests always run with the validation suite.
+
+For a read-only check against an existing cluster, using its current kubeconfig (including `KUBECONFIG`):
+
+```sh
+RUN_IMAGE_CACHE_HEALTH_CHECKS=1 go test -v -count=1 ./... -run '^TestImageCacheHealth$' -timeout 50m
+```
+
+This reads the deployed Helm release Secret to determine expected caches, then checks controller/webhook rollout, successful cache completion, failures, selectors, and matching Ready nodes. Intentionally empty releases pass; missing or unexpected caches fail immediately. It does not apply or destroy infrastructure. See [image caching validation](../docs/image-caching.md#validate-operations-on-oke). Offline checks can be run with `go test -count=1 ./... -run '^TestImageCacheValidation$'`.
+
 ## CI health checks and assertions
 
-The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health check logic lives in reusable scripts under `.github/scripts/` (not inline in the workflow YAML), so changes can be tested from PR branches via comment triggers. Public topologies connect to the API server directly; private topologies tunnel through OCI Bastion Service using an ephemeral SSH keypair generated at runtime.
+The CI apply workflows (`ci-apply-tf.yml`, `ci-apply-orm.yml`) run the following checks after a successful apply. Health check logic lives in reusable scripts under `.github/scripts/` and Go tests under `test/` (not inline in the workflow YAML), so changes can be tested from PR branches via comment triggers. Public topologies connect to the API server directly; private topologies tunnel through OCI Bastion Service using an ephemeral SSH keypair generated at runtime.
 
 ### Output assertions
 
@@ -184,7 +210,7 @@ All test pods include `nvidia.com/gpu` and `amd.com/gpu` tolerations.
 ## Notes
 - The default suite (no `TFVARS_FILE`) sets `create_policies=false` to avoid tenancy-level policy creation. When using a var file, set this explicitly if needed.
 - For instance principal runs, set `OCI_CLI_AUTH=instance_principal` when using monitoring tests so the `oci` CLI can authenticate.
-- Optional test flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`) are required to run those tests; missing flags will skip the test.
+- Optional suite flags (`RUN_FSS_TESTS`, `RUN_LUSTRE_TESTS`, `RUN_MONITORING_TESTS`, `RUN_IMAGE_CACHE_TESTS`) are required to run those tests; missing flags will skip the test.
 - Private topologies use OCI Bastion Service for CI health checks. The CI runner generates an ephemeral SSH keypair, creates a bastion port-forwarding session, and tunnels kubectl through it. No stored SSH keys are needed.
 
 ## Kueue monitoring checks

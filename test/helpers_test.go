@@ -17,3 +17,9 @@ func TestBaseVarsAllowsMissingSSHPublicKeyWhenVarFilesAreUsed(t *testing.T) {
 	_, exists := vars["ssh_public_key"]
 	require.False(t, exists)
 }
+
+func TestBaseVarsDisablesImageCachingByDefault(t *testing.T) {
+	vars := baseVars(t, baseVarsOptions{includeDefaults: true, allowMissingRequired: true})
+	require.Equal(t, false, vars["install_kube_fledged"])
+	require.Equal(t, false, vars["install_image_prepuller"])
+}

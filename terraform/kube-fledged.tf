@@ -59,7 +59,7 @@ variable "kube_fledged_image_groups" {
     images       = list(string)
   }))
   default     = null
-  description = "Replacement cache groups. Null uses the bundled NVIDIA NCCL/AMD RCCL defaults; an empty images list disables a group. Each active group requires an explicit node selector."
+  description = "Replacement cache groups. Null selects the bundled NVIDIA NCCL/AMD RCCL defaults for GPU vendors in enabled worker pools; an empty images list disables a group. Each active group requires an explicit node selector."
   validation {
     condition = var.kube_fledged_image_groups == null ? true : alltrue([
       for name, group in var.kube_fledged_image_groups :
@@ -84,8 +84,12 @@ locals {
     imagePullSecrets = [for name in var.kube_fledged_image_pull_secrets : { name = name }]
   })
   kube_fledged_cache_defaults = yamldecode(file("${path.module}/files/kube-fledged/imagecaches.yaml"))
+  kube_fledged_default_groups = {
+    for name, group in local.kube_fledged_cache_defaults.groups : name => group
+    if(name == "amd" && local.has_amd_gpu) || (name == "nvidia" && local.has_nvidia_gpu)
+  }
   kube_fledged_cache_values = {
-    groups           = var.kube_fledged_image_groups == null ? local.kube_fledged_cache_defaults.groups : var.kube_fledged_image_groups
+    groups           = var.kube_fledged_image_groups == null ? local.kube_fledged_default_groups : var.kube_fledged_image_groups
     imagePullSecrets = [for name in var.kube_fledged_image_pull_secrets : { name = name }]
   }
 }

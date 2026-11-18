@@ -20,7 +20,7 @@ Terraform installs two releases in the `kube-fledged` namespace:
 
 Both the local/Resource Manager provider path and the operator-host path use the same controller settings and image-cache values. On removal, image-cache resources are removed before the controller. Helm retains the upstream CRD; it is cluster-wide and may be used by other caches. No purge annotation is issued by the stack, so disabling the feature does not deliberately delete cached images.
 
-The default groups preserve the old images and selectors:
+The default groups preserve the old images and selectors. Terraform selects only groups for GPU vendors in enabled worker pools, using the same `has_amd_gpu` and `has_nvidia_gpu` conditions as monitoring. AMD-only pools get the AMD group, NVIDIA-only pools get the NVIDIA group, mixed pools get both, and deployments without GPU pools get no default caches. Explicit `kube_fledged_image_groups` are used as provided:
 
 | Group | Node selector | Image |
 |---|---|---|
@@ -62,7 +62,9 @@ The evaluation uses the published `v0.11.0` chart and its matching upstream sour
 
 The chart renders `apps/v1`, `apiextensions.k8s.io/v1`, `admissionregistration.k8s.io/v1`, and the upstream custom API. Rendering against Kubernetes 1.36.4 is an offline check, not proof of controller compatibility on that release. Live acceptance is required on the actual OKE version and both worker runtimes in use.
 
-Updating an existing ImageCache to remove an image causes upstream to launch image-deletion Jobs for the removed image. This differs from the old prepuller, which left obsolete images cached. Validate deletion on each worker runtime and account for its runtime-socket access requirements before changing image lists. Removing an entire ImageCache or disabling the feature does not request purge. Selector-only updates can report no images pulled; request a refresh afterward to populate newly selected nodes.
+Updating an existing ImageCache to remove an image causes upstream to launch image-deletion Jobs for the removed image. This differs from the old prepuller, which left obsolete images cached. Validate deletion on each worker runtime and account for its runtime-socket access requirements before changing image lists. Removing an entire ImageCache or disabling the feature does not request purge.
+
+Upstream rejects changes to an existing ImageCache's node selector with `Mismatch in node selector`; refreshing does not change this restriction. To change a selector, add a group with a new name and the desired selector, apply it, and validate its cache before removing the old group. Alternatively, remove the old group and apply, then re-add it with the new selector and apply again. Removing the entire old cache does not request image deletion; do not use the purge annotation during this migration.
 
 The upstream chart generates webhook TLS certificates valid for 365 days and restarts the webhook on Helm upgrade. Renew them with a controlled Helm upgrade before expiry, verify webhook admission afterward, and account for brief admission unavailability during certificate rotation. The chart has no controller/webhook readiness probes; Helm availability alone does not establish successful cache admission or image pulls. Keep one controller replica: this integration does not establish leader-election safety for multiple replicas.
 
@@ -75,7 +77,7 @@ For Terraform deployments:
 3. Review and apply the Terraform plan. The utilities upgrade removes its prepuller DaemonSets; the new releases install the controller and ImageCache resources. These operations are not an atomic handover. Existing cached images remain on nodes, but pause new workload submissions until cache validation succeeds.
 4. Run the completion check below and a representative warm-start workload. For rollback, restore the previous utilities chart/configuration after disabling both kube-fledged flags. Disabling both flags removes the kube-fledged releases.
 
-For manual Helm deployments, move old `prepuller.groups` into `groups` in a cache values file and `prepuller.imagePullSecrets` into `imagePullSecrets`. The cache chart has no built-in groups: pass `terraform/files/kube-fledged/imagecaches.yaml` for the default groups, or your own values file for custom groups. This avoids Helm merging an old selector or unwanted default group into a custom configuration.
+For manual Helm deployments, move old `prepuller.groups` into `groups` in a cache values file and `prepuller.imagePullSecrets` into `imagePullSecrets`. The cache chart has no built-in groups: pass `terraform/files/kube-fledged/imagecaches.yaml` for both default groups, or your own values file with only the groups needed by your nodes. Automatic vendor selection applies only to Terraform. This avoids Helm merging an old selector or unwanted default group into a custom configuration.
 
 ```bash
 helm upgrade --install kube-fledged kube-fledged \
@@ -90,13 +92,15 @@ After successful validation, upgrade the utilities chart with all `prepuller` va
 
 ## Validate operations on OKE
 
-Run against a disposable test cluster or explicitly selected OKE context. The check is read-only, waits up to 45 minutes by default, requires at least one matching Ready node per active group and rejects a completed operation that predates a matching node, and fails for missing caches, pending refreshes, incomplete operations, or reported failures. On a single-vendor cluster, disable the other default group before running it.
+Run against a disposable test cluster or explicitly selected OKE context. The Go/Terratest check requires Go (see `test/go.mod`) and `kubectl` read access to deployments, nodes, ImageCaches, and the deployed `oci-hpc-imagecaches` Helm release Secret. It uses the current kubeconfig and waits for controller/webhook rollout.
+
+The installed release manifest defines which caches must exist. An intentionally empty release passes; missing or unexpected caches fail immediately. Pending refreshes, incomplete operations, and reported failures are retried for approximately 45 minutes. Each active cache requires at least one matching Ready node, and completed operations must not predate matching Ready nodes. For manual Helm deployments on a single-vendor cluster, disable the other default group before running the check; Terraform selects default groups automatically.
 
 ```bash
 kubectl config current-context
 kubectl get nodes -o wide
 kubectl get imagecaches -n kube-fledged
-python3 scripts/validate-image-caches.py kube-fledged 2700
+(cd test && RUN_IMAGE_CACHE_HEALTH_CHECKS=1 go test -v -count=1 -run '^TestImageCacheHealth$' -timeout 50m ./...)
 kubectl get imagecaches -n kube-fledged -o yaml
 kubectl logs -n kube-fledged deployment/kube-fledged-controller --tail=100
 ```
@@ -122,7 +126,7 @@ Request a refresh for a specific cache (the controller removes the annotation af
 ```bash
 kubectl annotate imagecache oci-hpc-imagecaches-nvidia -n kube-fledged \
   kubefledged.io/refresh-imagecache= --overwrite
-python3 scripts/validate-image-caches.py kube-fledged 2700
+(cd test && RUN_IMAGE_CACHE_HEALTH_CHECKS=1 go test -v -count=1 -run '^TestImageCacheHealth$' -timeout 50m ./...)
 ```
 
 Inspect `status.failures`, pull Job events, controller logs, registry access, disk space, and node readiness on failure. Completed Jobs are deleted by default, so the ImageCache status is the durable diagnostic source until the next operation updates it. Refresh after correcting invalid cache specifications; upstream skips periodic retries for cache-spec validation failures. Do not use the purge annotation as part of routine disable/rollback: it deliberately deletes images from nodes.

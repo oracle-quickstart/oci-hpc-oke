@@ -83,6 +83,8 @@ func baseVars(t *testing.T, opts baseVarsOptions) map[string]interface{} {
 		vars["install_monitoring"] = false
 		vars["install_node_problem_detector_kube_prometheus_stack"] = false
 		vars["setup_alerting"] = false
+		vars["install_kube_fledged"] = false
+		vars["install_image_prepuller"] = false
 		vars["worker_cpu_enabled"] = false
 		vars["worker_gpu_enabled"] = false
 		vars["worker_ops_pool_size"] = 1

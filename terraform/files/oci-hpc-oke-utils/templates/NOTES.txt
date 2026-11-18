@@ -8,16 +8,6 @@ Labeler:
   Labels applied: oci.oraclecloud.com/rdma.*
 {{- end }}
 
-{{- if .Values.prepuller.enabled }}
-
-Prepullers:
-{{- range $name, $group := .Values.prepuller.groups }}
-{{- if $group.images }}
-  - {{ $name }}: {{ len $group.images }} image(s)
-{{- end }}
-{{- end }}
-{{- end }}
-
 {{- if .Values.hostexec.enabled }}
 
 Hostexec:
@@ -26,7 +16,7 @@ Hostexec:
   Interval:  {{ .Values.hostexec.interval }}s
 {{- end }}
 
-{{- if or .Values.labeler.enabled .Values.prepuller.enabled .Values.hostexec.enabled }}
+{{- if or .Values.labeler.enabled .Values.hostexec.enabled }}
 
 Verify with:
   kubectl get ds -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
