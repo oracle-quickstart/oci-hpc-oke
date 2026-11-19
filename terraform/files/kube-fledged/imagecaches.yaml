@@ -1,0 +1,13 @@
+# Install kube-fledged before installing this chart, in the same namespace.
+imagePullSecrets: []
+groups:
+  nvidia:
+    nodeSelector:
+      nvidia.com/gpu: "true"
+    images:
+      - iad.ocir.io/idxzjcdglx2s/nccl-tests:cuda-13.1.1-ubuntu-24.04-nccl-2.29.3-020926.1
+  amd:
+    nodeSelector:
+      amd.com/gpu: "true"
+    images:
+      - iad.ocir.io/idxzjcdglx2s/rccl-tests:rocm-7.1.1-ubuntu22.04-rccl-2.27.7-012126.1

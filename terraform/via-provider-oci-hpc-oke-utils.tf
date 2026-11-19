@@ -31,9 +31,6 @@ resource "helm_release" "oci_hpc_oke_utils" {
       defaultTopology = var.slinky_topology_default
       blockSizes      = var.slinky_topology_block_sizes
     }
-    prepuller = {
-      enabled = var.install_image_prepuller
-    }
     hostexec = {
       enabled = var.install_hostexec
     }

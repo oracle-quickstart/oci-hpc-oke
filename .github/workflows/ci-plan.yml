@@ -244,7 +244,7 @@ jobs:
           WORKER_GPU_AD: ${{ vars.WORKER_GPU_AD }}
           WORKER_GPU_IMAGE_CUSTOM_ID: ${{ vars.WORKER_GPU_IMAGE_CUSTOM_ID }}
           SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
-        run: go test -v -count=1 -run TestValidation -timeout 30m ./...
+        run: go test -v -count=1 -run 'TestValidation|TestImageCacheValidation|TestBaseVars' -timeout 30m ./...
 
   # ---------------------------------------------------------------------------
   # Terraform plan smoke tests: run terraform plan (no apply) across multiple

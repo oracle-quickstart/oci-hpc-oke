@@ -20,6 +20,7 @@ Engine (OKE). For deployment and project overview, see the
 
 - [Images to Use for Worker Nodes](./worker-node-images.md): OS images with GPU drivers and RDMA support to use for all worker pools.
 - [Importing Container Images from OCI File Storage Service Using Skopeo](./importing-images-from-fss-skopeo.md): Import container images from OCI File Storage using Skopeo.
+- [GPU image caching with kube-fledged](./image-caching.md): Configure, migrate, and validate GPU container image caches.
 - [oci-hpc-oke-utils](./oci-hpc-oke-utils.md): Helper utilities for oci-hpc-oke.
 
 ## Running GPU and RDMA workloads

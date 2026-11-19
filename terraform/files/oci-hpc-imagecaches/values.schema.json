@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["groups", "imagePullSecrets"],
+  "properties": {
+    "groups": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["images", "nodeSelector"],
+        "additionalProperties": false,
+        "properties": {
+          "images": {"type": "array", "items": {"type": "string", "minLength": 1, "pattern": "\\S"}},
+          "nodeSelector": {"type": "object", "additionalProperties": {"type": "string"}}
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {"name": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}
