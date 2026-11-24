@@ -258,7 +258,7 @@ jobs:
           ENABLED=$(jq -r '[.install_kube_fledged, .install_image_prepuller] | any(. == true or . == "true")' variables.json)
           echo "RUN_IMAGE_CACHE_HEALTH_CHECKS=$ENABLED" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5
         if: env.RUN_IMAGE_CACHE_HEALTH_CHECKS == 'true'
         with:
           go-version-file: test/go.mod
