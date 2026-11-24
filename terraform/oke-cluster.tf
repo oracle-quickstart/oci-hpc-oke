@@ -243,7 +243,7 @@ locals {
         lookup(var.subnet_advanced_attrs, "pods", {})
       )
       bastion_service = merge(
-        # bastion-service.tf creates this subnet. The entry only carries its CIDR.
+        # Only bastion-service.tf uses this entry. "never" stops the module from adding a duplicate subnet.
         { create = "never" },
         (var.create_vcn && var.bastion_service_sn_cidr == null) || (!var.create_vcn && !var.custom_subnet_ids) ?
         { newbits = 11, netnum = 4 } : {},
