@@ -3,7 +3,7 @@
 
 # Terraform
 output "state_id" { value = module.oke.state_id }
-output "stack_version" { value = "v26.9.0" }
+output "stack_version" { value = "v26.11.0" }
 
 # Network
 output "vcn_id" { value = module.oke.vcn_id }

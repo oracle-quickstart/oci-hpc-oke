@@ -6,14 +6,14 @@ locals {
   workers_subnet_cidr = (var.create_oci_bastion_service && var.bastion_service_allow_worker_ssh ?
     (var.custom_subnet_ids ?
       one(data.oci_core_subnet.workers_bastion_svc[*].cidr_block) :
-      lookup(local.subnets["workers"], "cidr", cidrsubnet(local.vcn_cidr, lookup(local.subnets["workers"], "newbits"), lookup(local.subnets["workers"], "netnum")))
+      try(local.subnets["workers"].cidr, cidrsubnet(local.vcn_cidr, local.subnets["workers"].newbits, local.subnets["workers"].netnum))
     ) :
     null
   )
   bastion_service_subnet_cidr = (var.create_oci_bastion_service ?
     (var.custom_subnet_ids ?
       one(data.oci_core_subnet.bastion_service.*.cidr_block) :
-      lookup(local.subnets["bastion_service"], "cidr", cidrsubnet(local.vcn_cidr, lookup(local.subnets["bastion_service"], "newbits"), lookup(local.subnets["bastion_service"], "netnum")))
+      try(local.subnets["bastion_service"].cidr, cidrsubnet(local.vcn_cidr, local.subnets["bastion_service"].newbits, local.subnets["bastion_service"].netnum))
     ) :
     null
   )
