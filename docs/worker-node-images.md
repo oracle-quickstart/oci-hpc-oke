@@ -14,19 +14,19 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/_rIGL48EfDt7jgiuwzEpADRV_bjNfwMGTsSa54qB7wa6JhhwIZBflFN_DAa1rDb8/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.29-0.oci)
-- [GPU driver 580.178.04 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/SKUnxF5sV6C7wnIYfOGQwy9LF6-_62zHDljaI1lG2NExAajsoUmjUu5h2vg93asK/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.29-0.oci)
+- [GPU driver 580.196.07 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/osB3J4-ciVUfoA0BVjmh8wVMp5rgsBAC24CdeywkvKx-_2iHXUXLZxPohJguV6d9/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-6.8-DOCA-OFED-3.2.3-GPU-580.196.07-OPEN-CUDA-13.2-LTS-2026.11.25-0)
 
-#### 6.17 Kernel
+- [GPU driver 620 & CUDA 13.5](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/3mSUQn6AC-ATWf6PsG53wJ7bIK_ovrdBaoCFCvRNXxJoyiuR2iOY7d9jvFQjNM8F/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-NVIDIA-6.8-DOCA-OFED-3.6.0-GPU-620-OPEN-CUDA-13.5-2026.11.25-0)
 
-- [GPU driver 595 & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/nddvOzZ9qEpQnTGsvjU3n0tiPBOFfIb4S4uoEdteGaHMLgtwokfYWkl0yPVNhUDM/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.29-0.oci)
+#### 7 Kernel
+
+- [GPU driver 620 & CUDA 13.5](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/AwvnoRIKTvuDFzf_-irngLCB5yEF4AdbdCwA2v8u1_GTto7EqYKKlVWXZFhKQGJv/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-7-DOCA-OFED-3.6.0-GPU-620-OPEN-CUDA-13.5-2026.11.25-0)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/Ep3DfojJtSW73bPrmyXjC_Va73L8yNfSpDHgE3FD6xSk3F1fPHdAdxobreyOy24J/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.29-0.oci)
-- [GPU driver 580.178.04 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/vsZ9bxM8UBgotEKqvQklEJuiXKJSExgdy8nhtb_PwPzWmagLxwOOx46QKyBlYsYB/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.09.18-0-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.29-0.oci)
+- [GPU driver 580.196.07 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/LRpUoD7n_CST4l-svO8r7LuIoLoVnqi-OY6qQWUdE-UTUJr7IigcEOnwM5k4oIJW/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.11.05-0-6.8-DOCA-OFED-3.2.3-GPU-580.196.07-OPEN-CUDA-13.2-LTS-2026.11.25-0)
 
 ## BM.GPU.GB200.4, BM.GPU.GB200-v3.4, BM.GPU.GB300.4
 
@@ -34,18 +34,18 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [GPU driver 580.178.04 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/j7s6BOI5Zm_aZWSfiDar2MG_tnlOav9UH7FKFam-y1Yr6aKaCkPqnn4AIS6TdajN/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.29-0.oci)
+- [GPU driver 580.196.07 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/Uq1aUHf_SBzm2tzs-uucXlcELCVu7WF3u9a57IQZyxnQdAKcAiMAzNDeX1nw0ygI/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-aarch64-2026.11.05-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.196.07-OPEN-CUDA-13.2-LTS-2026.11.25-0)
+- [GPU driver 620 & CUDA 13.5](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/Wj1xMGDLOjPyNlUtL2mNGJVCLTV5tBEBEJmSq2bkpjWDn0S7GqqdSMLLkSx4Egu7/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-aarch64-2026.11.05-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.6.0-GPU-620-OPEN-CUDA-13.5-2026.11.25-0)
 
-#### 6.17 Kernel
+#### 7 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/jnuCWYjvI9xFWZKierf01gCYIgZHwKR7pSXox7JqI5xGHTKwuR44F1YY4zf_t9SZ/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.17-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.29-0.oci)
+- [GPU driver 620 & CUDA 13.5](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/m1Kef0X-ZGW8tXc5dXDnNHPTb0ueJ42OoihSadSHWi71NipSbRPvSpcK5J9QklEM/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-aarch64-2026.11.05-0-KERNEL-NVIDIA-64K-7-DOCA-OFED-3.6.0-GPU-620-OPEN-CUDA-13.5-2026.11.25-0)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [GPU driver 595 & CUDA 13.2](https://idxzjcdglx2s.objectstorage.eu-frankfurt-1.oci.customer-oci.com/p/ZPwaXxeidz3BPrdzEQt_9r-CnrWWOUR_DQ7sB60j3-lqq5bXhLL0LF43J-QYGaua/n/idxzjcdglx2s/b/oci-hpc-image-builds/o/images/release/2026.10.19/Canonical-Ubuntu-22.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.5.0-GPU-595-OPEN-CUDA-13.2-2026.10.19-0.oci)
-- [GPU driver 580.178.04 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/chmNpigaBNeyhfqyLc0T9YpR4Di2oVaCnCpd9lID4IWidGevIWMSntOCDa74mhmx/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-aarch64-2026.09.18-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.178.04-OPEN-CUDA-13.2-LTS-2026.10.29-0.oci)
+- [GPU driver 580.196.07 LTS & CUDA 13.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/DWTmY5iCtl16k8xh6eGenY54PGVEERX7npEiBe69or3xnVN-TEGlR3ZvBlEGEQ7N/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-aarch64-2026.11.05-0-KERNEL-NVIDIA-64K-6.8-DOCA-OFED-3.2.3-GPU-580.196.07-OPEN-CUDA-13.2-LTS-2026.11.25-0)
 
 ## BM.GPU.MI300X.8, BM.GPU.MI355X-v1.8
 
