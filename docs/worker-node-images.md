@@ -53,17 +53,15 @@ You can use the instructions [here](https://docs.oracle.com/en-us/iaas/Content/C
 
 #### 6.8 Kernel
 
-- [ROCm 10.0](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/byxi1DomviLYjh3Z3XKCu_7lzMw-01euto-y0vMTauqHOa29Y-EI6ECim47fmIOB/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci)
+- [ROCm 7.14](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/wq7ZlLcf8zjB1swc8Ym8iIQv0P_j-m1-3pYIcTJU81Iu8Cc-pBM4DBxPMP-TUc7K/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-7141-2026.11.25-0)
 
-#### 6.17 Kernel
-
-- [ROCm 10.0](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/qbIFiQEuPJtMfDduQxBMZSYoObW0nLOTayHyL4Qt-pi-azZT6dgEHidcWfZNPcWN/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci)
+- [ROCm 10.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/p8vcRPc8PouX6XWWWYADkuB4LBRl9nMamcndKYO35EIfhC51CexpZvhiSsv1Az-T/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0)
 
 ### Ubuntu 22.04
 
 #### 6.8 Kernel
 
-- [ROCm 10.0](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/8jorRGfJH_bViyBB0aWqFuZwZj25CsiH_rwLcezfmRI4DP0F8upJotURFsHLpf-R/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci)
+- [ROCm 10.2](https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/hb3X2fK8fnZZpHmLj6tyArc9pbJmdMjZ3CQjnATh35ZUskPYeMnzQXfbexXv_Hdw/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0)
 
 ## BM.GPU.MI355X.8
 

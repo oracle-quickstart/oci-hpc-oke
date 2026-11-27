@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-11-26",
+  "updated": "2026-11-27",
   "images": [
     {
       "shapes": [
@@ -180,11 +180,11 @@
       "kernel": "6.8",
       "arch": "x86_64",
       "vendor": "amd",
-      "gpu_driver": "10.0",
+      "gpu_driver": "7.14.1",
       "cuda": null,
-      "name": "Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci",
-      "release_date": "2026-10-29",
-      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/byxi1DomviLYjh3Z3XKCu_7lzMw-01euto-y0vMTauqHOa29Y-EI6ECim47fmIOB/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci"
+      "name": "Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-7141-2026.11.25-0",
+      "release_date": "2026-11-25",
+      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/wq7ZlLcf8zjB1swc8Ym8iIQv0P_j-m1-3pYIcTJU81Iu8Cc-pBM4DBxPMP-TUc7K/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-7141-2026.11.25-0"
     },
     {
       "shapes": [
@@ -193,14 +193,14 @@
       ],
       "os": "Ubuntu",
       "os_version": "24.04",
-      "kernel": "6.17",
+      "kernel": "6.8",
       "arch": "x86_64",
       "vendor": "amd",
-      "gpu_driver": "10.0",
+      "gpu_driver": "10.2",
       "cuda": null,
-      "name": "Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci",
-      "release_date": "2026-10-29",
-      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/qbIFiQEuPJtMfDduQxBMZSYoObW0nLOTayHyL4Qt-pi-azZT6dgEHidcWfZNPcWN/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.09.18-0-KERNEL-ORACLE-6.17-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci"
+      "name": "Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0",
+      "release_date": "2026-11-25",
+      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/p8vcRPc8PouX6XWWWYADkuB4LBRl9nMamcndKYO35EIfhC51CexpZvhiSsv1Az-T/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-24.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0"
     },
     {
       "shapes": [
@@ -212,11 +212,11 @@
       "kernel": "6.8",
       "arch": "x86_64",
       "vendor": "amd",
-      "gpu_driver": "10.0",
+      "gpu_driver": "10.2",
       "cuda": null,
-      "name": "Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci",
-      "release_date": "2026-10-29",
-      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/8jorRGfJH_bViyBB0aWqFuZwZj25CsiH_rwLcezfmRI4DP0F8upJotURFsHLpf-R/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.09.18-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.5.0-AMD-ROCM-10.0-2026.10.29-0.oci"
+      "name": "Canonical-Ubuntu-22.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0",
+      "release_date": "2026-11-25",
+      "url": "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/hb3X2fK8fnZZpHmLj6tyArc9pbJmdMjZ3CQjnATh35ZUskPYeMnzQXfbexXv_Hdw/n/idxzjcdglx2s/b/hpc-images/o/Canonical-Ubuntu-22.04-2026.11.05-0-KERNEL-ORACLE-6.8-DOCA-OFED-3.6.0-AMD-ROCM-10.2-2026.11.25-0"
     },
     {
       "shapes": [
